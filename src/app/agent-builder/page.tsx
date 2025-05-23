@@ -76,7 +76,7 @@ export default function AgentBuilderPage() {
     toast({
       title: "Formulário Limpo",
       description: "Você pode começar a configurar um novo agente.",
-      action: <Info className="text-blue-500" />, // Using a more appropriate color
+      action: <Info className="text-blue-500" />,
     });
   };
 
@@ -103,7 +103,7 @@ export default function AgentBuilderPage() {
       model: agentModel,
       temperature: agentTemperature[0],
       version: agentVersion,
-      tools: agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean), // Save tool labels
+      tools: agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean), 
     };
     console.log("Configuração do Agente Salva:", agentConfiguration);
     toast({
@@ -140,7 +140,7 @@ export default function AgentBuilderPage() {
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-3"> {/* Changed lg:col-span-2 to lg:col-span-3 */}
           <CardHeader>
             <CardTitle>Configuração do Agente</CardTitle>
             <CardDescription>Defina as propriedades e configurações principais para o seu agente.</CardDescription>
@@ -321,46 +321,7 @@ export default function AgentBuilderPage() {
             </Button>
           </CardFooter>
         </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Workflow className="w-6 h-6 text-primary" />
-                Designer de Fluxo Visual (Conceito / Futuro)
-              </CardTitle>
-              <CardDescription>
-                Conceitualmente, esta seria uma interface de arrastar e soltar para modelar a lógica do seu agente. 
-                Você poderia adicionar etapas como: receber entrada do usuário, chamar um modelo de IA (Prompt Genkit), usar ferramentas (Tools Genkit), executar lógica condicional e formatar a saída.
-                Cada fluxo visual seria traduzido para um fluxo Genkit em TypeScript nos bastidores, permitindo tanto a facilidade visual quanto o poder do código.
-                Esta funcionalidade permitiria construir visualmente como o agente decide qual ferramenta usar e em que ordem executar as tarefas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Image 
-                src="https://placehold.co/600x400.png"
-                alt="Diagrama conceitual de um fluxo de trabalho visual para agentes de IA"
-                width={600}
-                height={400}
-                className="rounded-md aspect-video object-cover opacity-70"
-                data-ai-hint="fluxograma diagrama interface"
-              />
-              <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes, simplificando a criação de lógicas complexas que seriam implementadas com Genkit.</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Dicas Rápidas</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2 text-muted-foreground">
-              <p>• Defina claramente o <strong>objetivo</strong> e as <strong>tarefas</strong> do seu agente para melhor assistência da IA.</p>
-              <p>• As <strong>ferramentas</strong> selecionadas serão mencionadas no prompt do sistema para que o agente saiba que pode usá-las.</p>
-              <p>• Experimente diferentes <strong>temperaturas</strong> para ajustar a criatividade.</p>
-              <p>• Seja específico nas <strong>restrições</strong> para evitar comportamentos indesejados.</p>
-              <p>• Teste seu agente frequentemente durante o desenvolvimento na seção "Chat com Agentes".</p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Removed the div that contained the Visual Flow Designer and Quick Tips cards */}
       </div>
     </div>
   );
