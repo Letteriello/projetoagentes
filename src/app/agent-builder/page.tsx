@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface AvailableTool {
   id: string;
@@ -42,54 +43,95 @@ const agentToneOptions = [
     { id: "creative", label: "Criativo e Inspirador" },
 ];
 
-interface AgentConfig {
+const agentTypeOptions = [
+  { id: "llm", label: "Agente LLM (Foco em Linguagem e Decisão)" },
+  { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)" },
+  { id: "custom", label: "Agente Personalizado (Lógica Customizada via Genkit)" },
+];
+
+interface AgentConfigBase {
   agentName: string;
   agentDescription: string;
+  agentVersion: string;
+  agentTools: string[];
+}
+
+interface LLMAgentConfig extends AgentConfigBase {
+  agentType: "llm";
   agentGoal: string;
   agentTasks: string;
   agentPersonality: string;
   agentRestrictions: string;
   agentModel: string;
   agentTemperature: number;
-  agentVersion: string;
-  agentTools: string[];
 }
+
+interface WorkflowAgentConfig extends AgentConfigBase {
+  agentType: "workflow";
+  workflowDescription: string;
+   // LLM fields that might be irrelevant for a pure workflow agent
+  agentGoal?: string;
+  agentTasks?: string;
+  agentPersonality?: string;
+  agentRestrictions?: string;
+  agentModel?: string;
+  agentTemperature?: number;
+}
+
+interface CustomAgentConfig extends AgentConfigBase {
+  agentType: "custom";
+  customLogicDescription: string;
+  // LLM fields that might be irrelevant for a custom agent
+  agentGoal?: string;
+  agentTasks?: string;
+  agentPersonality?: string;
+  agentRestrictions?: string;
+  agentModel?: string;
+  agentTemperature?: number;
+}
+
+type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig;
 
 interface AgentTemplate {
   id: string;
   name: string;
-  config: AgentConfig;
+  config: AgentConfig; // Can be any of the specific config types
 }
 
 interface SavedAgentConfiguration extends AgentConfig {
-  id: string;
-  templateId: string;
-  systemPromptGenerated: string;
+  id: string; // Unique ID for the saved agent instance
+  templateId: string; // ID of the template used, if any
+  systemPromptGenerated?: string; // Only for LLM agents
   toolsLabels: string[];
 }
 
+const defaultLLMConfig: Omit<LLMAgentConfig, keyof AgentConfigBase | 'agentType'> = {
+  agentGoal: "",
+  agentTasks: "",
+  agentPersonality: agentToneOptions[0].label,
+  agentRestrictions: "",
+  agentModel: "googleai/gemini-2.0-flash",
+  agentTemperature: 0.7,
+};
 
 const agentTemplates: AgentTemplate[] = [
   {
-    id: "custom",
-    name: "Personalizado (Começar do Zero)",
+    id: "custom_llm",
+    name: "LLM Personalizado (Começar do Zero)",
     config: {
+      agentType: "llm",
       agentName: "",
       agentDescription: "",
-      agentGoal: "",
-      agentTasks: "",
-      agentPersonality: agentToneOptions[0].label,
-      agentRestrictions: "",
-      agentModel: "googleai/gemini-2.0-flash",
-      agentTemperature: 0.7,
       agentVersion: "1.0.0",
       agentTools: [],
+      ...defaultLLMConfig,
     },
   },
   {
     id: "support",
-    name: "Modelo: Agente de Suporte ao Cliente",
+    name: "Modelo: Agente de Suporte ao Cliente (LLM)",
     config: {
+      agentType: "llm",
       agentName: "Agente de Suporte ao Cliente",
       agentDescription: "Um agente prestativo para responder a perguntas comuns de clientes e ajudar com problemas.",
       agentGoal: "Fornecer suporte rápido e eficiente aos clientes.",
@@ -104,8 +146,9 @@ const agentTemplates: AgentTemplate[] = [
   },
   {
     id: "recommendation",
-    name: "Modelo: Agente de Recomendações",
+    name: "Modelo: Agente de Recomendações (LLM)",
     config: {
+      agentType: "llm",
       agentName: "Agente de Recomendações de Produtos",
       agentDescription: "Um agente para ajudar usuários a descobrir e escolher produtos ou serviços.",
       agentGoal: "Aumentar o engajamento e as vendas sugerindo itens relevantes com base nas necessidades do usuário.",
@@ -120,8 +163,9 @@ const agentTemplates: AgentTemplate[] = [
   },
   {
     id: "writer",
-    name: "Modelo: Assistente de Escrita Criativa",
+    name: "Modelo: Assistente de Escrita Criativa (LLM)",
     config: {
+      agentType: "llm",
       agentName: "Assistente de Escrita Criativa",
       agentDescription: "Um agente para ajudar a gerar ideias, esboços e rascunhos de conteúdo.",
       agentGoal: "Auxiliar na criação de conteúdo escrito original e envolvente, como posts de blog, e-mails ou descrições.",
@@ -141,38 +185,98 @@ export default function AgentBuilderPage() {
   const { toast } = useToast();
 
   const [selectedAgentTemplateId, setSelectedAgentTemplateId] = React.useState<string>(agentTemplates[0].id);
+  const [agentType, setAgentType] = React.useState<AgentConfig["agentType"]>(agentTemplates[0].config.agentType);
   
   const [agentName, setAgentName] = React.useState(agentTemplates[0].config.agentName);
   const [agentDescription, setAgentDescription] = React.useState(agentTemplates[0].config.agentDescription);
-  const [agentGoal, setAgentGoal] = React.useState(agentTemplates[0].config.agentGoal);
-  const [agentTasks, setAgentTasks] = React.useState(agentTemplates[0].config.agentTasks);
-  const [agentPersonality, setAgentPersonality] = React.useState(agentTemplates[0].config.agentPersonality);
-  const [agentRestrictions, setAgentRestrictions] = React.useState(agentTemplates[0].config.agentRestrictions);
-  const [agentModel, setAgentModel] = React.useState(agentTemplates[0].config.agentModel);
-  const [agentTemperature, setAgentTemperature] = React.useState([agentTemplates[0].config.agentTemperature]);
   const [agentVersion, setAgentVersion] = React.useState(agentTemplates[0].config.agentVersion);
   const [agentTools, setAgentTools] = React.useState<string[]>(agentTemplates[0].config.agentTools);
 
+  // LLM Specific State
+  const [agentGoal, setAgentGoal] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentGoal || "" );
+  const [agentTasks, setAgentTasks] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentTasks || "" );
+  const [agentPersonality, setAgentPersonality] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentPersonality || agentToneOptions[0].label );
+  const [agentRestrictions, setAgentRestrictions] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentRestrictions || "" );
+  const [agentModel, setAgentModel] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentModel || "googleai/gemini-2.0-flash" );
+  const [agentTemperature, setAgentTemperature] = React.useState( [(agentTemplates[0].config as LLMAgentConfig).agentTemperature || 0.7] );
+  
+  // Workflow Specific State
+  const [workflowDescription, setWorkflowDescription] = React.useState("");
+
+  // Custom Specific State
+  const [customLogicDescription, setCustomLogicDescription] = React.useState("");
+
   const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
+
+  const resetLLMFields = (config: Partial<LLMAgentConfig>) => {
+    setAgentGoal(config.agentGoal || defaultLLMConfig.agentGoal);
+    setAgentTasks(config.agentTasks || defaultLLMConfig.agentTasks);
+    setAgentPersonality(config.agentPersonality || defaultLLMConfig.agentPersonality);
+    setAgentRestrictions(config.agentRestrictions || defaultLLMConfig.agentRestrictions);
+    setAgentModel(config.agentModel || defaultLLMConfig.agentModel);
+    setAgentTemperature([config.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : config.agentTemperature]);
+  };
+  
+  const resetWorkflowFields = () => {
+    setWorkflowDescription("");
+  }
+  const resetCustomLogicFields = () => {
+    setCustomLogicDescription("");
+  }
 
   const handleTemplateChange = (templateId: string) => {
     const template = agentTemplates.find(t => t.id === templateId);
     if (template) {
       setSelectedAgentTemplateId(templateId);
+      setAgentType(template.config.agentType); // Set agent type from template
       setAgentName(template.config.agentName);
       setAgentDescription(template.config.agentDescription);
-      setAgentGoal(template.config.agentGoal);
-      setAgentTasks(template.config.agentTasks);
-      setAgentPersonality(template.config.agentPersonality);
-      setAgentRestrictions(template.config.agentRestrictions);
-      setAgentModel(template.config.agentModel);
-      setAgentTemperature([template.config.agentTemperature]);
       setAgentVersion(template.config.agentVersion);
       setAgentTools(template.config.agentTools);
+
+      if (template.config.agentType === 'llm') {
+        const llmConfig = template.config as LLMAgentConfig;
+        resetLLMFields(llmConfig);
+        resetWorkflowFields();
+        resetCustomLogicFields();
+      } else if (template.config.agentType === 'workflow') {
+        // For now, templates are LLM based. If we add workflow templates, handle here.
+        resetLLMFields({}); // Reset to default LLM fields or clear them
+        setWorkflowDescription((template.config as WorkflowAgentConfig).workflowDescription || "");
+        resetCustomLogicFields();
+      } else if (template.config.agentType === 'custom') {
+        // For now, templates are LLM based. If we add custom templates, handle here.
+        resetLLMFields({});
+        resetWorkflowFields();
+        setCustomLogicDescription((template.config as CustomAgentConfig).customLogicDescription || "");
+      }
+    }
+  };
+
+  const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
+    setAgentType(newAgentType);
+    // When type changes, we might want to reset fields of other types
+    // For simplicity now, it doesn't auto-clear, user can use "Criar Novo Agente"
+    // or select a template which will reset fields.
+    // Or we can reset specific fields:
+    if (newAgentType === 'llm') {
+        resetWorkflowFields();
+        resetCustomLogicFields();
+        // Optionally, re-apply default LLM config if coming from another type without a template change
+        if (selectedAgentTemplateId === agentTemplates[0].id) { // "Personalizado (Começar do Zero)"
+            resetLLMFields(defaultLLMConfig);
+        }
+    } else if (newAgentType === 'workflow') {
+        resetLLMFields({}); // Clear or default LLM fields
+        resetCustomLogicFields();
+    } else if (newAgentType === 'custom') {
+        resetLLMFields({}); // Clear or default LLM fields
+        resetWorkflowFields();
     }
   };
 
   const constructSystemPrompt = () => {
+    if (agentType !== 'llm') return "";
     let prompt = "";
     if (agentGoal) prompt += `Objetivo Principal: ${agentGoal}\n\n`;
     if (agentTasks) prompt += `Tarefas Principais:\n${agentTasks}\n\n`;
@@ -188,62 +292,91 @@ export default function AgentBuilderPage() {
   };
 
   const handleCreateNewAgent = () => {
-    const customTemplate = agentTemplates[0]; // "Personalizado (Começar do Zero)"
+    const customTemplate = agentTemplates[0]; // "LLM Personalizado (Começar do Zero)"
     setSelectedAgentTemplateId(customTemplate.id);
+    setAgentType(customTemplate.config.agentType); // Default to LLM for new
     setAgentName(customTemplate.config.agentName);
     setAgentDescription(customTemplate.config.agentDescription);
-    setAgentGoal(customTemplate.config.agentGoal);
-    setAgentTasks(customTemplate.config.agentTasks);
-    setAgentPersonality(customTemplate.config.agentPersonality);
-    setAgentRestrictions(customTemplate.config.agentRestrictions);
-    setAgentModel(customTemplate.config.agentModel);
-    setAgentTemperature([customTemplate.config.agentTemperature]);
     setAgentVersion(customTemplate.config.agentVersion);
     setAgentTools(customTemplate.config.agentTools);
+    
+    resetLLMFields(defaultLLMConfig);
+    resetWorkflowFields();
+    resetCustomLogicFields();
+
     toast({
       title: "Formulário Limpo",
-      description: "Você pode começar a configurar um novo agente personalizado.",
+      description: "Você pode começar a configurar um novo agente.",
       action: <Info className="text-blue-500" />,
     });
   };
 
   const handleSaveConfiguration = () => {
-    if (!agentName || !agentModel) {
+    if (!agentName) {
       toast({
-        title: "Campos Obrigatórios",
-        description: "Nome do Agente e Modelo de IA são obrigatórios.",
+        title: "Campo Obrigatório",
+        description: "Nome do Agente é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (agentType === 'llm' && !agentModel) {
+       toast({
+        title: "Campo Obrigatório para Agente LLM",
+        description: "Modelo de IA é obrigatório para Agentes LLM.",
         variant: "destructive",
       });
       return;
     }
 
-    const systemPrompt = constructSystemPrompt();
+
+    const systemPrompt = agentType === 'llm' ? constructSystemPrompt() : undefined;
     const selectedToolLabels = agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean) as string[];
 
+    let newAgentConfiguration: SavedAgentConfiguration;
 
-    const newAgentConfiguration: SavedAgentConfiguration = {
-      id: `agent-${Date.now()}`, // Simple unique ID
-      templateId: selectedAgentTemplateId,
-      agentName: agentName,
-      agentDescription: agentDescription,
-      agentGoal: agentGoal,
-      agentTasks: agentTasks,
-      agentPersonality: agentPersonality,
-      agentRestrictions: agentRestrictions,
-      systemPromptGenerated: systemPrompt,
-      agentModel: agentModel,
-      agentTemperature: agentTemperature[0],
-      agentVersion: agentVersion,
-      agentTools: agentTools, // Store IDs
-      toolsLabels: selectedToolLabels // Store labels for display
+    const baseSavedConfig = {
+        id: `agent-${Date.now()}`,
+        templateId: selectedAgentTemplateId,
+        agentName,
+        agentDescription,
+        agentVersion,
+        agentTools,
+        toolsLabels: selectedToolLabels,
     };
+
+    if (agentType === 'llm') {
+      newAgentConfiguration = {
+        ...baseSavedConfig,
+        agentType: 'llm',
+        agentGoal,
+        agentTasks,
+        agentPersonality,
+        agentRestrictions,
+        agentModel,
+        agentTemperature: agentTemperature[0],
+        systemPromptGenerated: systemPrompt,
+      };
+    } else if (agentType === 'workflow') {
+      newAgentConfiguration = {
+        ...baseSavedConfig,
+        agentType: 'workflow',
+        workflowDescription,
+      };
+    } else { // custom
+      newAgentConfiguration = {
+        ...baseSavedConfig,
+        agentType: 'custom',
+        customLogicDescription,
+      };
+    }
     
     setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
 
     console.log("Configuração do Agente Salva:", newAgentConfiguration);
     toast({
       title: "Configuração Salva!",
-      description: `O agente "${agentName}" foi adicionado à lista de agentes criados.`,
+      description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label}) foi adicionado à lista.`,
     });
   };
   
@@ -271,148 +404,222 @@ export default function AgentBuilderPage() {
       </header>
       
       <p className="text-muted-foreground">
-        Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir as capacidades, ferramentas e comportamento do seu agente, utilizando os modelos de IA do Google (como Gemini) via Genkit.
+        Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir o tipo, capacidades, ferramentas e comportamento do seu agente.
+        A plataforma visa permitir a criação de diversos tipos de agentes, incluindo aqueles baseados em LLMs, fluxos de trabalho estruturados e lógicas customizadas, com o objetivo futuro de suportar sistemas multiagentes complexos.
       </p>
 
       <Card>
         <CardHeader>
           <CardTitle>Configuração do Agente</CardTitle>
-          <CardDescription>Defina as propriedades e configurações principais para o seu agente. Você pode começar com um modelo ou criar um agente personalizado.</CardDescription>
+          <CardDescription>Defina as propriedades e configurações principais para o seu agente. Você pode começar com um modelo ou criar um agente personalizado escolhendo seu tipo.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="agentTemplate" className="flex items-center gap-1.5"><Layers size={16}/>Modelo de Agente Inicial</Label>
-            <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange}>
-              <SelectTrigger id="agentTemplate">
-                <SelectValue placeholder="Selecione um modelo para começar" />
-              </SelectTrigger>
-              <SelectContent>
-                {agentTemplates.map(template => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="agentTemplate" className="flex items-center gap-1.5"><Layers size={16}/>Modelo de Agente Inicial</Label>
+              <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange}>
+                <SelectTrigger id="agentTemplate">
+                  <SelectValue placeholder="Selecione um modelo para começar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentTemplates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Modelos pré-configuram o tipo de agente e seus campos.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agentType" className="flex items-center gap-1.5"><Share2 size={16}/>Tipo de Agente</Label>
+              <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentConfig["agentType"])}>
+                <SelectTrigger id="agentType">
+                  <SelectValue placeholder="Selecione o tipo de agente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentTypeOptions.map(option => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Define a arquitetura e o comportamento fundamental do agente.</p>
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="agentName">Nome do Agente</Label>
             <Input 
               id="agentName" 
-              placeholder="ex: Agente de Suporte ao Cliente Avançado" 
+              placeholder="ex: Agente de Suporte Avançado" 
               value={agentName}
               onChange={(e) => setAgentName(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="agentDescription">Descrição</Label>
+            <Label htmlFor="agentDescription">Descrição Geral do Agente</Label>
             <Textarea 
               id="agentDescription" 
-              placeholder="Descreva a função principal e o objetivo deste agente..." 
+              placeholder="Descreva a função principal e o objetivo geral deste agente, independente do tipo..." 
               value={agentDescription}
               onChange={(e) => setAgentDescription(e.target.value)}
             />
           </div>
-
-          <Separator />
-          <div>
-            <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções do Agente</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Forneça instruções claras para guiar o comportamento do seu agente. As respostas abaixo ajudarão a construir o "Prompt do Sistema" ideal.
-            </p>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
-                <Input 
-                  id="agentGoal" 
-                  placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos e resolver problemas comuns." 
-                  value={agentGoal}
-                  onChange={(e) => setAgentGoal(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
-                <Textarea 
-                  id="agentTasks" 
-                  placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos. 3. Indicar onde comprar. 4. Realizar busca na web por informações atualizadas." 
-                  value={agentTasks}
-                  onChange={(e) => setAgentTasks(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
-                <Select value={agentPersonality} onValueChange={setAgentPersonality}>
-                  <SelectTrigger id="agentPersonality">
-                    <SelectValue placeholder="Selecione um tom/personalidade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentToneOptions.map(option => (
-                      <SelectItem key={option.id} value={option.label}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma informação específica ou restrição importante?</Label>
-                <Textarea 
-                  id="agentRestrictions" 
-                  placeholder="ex: Nunca fornecer informações de contato direto. Não inventar funcionalidades que não existem. Sempre verificar informações da base de conhecimento antes de buscar na web." 
-                  value={agentRestrictions}
-                  onChange={(e) => setAgentRestrictions(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            </div>
-          </div>
-
+          
           <Separator />
 
-          <div>
-            <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Escolha o modelo de IA que será o "cérebro" do seu agente. O Genkit é responsável por conectar-se a estes modelos. 
-                  Para modelos do Google, a integração é direta. Para opções como OpenRouter ou outros endpoints HTTP, 
-                  uma configuração de "Ferramenta" Genkit correspondente pode ser necessária para definir como o AgentVerse deve interagir com eles 
-                  (geralmente gerenciando a chave API através do Cofre de Chaves).
+          {/* Conditional Fields based on Agent Type */}
+          {agentType === 'llm' && (
+            <>
+              <div>
+                <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções (Agente LLM)</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Forneça instruções claras para guiar o comportamento do seu agente LLM. As respostas abaixo ajudarão a construir o "Prompt do Sistema" ideal.
                 </p>
-                <Select value={agentModel} onValueChange={setAgentModel}>
-                  <SelectTrigger id="agentModel">
-                    <SelectValue placeholder="Selecione um modelo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
-                    <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
-                    <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
-                    <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
-                    <SelectItem value="openrouter/custom">OpenRouter (requer configuração de Ferramenta Genkit)</SelectItem>
-                    <SelectItem value="requestly/custom">Requestly Mock (requer configuração de Ferramenta Genkit)</SelectItem>
-                    <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente LLM?</Label>
+                    <Input 
+                      id="agentGoal" 
+                      placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos." 
+                      value={agentGoal}
+                      onChange={(e) => setAgentGoal(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente LLM deve realizar?</Label>
+                    <Textarea 
+                      id="agentTasks" 
+                      placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos." 
+                      value={agentTasks}
+                      onChange={(e) => setAgentTasks(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente LLM?</Label>
+                    <Select value={agentPersonality} onValueChange={setAgentPersonality}>
+                      <SelectTrigger id="agentPersonality">
+                        <SelectValue placeholder="Selecione um tom/personalidade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agentToneOptions.map(option => (
+                          <SelectItem key={option.id} value={option.label}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma restrição ou informação importante para o agente LLM?</Label>
+                    <Textarea 
+                      id="agentRestrictions" 
+                      placeholder="ex: Nunca fornecer informações de contato direto." 
+                      value={agentRestrictions}
+                      onChange={(e) => setAgentRestrictions(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="agentTemperature">Temperatura: {agentTemperature[0].toFixed(1)}</Label>
-                <Slider
-                  id="agentTemperature"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={agentTemperature}
-                  onValueChange={setAgentTemperature}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Controla a criatividade da resposta. Baixo = mais focado e direto, Alto = mais criativo e variado.
-                </p>
+              <Separator />
+              <div>
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo (Agente LLM)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
+                     <p className="text-xs text-muted-foreground">
+                      Escolha o modelo de IA para o agente LLM.
+                    </p>
+                    <Select value={agentModel} onValueChange={setAgentModel}>
+                      <SelectTrigger id="agentModel">
+                        <SelectValue placeholder="Selecione um modelo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
+                        <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
+                        <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
+                        <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
+                        <SelectItem value="openrouter/custom">OpenRouter (requer configuração de Ferramenta Genkit)</SelectItem>
+                        <SelectItem value="requestly/custom">Requestly Mock (requer configuração de Ferramenta Genkit)</SelectItem>
+                        <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agentTemperature">Temperatura: {agentTemperature[0].toFixed(1)}</Label>
+                    <Slider
+                      id="agentTemperature"
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      value={agentTemperature}
+                      onValueChange={setAgentTemperature}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Controla a criatividade da resposta. Baixo = focado, Alto = criativo.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
+
+          {agentType === 'workflow' && (
+            <>
+              <div>
+                <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Workflow className="w-5 h-5 text-primary/80" /> Configuração do Fluxo de Trabalho</h3>
+                 <Alert className="mb-4">
+                  <Workflow className="h-4 w-4" />
+                  <AlertTitle>Agente de Fluxo de Trabalho</AlertTitle>
+                  <AlertDescription>
+                    Agentes de fluxo de trabalho controlam a execução de outros agentes ou tarefas em padrões predefinidos (Sequencial, Paralelo, Loop).
+                    Uma interface visual dedicada para desenhar esses fluxos é um recurso planejado para o futuro.
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2">
+                  <Label htmlFor="workflowDescription">Descrição do Fluxo de Trabalho</Label>
+                  <Textarea 
+                    id="workflowDescription" 
+                    placeholder="Descreva as etapas, a ordem e a lógica do seu fluxo de trabalho. Ex: 'Etapa 1: Agente A. Etapa 2 (Paralelo): Agente B e Agente C. Etapa 3: Agente D se resultado de B for X.'" 
+                    value={workflowDescription}
+                    onChange={(e) => setWorkflowDescription(e.target.value)}
+                    rows={6}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {agentType === 'custom' && (
+            <>
+               <div>
+                <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><FileJson className="w-5 h-5 text-primary/80" /> Configuração do Agente Personalizado</h3>
+                <Alert className="mb-4">
+                  <FileJson className="h-4 w-4" />
+                  <AlertTitle>Agente Personalizado</AlertTitle>
+                  <AlertDescription>
+                    Agentes personalizados são criados estendendo a lógica base com fluxos Genkit customizados.
+                    Isto permite implementar lógicas operacionais únicas ou integrações especializadas que não são cobertas pelos tipos padrão. Requer desenvolvimento de código.
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2">
+                  <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
+                  <Textarea 
+                    id="customLogicDescription" 
+                    placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit personalizado implementará. Ex: 'Este agente se conectará a uma API interna de CRM para buscar dados de clientes e então usará um LLM para resumir o histórico do cliente.'" 
+                    value={customLogicDescription}
+                    onChange={(e) => setCustomLogicDescription(e.target.value)}
+                    rows={6}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
 
           <Separator />
           
@@ -433,9 +640,7 @@ export default function AgentBuilderPage() {
             <Card className="bg-muted/10">
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Selecione as ferramentas pré-configuradas que seu agente poderá utilizar. Cada ferramenta representa uma capacidade que o agente pode decidir usar.
-                  Integrações mais complexas ou personalizadas (como interagir com APIs específicas ou usar modelos de outros provedores como o OpenRouter) são configuradas como "Ferramentas Genkit" nos bastidores,
-                  geralmente utilizando chaves armazenadas no "Cofre de Chaves API".
+                  Selecione as ferramentas pré-configuradas que seu agente poderá utilizar. Estas são relevantes para Agentes LLM ou podem ser invocadas por Agentes Personalizados ou etapas de um Fluxo de Trabalho.
                 </p>
                 <div className="space-y-3 pt-2">
                   {availableTools.map((tool) => (
@@ -489,25 +694,50 @@ export default function AgentBuilderPage() {
               {savedAgents.map((agent) => (
                 <Card key={agent.id} className="flex flex-col">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Cpu size={20} className="text-primary" /> 
-                      {agent.agentName || "Agente Sem Nome"}
-                    </CardTitle>
-                    <CardDescription className="line-clamp-2 h-[2.5em]">
+                    <div className="flex justify-between items-start">
+                        <CardTitle className="flex items-center gap-2">
+                        <Cpu size={20} className="text-primary" /> 
+                        {agent.agentName || "Agente Sem Nome"}
+                        </CardTitle>
+                        <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-1 rounded-full">
+                            {agentTypeOptions.find(opt => opt.id === agent.agentType)?.label.split('(')[0].trim() || agent.agentType}
+                        </span>
+                    </div>
+                    <CardDescription className="line-clamp-2 h-[2.5em] pt-1">
                       {agent.agentDescription || "Sem descrição."}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 flex-grow">
-                    <div>
-                      <h4 className="text-sm font-medium mb-1">Objetivo:</h4>
-                      <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
-                        {agent.agentGoal || "Não definido."}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium mb-1">Modelo de IA:</h4>
-                      <p className="text-xs text-muted-foreground">{agent.agentModel}</p>
-                    </div>
+                    {agent.agentType === 'llm' && (
+                        <>
+                            <div>
+                                <h4 className="text-sm font-medium mb-1">Objetivo (LLM):</h4>
+                                <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
+                                    {(agent as LLMAgentConfig).agentGoal || "Não definido."}
+                                </p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-medium mb-1">Modelo de IA:</h4>
+                                <p className="text-xs text-muted-foreground">{(agent as LLMAgentConfig).agentModel}</p>
+                            </div>
+                        </>
+                    )}
+                    {agent.agentType === 'workflow' && (
+                        <div>
+                            <h4 className="text-sm font-medium mb-1">Descrição do Fluxo:</h4>
+                            <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
+                                {(agent as WorkflowAgentConfig).workflowDescription || "Não definida."}
+                            </p>
+                        </div>
+                    )}
+                    {agent.agentType === 'custom' && (
+                        <div>
+                            <h4 className="text-sm font-medium mb-1">Lógica Personalizada:</h4>
+                            <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
+                                {(agent as CustomAgentConfig).customLogicDescription || "Não definida."}
+                            </p>
+                        </div>
+                    )}
                      {agent.toolsLabels.length > 0 && (
                         <div>
                             <h4 className="text-sm font-medium mb-1">Ferramentas:</h4>
@@ -545,6 +775,4 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-    
-
     
