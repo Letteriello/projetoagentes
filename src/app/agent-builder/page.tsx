@@ -83,7 +83,7 @@ export default function AgentBuilderPage() {
       </header>
       
       <p className="text-muted-foreground">
-        Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir as capacidades, ferramentas e comportamento do seu agente.
+        Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir as capacidades, ferramentas e comportamento do seu agente, utilizando os modelos de IA do Google (como Gemini) via Genkit.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -113,18 +113,19 @@ export default function AgentBuilderPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="agentModel">Provedor/Modelo de IA (via Genkit)</Label>
+                <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
                 <p className="text-xs text-muted-foreground">
-                  Selecione o provedor e modelo de IA que seu agente utilizará. A integração é feita através do Genkit. Para opções como OpenRouter, Requestly ou outros endpoints HTTP, você precisará configurar um fluxo Genkit personalizado.
+                  Selecione o modelo de IA que seu agente utilizará. A integração com os modelos do Google e outros provedores é feita através do Genkit. Para opções como OpenRouter ou endpoints HTTP personalizados, você precisará de um fluxo Genkit específico.
                 </p>
                 <Select value={agentModel} onValueChange={setAgentModel}>
                   <SelectTrigger id="agentModel">
-                    <SelectValue placeholder="Selecione um provedor/modelo" />
+                    <SelectValue placeholder="Selecione um modelo" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
                     <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
                     <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
+                    <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
                     <SelectItem value="openrouter/custom">OpenRouter (requer fluxo Genkit)</SelectItem>
                     <SelectItem value="requestly/custom">Requestly (requer fluxo Genkit)</SelectItem>
                     <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Genkit)</SelectItem>
@@ -201,5 +202,4 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
     
