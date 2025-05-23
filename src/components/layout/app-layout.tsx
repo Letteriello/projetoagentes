@@ -35,10 +35,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/agent-builder', icon: <Cpu />, label: 'Agent Builder', tooltip: 'Build Agents' },
-  { href: '/ai-assistant', icon: <Sparkles />, label: 'AI Assistant', tooltip: 'AI Configuration Assistant' },
-  { href: '/agent-monitor', icon: <LineChart />, label: 'Agent Monitor', tooltip: 'Monitor Agents' },
-  { href: '/api-key-vault', icon: <KeyRound />, label: 'API Key Vault', tooltip: 'Manage API Keys' },
+  { href: '/agent-builder', icon: <Cpu />, label: 'Construtor de Agentes', tooltip: 'Construir Agentes' },
+  { href: '/ai-assistant', icon: <Sparkles />, label: 'Assistente de IA', tooltip: 'Assistente de Configuração IA' },
+  { href: '/agent-monitor', icon: <LineChart />, label: 'Monitor de Agentes', tooltip: 'Monitorar Agentes' },
+  { href: '/api-key-vault', icon: <KeyRound />, label: 'Cofre de Chaves API', tooltip: 'Gerenciar Chaves API' },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -80,26 +80,26 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center p-2">
                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="user avatar" />
+                    <AvatarImage src="https://placehold.co/100x100.png" alt="Avatar do Usuário" data-ai-hint="avatar usuário" />
                     <AvatarFallback>AV</AvatarFallback>
                   </Avatar>
-                <span className="ml-2 group-data-[collapsible=icon]:hidden">User Name</span>
+                <span className="ml-2 group-data-[collapsible=icon]:hidden">Nome do Usuário</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="start" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <UserCircle className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <span>Perfil</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Settings2 className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+                <span>Configurações</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
-                <span>Log out</span>
+                <span>Sair</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

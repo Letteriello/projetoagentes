@@ -13,57 +13,57 @@ export default function AgentBuilderPage() {
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Cpu className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Agent Builder</h1>
+          <h1 className="text-3xl font-bold">Construtor de Agentes</h1>
         </div>
         <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New Agent
+          <PlusCircle className="mr-2 h-4 w-4" /> Criar Novo Agente
         </Button>
       </header>
       
       <p className="text-muted-foreground">
-        Design, configure, and deploy your custom AI agents. Use the visual interface below to define your agent's capabilities, tools, and behavior.
+        Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir as capacidades, ferramentas e comportamento do seu agente.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Agent Configuration</CardTitle>
-            <CardDescription>Define the core properties and settings for your agent.</CardDescription>
+            <CardTitle>Configuração do Agente</CardTitle>
+            <CardDescription>Defina as propriedades e configurações principais para o seu agente.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="agentName">Agent Name</Label>
-              <Input id="agentName" placeholder="e.g., Customer Support Pro" />
+              <Label htmlFor="agentName">Nome do Agente</Label>
+              <Input id="agentName" placeholder="ex: Profissional de Suporte ao Cliente" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="agentDescription">Description</Label>
-              <Textarea id="agentDescription" placeholder="Describe what this agent does..." />
+              <Label htmlFor="agentDescription">Descrição</Label>
+              <Textarea id="agentDescription" placeholder="Descreva o que este agente faz..." />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="agentModel">Base Model (Google ADK)</Label>
+                <Label htmlFor="agentModel">Modelo Base (Google ADK)</Label>
                 <Select>
                   <SelectTrigger id="agentModel">
-                    <SelectValue placeholder="Select a model" />
+                    <SelectValue placeholder="Selecione um modelo" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="gemini-pro">Gemini Pro</SelectItem>
                     <SelectItem value="gemini-flash">Gemini Flash</SelectItem>
-                    <SelectItem value="custom-model">Custom Model (via ADK)</SelectItem>
+                    <SelectItem value="custom-model">Modelo Personalizado (via ADK)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="agentVersion">Version</Label>
+                <Label htmlFor="agentVersion">Versão</Label>
                 <Input id="agentVersion" placeholder="1.0.0" defaultValue="1.0.0" />
               </div>
             </div>
              <div className="space-y-2">
-              <Label>Tools & Integrations</Label>
+              <Label>Ferramentas e Integrações</Label>
               <Card>
                 <CardContent className="p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">Select and configure tools from Google ADK library.</p>
-                  <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Tool</Button>
+                  <p className="text-sm text-muted-foreground">Selecione e configure ferramentas da biblioteca Google ADK.</p>
+                  <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Ferramenta</Button>
                   {/* Placeholder for selected tools list */}
                 </CardContent>
               </Card>
@@ -71,7 +71,7 @@ export default function AgentBuilderPage() {
           </CardContent>
           <CardFooter>
             <Button>
-              <Save className="mr-2 h-4 w-4" /> Save Agent Configuration
+              <Save className="mr-2 h-4 w-4" /> Salvar Configuração do Agente
             </Button>
           </CardFooter>
         </Card>
@@ -79,29 +79,29 @@ export default function AgentBuilderPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Visual Workflow (Coming Soon)</CardTitle>
-              <CardDescription>Drag-and-drop interface for agent logic.</CardDescription>
+              <CardTitle>Fluxo de Trabalho Visual (Em Breve)</CardTitle>
+              <CardDescription>Interface de arrastar e soltar para a lógica do agente.</CardDescription>
             </CardHeader>
             <CardContent>
               <Image 
                 src="https://placehold.co/600x400.png"
-                alt="Visual Workflow Placeholder"
+                alt="Placeholder do Fluxo de Trabalho Visual"
                 width={600}
                 height={400}
                 className="rounded-md aspect-video object-cover"
-                data-ai-hint="flowchart diagram"
+                data-ai-hint="diagrama fluxograma"
               />
-              <p className="text-sm text-muted-foreground mt-2">This feature will allow visual construction of agent flows.</p>
+              <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes.</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Quick Tips</CardTitle>
+              <CardTitle>Dicas Rápidas</CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-2 text-muted-foreground">
-              <p>• Clearly define your agent's goal for better AI assistance.</p>
-              <p>• Start with simpler models and iterate.</p>
-              <p>• Test your agent frequently during development.</p>
+              <p>• Defina claramente o objetivo do seu agente para melhor assistência da IA.</p>
+              <p>• Comece com modelos mais simples e itere.</p>
+              <p>• Teste seu agente frequentemente durante o desenvolvimento.</p>
             </CardContent>
           </Card>
         </div>

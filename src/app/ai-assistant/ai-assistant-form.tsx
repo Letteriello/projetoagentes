@@ -19,7 +19,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} aria-disabled={pending}>
-      {pending ? "Getting Suggestion..." : "Get Suggestion"}
+      {pending ? "Obtendo Sugestão..." : "Obter Sugestão"}
     </Button>
   );
 }
@@ -31,19 +31,19 @@ export function AiAssistantForm() {
 
   useEffect(() => {
     if (state.message) {
-      if (state.suggestedConfiguration || state.message === "Suggestion received successfully!") {
+      if (state.suggestedConfiguration || state.message === "Sugestão recebida com sucesso!") {
          if (formRef.current && !state.errors) { // Only show toast and reset if successful
           toast({
-            title: "Success!",
+            title: "Sucesso!",
             description: state.message,
             variant: "default",
             action: <CheckCircle2 className="text-green-500" />,
           });
           // formRef.current.reset(); // Optional: reset form on success
         }
-      } else if (state.errors || state.message !== "Suggestion received successfully!") {
+      } else if (state.errors || state.message !== "Sugestão recebida com sucesso!") {
          toast({
-          title: "Error",
+          title: "Erro",
           description: state.message,
           variant: "destructive",
           action: <AlertCircle className="text-white" />,
@@ -56,18 +56,18 @@ export function AiAssistantForm() {
     <form ref={formRef} action={formAction} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Describe Your Agent's Goal</CardTitle>
+          <CardTitle>Descreva o Objetivo do Seu Agente</CardTitle>
           <CardDescription>
-            Provide a detailed description of the task your agent needs to accomplish. The more specific you are, the better the AI can assist with configuration suggestions.
+            Forneça uma descrição detalhada da tarefa que seu agente precisa realizar. Quanto mais específico você for, melhor a IA poderá ajudar com sugestões de configuração.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="taskGoal">Task Goal</Label>
+            <Label htmlFor="taskGoal">Objetivo da Tarefa</Label>
             <Textarea
               id="taskGoal"
               name="taskGoal"
-              placeholder="e.g., 'Create an agent that automatically responds to customer inquiries about order status via email, looking up information in our Shopify store.'"
+              placeholder="ex: 'Criar um agente que responda automaticamente a perguntas de clientes sobre o status de pedidos por e-mail, buscando informações em nossa loja Shopify.'"
               rows={5}
               required
               className="mt-1"
@@ -85,8 +85,8 @@ export function AiAssistantForm() {
       {state.suggestedConfiguration && (
         <Card>
           <CardHeader>
-            <CardTitle>Suggested Configuration</CardTitle>
-            <CardDescription>Based on your task goal, here's a suggested configuration using Google ADK components.</CardDescription>
+            <CardTitle>Configuração Sugerida</CardTitle>
+            <CardDescription>Com base no seu objetivo de tarefa, aqui está uma configuração sugerida usando componentes do Google ADK.</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -98,7 +98,7 @@ export function AiAssistantForm() {
           </CardContent>
           <CardFooter>
              <Button variant="outline" onClick={() => navigator.clipboard.writeText(state.suggestedConfiguration || '')}>
-              Copy Configuration
+              Copiar Configuração
             </Button>
           </CardFooter>
         </Card>
@@ -106,7 +106,7 @@ export function AiAssistantForm() {
        {state.message && !state.suggestedConfiguration && state.errors && (
          <Alert variant="destructive">
            <AlertCircle className="h-4 w-4" />
-           <AlertTitle>Error</AlertTitle>
+           <AlertTitle>Erro</AlertTitle>
            <AlertDescription>{state.message}</AlertDescription>
          </Alert>
        )}

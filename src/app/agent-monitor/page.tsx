@@ -1,30 +1,30 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { LineChart as LineChartIcon, Activity, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { LineChart as LineChartIcon, Activity, AlertTriangle, CheckCircle2, Cpu } from "lucide-react"; // Added Cpu
 import Image from "next/image";
 import { BarChart, CartesianGrid, XAxis, Bar, Tooltip, ResponsiveContainer, Legend, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 const agentData = [
-  { id: "agent_001", name: "Support Bot Alpha", status: "active", tasksCompleted: 102, errors: 3, lastActivity: "5m ago" },
-  { id: "agent_002", name: "Inventory Manager Zeta", status: "idle", tasksCompleted: 560, errors: 1, lastActivity: "1h ago" },
-  { id: "agent_003", name: "Email Campaigner Gamma", status: "error", tasksCompleted: 12, errors: 15, lastActivity: "2d ago" },
-  { id: "agent_004", name: "Data Scraper Delta", status: "active", tasksCompleted: 1203, errors: 0, lastActivity: "10s ago" },
+  { id: "agent_001", name: "Support Bot Alpha", status: "ativo", tasksCompleted: 102, errors: 3, lastActivity: "há 5min" },
+  { id: "agent_002", name: "Inventory Manager Zeta", status: "ocioso", tasksCompleted: 560, errors: 1, lastActivity: "há 1h" },
+  { id: "agent_003", name: "Email Campaigner Gamma", status: "erro", tasksCompleted: 12, errors: 15, lastActivity: "há 2d" },
+  { id: "agent_004", name: "Data Scraper Delta", status: "ativo", tasksCompleted: 1203, errors: 0, lastActivity: "há 10s" },
 ];
 
 const chartData = [
   { month: 'Jan', tasks: 400, errors: 24 },
-  { month: 'Feb', tasks: 300, errors: 13 },
+  { month: 'Fev', tasks: 300, errors: 13 },
   { month: 'Mar', tasks: 600, errors: 98 },
-  { month: 'Apr', tasks: 480, errors: 39 },
-  { month: 'May', tasks: 700, errors: 48 },
+  { month: 'Abr', tasks: 480, errors: 39 },
+  { month: 'Mai', tasks: 700, errors: 48 },
   { month: 'Jun', tasks: 550, errors: 38 },
 ];
 
 const chartConfig = {
-  tasks: { label: "Tasks Completed", color: "hsl(var(--primary))" },
-  errors: { label: "Errors", color: "hsl(var(--destructive))" },
+  tasks: { label: "Tarefas Concluídas", color: "hsl(var(--primary))" },
+  errors: { label: "Erros", color: "hsl(var(--destructive))" },
 } satisfies import("@/components/ui/chart").ChartConfig;
 
 
@@ -33,58 +33,58 @@ export default function AgentMonitorPage() {
     <div className="space-y-6">
       <header className="flex items-center gap-3">
         <LineChartIcon className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold">Agent Monitor</h1>
+        <h1 className="text-3xl font-bold">Monitor de Agentes</h1>
       </header>
       <p className="text-muted-foreground">
-        Oversee your agents in real-time. Track their activities, performance metrics, and identify any issues promptly.
+        Supervisione seus agentes em tempo real. Acompanhe suas atividades, métricas de desempenho e identifique quaisquer problemas prontamente.
       </p>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Agents</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Agentes</CardTitle>
             <Cpu className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{agentData.length}</div>
             <p className="text-xs text-muted-foreground">
-              Currently managed agents
+              Agentes gerenciados atualmente
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Agents</CardTitle>
+            <CardTitle className="text-sm font-medium">Agentes Ativos</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{agentData.filter(a => a.status === 'active').length}</div>
+            <div className="text-2xl font-bold">{agentData.filter(a => a.status === 'ativo').length}</div>
             <p className="text-xs text-muted-foreground">
-              Currently processing tasks
+              Processando tarefas atualmente
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasks Today</CardTitle>
+            <CardTitle className="text-sm font-medium">Tarefas Hoje</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,234</div>
+            <div className="text-2xl font-bold">1.234</div>
             <p className="text-xs text-muted-foreground">
-              +15% from yesterday
+              +15% desde ontem
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Critical Errors</CardTitle>
+            <CardTitle className="text-sm font-medium">Erros Críticos</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{agentData.reduce((sum, a) => sum + (a.status === 'error' ? 1 : 0), 0)}</div>
+            <div className="text-2xl font-bold">{agentData.reduce((sum, a) => sum + (a.status === 'erro' ? 1 : 0), 0)}</div>
             <p className="text-xs text-muted-foreground">
-              Require immediate attention
+              Requerem atenção imediata
             </p>
           </CardContent>
         </Card>
@@ -93,8 +93,8 @@ export default function AgentMonitorPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Agent Performance Overview</CardTitle>
-            <CardDescription>Monthly tasks completed vs. errors.</CardDescription>
+            <CardTitle>Visão Geral do Desempenho dos Agentes</CardTitle>
+            <CardDescription>Tarefas concluídas mensalmente vs. erros.</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -114,37 +114,37 @@ export default function AgentMonitorPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Activity Log (Placeholder)</CardTitle>
-            <CardDescription>Recent activities across all agents.</CardDescription>
+            <CardTitle>Registro de Atividades (Placeholder)</CardTitle>
+            <CardDescription>Atividades recentes em todos os agentes.</CardDescription>
           </CardHeader>
           <CardContent>
              <Image 
                 src="https://placehold.co/600x400.png"
-                alt="Activity Log Placeholder"
+                alt="Placeholder do Registro de Atividades"
                 width={600}
                 height={300}
                 className="rounded-md aspect-video object-cover"
-                data-ai-hint="log file text"
+                data-ai-hint="texto arquivo log"
               />
-            <p className="text-sm text-muted-foreground mt-2">Real-time logs will be displayed here.</p>
+            <p className="text-sm text-muted-foreground mt-2">Logs em tempo real serão exibidos aqui.</p>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Agent Status</CardTitle>
-          <CardDescription>Overview of all configured agents and their current status.</CardDescription>
+          <CardTitle>Status do Agente</CardTitle>
+          <CardDescription>Visão geral de todos os agentes configurados e seu status atual.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>Nome</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Tasks Completed</TableHead>
-                <TableHead className="text-right">Errors</TableHead>
-                <TableHead>Last Activity</TableHead>
+                <TableHead className="text-right">Tarefas Concluídas</TableHead>
+                <TableHead className="text-right">Erros</TableHead>
+                <TableHead>Última Atividade</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -152,7 +152,7 @@ export default function AgentMonitorPage() {
                 <TableRow key={agent.id}>
                   <TableCell className="font-medium">{agent.name}</TableCell>
                   <TableCell>
-                    <Badge variant={agent.status === 'active' ? 'default' : agent.status === 'error' ? 'destructive' : 'secondary'}>
+                    <Badge variant={agent.status === 'ativo' ? 'default' : agent.status === 'erro' ? 'destructive' : 'secondary'}>
                       {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
                     </Badge>
                   </TableCell>

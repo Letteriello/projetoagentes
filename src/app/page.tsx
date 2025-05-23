@@ -10,22 +10,22 @@ export default function HomePage() {
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] py-12 px-4 text-center">
       <LayoutGrid className="w-28 h-28 text-primary mb-8" />
       <h1 className="text-5xl font-bold tracking-tight mb-4">
-        Welcome to <span className="text-primary">AgentVerse</span>
+        Bem-vindo ao <span className="text-primary">AgentVerse</span>
       </h1>
       <p className="text-xl text-muted-foreground max-w-2xl mb-8">
-        Empowering you to create, configure, and monitor intelligent AI agents with ease. Dive into the world of agent development using Google's ADK and bring your automated solutions to life.
+        Capacitando você a criar, configurar e monitorar agentes de IA inteligentes com facilidade. Mergulhe no mundo do desenvolvimento de agentes usando o ADK do Google e dê vida às suas soluções automatizadas.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 mb-12">
         <Button size="lg" asChild>
           <Link href="/agent-builder">
             <Cpu className="mr-2 h-5 w-5" />
-            Start Building Agents
+            Comece a Construir Agentes
           </Link>
         </Button>
         <Button size="lg" variant="outline" asChild>
           <Link href="/ai-assistant">
             <Sparkles className="mr-2 h-5 w-5" />
-            Get AI Configuration Help
+            Obtenha Ajuda de Configuração com IA
           </Link>
         </Button>
       </div>
@@ -35,18 +35,18 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Cpu className="w-6 h-6 text-primary" />
-              Agent Builder
+              Construtor de Agentes
             </CardTitle>
-            <CardDescription>Visually construct and fine-tune your agents with a comprehensive set of tools and configurations.</CardDescription>
+            <CardDescription>Construa e ajuste visualmente seus agentes com um conjunto abrangente de ferramentas e configurações.</CardDescription>
           </CardHeader>
           <CardContent>
             <Image
               src="https://placehold.co/600x400.png"
-              alt="Agent Builder Illustration"
+              alt="Ilustração do Construtor de Agentes"
               width={600}
               height={400}
               className="rounded-md aspect-video object-cover"
-              data-ai-hint="abstract tech"
+              data-ai-hint="tecnologia abstrata"
             />
           </CardContent>
         </Card>
@@ -54,18 +54,18 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-primary" />
-              AI Assistant
+              Assistente de IA
             </CardTitle>
-            <CardDescription>Leverage AI to get optimal configuration suggestions based on your agent's task goals.</CardDescription>
+            <CardDescription>Utilize IA para obter sugestões de configuração ideais com base nos objetivos de tarefa do seu agente.</CardDescription>
           </CardHeader>
           <CardContent>
             <Image
               src="https://placehold.co/600x400.png"
-              alt="AI Assistant Illustration"
+              alt="Ilustração do Assistente de IA"
               width={600}
               height={400}
               className="rounded-md aspect-video object-cover"
-              data-ai-hint="ai assistant"
+              data-ai-hint="assistente ia"
             />
           </CardContent>
         </Card>
@@ -73,18 +73,18 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <LineChart className="w-6 h-6 text-primary" />
-              Agent Monitor
+              Monitor de Agentes
             </CardTitle>
-            <CardDescription>Keep an eye on your agents' activities and performance with real-time monitoring and insightful visualizations.</CardDescription>
+            <CardDescription>Acompanhe as atividades e o desempenho de seus agentes com monitoramento em tempo real e visualizações perspicazes.</CardDescription>
           </CardHeader>
           <CardContent>
             <Image
               src="https://placehold.co/600x400.png"
-              alt="Agent Monitor Illustration"
+              alt="Ilustração do Monitor de Agentes"
               width={600}
               height={400}
               className="rounded-md aspect-video object-cover"
-              data-ai-hint="data chart"
+              data-ai-hint="gráfico dados"
             />
           </CardContent>
         </Card>

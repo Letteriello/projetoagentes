@@ -3,7 +3,7 @@ import { suggestAgentConfiguration, SuggestAgentConfigurationInput, SuggestAgent
 import { z } from 'zod';
 
 const TaskGoalSchema = z.object({
-  taskGoal: z.string().min(10, { message: "Task goal must be at least 10 characters long." }),
+  taskGoal: z.string().min(10, { message: "O objetivo da tarefa deve ter pelo menos 10 caracteres." }),
 });
 
 interface FormState {
@@ -24,7 +24,7 @@ export async function getAgentConfigurationSuggestion(
 
   if (!validatedFields.success) {
     return {
-      message: "Validation failed. Please check your input.",
+      message: "Falha na validação. Por favor, verifique sua entrada.",
       errors: validatedFields.error.flatten().fieldErrors,
     };
   }
@@ -36,13 +36,13 @@ export async function getAgentConfigurationSuggestion(
   try {
     const result: SuggestAgentConfigurationOutput = await suggestAgentConfiguration(input);
     return {
-      message: "Suggestion received successfully!",
+      message: "Sugestão recebida com sucesso!",
       suggestedConfiguration: result.suggestedConfiguration,
     };
   } catch (error) {
     console.error("Error calling AI flow:", error);
     return {
-      message: "An error occurred while fetching the suggestion. Please try again.",
+      message: "Ocorreu um erro ao buscar a sugestão. Por favor, tente novamente.",
     };
   }
 }
