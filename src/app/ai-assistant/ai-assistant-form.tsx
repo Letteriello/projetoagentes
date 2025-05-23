@@ -1,12 +1,13 @@
+
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react"; // Changed from useFormState and useFormStatus
 import { getAgentConfigurationSuggestion } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react"; // Removed useFormState, useFormStatus. Kept useEffect, useRef. Added useActionState above.
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,17 +16,16 @@ const initialState = {
   message: "",
 };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ isPending }: { isPending: boolean }) { // Accept isPending as a prop
   return (
-    <Button type="submit" disabled={pending} aria-disabled={pending}>
-      {pending ? "Obtendo Sugestão..." : "Obter Sugestão"}
+    <Button type="submit" disabled={isPending} aria-disabled={isPending}>
+      {isPending ? "Obtendo Sugestão..." : "Obter Sugestão"}
     </Button>
   );
 }
 
 export function AiAssistantForm() {
-  const [state, formAction] = useFormState(getAgentConfigurationSuggestion, initialState);
+  const [state, formAction, isPending] = useActionState(getAgentConfigurationSuggestion, initialState); // Changed to useActionState
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -78,7 +78,7 @@ export function AiAssistantForm() {
           </div>
         </CardContent>
         <CardFooter>
-          <SubmitButton />
+          <SubmitButton isPending={isPending} /> {/* Pass isPending to SubmitButton */}
         </CardFooter>
       </Card>
 
