@@ -8,11 +8,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+
+interface AvailableTool {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+const availableTools: AvailableTool[] = [
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet." },
+  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos." },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em documentos ou bases de dados internas." },
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda." },
+  { id: "customApiIntegration", label: "Integração com API Externa", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com outros serviços via API (requer configuração Genkit específica)." },
+];
+
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -28,7 +45,7 @@ export default function AgentBuilderPage() {
   const [agentModel, setAgentModel] = React.useState("");
   const [agentTemperature, setAgentTemperature] = React.useState([0.7]);
   const [agentVersion, setAgentVersion] = React.useState("1.0.0");
-  const [agentTools, setAgentTools] = React.useState<string[]>([]);
+  const [agentTools, setAgentTools] = React.useState<string[]>([]); // Stores IDs of selected tools
 
   const constructSystemPrompt = () => {
     let prompt = "";
@@ -36,6 +53,12 @@ export default function AgentBuilderPage() {
     if (agentTasks) prompt += `Tarefas Principais:\n${agentTasks}\n\n`;
     if (agentPersonality) prompt += `Personalidade/Tom: ${agentPersonality}\n\n`;
     if (agentRestrictions) prompt += `Restrições Importantes:\n${agentRestrictions}\n\n`;
+    
+    const selectedToolObjects = agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean);
+    if (selectedToolObjects.length > 0) {
+        prompt += `Ferramentas Disponíveis: ${selectedToolObjects.join(', ')}\n\n`;
+    }
+
     return prompt.trim() || "Você é um assistente prestativo."; // Fallback
   };
 
@@ -53,7 +76,7 @@ export default function AgentBuilderPage() {
     toast({
       title: "Formulário Limpo",
       description: "Você pode começar a configurar um novo agente.",
-      action: <Info className="text-blue-500" />,
+      action: <Info className="text-blue-500" />, // Using a more appropriate color
     });
   };
 
@@ -80,23 +103,25 @@ export default function AgentBuilderPage() {
       model: agentModel,
       temperature: agentTemperature[0],
       version: agentVersion,
-      tools: agentTools,
+      tools: agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean), // Save tool labels
     };
     console.log("Configuração do Agente Salva:", agentConfiguration);
     toast({
       title: "Configuração Salva!",
-      description: `O agente "${agentName}" foi salvo com sucesso (simulado). O prompt do sistema gerado foi: "${systemPrompt}"`,
+      description: `O agente "${agentName}" foi salvo com sucesso (simulado). O prompt do sistema gerado inclui as ferramentas selecionadas.`,
+    });
+  };
+  
+  const handleToolSelectionChange = (toolId: string, checked: boolean) => {
+    setAgentTools(prevTools => {
+      if (checked) {
+        return [...prevTools, toolId];
+      } else {
+        return prevTools.filter(id => id !== toolId);
+      }
     });
   };
 
-  const handleAddTool = () => {
-    console.log("Botão 'Adicionar Ferramenta' clicado. Funcionalidade a ser implementada.");
-    setAgentTools(prevTools => [...prevTools, `Nova Ferramenta ${prevTools.length + 1}`]);
-    toast({
-      title: "Adicionar Ferramenta",
-      description: "Interface para adicionar ferramentas ainda em desenvolvimento. Uma ferramenta de exemplo foi adicionada.",
-    });
-  };
 
   return (
     <div className="space-y-6">
@@ -125,7 +150,7 @@ export default function AgentBuilderPage() {
               <Label htmlFor="agentName">Nome do Agente</Label>
               <Input 
                 id="agentName" 
-                placeholder="ex: Agente de Suporte ao Cliente" 
+                placeholder="ex: Agente de Suporte ao Cliente Avançado" 
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
               />
@@ -151,7 +176,7 @@ export default function AgentBuilderPage() {
                   <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
                   <Input 
                     id="agentGoal" 
-                    placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos." 
+                    placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos e resolver problemas comuns." 
                     value={agentGoal}
                     onChange={(e) => setAgentGoal(e.target.value)}
                   />
@@ -160,7 +185,7 @@ export default function AgentBuilderPage() {
                   <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
                   <Textarea 
                     id="agentTasks" 
-                    placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos. 3. Indicar onde comprar." 
+                    placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos. 3. Indicar onde comprar. 4. Realizar busca na web por informações atualizadas." 
                     value={agentTasks}
                     onChange={(e) => setAgentTasks(e.target.value)}
                     rows={3}
@@ -170,7 +195,7 @@ export default function AgentBuilderPage() {
                   <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
                   <Input 
                     id="agentPersonality" 
-                    placeholder="ex: Amigável, prestativo e um pouco informal." 
+                    placeholder="ex: Amigável, prestativo e um pouco informal, mas sempre profissional." 
                     value={agentPersonality}
                     onChange={(e) => setAgentPersonality(e.target.value)}
                   />
@@ -179,7 +204,7 @@ export default function AgentBuilderPage() {
                   <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma informação específica ou restrição importante?</Label>
                   <Textarea 
                     id="agentRestrictions" 
-                    placeholder="ex: Nunca fornecer informações de contato direto. Não inventar funcionalidades que não existem." 
+                    placeholder="ex: Nunca fornecer informações de contato direto. Não inventar funcionalidades que não existem. Sempre verificar informações da base de conhecimento antes de buscar na web." 
                     value={agentRestrictions}
                     onChange={(e) => setAgentRestrictions(e.target.value)}
                     rows={3}
@@ -247,23 +272,42 @@ export default function AgentBuilderPage() {
                 </div>
             </div>
             
-             <div className="space-y-2">
-              <Label>Ferramentas e Integrações (Genkit Tools)</Label>
-              <Card className="bg-muted/30">
+            <div className="space-y-4">
+              <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas e Integrações (Genkit Tools)</Label>
+              <Card className="bg-muted/10">
                 <CardContent className="p-4 space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Adicione "Ferramentas" (Genkit Tools) para dar ao seu agente habilidades extras, como buscar informações na internet, 
-                    consultar bancos de dados, ou interagir com APIs externas (incluindo provedores de modelos como OpenRouter, se não integrado diretamente acima). 
-                    Cada ferramenta representa uma capacidade que o agente pode decidir usar.
+                    Selecione as ferramentas pré-configuradas que seu agente poderá utilizar. Cada ferramenta representa uma capacidade que o agente pode decidir usar.
+                    Integrações mais complexas ou personalizadas (como interagir com APIs específicas ou usar modelos de outros provedores como o OpenRouter) são configuradas como "Ferramentas Genkit" nos bastidores,
+                    geralmente utilizando chaves armazenadas no "Cofre de Chaves API".
                   </p>
-                  <Button variant="outline" size="sm" onClick={handleAddTool}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Ferramenta</Button>
+                  <div className="space-y-3 pt-2">
+                    {availableTools.map((tool) => (
+                      <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                        <Checkbox
+                          id={`tool-${tool.id}`}
+                          checked={agentTools.includes(tool.id)}
+                          onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
+                          className="mt-1"
+                        />
+                        <div className="ml-3">
+                          <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer">
+                            {tool.icon} {tool.label}
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   {agentTools.length > 0 && (
-                    <div className="mt-3 pt-3 border-t">
-                      <h4 className="text-xs font-medium mb-1">Ferramentas Adicionadas:</h4>
-                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                        {agentTools.map((tool, index) => (
-                          <li key={index}>{tool}</li>
-                        ))}
+                    <div className="mt-4 pt-3 border-t">
+                      <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                        {agentTools.map(toolId => {
+                            const tool = availableTools.find(t => t.id === toolId);
+                            return tool ? <li key={toolId} className="flex items-center">{tool.icon} {tool.label}</li> : null;
+                        })}
                       </ul>
                     </div>
                   )}
@@ -289,6 +333,7 @@ export default function AgentBuilderPage() {
                 Conceitualmente, esta seria uma interface de arrastar e soltar para modelar a lógica do seu agente. 
                 Você poderia adicionar etapas como: receber entrada do usuário, chamar um modelo de IA (Prompt Genkit), usar ferramentas (Tools Genkit), executar lógica condicional e formatar a saída.
                 Cada fluxo visual seria traduzido para um fluxo Genkit em TypeScript nos bastidores, permitindo tanto a facilidade visual quanto o poder do código.
+                Esta funcionalidade permitiria construir visualmente como o agente decide qual ferramenta usar e em que ordem executar as tarefas.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -298,7 +343,7 @@ export default function AgentBuilderPage() {
                 width={600}
                 height={400}
                 className="rounded-md aspect-video object-cover opacity-70"
-                data-ai-hint="fluxograma interface diagrama"
+                data-ai-hint="fluxograma diagrama interface"
               />
               <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes, simplificando a criação de lógicas complexas que seriam implementadas com Genkit.</p>
             </CardContent>
@@ -309,6 +354,7 @@ export default function AgentBuilderPage() {
             </CardHeader>
             <CardContent className="text-sm space-y-2 text-muted-foreground">
               <p>• Defina claramente o <strong>objetivo</strong> e as <strong>tarefas</strong> do seu agente para melhor assistência da IA.</p>
+              <p>• As <strong>ferramentas</strong> selecionadas serão mencionadas no prompt do sistema para que o agente saiba que pode usá-las.</p>
               <p>• Experimente diferentes <strong>temperaturas</strong> para ajustar a criatividade.</p>
               <p>• Seja específico nas <strong>restrições</strong> para evitar comportamentos indesejados.</p>
               <p>• Teste seu agente frequentemente durante o desenvolvimento na seção "Chat com Agentes".</p>
