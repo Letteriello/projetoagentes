@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -42,22 +42,32 @@ const agentToneOptions = [
     { id: "creative", label: "Criativo e Inspirador" },
 ];
 
+interface AgentConfig {
+  agentName: string;
+  agentDescription: string;
+  agentGoal: string;
+  agentTasks: string;
+  agentPersonality: string;
+  agentRestrictions: string;
+  agentModel: string;
+  agentTemperature: number;
+  agentVersion: string;
+  agentTools: string[];
+}
+
 interface AgentTemplate {
   id: string;
   name: string;
-  config: {
-    agentName: string;
-    agentDescription: string;
-    agentGoal: string;
-    agentTasks: string;
-    agentPersonality: string;
-    agentRestrictions: string;
-    agentModel: string;
-    agentTemperature: number;
-    agentVersion: string;
-    agentTools: string[];
-  };
+  config: AgentConfig;
 }
+
+interface SavedAgentConfiguration extends AgentConfig {
+  id: string;
+  templateId: string;
+  systemPromptGenerated: string;
+  toolsLabels: string[];
+}
+
 
 const agentTemplates: AgentTemplate[] = [
   {
@@ -143,6 +153,8 @@ export default function AgentBuilderPage() {
   const [agentVersion, setAgentVersion] = React.useState(agentTemplates[0].config.agentVersion);
   const [agentTools, setAgentTools] = React.useState<string[]>(agentTemplates[0].config.agentTools);
 
+  const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
+
   const handleTemplateChange = (templateId: string) => {
     const template = agentTemplates.find(t => t.id === templateId);
     if (template) {
@@ -206,25 +218,32 @@ export default function AgentBuilderPage() {
     }
 
     const systemPrompt = constructSystemPrompt();
+    const selectedToolLabels = agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean) as string[];
 
-    const agentConfiguration = {
+
+    const newAgentConfiguration: SavedAgentConfiguration = {
+      id: `agent-${Date.now()}`, // Simple unique ID
       templateId: selectedAgentTemplateId,
-      name: agentName,
-      description: agentDescription,
-      goal: agentGoal,
-      tasks: agentTasks,
-      personality: agentPersonality,
-      restrictions: agentRestrictions,
+      agentName: agentName,
+      agentDescription: agentDescription,
+      agentGoal: agentGoal,
+      agentTasks: agentTasks,
+      agentPersonality: agentPersonality,
+      agentRestrictions: agentRestrictions,
       systemPromptGenerated: systemPrompt,
-      model: agentModel,
-      temperature: agentTemperature[0],
-      version: agentVersion,
-      tools: agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean), 
+      agentModel: agentModel,
+      agentTemperature: agentTemperature[0],
+      agentVersion: agentVersion,
+      agentTools: agentTools, // Store IDs
+      toolsLabels: selectedToolLabels // Store labels for display
     };
-    console.log("Configuração do Agente Salva:", agentConfiguration);
+    
+    setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
+
+    console.log("Configuração do Agente Salva:", newAgentConfiguration);
     toast({
       title: "Configuração Salva!",
-      description: `O agente "${agentName}" foi salvo com sucesso (simulado). O prompt do sistema gerado inclui as ferramentas selecionadas.`,
+      description: `O agente "${agentName}" foi adicionado à lista de agentes criados.`,
     });
   };
   
@@ -240,7 +259,7 @@ export default function AgentBuilderPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Cpu className="h-8 w-8 text-primary" />
@@ -255,211 +274,274 @@ export default function AgentBuilderPage() {
         Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir as capacidades, ferramentas e comportamento do seu agente, utilizando os modelos de IA do Google (como Gemini) via Genkit.
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>Configuração do Agente</CardTitle>
-            <CardDescription>Defina as propriedades e configurações principais para o seu agente. Você pode começar com um modelo ou criar um agente personalizado.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="agentTemplate" className="flex items-center gap-1.5"><Layers size={16}/>Modelo de Agente Inicial</Label>
-              <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange}>
-                <SelectTrigger id="agentTemplate">
-                  <SelectValue placeholder="Selecione um modelo para começar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {agentTemplates.map(template => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuração do Agente</CardTitle>
+          <CardDescription>Defina as propriedades e configurações principais para o seu agente. Você pode começar com um modelo ou criar um agente personalizado.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="agentTemplate" className="flex items-center gap-1.5"><Layers size={16}/>Modelo de Agente Inicial</Label>
+            <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange}>
+              <SelectTrigger id="agentTemplate">
+                <SelectValue placeholder="Selecione um modelo para começar" />
+              </SelectTrigger>
+              <SelectContent>
+                {agentTemplates.map(template => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="agentName">Nome do Agente</Label>
-              <Input 
-                id="agentName" 
-                placeholder="ex: Agente de Suporte ao Cliente Avançado" 
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agentDescription">Descrição</Label>
-              <Textarea 
-                id="agentDescription" 
-                placeholder="Descreva a função principal e o objetivo deste agente..." 
-                value={agentDescription}
-                onChange={(e) => setAgentDescription(e.target.value)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="agentName">Nome do Agente</Label>
+            <Input 
+              id="agentName" 
+              placeholder="ex: Agente de Suporte ao Cliente Avançado" 
+              value={agentName}
+              onChange={(e) => setAgentName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="agentDescription">Descrição</Label>
+            <Textarea 
+              id="agentDescription" 
+              placeholder="Descreva a função principal e o objetivo deste agente..." 
+              value={agentDescription}
+              onChange={(e) => setAgentDescription(e.target.value)}
+            />
+          </div>
 
-            <Separator />
-            <div>
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções do Agente</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Forneça instruções claras para guiar o comportamento do seu agente. As respostas abaixo ajudarão a construir o "Prompt do Sistema" ideal.
-              </p>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
-                  <Input 
-                    id="agentGoal" 
-                    placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos e resolver problemas comuns." 
-                    value={agentGoal}
-                    onChange={(e) => setAgentGoal(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
-                  <Textarea 
-                    id="agentTasks" 
-                    placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos. 3. Indicar onde comprar. 4. Realizar busca na web por informações atualizadas." 
-                    value={agentTasks}
-                    onChange={(e) => setAgentTasks(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
-                  <Select value={agentPersonality} onValueChange={setAgentPersonality}>
-                    <SelectTrigger id="agentPersonality">
-                      <SelectValue placeholder="Selecione um tom/personalidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agentToneOptions.map(option => (
-                        <SelectItem key={option.id} value={option.label}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma informação específica ou restrição importante?</Label>
-                  <Textarea 
-                    id="agentRestrictions" 
-                    placeholder="ex: Nunca fornecer informações de contato direto. Não inventar funcionalidades que não existem. Sempre verificar informações da base de conhecimento antes de buscar na web." 
-                    value={agentRestrictions}
-                    onChange={(e) => setAgentRestrictions(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Escolha o modelo de IA que será o "cérebro" do seu agente. O Genkit é responsável por conectar-se a estes modelos. 
-                    Para modelos do Google, a integração é direta. Para opções como OpenRouter ou outros endpoints HTTP, 
-                    uma configuração de "Ferramenta" Genkit correspondente pode ser necessária para definir como o AgentVerse deve interagir com eles 
-                    (geralmente gerenciando a chave API através do Cofre de Chaves).
-                  </p>
-                  <Select value={agentModel} onValueChange={setAgentModel}>
-                    <SelectTrigger id="agentModel">
-                      <SelectValue placeholder="Selecione um modelo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
-                      <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
-                      <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
-                      <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
-                      <SelectItem value="openrouter/custom">OpenRouter (requer configuração de Ferramenta Genkit)</SelectItem>
-                      <SelectItem value="requestly/custom">Requestly Mock (requer configuração de Ferramenta Genkit)</SelectItem>
-                      <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentTemperature">Temperatura: {agentTemperature[0].toFixed(1)}</Label>
-                  <Slider
-                    id="agentTemperature"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={agentTemperature}
-                    onValueChange={setAgentTemperature}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Controla a criatividade da resposta. Baixo = mais focado e direto, Alto = mais criativo e variado.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="agentVersion">Versão do Agente</Label>
-                    <Input 
-                    id="agentVersion" 
-                    placeholder="ex: 1.0.0" 
-                    value={agentVersion}
-                    onChange={(e) => setAgentVersion(e.target.value)}
-                    />
-                </div>
-            </div>
-            
+          <Separator />
+          <div>
+            <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções do Agente</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Forneça instruções claras para guiar o comportamento do seu agente. As respostas abaixo ajudarão a construir o "Prompt do Sistema" ideal.
+            </p>
             <div className="space-y-4">
-              <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas e Integrações (Genkit Tools)</Label>
-              <Card className="bg-muted/10">
-                <CardContent className="p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Selecione as ferramentas pré-configuradas que seu agente poderá utilizar. Cada ferramenta representa uma capacidade que o agente pode decidir usar.
-                    Integrações mais complexas ou personalizadas (como interagir com APIs específicas ou usar modelos de outros provedores como o OpenRouter) são configuradas como "Ferramentas Genkit" nos bastidores,
-                    geralmente utilizando chaves armazenadas no "Cofre de Chaves API".
-                  </p>
-                  <div className="space-y-3 pt-2">
-                    {availableTools.map((tool) => (
-                      <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
-                        <Checkbox
-                          id={`tool-${tool.id}`}
-                          checked={agentTools.includes(tool.id)}
-                          onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
-                          className="mt-1"
-                        />
-                        <div className="ml-3">
-                          <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer">
-                            {tool.icon} {tool.label}
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
-                        </div>
-                      </div>
+              <div className="space-y-2">
+                <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
+                <Input 
+                  id="agentGoal" 
+                  placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos e resolver problemas comuns." 
+                  value={agentGoal}
+                  onChange={(e) => setAgentGoal(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
+                <Textarea 
+                  id="agentTasks" 
+                  placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos. 3. Indicar onde comprar. 4. Realizar busca na web por informações atualizadas." 
+                  value={agentTasks}
+                  onChange={(e) => setAgentTasks(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
+                <Select value={agentPersonality} onValueChange={setAgentPersonality}>
+                  <SelectTrigger id="agentPersonality">
+                    <SelectValue placeholder="Selecione um tom/personalidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agentToneOptions.map(option => (
+                      <SelectItem key={option.id} value={option.label}>
+                        {option.label}
+                      </SelectItem>
                     ))}
-                  </div>
-
-                  {agentTools.length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
-                      <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
-                      <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                        {agentTools.map(toolId => {
-                            const tool = availableTools.find(t => t.id === toolId);
-                            return tool ? <li key={toolId} className="flex items-center">{tool.icon} {tool.label}</li> : null;
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma informação específica ou restrição importante?</Label>
+                <Textarea 
+                  id="agentRestrictions" 
+                  placeholder="ex: Nunca fornecer informações de contato direto. Não inventar funcionalidades que não existem. Sempre verificar informações da base de conhecimento antes de buscar na web." 
+                  value={agentRestrictions}
+                  onChange={(e) => setAgentRestrictions(e.target.value)}
+                  rows={3}
+                />
+              </div>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleSaveConfiguration}>
-              <Save className="mr-2 h-4 w-4" /> Salvar Configuração do Agente
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Escolha o modelo de IA que será o "cérebro" do seu agente. O Genkit é responsável por conectar-se a estes modelos. 
+                  Para modelos do Google, a integração é direta. Para opções como OpenRouter ou outros endpoints HTTP, 
+                  uma configuração de "Ferramenta" Genkit correspondente pode ser necessária para definir como o AgentVerse deve interagir com eles 
+                  (geralmente gerenciando a chave API através do Cofre de Chaves).
+                </p>
+                <Select value={agentModel} onValueChange={setAgentModel}>
+                  <SelectTrigger id="agentModel">
+                    <SelectValue placeholder="Selecione um modelo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
+                    <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
+                    <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
+                    <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
+                    <SelectItem value="openrouter/custom">OpenRouter (requer configuração de Ferramenta Genkit)</SelectItem>
+                    <SelectItem value="requestly/custom">Requestly Mock (requer configuração de Ferramenta Genkit)</SelectItem>
+                    <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="agentTemperature">Temperatura: {agentTemperature[0].toFixed(1)}</Label>
+                <Slider
+                  id="agentTemperature"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={agentTemperature}
+                  onValueChange={setAgentTemperature}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Controla a criatividade da resposta. Baixo = mais focado e direto, Alto = mais criativo e variado.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                  <Label htmlFor="agentVersion">Versão do Agente</Label>
+                  <Input 
+                  id="agentVersion" 
+                  placeholder="ex: 1.0.0" 
+                  value={agentVersion}
+                  onChange={(e) => setAgentVersion(e.target.value)}
+                  />
+              </div>
+          </div>
+          
+          <div className="space-y-4">
+            <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas e Integrações (Genkit Tools)</Label>
+            <Card className="bg-muted/10">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Selecione as ferramentas pré-configuradas que seu agente poderá utilizar. Cada ferramenta representa uma capacidade que o agente pode decidir usar.
+                  Integrações mais complexas ou personalizadas (como interagir com APIs específicas ou usar modelos de outros provedores como o OpenRouter) são configuradas como "Ferramentas Genkit" nos bastidores,
+                  geralmente utilizando chaves armazenadas no "Cofre de Chaves API".
+                </p>
+                <div className="space-y-3 pt-2">
+                  {availableTools.map((tool) => (
+                    <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        id={`tool-${tool.id}`}
+                        checked={agentTools.includes(tool.id)}
+                        onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
+                        className="mt-1"
+                      />
+                      <div className="ml-3">
+                        <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer">
+                          {tool.icon} {tool.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {agentTools.length > 0 && (
+                  <div className="mt-4 pt-3 border-t">
+                    <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
+                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                      {agentTools.map(toolId => {
+                          const tool = availableTools.find(t => t.id === toolId);
+                          return tool ? <li key={toolId} className="flex items-center">{tool.icon} {tool.label}</li> : null;
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleSaveConfiguration}>
+            <Save className="mr-2 h-4 w-4" /> Salvar Configuração do Agente
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {savedAgents.length > 0 && (
+        <div className="space-y-6">
+          <Separator />
+          <div>
+            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <Layers className="w-7 h-7 text-primary" /> Meus Agentes Criados
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {savedAgents.map((agent) => (
+                <Card key={agent.id} className="flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Cpu size={20} className="text-primary" /> 
+                      {agent.agentName || "Agente Sem Nome"}
+                    </CardTitle>
+                    <CardDescription className="line-clamp-2 h-[2.5em]">
+                      {agent.agentDescription || "Sem descrição."}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 flex-grow">
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Objetivo:</h4>
+                      <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
+                        {agent.agentGoal || "Não definido."}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Modelo de IA:</h4>
+                      <p className="text-xs text-muted-foreground">{agent.agentModel}</p>
+                    </div>
+                     {agent.toolsLabels.length > 0 && (
+                        <div>
+                            <h4 className="text-sm font-medium mb-1">Ferramentas:</h4>
+                            <div className="flex flex-wrap gap-1">
+                                {agent.toolsLabels.map(toolLabel => {
+                                    const toolDetail = availableTools.find(t => t.label === toolLabel);
+                                    return (
+                                        <span key={toolLabel} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            {toolDetail?.icon && React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12, className: "mr-0.5"})}
+                                            {toolLabel}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="gap-2 mt-auto pt-4 border-t">
+                    <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de edição de agente."})}>
+                      <Edit size={16} className="mr-1.5" /> Editar
+                    </Button>
+                     <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat."})}>
+                      <MessageSquare size={16} className="mr-1.5" /> Testar
+                    </Button>
+                    <Button variant="destructive" size="sm" className="ml-auto" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de exclusão de agente."})}>
+                      <Trash2 size={16} className="mr-1.5" /> Excluir
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
