@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 // Esquema para a entrada do fluxo de chat
-export const BasicChatInputSchema = z.object({
+const BasicChatInputSchema = z.object({
   userMessage: z.string().describe('A mensagem do usuário para o agente.'),
   systemPrompt: z.string().optional().describe('O prompt do sistema para guiar o comportamento do agente.'),
   // agentId: z.string().optional().describe('O ID do agente configurado para usar (para lógica futura).'),
@@ -20,7 +20,7 @@ export const BasicChatInputSchema = z.object({
 export type BasicChatInput = z.infer<typeof BasicChatInputSchema>;
 
 // Esquema para a saída do fluxo de chat
-export const BasicChatOutputSchema = z.object({
+const BasicChatOutputSchema = z.object({
   agentResponse: z.string().describe('A resposta do agente para a mensagem do usuário.'),
 });
 export type BasicChatOutput = z.infer<typeof BasicChatOutputSchema>;
@@ -87,3 +87,4 @@ const internalChatFlow = ai.defineFlow(
     return output;
   }
 );
+
