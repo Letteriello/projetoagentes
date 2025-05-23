@@ -30,6 +30,17 @@ const availableTools: AvailableTool[] = [
   { id: "customApiIntegration", label: "Integração com API Externa", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com outros serviços via API (requer configuração Genkit específica)." },
 ];
 
+const agentToneOptions = [
+    { id: "friendly", label: "Amigável e Prestativo" },
+    { id: "professional", label: "Profissional e Direto" },
+    { id: "formal", label: "Formal e Educado" },
+    { id: "casual", label: "Casual e Descontraído" },
+    { id: "funny", label: "Engraçado e Divertido" },
+    { id: "analytical", label: "Analítico e Detalhista" },
+    { id: "concise", label: "Conciso e Objetivo" },
+    { id: "empathetic", label: "Empático e Compreensivo" },
+];
+
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -39,7 +50,7 @@ export default function AgentBuilderPage() {
   
   const [agentGoal, setAgentGoal] = React.useState("");
   const [agentTasks, setAgentTasks] = React.useState("");
-  const [agentPersonality, setAgentPersonality] = React.useState("");
+  const [agentPersonality, setAgentPersonality] = React.useState(agentToneOptions[0].label); // Default to the first option's label
   const [agentRestrictions, setAgentRestrictions] = React.useState("");
 
   const [agentModel, setAgentModel] = React.useState("");
@@ -67,7 +78,7 @@ export default function AgentBuilderPage() {
     setAgentDescription("");
     setAgentGoal("");
     setAgentTasks("");
-    setAgentPersonality("");
+    setAgentPersonality(agentToneOptions[0].label);
     setAgentRestrictions("");
     setAgentModel("");
     setAgentTemperature([0.7]);
@@ -193,12 +204,18 @@ export default function AgentBuilderPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
-                  <Input 
-                    id="agentPersonality" 
-                    placeholder="ex: Amigável, prestativo e um pouco informal, mas sempre profissional." 
-                    value={agentPersonality}
-                    onChange={(e) => setAgentPersonality(e.target.value)}
-                  />
+                  <Select value={agentPersonality} onValueChange={setAgentPersonality}>
+                    <SelectTrigger id="agentPersonality">
+                      <SelectValue placeholder="Selecione um tom/personalidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agentToneOptions.map(option => (
+                        <SelectItem key={option.id} value={option.label}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma informação específica ou restrição importante?</Label>
