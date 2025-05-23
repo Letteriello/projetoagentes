@@ -42,19 +42,21 @@ export default function AgentBuilderPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="agentModel">Modelo de IA (Google via Genkit)</Label>
+                <Label htmlFor="agentModel">Provedor/Modelo de IA (via Genkit)</Label>
                 <p className="text-xs text-muted-foreground">
-                  Selecione o modelo de IA generativa do Google (acessado via Genkit) que seu agente utilizará.
+                  Selecione o provedor e modelo de IA que seu agente utilizará. A integração é feita através do Genkit. Para opções como OpenRouter, Requestly ou outros endpoints HTTP, você precisará configurar um fluxo Genkit personalizado.
                 </p>
                 <Select>
                   <SelectTrigger id="agentModel">
-                    <SelectValue placeholder="Selecione um modelo Gemini ou personalizado" />
+                    <SelectValue placeholder="Selecione um provedor/modelo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
-                    <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
-                    <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro</SelectItem>
-                    <SelectItem value="custom-via-genkit">Outro Modelo (configurado no Genkit)</SelectItem>
+                    <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
+                    <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
+                    <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
+                    <SelectItem value="openrouter/custom">OpenRouter (requer fluxo Genkit)</SelectItem>
+                    <SelectItem value="requestly/custom">Requestly (requer fluxo Genkit)</SelectItem>
+                    <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Genkit)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
