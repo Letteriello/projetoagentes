@@ -114,6 +114,8 @@ interface AgentTemplate {
 interface ToolConfigData {
   googleApiKey?: string;
   googleCseId?: string;
+  openapiSpecUrl?: string;
+  openapiApiKey?: string;
   // Futuros campos para outras ferramentas
 }
 
@@ -270,6 +272,8 @@ export default function AgentBuilderPage() {
   // Temporary state for modal inputs
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState("");
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
+  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState("");
+  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState("");
 
 
   const resetLLMFields = (config: Partial<LLMAgentConfig>) => {
@@ -305,12 +309,12 @@ export default function AgentBuilderPage() {
         resetCustomLogicFields();
       } else if (template.config.agentType === 'workflow') {
         const workflowConfig = template.config as WorkflowAgentConfig;
-        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>); // LLM fields might still be relevant as sub-agents
+        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>); 
         setWorkflowDescription(workflowConfig.workflowDescription || "");
         resetCustomLogicFields();
       } else if (template.config.agentType === 'custom') {
         const customConfig = template.config as CustomAgentConfig;
-        resetLLMFields(customConfig as Partial<LLMAgentConfig>); // LLM fields might be relevant
+        resetLLMFields(customConfig as Partial<LLMAgentConfig>); 
         resetWorkflowFields();
         setCustomLogicDescription(customConfig.customLogicDescription || "");
       }
@@ -327,12 +331,8 @@ export default function AgentBuilderPage() {
            resetLLMFields(defaultLLMConfig);
         }
     } else if (newAgentType === 'workflow') {
-        // Keep LLM fields as they might be used by sub-agents in a workflow
-        // resetLLMFields({}); 
         resetCustomLogicFields();
     } else if (newAgentType === 'custom') {
-        // Keep LLM fields
-        // resetLLMFields({}); 
         resetWorkflowFields();
     }
   };
@@ -354,7 +354,7 @@ export default function AgentBuilderPage() {
     if (selectedToolObjects.length > 0) {
         prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n`;
         selectedToolObjects.forEach(tool => {
-            prompt += `- ${tool.label}${tool.needsConfiguration ? " (pode requerer configuração adicional que foi fornecida)" : ""}\n`;
+            prompt += `- ${tool.label}${tool.needsConfiguration ? " (configurada e pronta para uso se os parâmetros foram fornecidos)" : ""}\n`;
         });
         prompt += "\n";
     } else {
@@ -377,7 +377,7 @@ export default function AgentBuilderPage() {
     setAgentDescription(customTemplate.config.agentDescription);
     setAgentVersion(customTemplate.config.agentVersion);
     setAgentTools(customTemplate.config.agentTools);
-    setToolConfigurations({}); // Reset tool configurations as well
+    setToolConfigurations({}); 
 
     resetLLMFields(defaultLLMConfig);
     resetWorkflowFields();
@@ -446,7 +446,7 @@ export default function AgentBuilderPage() {
         agentType: 'workflow',
         workflowDescription,
       };
-    } else { // custom
+    } else { 
       newAgentConfiguration = {
         ...baseSavedConfig,
         agentType: 'custom',
@@ -468,7 +468,6 @@ export default function AgentBuilderPage() {
       if (checked) {
         return [...prevTools, toolId];
       } else {
-        // Also remove configuration for this tool if unchecked
         const newToolConfigs = { ...toolConfigurations };
         delete newToolConfigs[toolId];
         setToolConfigurations(newToolConfigs);
@@ -477,34 +476,47 @@ export default function AgentBuilderPage() {
     });
   };
 
+  const resetModalInputs = () => {
+    setModalGoogleApiKey("");
+    setModalGoogleCseId("");
+    setModalOpenapiSpecUrl("");
+    setModalOpenapiApiKey("");
+  }
+
   const openToolConfigModal = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    // Pre-fill modal inputs if config exists
+    resetModalInputs(); // Reset inputs before opening
+
     const currentConfig = toolConfigurations[tool.id] || {};
     if (tool.id === "webSearch") {
         setModalGoogleApiKey(currentConfig.googleApiKey || "");
         setModalGoogleCseId(currentConfig.googleCseId || "");
+    } else if (tool.id === "customApiIntegration") {
+        setModalOpenapiSpecUrl(currentConfig.openapiSpecUrl || "");
+        setModalOpenapiApiKey(currentConfig.openapiApiKey || "");
     }
-    // Add other tool pre-fills here
     setIsToolConfigModalOpen(true);
   };
 
   const handleSaveToolConfiguration = () => {
     if (!configuringTool) return;
 
-    const newConfig: ToolConfigData = {};
-    if (configuringTool.id === "webSearch") {
-      newConfig.googleApiKey = modalGoogleApiKey;
-      newConfig.googleCseId = modalGoogleCseId;
-    }
-    // Add other tool save logic here
+    let newConfigData: Partial<ToolConfigData> = { ...toolConfigurations[configuringTool.id] };
 
+    if (configuringTool.id === "webSearch") {
+      newConfigData.googleApiKey = modalGoogleApiKey;
+      newConfigData.googleCseId = modalGoogleCseId;
+    } else if (configuringTool.id === "customApiIntegration") {
+      newConfigData.openapiSpecUrl = modalOpenapiSpecUrl;
+      newConfigData.openapiApiKey = modalOpenapiApiKey;
+    }
+    
     setToolConfigurations(prev => ({
       ...prev,
-      [configuringTool.id]: newConfig,
+      [configuringTool.id]: newConfigData as ToolConfigData,
     }));
     setIsToolConfigModalOpen(false);
-    setConfiguringTool(null); // Reset for next time
+    // Don't reset configuringTool here, allow modal to close first
     toast({ title: `Configuração salva para ${configuringTool.label}`});
   };
 
@@ -824,9 +836,9 @@ export default function AgentBuilderPage() {
       </Card>
 
       {/* Modal de Configuração de Ferramenta */}
-      {configuringTool && configuringTool.id === "webSearch" && (
+      {isToolConfigModalOpen && configuringTool && (
         <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => {
-          if (!open) setConfiguringTool(null); // Reset on close
+          if (!open) setConfiguringTool(null); 
           setIsToolConfigModalOpen(open);
         }}>
           <DialogContent>
@@ -837,37 +849,67 @@ export default function AgentBuilderPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="googleApiKey">Chave de API do Google Custom Search</Label>
-                <Input 
-                  id="googleApiKey" 
-                  value={modalGoogleApiKey} 
-                  onChange={(e) => setModalGoogleApiKey(e.target.value)}
-                  placeholder="Cole sua chave API aqui (ex: AIza...)" 
-                />
-                <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações à API de busca.</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="googleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
-                <Input 
-                  id="googleCseId" 
-                  value={modalGoogleCseId}
-                  onChange={(e) => setModalGoogleCseId(e.target.value)}
-                  placeholder="Cole seu CSE ID aqui (ex: 0123...)" 
-                />
-                <p className="text-xs text-muted-foreground">Identifica qual mecanismo de busca personalizado você deseja usar.</p>
-              </div>
+              {configuringTool.id === "webSearch" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label>
+                    <Input 
+                      id="modalGoogleApiKey" 
+                      value={modalGoogleApiKey} 
+                      onChange={(e) => setModalGoogleApiKey(e.target.value)}
+                      placeholder="Cole sua chave API aqui (ex: AIza...)" 
+                      type="password"
+                    />
+                    <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações à API de busca.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
+                    <Input 
+                      id="modalGoogleCseId" 
+                      value={modalGoogleCseId}
+                      onChange={(e) => setModalGoogleCseId(e.target.value)}
+                      placeholder="Cole seu CSE ID aqui (ex: 0123...)" 
+                    />
+                    <p className="text-xs text-muted-foreground">Identifica qual mecanismo de busca personalizado você deseja usar.</p>
+                  </div>
+                </>
+              )}
+              {configuringTool.id === "customApiIntegration" && (
+                 <>
+                  <div className="space-y-2">
+                    <Label htmlFor="modalOpenapiSpecUrl">URL do Esquema OpenAPI (JSON ou YAML)</Label>
+                    <Input 
+                      id="modalOpenapiSpecUrl" 
+                      value={modalOpenapiSpecUrl} 
+                      onChange={(e) => setModalOpenapiSpecUrl(e.target.value)}
+                      placeholder="ex: https://petstore.swagger.io/v2/swagger.json" 
+                    />
+                    <p className="text-xs text-muted-foreground">O link direto para o arquivo de especificação da API.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="modalOpenapiApiKey">Chave de API (Opcional)</Label>
+                    <Input 
+                      id="modalOpenapiApiKey" 
+                      value={modalOpenapiApiKey}
+                      onChange={(e) => setModalOpenapiApiKey(e.target.value)}
+                      placeholder="Se a API requer uma chave de autenticação"
+                      type="password"
+                    />
+                    <p className="text-xs text-muted-foreground">Necessária se a API OpenAPI for protegida por uma chave.</p>
+                  </div>
+                </>
+              )}
+              {/* Outros casos de configuração de ferramentas podem ser adicionados aqui */}
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline">Cancelar</Button>
+                <Button variant="outline" onClick={() => setConfiguringTool(null)}>Cancelar</Button>
               </DialogClose>
               <Button onClick={handleSaveToolConfiguration}>Salvar Configuração</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
-      {/* Adicionar outros modais de configuração de ferramentas aqui no futuro */}
 
 
       {savedAgents.length > 0 && (
@@ -935,7 +977,10 @@ export default function AgentBuilderPage() {
                                         variant="outline"
                                         size="sm"
                                         className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-muted group"
-                                        onClick={toolDetail.needsConfiguration ? () => openToolConfigModal(toolDetail as AvailableTool) : undefined}
+                                        onClick={toolDetail.needsConfiguration ? () => {
+                                            const fullTool = availableTools.find(t => t.id === toolDetail.id);
+                                            if (fullTool) openToolConfigModal(fullTool);
+                                        } : undefined}
                                         disabled={!toolDetail.needsConfiguration && !agent.toolConfigsApplied?.[toolDetail.id]}
                                     >
                                         {React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12, className: "mr-0.5"})}
@@ -973,3 +1018,4 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
