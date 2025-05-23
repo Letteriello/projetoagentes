@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Cpu, Sparkles, LayoutGrid, LineChart } from "lucide-react";
@@ -7,7 +8,7 @@ import Image from "next/image";
 export default function HomePage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] py-12 px-4 text-center">
-      <LayoutGrid className="w-24 h-24 text-primary mb-6" />
+      <LayoutGrid className="w-28 h-28 text-primary mb-8" />
       <h1 className="text-5xl font-bold tracking-tight mb-4">
         Welcome to <span className="text-primary">AgentVerse</span>
       </h1>
@@ -29,8 +30,8 @@ export default function HomePage() {
         </Button>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl w-full">
-        <Card className="text-left shadow-lg hover:shadow-xl transition-shadow">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl w-full">
+        <Card className="text-left shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Cpu className="w-6 h-6 text-primary" />
@@ -39,17 +40,17 @@ export default function HomePage() {
             <CardDescription>Visually construct and fine-tune your agents with a comprehensive set of tools and configurations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Image 
+            <Image
               src="https://placehold.co/600x400.png"
               alt="Agent Builder Illustration"
               width={600}
               height={400}
-              className="rounded-md"
-              data-ai-hint="abstract technology" 
+              className="rounded-md aspect-video object-cover"
+              data-ai-hint="abstract tech"
             />
           </CardContent>
         </Card>
-        <Card className="text-left shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="text-left shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-primary" />
@@ -58,17 +59,17 @@ export default function HomePage() {
             <CardDescription>Leverage AI to get optimal configuration suggestions based on your agent's task goals.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Image 
+            <Image
               src="https://placehold.co/600x400.png"
               alt="AI Assistant Illustration"
               width={600}
               height={400}
-              className="rounded-md"
-              data-ai-hint="artificial intelligence"
+              className="rounded-md aspect-video object-cover"
+              data-ai-hint="ai assistant"
             />
           </CardContent>
         </Card>
-        <Card className="text-left shadow-lg hover:shadow-xl transition-shadow md:col-span-2 lg:col-span-1">
+        <Card className="text-left shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 md:col-span-2 lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <LineChart className="w-6 h-6 text-primary" />
@@ -77,13 +78,13 @@ export default function HomePage() {
             <CardDescription>Keep an eye on your agents' activities and performance with real-time monitoring and insightful visualizations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Image 
+            <Image
               src="https://placehold.co/600x400.png"
               alt="Agent Monitor Illustration"
               width={600}
               height={400}
-              className="rounded-md"
-              data-ai-hint="data analytics"
+              className="rounded-md aspect-video object-cover"
+              data-ai-hint="data chart"
             />
           </CardContent>
         </Card>
