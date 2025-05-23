@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -39,24 +39,126 @@ const agentToneOptions = [
     { id: "analytical", label: "Analítico e Detalhista" },
     { id: "concise", label: "Conciso e Objetivo" },
     { id: "empathetic", label: "Empático e Compreensivo" },
+    { id: "creative", label: "Criativo e Inspirador" },
+];
+
+interface AgentTemplate {
+  id: string;
+  name: string;
+  config: {
+    agentName: string;
+    agentDescription: string;
+    agentGoal: string;
+    agentTasks: string;
+    agentPersonality: string;
+    agentRestrictions: string;
+    agentModel: string;
+    agentTemperature: number;
+    agentVersion: string;
+    agentTools: string[];
+  };
+}
+
+const agentTemplates: AgentTemplate[] = [
+  {
+    id: "custom",
+    name: "Personalizado (Começar do Zero)",
+    config: {
+      agentName: "",
+      agentDescription: "",
+      agentGoal: "",
+      agentTasks: "",
+      agentPersonality: agentToneOptions[0].label,
+      agentRestrictions: "",
+      agentModel: "googleai/gemini-2.0-flash",
+      agentTemperature: 0.7,
+      agentVersion: "1.0.0",
+      agentTools: [],
+    },
+  },
+  {
+    id: "support",
+    name: "Modelo: Agente de Suporte ao Cliente",
+    config: {
+      agentName: "Agente de Suporte ao Cliente",
+      agentDescription: "Um agente prestativo para responder a perguntas comuns de clientes e ajudar com problemas.",
+      agentGoal: "Fornecer suporte rápido e eficiente aos clientes.",
+      agentTasks: "1. Responder perguntas frequentes sobre produtos/serviços.\n2. Ajudar a solucionar problemas básicos de utilização.\n3. Direcionar para documentação relevante ou FAQs.\n4. Escalar problemas complexos para um atendente humano quando necessário.",
+      agentPersonality: "Empático e Compreensivo",
+      agentRestrictions: "Nunca fornecer informações financeiras pessoais. Não prometer prazos de resolução exatos sem confirmação.",
+      agentModel: "googleai/gemini-1.5-flash-latest",
+      agentTemperature: 0.5,
+      agentVersion: "1.0.0",
+      agentTools: ["knowledgeBase", "webSearch"],
+    },
+  },
+  {
+    id: "recommendation",
+    name: "Modelo: Agente de Recomendações",
+    config: {
+      agentName: "Agente de Recomendações de Produtos",
+      agentDescription: "Um agente para ajudar usuários a descobrir e escolher produtos ou serviços.",
+      agentGoal: "Aumentar o engajamento e as vendas sugerindo itens relevantes com base nas necessidades do usuário.",
+      agentTasks: "1. Perguntar sobre as preferências e necessidades do usuário.\n2. Sugerir produtos/serviços com base nas respostas.\n3. Comparar até 3 produtos lado a lado.\n4. Fornecer links diretos para as páginas dos produtos/serviços recomendados.",
+      agentPersonality: "Amigável e Prestativo",
+      agentRestrictions: "Apenas recomendar produtos/serviços do catálogo atual. Não inventar características ou preços.",
+      agentModel: "googleai/gemini-1.5-pro-latest",
+      agentTemperature: 0.7,
+      agentVersion: "1.0.0",
+      agentTools: ["knowledgeBase"],
+    },
+  },
+  {
+    id: "writer",
+    name: "Modelo: Assistente de Escrita Criativa",
+    config: {
+      agentName: "Assistente de Escrita Criativa",
+      agentDescription: "Um agente para ajudar a gerar ideias, esboços e rascunhos de conteúdo.",
+      agentGoal: "Auxiliar na criação de conteúdo escrito original e envolvente, como posts de blog, e-mails ou descrições.",
+      agentTasks: "1. Brainstorming de tópicos com base em palavras-chave.\n2. Gerar parágrafos introdutórios ou conclusivos.\n3. Sugerir diferentes títulos e subtítulos para um texto.\n4. Resumir textos longos em pontos principais.",
+      agentPersonality: "Criativo e Inspirador",
+      agentRestrictions: "Evitar plágio. Se usar informações externas, sugerir a necessidade de citação (não pode citar diretamente sem ferramenta de busca ativa).",
+      agentModel: "googleai/gemini-1.5-pro-latest",
+      agentTemperature: 0.8,
+      agentVersion: "1.0.0",
+      agentTools: ["webSearch"],
+    },
+  },
 ];
 
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
 
-  const [agentName, setAgentName] = React.useState("");
-  const [agentDescription, setAgentDescription] = React.useState("");
+  const [selectedAgentTemplateId, setSelectedAgentTemplateId] = React.useState<string>(agentTemplates[0].id);
   
-  const [agentGoal, setAgentGoal] = React.useState("");
-  const [agentTasks, setAgentTasks] = React.useState("");
-  const [agentPersonality, setAgentPersonality] = React.useState(agentToneOptions[0].label); // Default to the first option's label
-  const [agentRestrictions, setAgentRestrictions] = React.useState("");
+  const [agentName, setAgentName] = React.useState(agentTemplates[0].config.agentName);
+  const [agentDescription, setAgentDescription] = React.useState(agentTemplates[0].config.agentDescription);
+  const [agentGoal, setAgentGoal] = React.useState(agentTemplates[0].config.agentGoal);
+  const [agentTasks, setAgentTasks] = React.useState(agentTemplates[0].config.agentTasks);
+  const [agentPersonality, setAgentPersonality] = React.useState(agentTemplates[0].config.agentPersonality);
+  const [agentRestrictions, setAgentRestrictions] = React.useState(agentTemplates[0].config.agentRestrictions);
+  const [agentModel, setAgentModel] = React.useState(agentTemplates[0].config.agentModel);
+  const [agentTemperature, setAgentTemperature] = React.useState([agentTemplates[0].config.agentTemperature]);
+  const [agentVersion, setAgentVersion] = React.useState(agentTemplates[0].config.agentVersion);
+  const [agentTools, setAgentTools] = React.useState<string[]>(agentTemplates[0].config.agentTools);
 
-  const [agentModel, setAgentModel] = React.useState("");
-  const [agentTemperature, setAgentTemperature] = React.useState([0.7]);
-  const [agentVersion, setAgentVersion] = React.useState("1.0.0");
-  const [agentTools, setAgentTools] = React.useState<string[]>([]); // Stores IDs of selected tools
+  const handleTemplateChange = (templateId: string) => {
+    const template = agentTemplates.find(t => t.id === templateId);
+    if (template) {
+      setSelectedAgentTemplateId(templateId);
+      setAgentName(template.config.agentName);
+      setAgentDescription(template.config.agentDescription);
+      setAgentGoal(template.config.agentGoal);
+      setAgentTasks(template.config.agentTasks);
+      setAgentPersonality(template.config.agentPersonality);
+      setAgentRestrictions(template.config.agentRestrictions);
+      setAgentModel(template.config.agentModel);
+      setAgentTemperature([template.config.agentTemperature]);
+      setAgentVersion(template.config.agentVersion);
+      setAgentTools(template.config.agentTools);
+    }
+  };
 
   const constructSystemPrompt = () => {
     let prompt = "";
@@ -74,19 +176,21 @@ export default function AgentBuilderPage() {
   };
 
   const handleCreateNewAgent = () => {
-    setAgentName("");
-    setAgentDescription("");
-    setAgentGoal("");
-    setAgentTasks("");
-    setAgentPersonality(agentToneOptions[0].label);
-    setAgentRestrictions("");
-    setAgentModel("");
-    setAgentTemperature([0.7]);
-    setAgentVersion("1.0.0");
-    setAgentTools([]);
+    const customTemplate = agentTemplates[0]; // "Personalizado (Começar do Zero)"
+    setSelectedAgentTemplateId(customTemplate.id);
+    setAgentName(customTemplate.config.agentName);
+    setAgentDescription(customTemplate.config.agentDescription);
+    setAgentGoal(customTemplate.config.agentGoal);
+    setAgentTasks(customTemplate.config.agentTasks);
+    setAgentPersonality(customTemplate.config.agentPersonality);
+    setAgentRestrictions(customTemplate.config.agentRestrictions);
+    setAgentModel(customTemplate.config.agentModel);
+    setAgentTemperature([customTemplate.config.agentTemperature]);
+    setAgentVersion(customTemplate.config.agentVersion);
+    setAgentTools(customTemplate.config.agentTools);
     toast({
       title: "Formulário Limpo",
-      description: "Você pode começar a configurar um novo agente.",
+      description: "Você pode começar a configurar um novo agente personalizado.",
       action: <Info className="text-blue-500" />,
     });
   };
@@ -104,6 +208,7 @@ export default function AgentBuilderPage() {
     const systemPrompt = constructSystemPrompt();
 
     const agentConfiguration = {
+      templateId: selectedAgentTemplateId,
       name: agentName,
       description: agentDescription,
       goal: agentGoal,
@@ -151,12 +256,28 @@ export default function AgentBuilderPage() {
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-3"> {/* Changed lg:col-span-2 to lg:col-span-3 */}
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Configuração do Agente</CardTitle>
-            <CardDescription>Defina as propriedades e configurações principais para o seu agente.</CardDescription>
+            <CardDescription>Defina as propriedades e configurações principais para o seu agente. Você pode começar com um modelo ou criar um agente personalizado.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="agentTemplate" className="flex items-center gap-1.5"><Layers size={16}/>Modelo de Agente Inicial</Label>
+              <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange}>
+                <SelectTrigger id="agentTemplate">
+                  <SelectValue placeholder="Selecione um modelo para começar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentTemplates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="agentName">Nome do Agente</Label>
               <Input 
@@ -338,7 +459,6 @@ export default function AgentBuilderPage() {
             </Button>
           </CardFooter>
         </Card>
-        {/* Removed the div that contained the Visual Flow Designer and Quick Tips cards */}
       </div>
     </div>
   );
