@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -21,15 +21,16 @@ interface AvailableTool {
   label: string;
   icon: React.ReactNode;
   description: string;
+  needsConfiguration?: boolean; // Nova propriedade
 }
 
 const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit." },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit.", needsConfiguration: true },
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit)." },
-  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit)." },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit)." },
-  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão)." },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit).", needsConfiguration: true },
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit).", needsConfiguration: true },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit).", needsConfiguration: true },
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão).", needsConfiguration: true },
   { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
 
@@ -71,7 +72,6 @@ interface LLMAgentConfig extends AgentConfigBase {
 interface WorkflowAgentConfig extends AgentConfigBase {
   agentType: "workflow";
   workflowDescription: string;
-   // LLM fields that might be irrelevant for a pure workflow agent
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -83,7 +83,6 @@ interface WorkflowAgentConfig extends AgentConfigBase {
 interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
-  // LLM fields that might be irrelevant for a custom agent
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -97,14 +96,14 @@ type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig;
 interface AgentTemplate {
   id: string;
   name: string;
-  config: AgentConfig; 
+  config: AgentConfig;
 }
 
 interface SavedAgentConfiguration extends AgentConfig {
-  id: string; 
-  templateId: string; 
-  systemPromptGenerated?: string; 
-  toolsLabels: string[];
+  id: string;
+  templateId: string;
+  systemPromptGenerated?: string;
+  toolsDetails: Array<{ id: string; label: string; icon: React.ReactNode; needsConfiguration?: boolean }>;
 }
 
 const defaultLLMConfig: Omit<LLMAgentConfig, keyof AgentConfigBase | 'agentType'> = {
@@ -222,7 +221,7 @@ export default function AgentBuilderPage() {
 
   const [selectedAgentTemplateId, setSelectedAgentTemplateId] = React.useState<string>(agentTemplates[0].id);
   const [agentType, setAgentType] = React.useState<AgentConfig["agentType"]>(agentTemplates[0].config.agentType);
-  
+
   const [agentName, setAgentName] = React.useState(agentTemplates[0].config.agentName);
   const [agentDescription, setAgentDescription] = React.useState(agentTemplates[0].config.agentDescription);
   const [agentVersion, setAgentVersion] = React.useState(agentTemplates[0].config.agentVersion);
@@ -235,7 +234,7 @@ export default function AgentBuilderPage() {
   const [agentRestrictions, setAgentRestrictions] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentRestrictions || "" );
   const [agentModel, setAgentModel] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentModel || "googleai/gemini-2.0-flash" );
   const [agentTemperature, setAgentTemperature] = React.useState( [(agentTemplates[0].config as LLMAgentConfig).agentTemperature || 0.7] );
-  
+
   // Workflow Specific State
   const [workflowDescription, setWorkflowDescription] = React.useState("");
 
@@ -252,7 +251,7 @@ export default function AgentBuilderPage() {
     setAgentModel(config.agentModel || defaultLLMConfig.agentModel);
     setAgentTemperature([config.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : config.agentTemperature]);
   };
-  
+
   const resetWorkflowFields = () => {
     setWorkflowDescription("");
   }
@@ -264,7 +263,7 @@ export default function AgentBuilderPage() {
     const template = agentTemplates.find(t => t.id === templateId);
     if (template) {
       setSelectedAgentTemplateId(templateId);
-      setAgentType(template.config.agentType); 
+      setAgentType(template.config.agentType);
       setAgentName(template.config.agentName);
       setAgentDescription(template.config.agentDescription);
       setAgentVersion(template.config.agentVersion);
@@ -277,12 +276,12 @@ export default function AgentBuilderPage() {
         resetCustomLogicFields();
       } else if (template.config.agentType === 'workflow') {
         const workflowConfig = template.config as WorkflowAgentConfig;
-        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>); // Reset LLM fields, but retain common base fields if any
+        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>);
         setWorkflowDescription(workflowConfig.workflowDescription || "");
         resetCustomLogicFields();
       } else if (template.config.agentType === 'custom') {
         const customConfig = template.config as CustomAgentConfig;
-        resetLLMFields(customConfig as Partial<LLMAgentConfig>); // Reset LLM fields
+        resetLLMFields(customConfig as Partial<LLMAgentConfig>);
         resetWorkflowFields();
         setCustomLogicDescription(customConfig.customLogicDescription || "");
       }
@@ -291,49 +290,50 @@ export default function AgentBuilderPage() {
 
   const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
     setAgentType(newAgentType);
-    // When type changes manually, we might want to disassociate from a full template
-    // and reset fields more generally, or keep current common values and reset type-specific ones.
-    // For now, selecting "Personalizado (Começar do Zero)" template is the primary way to reset.
-    // If type is changed while a specific template is selected, it could lead to inconsistent state.
-    // A better approach might be to clear template selection if type is changed manually.
-    // Or ensure "Personalizado (Começar do Zero)" gets selected if type doesn't match current template.
-    
-    // Simplistic reset for now: if not "Personalizado (Começar do Zero)", switch to it.
-    const customTemplate = agentTemplates.find(t => t.id === "custom_llm");
-    if (selectedAgentTemplateId !== "custom_llm" && customTemplate) {
-        // If a specific template was selected and the type is manually changed
-        // to something inconsistent with that template, reset to the "custom" template
-        // which defaults to LLM type, but allows changing.
-        // This behavior might need more refinement based on desired UX.
-    }
+    // Se o tipo de agente é alterado manualmente, idealmente desassociamos de um template completo.
+    // Por enquanto, se o tipo mudar para algo incompatível com o template selecionado,
+    // o comportamento dos campos específicos pode precisar de mais lógica para resetar adequadamente.
+    // A maneira mais simples é, se o usuário mudar o tipo, talvez resetar para o "LLM Personalizado".
+    // Ou, deixar que os campos preenchidos pelo template anterior permaneçam,
+    // e o usuário lide com as inconsistências (menos ideal).
 
     if (newAgentType === 'llm') {
         resetWorkflowFields();
         resetCustomLogicFields();
-        if (selectedAgentTemplateId === "custom_llm" || !agentTemplates.find(t => t.id === selectedAgentTemplateId && t.config.agentType === 'llm')) {
-           resetLLMFields(defaultLLMConfig); // Re-apply default LLM if no specific LLM template active
+        // Se nenhum template LLM estiver ativo ou o template ativo não for LLM, reseta para LLM padrão.
+        const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId);
+        if (!currentTemplate || currentTemplate.config.agentType !== 'llm') {
+           resetLLMFields(defaultLLMConfig);
         }
     } else if (newAgentType === 'workflow') {
-        resetLLMFields({}); 
+        resetLLMFields({}); // Limpa campos LLM, mas mantém os comuns se houver
         resetCustomLogicFields();
     } else if (newAgentType === 'custom') {
-        resetLLMFields({}); 
+        resetLLMFields({}); // Limpa campos LLM
         resetWorkflowFields();
     }
   };
 
   const constructSystemPrompt = () => {
     if (agentType !== 'llm') return "";
-    
-    let prompt = "";
-    if (agentGoal) prompt += `Objetivo Principal: ${agentGoal}\n\n`;
-    if (agentTasks) prompt += `Tarefas Principais:\n${agentTasks}\n\n`;
-    if (agentPersonality) prompt += `Personalidade/Tom: ${agentPersonality}\n\n`;
-    if (agentRestrictions) prompt += `Restrições Importantes:\n${agentRestrictions}\n\n`;
-    
-    const selectedToolObjects = agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean);
+
+    let prompt = `Objetivo Principal: ${agentGoal || "Não definido."}\n\n`;
+    prompt += `Tarefas Principais:\n${agentTasks || "Nenhuma tarefa específica definida."}\n\n`;
+    prompt += `Personalidade/Tom: ${agentPersonality || "Neutro."}\n\n`;
+    if (agentRestrictions) {
+      prompt += `Restrições Importantes:\n${agentRestrictions}\n\n`;
+    }
+
+    const selectedToolObjects = agentTools
+      .map(toolId => availableTools.find(t => t.id === toolId))
+      .filter(Boolean) as AvailableTool[];
+
     if (selectedToolObjects.length > 0) {
-        prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n- ${selectedToolObjects.join('\n- ')}\n\n`;
+        prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n`;
+        selectedToolObjects.forEach(tool => {
+            prompt += `- ${tool.label}${tool.needsConfiguration ? " (requer configuração adicional)" : ""}\n`;
+        });
+        prompt += "\n";
     } else {
         prompt += `Nenhuma ferramenta externa está configurada para este agente.\n\n`;
     }
@@ -342,26 +342,26 @@ export default function AgentBuilderPage() {
     prompt += "- Responda de forma concisa e direta ao ponto, a menos que o tom da personalidade solicite o contrário.\n";
     prompt += "- Se precisar usar uma ferramenta, indique claramente qual ferramenta seria usada e porquê ANTES de simular a sua execução ou pedir para o usuário aguardar.\n";
     prompt += "- Seja transparente sobre suas capacidades e limitações. Se não puder realizar uma tarefa, explique o motivo.\n";
-    
+
     return prompt.trim() || "Você é um assistente prestativo."; // Fallback
   };
 
   const handleCreateNewAgent = () => {
-    const customTemplate = agentTemplates[0]; 
+    const customTemplate = agentTemplates.find(t => t.id === "custom_llm") || agentTemplates[0];
     setSelectedAgentTemplateId(customTemplate.id);
-    setAgentType(customTemplate.config.agentType); 
+    setAgentType(customTemplate.config.agentType);
     setAgentName(customTemplate.config.agentName);
     setAgentDescription(customTemplate.config.agentDescription);
     setAgentVersion(customTemplate.config.agentVersion);
     setAgentTools(customTemplate.config.agentTools);
-    
+
     resetLLMFields(defaultLLMConfig);
     resetWorkflowFields();
     resetCustomLogicFields();
 
     toast({
       title: "Formulário Limpo",
-      description: "Você pode começar a configurar um novo agente do tipo LLM personalizado.",
+      description: "Você pode começar a configurar um novo agente.",
       action: <Info className="text-blue-500" />,
     });
   };
@@ -385,7 +385,13 @@ export default function AgentBuilderPage() {
     }
 
     const systemPrompt = agentType === 'llm' ? constructSystemPrompt() : undefined;
-    const selectedToolLabels = agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean) as string[];
+    const selectedToolsDetails = agentTools
+        .map(toolId => {
+            const tool = availableTools.find(t => t.id === toolId);
+            return tool ? { id: tool.id, label: tool.label, icon: tool.icon, needsConfiguration: tool.needsConfiguration } : null;
+        })
+        .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
+
 
     let newAgentConfiguration: SavedAgentConfiguration;
 
@@ -395,8 +401,8 @@ export default function AgentBuilderPage() {
         agentName,
         agentDescription,
         agentVersion,
-        agentTools,
-        toolsLabels: selectedToolLabels,
+        agentTools, // Mantém os IDs das ferramentas
+        toolsDetails: selectedToolsDetails, // Adiciona detalhes das ferramentas para exibição
     };
 
     if (agentType === 'llm') {
@@ -416,7 +422,6 @@ export default function AgentBuilderPage() {
         ...baseSavedConfig,
         agentType: 'workflow',
         workflowDescription,
-        // Explicitly ensure LLM fields that don't apply are not carried over or are defaulted
         agentGoal: undefined,
         agentTasks: undefined,
         agentPersonality: undefined,
@@ -430,7 +435,6 @@ export default function AgentBuilderPage() {
         ...baseSavedConfig,
         agentType: 'custom',
         customLogicDescription,
-        // Explicitly ensure LLM fields that don't apply are not carried over or are defaulted
         agentGoal: undefined,
         agentTasks: undefined,
         agentPersonality: undefined,
@@ -440,7 +444,7 @@ export default function AgentBuilderPage() {
         systemPromptGenerated: undefined,
       };
     }
-    
+
     setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
 
     console.log("Configuração do Agente Salva:", newAgentConfiguration);
@@ -449,7 +453,7 @@ export default function AgentBuilderPage() {
       description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label}) foi adicionado à lista.`,
     });
   };
-  
+
   const handleToolSelectionChange = (toolId: string, checked: boolean) => {
     setAgentTools(prevTools => {
       if (checked) {
@@ -457,6 +461,14 @@ export default function AgentBuilderPage() {
       } else {
         return prevTools.filter(id => id !== toolId);
       }
+    });
+  };
+
+  const handleConfigureTool = (toolLabel: string) => {
+    toast({
+        title: `Configurar ${toolLabel}`,
+        description: "Funcionalidade de configuração específica para esta ferramenta será implementada em breve.",
+        action: <ConfigureIcon className="text-blue-500" />
     });
   };
 
@@ -472,10 +484,10 @@ export default function AgentBuilderPage() {
           <PlusCircle className="mr-2 h-4 w-4" /> Criar Novo Agente
         </Button>
       </header>
-      
+
       <p className="text-muted-foreground">
         Projete, configure e implante seus agentes de IA personalizados. Use a interface visual abaixo para definir o tipo, capacidades, ferramentas e comportamento do seu agente.
-        A plataforma visa permitir a criação de diversos tipos de agentes, incluindo aqueles baseados em LLMs, fluxos de trabalho estruturados e lógicas customizadas, com o objetivo futuro de suportar sistemas multiagentes complexos.
+        A plataforma visa permitir a criação de diversos tipos de agentes, com o objetivo futuro de suportar sistemas multiagentes complexos.
       </p>
 
       <Card>
@@ -521,23 +533,23 @@ export default function AgentBuilderPage() {
 
           <div className="space-y-2">
             <Label htmlFor="agentName">Nome do Agente</Label>
-            <Input 
-              id="agentName" 
-              placeholder="ex: Agente de Suporte Avançado" 
+            <Input
+              id="agentName"
+              placeholder="ex: Agente de Suporte Avançado"
               value={agentName}
               onChange={(e) => setAgentName(e.target.value)}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="agentDescription">Descrição Geral do Agente</Label>
-            <Textarea 
-              id="agentDescription" 
-              placeholder="Descreva a função principal e o objetivo geral deste agente, independente do tipo..." 
+            <Textarea
+              id="agentDescription"
+              placeholder="Descreva a função principal e o objetivo geral deste agente, independente do tipo..."
               value={agentDescription}
               onChange={(e) => setAgentDescription(e.target.value)}
             />
           </div>
-          
+
           <Separator />
 
           {/* Conditional Fields based on Agent Type */}
@@ -551,18 +563,18 @@ export default function AgentBuilderPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente LLM?</Label>
-                    <Input 
-                      id="agentGoal" 
-                      placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos." 
+                    <Input
+                      id="agentGoal"
+                      placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos."
                       value={agentGoal}
                       onChange={(e) => setAgentGoal(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente LLM deve realizar?</Label>
-                    <Textarea 
-                      id="agentTasks" 
-                      placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos." 
+                    <Textarea
+                      id="agentTasks"
+                      placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos."
                       value={agentTasks}
                       onChange={(e) => setAgentTasks(e.target.value)}
                       rows={3}
@@ -585,9 +597,9 @@ export default function AgentBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma restrição ou informação importante para o agente LLM?</Label>
-                    <Textarea 
-                      id="agentRestrictions" 
-                      placeholder="ex: Nunca fornecer informações de contato direto." 
+                    <Textarea
+                      id="agentRestrictions"
+                      placeholder="ex: Nunca fornecer informações de contato direto."
                       value={agentRestrictions}
                       onChange={(e) => setAgentRestrictions(e.target.value)}
                       rows={3}
@@ -652,9 +664,9 @@ export default function AgentBuilderPage() {
                 </Alert>
                 <div className="space-y-2">
                   <Label htmlFor="workflowDescription">Descrição do Fluxo de Trabalho</Label>
-                  <Textarea 
-                    id="workflowDescription" 
-                    placeholder="Descreva as etapas, a ordem e a lógica do seu fluxo de trabalho. Ex: 'Etapa 1: Agente A (LLM). Etapa 2 (Paralelo): Agente B (LLM com ferramenta de busca) e Agente C (Custom para API interna). Etapa 3: Agente D (LLM para resumo) se resultado de B for X.'" 
+                  <Textarea
+                    id="workflowDescription"
+                    placeholder="Descreva as etapas, a ordem e a lógica do seu fluxo de trabalho. Ex: 'Etapa 1: Agente A (LLM). Etapa 2 (Paralelo): Agente B (LLM com ferramenta de busca) e Agente C (Custom para API interna). Etapa 3: Agente D (LLM para resumo) se resultado de B for X.'"
                     value={workflowDescription}
                     onChange={(e) => setWorkflowDescription(e.target.value)}
                     rows={6}
@@ -678,9 +690,9 @@ export default function AgentBuilderPage() {
                 </Alert>
                 <div className="space-y-2">
                   <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
-                  <Textarea 
-                    id="customLogicDescription" 
-                    placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit personalizado implementará. Ex: 'Este agente se conectará a uma API interna de CRM para buscar dados de clientes e então usará um LLM para resumir o histórico do cliente, utilizando uma ferramenta de análise de sentimento no resumo.'" 
+                  <Textarea
+                    id="customLogicDescription"
+                    placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit personalizado implementará. Ex: 'Este agente se conectará a uma API interna de CRM para buscar dados de clientes e então usará um LLM para resumir o histórico do cliente, utilizando uma ferramenta de análise de sentimento no resumo.'"
                     value={customLogicDescription}
                     onChange={(e) => setCustomLogicDescription(e.target.value)}
                     rows={6}
@@ -692,41 +704,47 @@ export default function AgentBuilderPage() {
 
 
           <Separator />
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                   <Label htmlFor="agentVersion">Versão do Agente</Label>
-                  <Input 
-                  id="agentVersion" 
-                  placeholder="ex: 1.0.0" 
+                  <Input
+                  id="agentVersion"
+                  placeholder="ex: 1.0.0"
                   value={agentVersion}
                   onChange={(e) => setAgentVersion(e.target.value)}
                   />
               </div>
           </div>
-          
+
           <div className="space-y-4">
             <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</Label>
-            <Card className="bg-card"> {/* Changed background for better contrast with checkboxes */}
+            <Card className="bg-card">
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Capacite seu agente com diversas ferramentas. Estas são funcionalidades que o agente (especialmente Agentes LLM) pode decidir usar para interagir com o mundo exterior, buscar informações ou realizar tarefas. A implementação real de cada ferramenta geralmente requer a criação de um fluxo Genkit correspondente e, para serviços externos, chaves API gerenciadas no "Cofre de Chaves API".
                 </p>
                 <div className="space-y-3 pt-2">
                   {availableTools.map((tool) => (
-                    <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors"> {/* Changed background for checkbox rows */}
+                    <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
                       <Checkbox
                         id={`tool-${tool.id}`}
                         checked={agentTools.includes(tool.id)}
                         onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
                         className="mt-1"
                       />
-                      <div className="ml-3">
+                      <div className="ml-3 flex-grow">
                         <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer">
                           {tool.icon} {tool.label}
+                          {tool.needsConfiguration && <ConfigureIcon size={14} className="ml-2 text-muted-foreground group-hover:text-primary transition-colors" />}
                         </Label>
                         <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
                       </div>
+                       {tool.needsConfiguration && agentTools.includes(tool.id) && (
+                         <Button variant="outline" size="sm" className="ml-auto shrink-0" onClick={() => handleConfigureTool(tool.label)}>
+                           <ConfigureIcon size={14} className="mr-1.5" /> Configurar
+                         </Button>
+                       )}
                     </div>
                   ))}
                 </div>
@@ -737,7 +755,13 @@ export default function AgentBuilderPage() {
                     <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                       {agentTools.map(toolId => {
                           const tool = availableTools.find(t => t.id === toolId);
-                          return tool ? <li key={toolId} className="flex items-center">{React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5"})} {tool.label}</li> : null;
+                          return tool ? (
+                            <li key={toolId} className="flex items-center">
+                                {React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5"})}
+                                {tool.label}
+                                {tool.needsConfiguration && <ConfigureIcon size={12} className="ml-1.5 text-muted-foreground" titleAccess="Requer configuração" />}
+                            </li>
+                          ) : null;
                       })}
                     </ul>
                   </div>
@@ -762,11 +786,11 @@ export default function AgentBuilderPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {savedAgents.map((agent) => (
-                <Card key={agent.id} className="flex flex-col bg-card"> {/* Ensure card background */}
+                <Card key={agent.id} className="flex flex-col bg-card">
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                        <CardTitle className="flex items-center gap-2 text-lg"> {/* Slightly smaller title for cards */}
-                        <Cpu size={20} className="text-primary" /> 
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                        <Cpu size={20} className="text-primary" />
                         {agent.agentName || "Agente Sem Nome"}
                         </CardTitle>
                         <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-1 rounded-full">
@@ -808,19 +832,24 @@ export default function AgentBuilderPage() {
                             </p>
                         </div>
                     )}
-                     {agent.toolsLabels.length > 0 && (
+                     {agent.toolsDetails.length > 0 && (
                         <div className="pt-2">
                             <h4 className="text-sm font-medium mb-1.5">Ferramentas:</h4>
                             <div className="flex flex-wrap gap-1.5">
-                                {agent.toolsLabels.map(toolLabel => {
-                                    const toolDetail = availableTools.find(t => t.label === toolLabel);
-                                    return (
-                                        <span key={toolLabel} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            {toolDetail?.icon && React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12, className: "mr-0.5"})}
-                                            {toolLabel}
-                                        </span>
-                                    );
-                                })}
+                                {agent.toolsDetails.map(toolDetail => (
+                                    <Button
+                                        key={toolDetail.id}
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default hover:bg-muted"
+                                        onClick={toolDetail.needsConfiguration ? () => handleConfigureTool(toolDetail.label) : undefined}
+                                        aria-disabled={!toolDetail.needsConfiguration}
+                                    >
+                                        {React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12, className: "mr-0.5"})}
+                                        {toolDetail.label}
+                                        {toolDetail.needsConfiguration && <ConfigureIcon size={10} className="ml-1 opacity-70 group-hover:opacity-100" />}
+                                    </Button>
+                                ))}
                             </div>
                         </div>
                     )}
