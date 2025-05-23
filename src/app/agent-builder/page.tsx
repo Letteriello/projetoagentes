@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 
@@ -172,8 +172,15 @@ export default function AgentBuilderPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Fluxo de Trabalho Visual (Em Breve)</CardTitle>
-              <CardDescription>Interface de arrastar e soltar para a lógica do agente.</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Workflow className="w-6 h-6 text-primary" />
+                Designer de Fluxo Visual (Conceito / Futuro)
+              </CardTitle>
+              <CardDescription>
+                Conceitualmente, esta seria uma interface de arrastar e soltar para modelar a lógica do seu agente. 
+                Você poderia adicionar etapas como: receber entrada, chamar um modelo de IA (Prompt Genkit), usar ferramentas (Tools Genkit) e formatar a saída.
+                Cada fluxo visual seria traduzido para um fluxo Genkit em TypeScript nos bastidores.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Image 
@@ -181,10 +188,10 @@ export default function AgentBuilderPage() {
                 alt="Placeholder do Fluxo de Trabalho Visual"
                 width={600}
                 height={400}
-                className="rounded-md aspect-video object-cover"
-                data-ai-hint="diagrama fluxograma"
+                className="rounded-md aspect-video object-cover opacity-70"
+                data-ai-hint="diagrama fluxograma ui"
               />
-              <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes.</p>
+              <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes, simplificando a criação de lógicas complexas que seriam implementadas com Genkit.</p>
             </CardContent>
           </Card>
           <Card>
@@ -202,4 +209,6 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+    
+
     
