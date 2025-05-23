@@ -15,21 +15,31 @@ import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 interface AvailableTool {
   id: string;
   label: string;
   icon: React.ReactNode;
   description: string;
-  needsConfiguration?: boolean; // Nova propriedade
+  needsConfiguration?: boolean;
 }
 
 const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit.", needsConfiguration: true },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit (requer Chave API Google e CSE ID).", needsConfiguration: true },
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit).", needsConfiguration: true },
-  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit).", needsConfiguration: true },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit).", needsConfiguration: true },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração).", needsConfiguration: true },
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit e autenticação).", needsConfiguration: true },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit e possivelmente chaves API).", needsConfiguration: true },
   { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão).", needsConfiguration: true },
   { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
@@ -72,6 +82,7 @@ interface LLMAgentConfig extends AgentConfigBase {
 interface WorkflowAgentConfig extends AgentConfigBase {
   agentType: "workflow";
   workflowDescription: string;
+  // Campos de LLM podem ser opcionais ou não aplicáveis para workflow puro
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -83,6 +94,7 @@ interface WorkflowAgentConfig extends AgentConfigBase {
 interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
+   // Campos de LLM podem ser opcionais ou não aplicáveis
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -99,11 +111,18 @@ interface AgentTemplate {
   config: AgentConfig;
 }
 
+interface ToolConfigData {
+  googleApiKey?: string;
+  googleCseId?: string;
+  // Futuros campos para outras ferramentas
+}
+
 interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string;
   toolsDetails: Array<{ id: string; label: string; icon: React.ReactNode; needsConfiguration?: boolean }>;
+  toolConfigsApplied?: Record<string, ToolConfigData>;
 }
 
 const defaultLLMConfig: Omit<LLMAgentConfig, keyof AgentConfigBase | 'agentType'> = {
@@ -243,6 +262,16 @@ export default function AgentBuilderPage() {
 
   const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
 
+  // State for tool configurations
+  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
+  
+  // Temporary state for modal inputs
+  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState("");
+  const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
+
+
   const resetLLMFields = (config: Partial<LLMAgentConfig>) => {
     setAgentGoal(config.agentGoal || defaultLLMConfig.agentGoal);
     setAgentTasks(config.agentTasks || defaultLLMConfig.agentTasks);
@@ -276,12 +305,12 @@ export default function AgentBuilderPage() {
         resetCustomLogicFields();
       } else if (template.config.agentType === 'workflow') {
         const workflowConfig = template.config as WorkflowAgentConfig;
-        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>);
+        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>); // LLM fields might still be relevant as sub-agents
         setWorkflowDescription(workflowConfig.workflowDescription || "");
         resetCustomLogicFields();
       } else if (template.config.agentType === 'custom') {
         const customConfig = template.config as CustomAgentConfig;
-        resetLLMFields(customConfig as Partial<LLMAgentConfig>);
+        resetLLMFields(customConfig as Partial<LLMAgentConfig>); // LLM fields might be relevant
         resetWorkflowFields();
         setCustomLogicDescription(customConfig.customLogicDescription || "");
       }
@@ -290,26 +319,20 @@ export default function AgentBuilderPage() {
 
   const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
     setAgentType(newAgentType);
-    // Se o tipo de agente é alterado manualmente, idealmente desassociamos de um template completo.
-    // Por enquanto, se o tipo mudar para algo incompatível com o template selecionado,
-    // o comportamento dos campos específicos pode precisar de mais lógica para resetar adequadamente.
-    // A maneira mais simples é, se o usuário mudar o tipo, talvez resetar para o "LLM Personalizado".
-    // Ou, deixar que os campos preenchidos pelo template anterior permaneçam,
-    // e o usuário lide com as inconsistências (menos ideal).
-
     if (newAgentType === 'llm') {
         resetWorkflowFields();
         resetCustomLogicFields();
-        // Se nenhum template LLM estiver ativo ou o template ativo não for LLM, reseta para LLM padrão.
         const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId);
         if (!currentTemplate || currentTemplate.config.agentType !== 'llm') {
            resetLLMFields(defaultLLMConfig);
         }
     } else if (newAgentType === 'workflow') {
-        resetLLMFields({}); // Limpa campos LLM, mas mantém os comuns se houver
+        // Keep LLM fields as they might be used by sub-agents in a workflow
+        // resetLLMFields({}); 
         resetCustomLogicFields();
     } else if (newAgentType === 'custom') {
-        resetLLMFields({}); // Limpa campos LLM
+        // Keep LLM fields
+        // resetLLMFields({}); 
         resetWorkflowFields();
     }
   };
@@ -331,7 +354,7 @@ export default function AgentBuilderPage() {
     if (selectedToolObjects.length > 0) {
         prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n`;
         selectedToolObjects.forEach(tool => {
-            prompt += `- ${tool.label}${tool.needsConfiguration ? " (requer configuração adicional)" : ""}\n`;
+            prompt += `- ${tool.label}${tool.needsConfiguration ? " (pode requerer configuração adicional que foi fornecida)" : ""}\n`;
         });
         prompt += "\n";
     } else {
@@ -354,6 +377,7 @@ export default function AgentBuilderPage() {
     setAgentDescription(customTemplate.config.agentDescription);
     setAgentVersion(customTemplate.config.agentVersion);
     setAgentTools(customTemplate.config.agentTools);
+    setToolConfigurations({}); // Reset tool configurations as well
 
     resetLLMFields(defaultLLMConfig);
     resetWorkflowFields();
@@ -368,19 +392,11 @@ export default function AgentBuilderPage() {
 
   const handleSaveConfiguration = () => {
     if (!agentName) {
-      toast({
-        title: "Campo Obrigatório",
-        description: "Nome do Agente é obrigatório.",
-        variant: "destructive",
-      });
+      toast({ title: "Campo Obrigatório", description: "Nome do Agente é obrigatório.", variant: "destructive" });
       return;
     }
     if (agentType === 'llm' && !agentModel) {
-       toast({
-        title: "Campo Obrigatório para Agente LLM",
-        description: "Modelo de IA é obrigatório para Agentes LLM.",
-        variant: "destructive",
-      });
+       toast({ title: "Campo Obrigatório para Agente LLM", description: "Modelo de IA é obrigatório para Agentes LLM.", variant: "destructive" });
       return;
     }
 
@@ -392,6 +408,12 @@ export default function AgentBuilderPage() {
         })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
 
+    const appliedToolConfigs: Record<string, ToolConfigData> = {};
+    agentTools.forEach(toolId => {
+      if (toolConfigurations[toolId]) {
+        appliedToolConfigs[toolId] = toolConfigurations[toolId];
+      }
+    });
 
     let newAgentConfiguration: SavedAgentConfiguration;
 
@@ -401,8 +423,9 @@ export default function AgentBuilderPage() {
         agentName,
         agentDescription,
         agentVersion,
-        agentTools, // Mantém os IDs das ferramentas
-        toolsDetails: selectedToolsDetails, // Adiciona detalhes das ferramentas para exibição
+        agentTools,
+        toolsDetails: selectedToolsDetails,
+        toolConfigsApplied: appliedToolConfigs,
     };
 
     if (agentType === 'llm') {
@@ -422,26 +445,12 @@ export default function AgentBuilderPage() {
         ...baseSavedConfig,
         agentType: 'workflow',
         workflowDescription,
-        agentGoal: undefined,
-        agentTasks: undefined,
-        agentPersonality: undefined,
-        agentRestrictions: undefined,
-        agentModel: undefined,
-        agentTemperature: undefined,
-        systemPromptGenerated: undefined,
       };
     } else { // custom
       newAgentConfiguration = {
         ...baseSavedConfig,
         agentType: 'custom',
         customLogicDescription,
-        agentGoal: undefined,
-        agentTasks: undefined,
-        agentPersonality: undefined,
-        agentRestrictions: undefined,
-        agentModel: undefined,
-        agentTemperature: undefined,
-        systemPromptGenerated: undefined,
       };
     }
 
@@ -459,17 +468,44 @@ export default function AgentBuilderPage() {
       if (checked) {
         return [...prevTools, toolId];
       } else {
+        // Also remove configuration for this tool if unchecked
+        const newToolConfigs = { ...toolConfigurations };
+        delete newToolConfigs[toolId];
+        setToolConfigurations(newToolConfigs);
         return prevTools.filter(id => id !== toolId);
       }
     });
   };
 
-  const handleConfigureTool = (toolLabel: string) => {
-    toast({
-        title: `Configurar ${toolLabel}`,
-        description: "Funcionalidade de configuração específica para esta ferramenta será implementada em breve.",
-        action: <ConfigureIcon className="text-blue-500" />
-    });
+  const openToolConfigModal = (tool: AvailableTool) => {
+    setConfiguringTool(tool);
+    // Pre-fill modal inputs if config exists
+    const currentConfig = toolConfigurations[tool.id] || {};
+    if (tool.id === "webSearch") {
+        setModalGoogleApiKey(currentConfig.googleApiKey || "");
+        setModalGoogleCseId(currentConfig.googleCseId || "");
+    }
+    // Add other tool pre-fills here
+    setIsToolConfigModalOpen(true);
+  };
+
+  const handleSaveToolConfiguration = () => {
+    if (!configuringTool) return;
+
+    const newConfig: ToolConfigData = {};
+    if (configuringTool.id === "webSearch") {
+      newConfig.googleApiKey = modalGoogleApiKey;
+      newConfig.googleCseId = modalGoogleCseId;
+    }
+    // Add other tool save logic here
+
+    setToolConfigurations(prev => ({
+      ...prev,
+      [configuringTool.id]: newConfig,
+    }));
+    setIsToolConfigModalOpen(false);
+    setConfiguringTool(null); // Reset for next time
+    toast({ title: `Configuração salva para ${configuringTool.label}`});
   };
 
 
@@ -552,7 +588,6 @@ export default function AgentBuilderPage() {
 
           <Separator />
 
-          {/* Conditional Fields based on Agent Type */}
           {agentType === 'llm' && (
             <>
               <div>
@@ -702,7 +737,6 @@ export default function AgentBuilderPage() {
             </>
           )}
 
-
           <Separator />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -741,8 +775,14 @@ export default function AgentBuilderPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
                       </div>
                        {tool.needsConfiguration && agentTools.includes(tool.id) && (
-                         <Button variant="outline" size="sm" className="ml-auto shrink-0" onClick={() => handleConfigureTool(tool.label)}>
-                           <ConfigureIcon size={14} className="mr-1.5" /> Configurar
+                         <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="ml-auto shrink-0" 
+                            onClick={() => openToolConfigModal(tool)}
+                         >
+                           <ConfigureIcon size={14} className="mr-1.5" /> 
+                           {toolConfigurations[tool.id] ? "Reconfigurar" : "Configurar"}
                          </Button>
                        )}
                     </div>
@@ -759,7 +799,13 @@ export default function AgentBuilderPage() {
                             <li key={toolId} className="flex items-center">
                                 {React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5"})}
                                 {tool.label}
-                                {tool.needsConfiguration && <ConfigureIcon size={12} className="ml-1.5 text-muted-foreground" titleAccess="Requer configuração" />}
+                                {tool.needsConfiguration && (
+                                    <ConfigureIcon 
+                                        size={12} 
+                                        className={`ml-1.5 ${toolConfigurations[toolId] ? 'text-green-500' : 'text-muted-foreground'}`}
+                                        titleAccess={toolConfigurations[toolId] ? "Configurada" : "Requer configuração"}
+                                    />
+                                )}
                             </li>
                           ) : null;
                       })}
@@ -776,6 +822,53 @@ export default function AgentBuilderPage() {
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Modal de Configuração de Ferramenta */}
+      {configuringTool && configuringTool.id === "webSearch" && (
+        <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => {
+          if (!open) setConfiguringTool(null); // Reset on close
+          setIsToolConfigModalOpen(open);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Configurar: {configuringTool.label}</DialogTitle>
+              <DialogDescription>
+                Forneça os detalhes de configuração para a ferramenta {configuringTool.label}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="googleApiKey">Chave de API do Google Custom Search</Label>
+                <Input 
+                  id="googleApiKey" 
+                  value={modalGoogleApiKey} 
+                  onChange={(e) => setModalGoogleApiKey(e.target.value)}
+                  placeholder="Cole sua chave API aqui (ex: AIza...)" 
+                />
+                <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações à API de busca.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="googleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
+                <Input 
+                  id="googleCseId" 
+                  value={modalGoogleCseId}
+                  onChange={(e) => setModalGoogleCseId(e.target.value)}
+                  placeholder="Cole seu CSE ID aqui (ex: 0123...)" 
+                />
+                <p className="text-xs text-muted-foreground">Identifica qual mecanismo de busca personalizado você deseja usar.</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button onClick={handleSaveToolConfiguration}>Salvar Configuração</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {/* Adicionar outros modais de configuração de ferramentas aqui no futuro */}
+
 
       {savedAgents.length > 0 && (
         <div className="space-y-6">
@@ -841,13 +934,19 @@ export default function AgentBuilderPage() {
                                         key={toolDetail.id}
                                         variant="outline"
                                         size="sm"
-                                        className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default hover:bg-muted"
-                                        onClick={toolDetail.needsConfiguration ? () => handleConfigureTool(toolDetail.label) : undefined}
-                                        aria-disabled={!toolDetail.needsConfiguration}
+                                        className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-muted group"
+                                        onClick={toolDetail.needsConfiguration ? () => openToolConfigModal(toolDetail as AvailableTool) : undefined}
+                                        disabled={!toolDetail.needsConfiguration && !agent.toolConfigsApplied?.[toolDetail.id]}
                                     >
                                         {React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12, className: "mr-0.5"})}
                                         {toolDetail.label}
-                                        {toolDetail.needsConfiguration && <ConfigureIcon size={10} className="ml-1 opacity-70 group-hover:opacity-100" />}
+                                        {toolDetail.needsConfiguration && (
+                                            <ConfigureIcon 
+                                                size={10} 
+                                                className={`ml-1 opacity-70 group-hover:opacity-100 ${agent.toolConfigsApplied?.[toolDetail.id] ? 'text-green-500' : 'text-muted-foreground'}`}
+                                                titleAccess={agent.toolConfigsApplied?.[toolDetail.id] ? "Configurada" : "Requer Configuração"}
+                                            />
+                                        )}
                                     </Button>
                                 ))}
                             </div>
@@ -874,4 +973,3 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-    
