@@ -1,14 +1,75 @@
 
+"use client";
+
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info } from "lucide-react";
 import Image from "next/image";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AgentBuilderPage() {
+  const { toast } = useToast();
+
+  const [agentName, setAgentName] = React.useState("");
+  const [agentDescription, setAgentDescription] = React.useState("");
+  const [agentModel, setAgentModel] = React.useState("");
+  const [agentVersion, setAgentVersion] = React.useState("1.0.0");
+  // Placeholder para ferramentas, pode ser uma lista de strings ou objetos mais complexos
+  const [agentTools, setAgentTools] = React.useState<string[]>([]); 
+
+  const handleCreateNewAgent = () => {
+    setAgentName("");
+    setAgentDescription("");
+    setAgentModel("");
+    setAgentVersion("1.0.0");
+    setAgentTools([]);
+    toast({
+      title: "Formulário Limpo",
+      description: "Você pode começar a configurar um novo agente.",
+      action: <Info className="text-blue-500" />,
+    });
+  };
+
+  const handleSaveConfiguration = () => {
+    if (!agentName || !agentModel) {
+      toast({
+        title: "Campos Obrigatórios",
+        description: "Nome do Agente e Modelo de IA são obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const agentConfiguration = {
+      name: agentName,
+      description: agentDescription,
+      model: agentModel,
+      version: agentVersion,
+      tools: agentTools, // Incluído no log
+    };
+    console.log("Configuração do Agente Salva:", agentConfiguration);
+    toast({
+      title: "Configuração Salva!",
+      description: `O agente "${agentName}" foi salvo com sucesso (simulado).`,
+    });
+  };
+
+  const handleAddTool = () => {
+    // Placeholder para a lógica de adicionar ferramenta
+    // Poderia abrir um modal ou adicionar um campo de input para nome da ferramenta
+    console.log("Botão 'Adicionar Ferramenta' clicado. Funcionalidade a ser implementada.");
+    setAgentTools(prevTools => [...prevTools, `Nova Ferramenta ${prevTools.length + 1}`]); // Exemplo
+    toast({
+      title: "Adicionar Ferramenta",
+      description: "Interface para adicionar ferramentas ainda em desenvolvimento. Uma ferramenta de exemplo foi adicionada.",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -16,7 +77,7 @@ export default function AgentBuilderPage() {
           <Cpu className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Construtor de Agentes</h1>
         </div>
-        <Button>
+        <Button onClick={handleCreateNewAgent}>
           <PlusCircle className="mr-2 h-4 w-4" /> Criar Novo Agente
         </Button>
       </header>
@@ -34,11 +95,21 @@ export default function AgentBuilderPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="agentName">Nome do Agente</Label>
-              <Input id="agentName" placeholder="ex: Agente de Suporte ao Cliente" />
+              <Input 
+                id="agentName" 
+                placeholder="ex: Agente de Suporte ao Cliente" 
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="agentDescription">Descrição</Label>
-              <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo deste agente..." />
+              <Textarea 
+                id="agentDescription" 
+                placeholder="Descreva a função principal e o objetivo deste agente..." 
+                value={agentDescription}
+                onChange={(e) => setAgentDescription(e.target.value)}
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -46,7 +117,7 @@ export default function AgentBuilderPage() {
                 <p className="text-xs text-muted-foreground">
                   Selecione o provedor e modelo de IA que seu agente utilizará. A integração é feita através do Genkit. Para opções como OpenRouter, Requestly ou outros endpoints HTTP, você precisará configurar um fluxo Genkit personalizado.
                 </p>
-                <Select>
+                <Select value={agentModel} onValueChange={setAgentModel}>
                   <SelectTrigger id="agentModel">
                     <SelectValue placeholder="Selecione um provedor/modelo" />
                   </SelectTrigger>
@@ -62,7 +133,12 @@ export default function AgentBuilderPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agentVersion">Versão</Label>
-                <Input id="agentVersion" placeholder="1.0.0" defaultValue="1.0.0" />
+                <Input 
+                  id="agentVersion" 
+                  placeholder="1.0.0" 
+                  value={agentVersion}
+                  onChange={(e) => setAgentVersion(e.target.value)}
+                />
               </div>
             </div>
              <div className="space-y-2">
@@ -70,14 +146,23 @@ export default function AgentBuilderPage() {
               <Card>
                 <CardContent className="p-4 space-y-3">
                   <p className="text-sm text-muted-foreground">Selecione e configure ferramentas (ex: busca na web, acesso a APIs) via Genkit.</p>
-                  <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Ferramenta</Button>
-                  {/* Placeholder for selected tools list */}
+                  <Button variant="outline" size="sm" onClick={handleAddTool}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Ferramenta</Button>
+                  {agentTools.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <h4 className="text-xs font-medium">Ferramentas Adicionadas:</h4>
+                      <ul className="list-disc list-inside text-xs text-muted-foreground">
+                        {agentTools.map((tool, index) => (
+                          <li key={index}>{tool}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </CardContent>
           <CardFooter>
-            <Button>
+            <Button onClick={handleSaveConfiguration}>
               <Save className="mr-2 h-4 w-4" /> Salvar Configuração do Agente
             </Button>
           </CardFooter>
@@ -116,3 +201,5 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
+    
