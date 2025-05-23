@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2 } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -24,11 +24,13 @@ interface AvailableTool {
 }
 
 const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet." },
-  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos." },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em documentos ou bases de dados internas." },
-  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda." },
-  { id: "customApiIntegration", label: "Integração com API Externa", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com outros serviços via API (requer configuração Genkit específica)." },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit." },
+  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit)." },
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit)." },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit)." },
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão)." },
+  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
 
 const agentToneOptions = [
@@ -285,8 +287,11 @@ export default function AgentBuilderPage() {
     
     const selectedToolObjects = agentTools.map(toolId => availableTools.find(t => t.id === toolId)?.label).filter(Boolean);
     if (selectedToolObjects.length > 0) {
-        prompt += `Ferramentas Disponíveis: ${selectedToolObjects.join(', ')}\n\n`;
+        prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n- ${selectedToolObjects.join('\n- ')}\n\n`;
     }
+    prompt += "Responda de forma concisa e direta ao ponto, a menos que o tom da personalidade peça o contrário.\n";
+    prompt += "Se precisar usar uma ferramenta, indique qual ferramenta usaria e porquê antes de pedir para o usuário aguardar a execução.\n";
+
 
     return prompt.trim() || "Você é um assistente prestativo."; // Fallback
   };
@@ -532,7 +537,7 @@ export default function AgentBuilderPage() {
                   <div className="space-y-2">
                     <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
                      <p className="text-xs text-muted-foreground">
-                      Escolha o modelo de IA para o agente LLM.
+                      Escolha o modelo Gemini do Google para o agente LLM. A integração com outros modelos (ex: OpenRouter) ou endpoints mock (ex: Requestly) pode ser feita configurando-os como uma "Ferramenta do Agente" e utilizando o "Cofre de Chaves API".
                     </p>
                     <Select value={agentModel} onValueChange={setAgentModel}>
                       <SelectTrigger id="agentModel">
@@ -543,8 +548,8 @@ export default function AgentBuilderPage() {
                         <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
                         <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
                         <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
-                        <SelectItem value="openrouter/custom">OpenRouter (requer configuração de Ferramenta Genkit)</SelectItem>
-                        <SelectItem value="requestly/custom">Requestly Mock (requer configuração de Ferramenta Genkit)</SelectItem>
+                        <SelectItem value="openrouter/custom">OpenRouter (requer configuração como Ferramenta Genkit)</SelectItem>
+                        <SelectItem value="requestly/custom">Requestly Mock (requer configuração como Ferramenta Genkit)</SelectItem>
                         <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -577,14 +582,14 @@ export default function AgentBuilderPage() {
                   <AlertTitle>Agente de Fluxo de Trabalho</AlertTitle>
                   <AlertDescription>
                     Agentes de fluxo de trabalho controlam a execução de outros agentes ou tarefas em padrões predefinidos (Sequencial, Paralelo, Loop).
-                    Uma interface visual dedicada para desenhar esses fluxos é um recurso planejado para o futuro.
+                    Uma interface visual dedicada para desenhar esses fluxos é um recurso planejado para o futuro. Por enquanto, descreva o fluxo abaixo.
                   </AlertDescription>
                 </Alert>
                 <div className="space-y-2">
                   <Label htmlFor="workflowDescription">Descrição do Fluxo de Trabalho</Label>
                   <Textarea 
                     id="workflowDescription" 
-                    placeholder="Descreva as etapas, a ordem e a lógica do seu fluxo de trabalho. Ex: 'Etapa 1: Agente A. Etapa 2 (Paralelo): Agente B e Agente C. Etapa 3: Agente D se resultado de B for X.'" 
+                    placeholder="Descreva as etapas, a ordem e a lógica do seu fluxo de trabalho. Ex: 'Etapa 1: Agente A (LLM). Etapa 2 (Paralelo): Agente B (LLM com ferramenta de busca) e Agente C (Custom para API interna). Etapa 3: Agente D (LLM para resumo) se resultado de B for X.'" 
                     value={workflowDescription}
                     onChange={(e) => setWorkflowDescription(e.target.value)}
                     rows={6}
@@ -600,17 +605,17 @@ export default function AgentBuilderPage() {
                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><FileJson className="w-5 h-5 text-primary/80" /> Configuração do Agente Personalizado</h3>
                 <Alert className="mb-4">
                   <FileJson className="h-4 w-4" />
-                  <AlertTitle>Agente Personalizado</AlertTitle>
+                  <AlertTitle>Agente Personalizado (Lógica via Genkit Flow)</AlertTitle>
                   <AlertDescription>
                     Agentes personalizados são criados estendendo a lógica base com fluxos Genkit customizados.
-                    Isto permite implementar lógicas operacionais únicas ou integrações especializadas que não são cobertas pelos tipos padrão. Requer desenvolvimento de código.
+                    Isto permite implementar lógicas operacionais únicas, integrações especializadas ou comportamentos complexos que não são cobertos pelos tipos padrão. Requer desenvolvimento de código para o fluxo Genkit.
                   </AlertDescription>
                 </Alert>
                 <div className="space-y-2">
                   <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
                   <Textarea 
                     id="customLogicDescription" 
-                    placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit personalizado implementará. Ex: 'Este agente se conectará a uma API interna de CRM para buscar dados de clientes e então usará um LLM para resumir o histórico do cliente.'" 
+                    placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit personalizado implementará. Ex: 'Este agente se conectará a uma API interna de CRM para buscar dados de clientes e então usará um LLM para resumir o histórico do cliente, utilizando uma ferramenta de análise de sentimento no resumo.'" 
                     value={customLogicDescription}
                     onChange={(e) => setCustomLogicDescription(e.target.value)}
                     rows={6}
@@ -636,15 +641,15 @@ export default function AgentBuilderPage() {
           </div>
           
           <div className="space-y-4">
-            <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas e Integrações (Genkit Tools)</Label>
+            <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</Label>
             <Card className="bg-muted/10">
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Selecione as ferramentas pré-configuradas que seu agente poderá utilizar. Estas são relevantes para Agentes LLM ou podem ser invocadas por Agentes Personalizados ou etapas de um Fluxo de Trabalho.
+                  Capacite seu agente com diversas ferramentas. Estas são funcionalidades que o agente (especialmente Agentes LLM) pode decidir usar para interagir com o mundo exterior, buscar informações ou realizar tarefas. A implementação real de cada ferramenta geralmente requer a criação de um fluxo Genkit correspondente e, para serviços externos, chaves API gerenciadas no "Cofre de Chaves API".
                 </p>
                 <div className="space-y-3 pt-2">
                   {availableTools.map((tool) => (
-                    <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                    <div key={tool.id} className="flex items-start p-3 border rounded-md bg-card hover:bg-muted/50 transition-colors">
                       <Checkbox
                         id={`tool-${tool.id}`}
                         checked={agentTools.includes(tool.id)}
@@ -775,4 +780,6 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+    
+
     
