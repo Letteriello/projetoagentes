@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain } from "lucide-react"; // Adicionado Brain
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -19,16 +19,34 @@ export default function AgentBuilderPage() {
 
   const [agentName, setAgentName] = React.useState("");
   const [agentDescription, setAgentDescription] = React.useState("");
-  const [agentSystemPrompt, setAgentSystemPrompt] = React.useState("");
+  
+  // Campos para construção guiada do system prompt
+  const [agentGoal, setAgentGoal] = React.useState("");
+  const [agentTasks, setAgentTasks] = React.useState("");
+  const [agentPersonality, setAgentPersonality] = React.useState("");
+  const [agentRestrictions, setAgentRestrictions] = React.useState("");
+
   const [agentModel, setAgentModel] = React.useState("");
-  const [agentTemperature, setAgentTemperature] = React.useState([0.7]); // Slider value is an array
+  const [agentTemperature, setAgentTemperature] = React.useState([0.7]);
   const [agentVersion, setAgentVersion] = React.useState("1.0.0");
-  const [agentTools, setAgentTools] = React.useState<string[]>([]); 
+  const [agentTools, setAgentTools] = React.useState<string[]>([]);
+
+  const constructSystemPrompt = () => {
+    let prompt = "";
+    if (agentGoal) prompt += `Objetivo Principal: ${agentGoal}\n\n`;
+    if (agentTasks) prompt += `Tarefas Principais:\n${agentTasks}\n\n`;
+    if (agentPersonality) prompt += `Personalidade/Tom: ${agentPersonality}\n\n`;
+    if (agentRestrictions) prompt += `Restrições Importantes:\n${agentRestrictions}\n\n`;
+    return prompt.trim() || "Você é um assistente prestativo."; // Fallback
+  };
 
   const handleCreateNewAgent = () => {
     setAgentName("");
     setAgentDescription("");
-    setAgentSystemPrompt("");
+    setAgentGoal("");
+    setAgentTasks("");
+    setAgentPersonality("");
+    setAgentRestrictions("");
     setAgentModel("");
     setAgentTemperature([0.7]);
     setAgentVersion("1.0.0");
@@ -50,10 +68,16 @@ export default function AgentBuilderPage() {
       return;
     }
 
+    const systemPrompt = constructSystemPrompt();
+
     const agentConfiguration = {
       name: agentName,
       description: agentDescription,
-      systemPrompt: agentSystemPrompt,
+      goal: agentGoal,
+      tasks: agentTasks,
+      personality: agentPersonality,
+      restrictions: agentRestrictions,
+      systemPromptGenerated: systemPrompt, // O prompt construído
       model: agentModel,
       temperature: agentTemperature[0],
       version: agentVersion,
@@ -62,13 +86,13 @@ export default function AgentBuilderPage() {
     console.log("Configuração do Agente Salva:", agentConfiguration);
     toast({
       title: "Configuração Salva!",
-      description: `O agente "${agentName}" foi salvo com sucesso (simulado).`,
+      description: `O agente "${agentName}" foi salvo com sucesso (simulado). O prompt do sistema gerado foi: "${systemPrompt}"`,
     });
   };
 
   const handleAddTool = () => {
     console.log("Botão 'Adicionar Ferramenta' clicado. Funcionalidade a ser implementada.");
-    setAgentTools(prevTools => [...prevTools, `Nova Ferramenta ${prevTools.length + 1}`]); // Exemplo
+    setAgentTools(prevTools => [...prevTools, `Nova Ferramenta ${prevTools.length + 1}`]);
     toast({
       title: "Adicionar Ferramenta",
       description: "Interface para adicionar ferramentas ainda em desenvolvimento. Uma ferramenta de exemplo foi adicionada.",
@@ -102,7 +126,7 @@ export default function AgentBuilderPage() {
               <Label htmlFor="agentName">Nome do Agente</Label>
               <Input 
                 id="agentName" 
-                placeholder="ex: Agente de Suporte ao Cliente" 
+                placeholder="ex: Agente de Suporte ao Cliente Avançado" 
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
               />
@@ -116,16 +140,52 @@ export default function AgentBuilderPage() {
                 onChange={(e) => setAgentDescription(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="agentSystemPrompt">Instruções do Sistema (System Prompt)</Label>
-               <Textarea 
-                id="agentSystemPrompt" 
-                placeholder="Defina o papel, personalidade e diretrizes do agente. Ex: 'Você é um assistente virtual amigável e especialista em culinária vegana...'" 
-                value={agentSystemPrompt}
-                onChange={(e) => setAgentSystemPrompt(e.target.value)}
-                rows={4}
-              />
+
+            <Separator />
+            <div>
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções do Agente</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
+                  <Input 
+                    id="agentGoal" 
+                    placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos." 
+                    value={agentGoal}
+                    onChange={(e) => setAgentGoal(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
+                  <Textarea 
+                    id="agentTasks" 
+                    placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos. 3. Indicar onde comprar." 
+                    value={agentTasks}
+                    onChange={(e) => setAgentTasks(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
+                  <Input 
+                    id="agentPersonality" 
+                    placeholder="ex: Amigável, prestativo e um pouco informal." 
+                    value={agentPersonality}
+                    onChange={(e) => setAgentPersonality(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma informação específica ou restrição importante?</Label>
+                  <Textarea 
+                    id="agentRestrictions" 
+                    placeholder="ex: Nunca fornecer informações de contato direto. Não inventar funcionalidades que não existem." 
+                    value={agentRestrictions}
+                    onChange={(e) => setAgentRestrictions(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
             </div>
+
 
             <Separator />
 
@@ -157,7 +217,7 @@ export default function AgentBuilderPage() {
                   <Slider
                     id="agentTemperature"
                     min={0}
-                    max={1} // Gemini models typically go up to 1 or 2. Let's stick to 1 for simplicity.
+                    max={1}
                     step={0.1}
                     value={agentTemperature}
                     onValueChange={setAgentTemperature}
@@ -230,7 +290,7 @@ export default function AgentBuilderPage() {
                 width={600}
                 height={400}
                 className="rounded-md aspect-video object-cover opacity-70"
-                data-ai-hint="diagrama fluxograma ui interativo"
+                data-ai-hint="diagrama interface fluxograma"
               />
               <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes, simplificando a criação de lógicas complexas que seriam implementadas com Genkit.</p>
             </CardContent>
@@ -240,9 +300,9 @@ export default function AgentBuilderPage() {
               <CardTitle>Dicas Rápidas</CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-2 text-muted-foreground">
-              <p>• Defina claramente o objetivo do seu agente nas "Instruções do Sistema" para melhor assistência da IA.</p>
-              <p>• Experimente diferentes temperaturas para ajustar a criatividade do agente.</p>
-              <p>• Comece com modelos mais simples e itere.</p>
+              <p>• Defina claramente o <strong>objetivo</strong> e as <strong>tarefas</strong> do seu agente para melhor assistência da IA.</p>
+              <p>• Experimente diferentes <strong>temperaturas</strong> para ajustar a criatividade.</p>
+              <p>• Seja específico nas <strong>restrições</strong> para evitar comportamentos indesejados.</p>
               <p>• Teste seu agente frequentemente durante o desenvolvimento.</p>
             </CardContent>
           </Card>
@@ -251,6 +311,5 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-    
 
     
