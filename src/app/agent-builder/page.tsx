@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,23 +34,27 @@ export default function AgentBuilderPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="agentName">Nome do Agente</Label>
-              <Input id="agentName" placeholder="ex: Profissional de Suporte ao Cliente" />
+              <Input id="agentName" placeholder="ex: Agente de Suporte ao Cliente" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="agentDescription">Descrição</Label>
-              <Textarea id="agentDescription" placeholder="Descreva o que este agente faz..." />
+              <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo deste agente..." />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="agentModel">Modelo Base (Google ADK)</Label>
+                <Label htmlFor="agentModel">Modelo de IA (Google via Genkit)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Selecione o modelo de IA generativa do Google (acessado via Genkit) que seu agente utilizará.
+                </p>
                 <Select>
                   <SelectTrigger id="agentModel">
-                    <SelectValue placeholder="Selecione um modelo" />
+                    <SelectValue placeholder="Selecione um modelo Gemini ou personalizado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gemini-pro">Gemini Pro</SelectItem>
-                    <SelectItem value="gemini-flash">Gemini Flash</SelectItem>
-                    <SelectItem value="custom-model">Modelo Personalizado (via ADK)</SelectItem>
+                    <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
+                    <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash</SelectItem>
+                    <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro</SelectItem>
+                    <SelectItem value="custom-via-genkit">Outro Modelo (configurado no Genkit)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -62,7 +67,7 @@ export default function AgentBuilderPage() {
               <Label>Ferramentas e Integrações</Label>
               <Card>
                 <CardContent className="p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">Selecione e configure ferramentas da biblioteca Google ADK.</p>
+                  <p className="text-sm text-muted-foreground">Selecione e configure ferramentas (ex: busca na web, acesso a APIs) via Genkit.</p>
                   <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Ferramenta</Button>
                   {/* Placeholder for selected tools list */}
                 </CardContent>
