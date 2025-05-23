@@ -1,3 +1,4 @@
+
 "use client";
 import type { ReactNode } from 'react';
 import Link from 'next/link';
@@ -15,7 +16,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Bot, Cpu, Sparkles, LineChart, KeyRound, Github, Settings2, UserCircle } from 'lucide-react';
+import { Bot, Cpu, Sparkles, KeyRound, Github, Settings2, UserCircle, MessageSquare } from 'lucide-react'; // Adicionado MessageSquare
 import { AppLogo } from '@/components/icons/logo';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -37,7 +38,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/agent-builder', icon: <Cpu />, label: 'Construtor de Agentes', tooltip: 'Construir Agentes' },
   { href: '/ai-assistant', icon: <Sparkles />, label: 'Assistente de IA', tooltip: 'Assistente de Configuração IA' },
-  { href: '/agent-monitor', icon: <LineChart />, label: 'Monitor de Agentes', tooltip: 'Monitorar Agentes' },
+  { href: '/chat', icon: <MessageSquare />, label: 'Chat com Agentes', tooltip: 'Interagir com Agentes' }, // Alterado
   { href: '/api-key-vault', icon: <KeyRound />, label: 'Cofre de Chaves API', tooltip: 'Gerenciar Chaves API' },
 ];
 
