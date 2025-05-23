@@ -20,7 +20,6 @@ export default function AgentBuilderPage() {
   const [agentName, setAgentName] = React.useState("");
   const [agentDescription, setAgentDescription] = React.useState("");
   
-  // Campos para construção guiada do system prompt
   const [agentGoal, setAgentGoal] = React.useState("");
   const [agentTasks, setAgentTasks] = React.useState("");
   const [agentPersonality, setAgentPersonality] = React.useState("");
@@ -77,7 +76,7 @@ export default function AgentBuilderPage() {
       tasks: agentTasks,
       personality: agentPersonality,
       restrictions: agentRestrictions,
-      systemPromptGenerated: systemPrompt, // O prompt construído
+      systemPromptGenerated: systemPrompt,
       model: agentModel,
       temperature: agentTemperature[0],
       version: agentVersion,
@@ -126,7 +125,7 @@ export default function AgentBuilderPage() {
               <Label htmlFor="agentName">Nome do Agente</Label>
               <Input 
                 id="agentName" 
-                placeholder="ex: Agente de Suporte ao Cliente Avançado" 
+                placeholder="ex: Agente de Suporte ao Cliente" 
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
               />
@@ -144,6 +143,9 @@ export default function AgentBuilderPage() {
             <Separator />
             <div>
               <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções do Agente</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Forneça instruções claras para guiar o comportamento do seu agente. As respostas abaixo ajudarão a construir o "Prompt do Sistema" ideal.
+              </p>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
@@ -186,7 +188,6 @@ export default function AgentBuilderPage() {
               </div>
             </div>
 
-
             <Separator />
 
             <div>
@@ -195,7 +196,10 @@ export default function AgentBuilderPage() {
                 <div className="space-y-2">
                   <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
                   <p className="text-xs text-muted-foreground">
-                    Selecione o modelo de IA que seu agente utilizará. A integração com os modelos do Google e outros provedores é feita através do Genkit. Para opções como OpenRouter ou endpoints HTTP personalizados, você precisará de um fluxo Genkit específico.
+                    Escolha o modelo de IA que será o "cérebro" do seu agente. O Genkit é responsável por conectar-se a estes modelos. 
+                    Para modelos do Google, a integração é direta. Para opções como OpenRouter ou outros endpoints HTTP, 
+                    uma configuração de "Ferramenta" Genkit correspondente pode ser necessária para definir como o AgentVerse deve interagir com eles 
+                    (geralmente gerenciando a chave API através do Cofre de Chaves).
                   </p>
                   <Select value={agentModel} onValueChange={setAgentModel}>
                     <SelectTrigger id="agentModel">
@@ -206,9 +210,9 @@ export default function AgentBuilderPage() {
                       <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
                       <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
                       <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
-                      <SelectItem value="openrouter/custom">OpenRouter (requer fluxo Genkit)</SelectItem>
-                      <SelectItem value="requestly/custom">Requestly (requer fluxo Genkit)</SelectItem>
-                      <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Genkit)</SelectItem>
+                      <SelectItem value="openrouter/custom">OpenRouter (requer configuração de Ferramenta Genkit)</SelectItem>
+                      <SelectItem value="requestly/custom">Requestly Mock (requer configuração de Ferramenta Genkit)</SelectItem>
+                      <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -223,7 +227,7 @@ export default function AgentBuilderPage() {
                     onValueChange={setAgentTemperature}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Controla a criatividade da resposta. Baixo = mais focado, Alto = mais aleatório.
+                    Controla a criatividade da resposta. Baixo = mais focado e direto, Alto = mais criativo e variado.
                   </p>
                 </div>
               </div>
@@ -236,7 +240,7 @@ export default function AgentBuilderPage() {
                     <Label htmlFor="agentVersion">Versão do Agente</Label>
                     <Input 
                     id="agentVersion" 
-                    placeholder="1.0.0" 
+                    placeholder="ex: 1.0.0" 
                     value={agentVersion}
                     onChange={(e) => setAgentVersion(e.target.value)}
                     />
@@ -244,10 +248,14 @@ export default function AgentBuilderPage() {
             </div>
             
              <div className="space-y-2">
-              <Label>Ferramentas e Integrações</Label>
+              <Label>Ferramentas e Integrações (Genkit Tools)</Label>
               <Card className="bg-muted/30">
                 <CardContent className="p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">Conecte ferramentas (ex: busca na web, APIs) ao seu agente via Genkit para estender suas capacidades.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Adicione "Ferramentas" (Genkit Tools) para dar ao seu agente habilidades extras, como buscar informações na internet, 
+                    consultar bancos de dados, ou interagir com APIs externas (incluindo provedores de modelos como OpenRouter, se não integrado diretamente acima). 
+                    Cada ferramenta representa uma capacidade que o agente pode decidir usar.
+                  </p>
                   <Button variant="outline" size="sm" onClick={handleAddTool}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Ferramenta</Button>
                   {agentTools.length > 0 && (
                     <div className="mt-3 pt-3 border-t">
@@ -286,11 +294,11 @@ export default function AgentBuilderPage() {
             <CardContent>
               <Image 
                 src="https://placehold.co/600x400.png"
-                alt="Placeholder do Fluxo de Trabalho Visual"
+                alt="Diagrama conceitual de um fluxo de trabalho visual para agentes de IA"
                 width={600}
                 height={400}
                 className="rounded-md aspect-video object-cover opacity-70"
-                data-ai-hint="diagrama interface fluxograma"
+                data-ai-hint="fluxograma interface diagrama"
               />
               <p className="text-sm text-muted-foreground mt-2">Este recurso permitirá a construção visual de fluxos de agentes, simplificando a criação de lógicas complexas que seriam implementadas com Genkit.</p>
             </CardContent>
@@ -303,7 +311,7 @@ export default function AgentBuilderPage() {
               <p>• Defina claramente o <strong>objetivo</strong> e as <strong>tarefas</strong> do seu agente para melhor assistência da IA.</p>
               <p>• Experimente diferentes <strong>temperaturas</strong> para ajustar a criatividade.</p>
               <p>• Seja específico nas <strong>restrições</strong> para evitar comportamentos indesejados.</p>
-              <p>• Teste seu agente frequentemente durante o desenvolvimento.</p>
+              <p>• Teste seu agente frequentemente durante o desenvolvimento na seção "Chat com Agentes".</p>
             </CardContent>
           </Card>
         </div>
@@ -311,5 +319,6 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+    
 
     
