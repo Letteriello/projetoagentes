@@ -1,3 +1,7 @@
+
+"use client";
+
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,12 +16,22 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const apiKeys = [
-  { id: "key_001", serviceName: "OpenAI GPT-4", apiKeyFragment: "sk- জুড়ে..._gH7d", dateAdded: "2023-10-26" },
-  { id: "key_002", serviceName: "Google Maps API", apiKeyFragment: "AIzaS..._zX9o", dateAdded: "2023-11-15" },
-  { id: "key_003", serviceName: "Shopify Admin API", apiKeyFragment: "shpat..._yU8n", dateAdded: "2024-01-05" },
+interface ApiKeyEntry {
+  id: string;
+  serviceName: string;
+  apiKeyFragment: string;
+  apiKeyFull?: string; // Store full key temporarily, in a real app this would be handled securely
+  dateAdded: string;
+  isKeyVisible: boolean;
+}
+
+const initialApiKeys: ApiKeyEntry[] = [
+  { id: "key_001", serviceName: "OpenAI GPT-4", apiKeyFragment: "sk- জুড়ে..._gH7d", apiKeyFull: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_gH7d", dateAdded: "2023-10-26", isKeyVisible: false },
+  { id: "key_002", serviceName: "Google Maps API", apiKeyFragment: "AIzaS..._zX9o", apiKeyFull: "AIzaSyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy_zX9o", dateAdded: "2023-11-15", isKeyVisible: false },
+  { id: "key_003", serviceName: "Shopify Admin API", apiKeyFragment: "shpat..._yU8n", apiKeyFull: "shpatzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_yU8n", dateAdded: "2024-01-05", isKeyVisible: false },
 ];
 
 // This is a placeholder page. In a real application, API keys would be stored securely,
@@ -25,6 +39,61 @@ const apiKeys = [
 // The UI below is for illustrative purposes only.
 
 export default function ApiKeyVaultPage() {
+  const [apiKeys, setApiKeys] = React.useState<ApiKeyEntry[]>(initialApiKeys);
+  const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
+  const [selectedProvider, setSelectedProvider] = React.useState<string>("");
+  const [customServiceName, setCustomServiceName] = React.useState<string>("");
+  const [apiKeyInputValue, setApiKeyInputValue] = React.useState<string>("");
+
+  const toggleKeyVisibility = (keyId: string) => {
+    setApiKeys(
+      apiKeys.map((key) =>
+        key.id === keyId ? { ...key, isKeyVisible: !key.isKeyVisible } : key
+      )
+    );
+  };
+
+  const handleAddApiKey = () => {
+    if (!apiKeyInputValue) {
+      alert("Por favor, insira uma chave API.");
+      return;
+    }
+    
+    let serviceName = selectedProvider;
+    if (selectedProvider === "other" && customServiceName) {
+      serviceName = customServiceName;
+    } else if (selectedProvider === "other" && !customServiceName) {
+      alert("Por favor, insira um nome de serviço personalizado.");
+      return;
+    }
+
+
+    if (!serviceName || serviceName === "other") {
+        alert("Por favor, selecione um provedor ou forneça um nome de serviço personalizado.");
+        return;
+    }
+
+    const newKey: ApiKeyEntry = {
+      id: `key_${Date.now()}`,
+      serviceName: serviceName,
+      apiKeyFragment: `${apiKeyInputValue.substring(0, 5)}...${apiKeyInputValue.substring(apiKeyInputValue.length - 4)}`,
+      apiKeyFull: apiKeyInputValue,
+      dateAdded: new Date().toISOString().split("T")[0],
+      isKeyVisible: false,
+    };
+    setApiKeys([...apiKeys, newKey]);
+    setIsAddKeyDialogOpen(false);
+    setSelectedProvider("");
+    setCustomServiceName("");
+    setApiKeyInputValue("");
+  };
+
+  const resetAddKeyForm = () => {
+    setSelectedProvider("");
+    setCustomServiceName("");
+    setApiKeyInputValue("");
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -32,13 +101,16 @@ export default function ApiKeyVaultPage() {
           <KeyRound className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Cofre de Chaves API</h1>
         </div>
-        <Dialog>
+        <Dialog open={isAddKeyDialogOpen} onOpenChange={(isOpen) => {
+          setIsAddKeyDialogOpen(isOpen);
+          if (!isOpen) resetAddKeyForm();
+        }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => setIsAddKeyDialogOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Nova Chave API
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[475px]">
             <DialogHeader>
               <DialogTitle>Adicionar Nova Chave API</DialogTitle>
               <DialogDescription>
@@ -47,33 +119,69 @@ export default function ApiKeyVaultPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="serviceName" className="text-right">
-                  Nome do Serviço
+                <Label htmlFor="apiProvider" className="text-right">
+                  Provedor
                 </Label>
-                <Input id="serviceName" placeholder="ex: OpenAI" className="col-span-3" />
+                <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                  <SelectTrigger id="apiProvider" className="col-span-3">
+                    <SelectValue placeholder="Selecione um provedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="OpenAI">OpenAI</SelectItem>
+                    <SelectItem value="Google Gemini">Google Gemini</SelectItem>
+                    <SelectItem value="OpenRouter">OpenRouter</SelectItem>
+                    <SelectItem value="Requestly">Requestly (Mock Endpoint)</SelectItem>
+                    <SelectItem value="other">Outro (Personalizado)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              {selectedProvider === "other" && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="customServiceName" className="text-right">
+                    Nome do Serviço
+                  </Label>
+                  <Input 
+                    id="customServiceName" 
+                    placeholder="ex: Meu Serviço Customizado" 
+                    className="col-span-3" 
+                    value={customServiceName}
+                    onChange={(e) => setCustomServiceName(e.target.value)}
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="apiKey" className="text-right">
                   Chave API
                 </Label>
-                <Input id="apiKey" type="password" placeholder="Digite sua chave API" className="col-span-3" />
+                <Input 
+                  id="apiKey" 
+                  type="password" 
+                  placeholder="Cole sua chave API aqui" 
+                  className="col-span-3" 
+                  value={apiKeyInputValue}
+                  onChange={(e) => setApiKeyInputValue(e.target.value)}
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit">Salvar Chave</Button>
+              <Button variant="outline" onClick={() => {
+                setIsAddKeyDialogOpen(false);
+                resetAddKeyForm();
+              }}>Cancelar</Button>
+              <Button type="submit" onClick={handleAddApiKey}>Salvar Chave</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </header>
       <p className="text-muted-foreground">
-        Gerencie suas chaves API para vários serviços usados por seus agentes. As chaves armazenadas aqui são criptografadas para segurança.
+        Gerencie suas chaves API para vários serviços usados por seus agentes. As chaves armazenadas aqui são criptografadas (visualmente) para segurança.
       </p>
 
       <Card>
         <CardHeader>
           <CardTitle>Chaves API Armazenadas</CardTitle>
           <CardDescription>
-            Lista de chaves API atualmente armazenadas. Por segurança, as chaves completas não são exibidas.
+            Lista de chaves API atualmente armazenadas. Por segurança, as chaves completas não são exibidas por padrão.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -81,7 +189,7 @@ export default function ApiKeyVaultPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome do Serviço</TableHead>
-                <TableHead>Fragmento da Chave API</TableHead>
+                <TableHead>Chave API</TableHead>
                 <TableHead>Data de Adição</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -90,14 +198,21 @@ export default function ApiKeyVaultPage() {
               {apiKeys.map((key) => (
                 <TableRow key={key.id}>
                   <TableCell className="font-medium">{key.serviceName}</TableCell>
-                  <TableCell className="font-mono">{key.apiKeyFragment}</TableCell>
+                  <TableCell className="font-mono">
+                    {key.isKeyVisible ? key.apiKeyFull : key.apiKeyFragment}
+                  </TableCell>
                   <TableCell>{key.dateAdded}</TableCell>
-                  <TableCell className="text-right space-x-2">
+                  <TableCell className="text-right space-x-1">
                     <Button variant="ghost" size="icon" aria-label="Editar Chave API">
                       <Edit3 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" aria-label="Alternar Visibilidade da Chave API">
-                      <Eye className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleKeyVisibility(key.id)}
+                      aria-label="Alternar Visibilidade da Chave API"
+                    >
+                      {key.isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                     <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Excluir Chave API">
                       <Trash2 className="h-4 w-4" />
@@ -110,7 +225,7 @@ export default function ApiKeyVaultPage() {
         </CardContent>
          <CardFooter>
           <p className="text-xs text-muted-foreground">
-            Observação: O gerenciamento de chaves API é uma função de segurança crítica. Garanta que controles de acesso adequados e logs de auditoria estejam implementados para sistemas de produção.
+            Observação: O gerenciamento de chaves API é uma função de segurança crítica. Garanta que controles de acesso adequados e logs de auditoria estejam implementados para sistemas de produção. Esta é uma simulação visual.
           </p>
         </CardFooter>
       </Card>
