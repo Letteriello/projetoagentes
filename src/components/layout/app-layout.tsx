@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, Home } from 'lucide-react'; // PanelLeft foi removido pois SidebarToggle o substitui
+import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, Home, PanelLeftClose, PanelRightOpen } from 'lucide-react';
 import {
   Sidebar,
   SidebarHeader,
@@ -14,7 +14,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  useSidebar, // Import useSidebar
+  useSidebar,
   SidebarProvider
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -36,11 +36,9 @@ interface NavItem {
   label: string;
 }
 
-// Removido "Início" e ajustado href de "Agentes"
 const navItems: NavItem[] = [
   { href: '/agent-builder', icon: Cpu, label: 'Agentes' },
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
-  // "Cofre de Chaves API" foi movido para o menu "Minha Conta"
 ];
 
 // Componente interno para o toggle da sidebar, usando o contexto
@@ -51,21 +49,22 @@ function SidebarToggle() {
     return null;
   }
 
+  const isIconOnly = collapsible === 'icon' && state === 'collapsed';
+
   return (
     <Button
       variant="ghost"
-      size="icon"
+      size={isIconOnly ? "icon" : "icon"} // Mantém 'icon' para o padding padrão do botão, mas ajustamos h/w
       className={cn(
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-         // Posicionamento condicional para centralizar no modo ícone
-        (collapsible === 'icon' && state === 'collapsed')
-          ? "relative" // Deixa o flex do pai centralizar
-          : "absolute right-2 top-1/2 -translate-y-1/2" 
+        isIconOnly 
+          ? "h-12 w-12" // Tamanho 48x48px no modo ícone
+          : "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" // Posicionamento e tamanho no modo expandido
       )}
       onClick={toggleSidebar}
       aria-label={state === 'expanded' ? "Colapsar sidebar" : "Expandir sidebar"}
     >
-      {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-5 w-5" />}
+      {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-6 w-6" />}
     </Button>
   );
 }
@@ -76,13 +75,13 @@ function MainLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarInset>
-      {/* Header móvel simplificado, apenas com botão de toggle da sidebar */}
+      {/* Header móvel simplificado */}
       {mounted && isMobile && (
         <header
           className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
         >
           <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
-            <ChevronsRight className="h-5 w-5" /> {/* Ou outro ícone como PanelLeft */}
+            <ChevronsRight className="h-5 w-5" />
           </Button>
         </header>
       )}
@@ -96,18 +95,17 @@ function MainLayout({ children }: { children: ReactNode }) {
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  // Hooks do useSidebar agora são chamados dentro dos componentes que os utilizam diretamente (SidebarToggle, ou aqui para isSidebarIconOnly)
   const { state: sidebarState, isMobile, collapsible, mounted } = useSidebar();
 
-  // Determina se a sidebar está no modo "apenas ícone"
-  // Adicionado 'mounted' para garantir que isMobile e collapsible já foram determinados
   const isSidebarIconOnly = mounted && !isMobile && collapsible === 'icon' && sidebarState === 'collapsed';
 
   return (
     <>
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground" collapsible="icon">
-        <SidebarHeader className="p-4 flex items-center justify-center h-16 relative">
-          {/* O SidebarToggle agora é um componente que usa o contexto */}
+        <SidebarHeader className={cn(
+          "flex items-center relative",
+          isSidebarIconOnly ? "h-14 justify-center p-2" : "h-16 justify-center p-4" // Altura e padding ajustados para modo ícone
+        )}>
           <SidebarToggle />
           {!isSidebarIconOnly && (
             <Link href="/agent-builder" className="hover:text-sidebar-primary/90 transition-colors">
@@ -124,15 +122,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     asChild
                     isActive={pathname === item.href}
                     className={cn(
-                      "justify-start", 
-                       isSidebarIconOnly && "justify-center" 
+                      isSidebarIconOnly ? "justify-center" : "justify-start"
                     )}
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
                     <a>
                       <item.icon className={cn(
                         "flex-shrink-0",
-                        isSidebarIconOnly ? "size-5" : "size-5 mr-2" // Tamanho consistente
+                        isSidebarIconOnly ? "size-6" : "size-5 mr-2" 
                       )} />
                       {!isSidebarIconOnly && <span className="truncate">{item.label}</span>}
                     </a>
@@ -149,15 +146,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   className={cn(
-                    "justify-start w-full",
-                     isSidebarIconOnly && "justify-center" 
+                     isSidebarIconOnly ? "justify-center" : "justify-start w-full"
                   )}
                   tooltip={{ children: "Minha Conta", side: "right", className: "bg-popover text-popover-foreground" }}
                   aria-label="Opções da conta"
                 >
                   <UserCircle className={cn(
                      "flex-shrink-0",
-                     isSidebarIconOnly ? "size-5" : "size-5 mr-2" // Tamanho consistente
+                     isSidebarIconOnly ? "size-6" : "size-5 mr-2" 
                   )} />
                   {!isSidebarIconOnly && <span className="truncate">Minha Conta</span>}
                 </SidebarMenuButton>
