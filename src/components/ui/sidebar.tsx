@@ -24,7 +24,7 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 const SIDEBAR_WIDTH = "16rem" // w-64
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3.5rem"; // Consistent value: 3.5rem (w-14)
+const SIDEBAR_WIDTH_ICON = "3.5rem"; // Consistent value: 3.5rem (w-14 for h-12 buttons)
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextValue = {
@@ -62,7 +62,7 @@ export const SidebarProvider = React.forwardRef<
       defaultOpen = true,
       open: openProp,
       onOpenChange: setOpenProp,
-      collapsible = "icon",
+      collapsible = "icon", 
       className,
       style,
       children,
@@ -72,7 +72,6 @@ export const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
-    // Initialize with defaultOpen, cookie value will be applied client-side
     const [_open, _setOpen] = React.useState(defaultOpen) 
     const [mounted, setMounted] = React.useState(false)
 
@@ -81,7 +80,6 @@ export const SidebarProvider = React.forwardRef<
     }, [])
 
     React.useEffect(() => {
-      // Only read cookie on client after mount and if not controlled
       if (mounted && typeof window !== "undefined" && openProp === undefined) {
         const cookieValue = document.cookie
           .split("; ")
@@ -114,7 +112,7 @@ export const SidebarProvider = React.forwardRef<
       if (isMobile === undefined) return
       if (isMobile) {
         setOpenMobile((current) => !current)
-      } else if (collapsible !== "none") {
+      } else if (collapsible !== "none") { 
         setOpen((current) => !current)
       }
     }, [isMobile, setOpen, setOpenMobile, collapsible])
@@ -144,7 +142,7 @@ export const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
-        collapsible,
+        collapsible, 
       }),
       [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, collapsible]
     )
@@ -156,7 +154,7 @@ export const SidebarProvider = React.forwardRef<
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
-                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON, // Ensured this uses 3.5rem
+                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON, 
                 ...style,
               } as React.CSSProperties
             }
@@ -187,7 +185,7 @@ export const Sidebar = React.forwardRef<
   (
     {
       side = "left",
-      variant = "sidebar", // Default to "sidebar"
+      variant = "sidebar",
       className,
       children,
       ...props
@@ -202,10 +200,7 @@ export const Sidebar = React.forwardRef<
     }, [])
 
     if (!mounted) {
-      // On the server and initial client render before mount, render null to avoid hydration mismatches.
-      // Tailwind's responsive classes (hidden md:block) will handle visibility if needed on a static shell.
-      // However, for complex conditional logic like this sidebar, returning null is often safest.
-      return null; 
+      return null;
     }
 
     if (isMobile) {
@@ -228,18 +223,17 @@ export const Sidebar = React.forwardRef<
       )
     }
     
-    // Desktop sidebar logic
-    let sidebarWidthClass = "w-[var(--sidebar-width)]"; // Default for expanded
+    let sidebarWidthClass = "w-[var(--sidebar-width)]";
     let spacerWidthClass = "w-[var(--sidebar-width)]";
 
     if (collapsible === 'icon' && state === 'collapsed') {
-      sidebarWidthClass = "w-[var(--sidebar-width-icon)]"; // e.g., w-14 (3.5rem)
+      sidebarWidthClass = "w-[var(--sidebar-width-icon)]";
       spacerWidthClass = "w-[var(--sidebar-width-icon)]";
     } else if (collapsible === 'offcanvas' && state === 'collapsed') {
-      sidebarWidthClass = "w-0"; // Collapsed offcanvas is effectively zero width for content flow
+      sidebarWidthClass = "w-0"; 
       spacerWidthClass = "w-0";
     } else if (collapsible === 'none'){
-       // Remains default expanded width
+       // Remains default expanded width (w-[var(--sidebar-width)])
     }
 
 
@@ -247,17 +241,15 @@ export const Sidebar = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "group peer text-sidebar-foreground", 
-          "hidden md:block", // Only for desktop
+          "group peer text-sidebar-foreground hidden md:block", 
           className
         )}
         data-state={state}
-        data-collapsible={collapsible}
+        data-collapsible={collapsible || "none"} 
         data-variant={variant}
         data-side={side}
         {...props} 
       >
-        {/* Spacer div to push content */}
         <div
           className={cn(
             "relative h-svh bg-transparent transition-[width] duration-200 ease-linear",
@@ -266,7 +258,6 @@ export const Sidebar = React.forwardRef<
             (collapsible === 'offcanvas' && state === 'collapsed') && "!w-0" 
           )}
         />
-        {/* Actual sidebar content */}
         <div
           className={cn(
             "fixed inset-y-0 z-10 flex h-svh flex-col overflow-hidden bg-sidebar text-sidebar-foreground transition-[left,right,width] duration-200 ease-linear",
@@ -355,20 +346,17 @@ export const SidebarInset = React.forwardRef<
   }, []);
 
   if (!mounted) {
-    // Render a basic div that will occupy space correctly on server,
-    // without the dynamic margin that depends on client-side state.
-    // Ensure this renders a <div> to match client expectation.
     return <div ref={ref} className={cn("relative flex min-h-svh flex-1 flex-col bg-background", className)} {...props}>{children}</div>;
   }
 
   let marginLeftValue = "0px";
-  if (!isMobile) {
+  if (!isMobile) { 
     if (collapsible === 'icon') {
       marginLeftValue = state === 'expanded' ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON;
     } else if (collapsible === 'offcanvas') {
-       marginLeftValue = "0px"; 
+       marginLeftValue = state === 'expanded' ? SIDEBAR_WIDTH : "0px"; 
     } else { 
-      marginLeftValue = state === 'expanded' ? SIDEBAR_WIDTH : "0px";
+      marginLeftValue = SIDEBAR_WIDTH; 
     }
   }
   
@@ -465,7 +453,7 @@ export const SidebarContent = React.forwardRef<
       data-sidebar="content"
       className={cn(
         "flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2", 
-        collapsible === 'icon' && state === 'collapsed' && "overflow-hidden items-center", 
+        collapsible === 'icon' && state === 'collapsed' && "items-center", 
         className
       )}
       {...props}
@@ -583,7 +571,7 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-12 text-sm", 
+        default: "h-12 text-sm", // Altura padrão de 48px
         sm: "h-9 text-xs", 
         lg: "h-12 text-sm", 
       },
@@ -609,7 +597,7 @@ export const SidebarMenuButton = React.forwardRef<
       asChild = false,
       isActive = false,
       variant = "default",
-      size = "default",
+      size = "default", // Garante que o tamanho padrão seja 'default' (h-12)
       tooltip,
       className: classNameProp,
       children,
@@ -628,9 +616,9 @@ export const SidebarMenuButton = React.forwardRef<
     const isIconOnly = clientMounted && !isMobile && collapsible === 'icon' && state === 'collapsed';
     
     const finalClassName = cn(
-      sidebarMenuButtonVariants({ variant, size }),
+      sidebarMenuButtonVariants({ variant, size }), // Usa o 'size' passado ou o padrão
       clientMounted && isActive && "sidebar-item-active-glow bg-sidebar-accent text-sidebar-accent-foreground font-medium",
-      isIconOnly && "!size-12 !p-0 justify-center",
+      isIconOnly && "!h-12 !w-12 !p-0 justify-center", // Garante h-12 e centraliza
       classNameProp
     );
 
@@ -647,10 +635,11 @@ export const SidebarMenuButton = React.forwardRef<
       </Comp>
     );
 
-    if (!clientMounted || !tooltip || (isMobile === false && state === "expanded" && collapsible !== 'icon') || (isMobile === false && collapsible === 'offcanvas' && state === 'expanded')) {
+    if (!clientMounted || !tooltip) {
       return buttonElement;
     }
     
+    const showTooltip = isIconOnly;
     const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
     
     return (
@@ -658,13 +647,7 @@ export const SidebarMenuButton = React.forwardRef<
         <TooltipTrigger asChild>
           {buttonElement}
         </TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          // Show tooltip only when in icon-only mode on desktop
-          hidden={!(isMobile === false && collapsible === 'icon' && state === 'collapsed')}
-          {...tooltipContentProps}
-        />
+        {showTooltip && <TooltipContent {...tooltipContentProps} />}
       </Tooltip>
     );
   }
