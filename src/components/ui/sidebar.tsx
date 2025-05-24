@@ -522,7 +522,7 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-12 text-sm", // Alterado de h-8 para h-12
+        default: "h-12 text-sm", 
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
       },
@@ -550,21 +550,13 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
-      children, // Adicionado children aqui
+      children, 
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
-
-    const buttonContent = (
-      <>
-        {/* Este wrapper é para garantir que o conteúdo tenha z-index sobre o ::before */}
-        {/* Removido o wrapper <div className="relative z-[1]"> para simplificar e usar CSS global */}
-        {children}
-      </>
-    );
 
     const button = (
       <Comp
@@ -573,14 +565,11 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(
-          sidebarMenuButtonVariants({ variant, size }),
-          isActive && "sidebar-item-active-glow", // Aplicar a classe de brilho aqui
-          className
+          sidebarMenuButtonVariants({ variant, size, className }),
+          isActive && "sidebar-item-active-glow"
         )}
-        {...props}
-      >
-        {buttonContent}
-      </Comp>
+        {...props} // children are passed here
+      />
     )
 
     if (!tooltip) {
@@ -626,8 +615,8 @@ const SidebarMenuAction = React.forwardRef<
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-3", // Ajustado para h-12
-        "peer-data-[size=lg]/menu-button:top-2.5", // Pode precisar de ajuste se lg for usado com h-12
+        "peer-data-[size=default]/menu-button:top-3", 
+        "peer-data-[size=lg]/menu-button:top-2.5", 
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
           "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
@@ -650,8 +639,8 @@ const SidebarMenuBadge = React.forwardRef<
       "absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-sidebar-foreground select-none pointer-events-none",
       "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
       "peer-data-[size=sm]/menu-button:top-1",
-      "peer-data-[size=default]/menu-button:top-3", // Ajustado para h-12
-      "peer-data-[size=lg]/menu-button:top-2.5", // Pode precisar de ajuste se lg for usado com h-12
+      "peer-data-[size=default]/menu-button:top-3", 
+      "peer-data-[size=lg]/menu-button:top-2.5", 
       "group-data-[collapsible=icon]:hidden",
       className
     )}
