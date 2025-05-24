@@ -62,9 +62,9 @@ export const agentToneOptions = [
 ];
 
 export const agentTypeOptions = [
-  { id: "llm", label: "Agente LLM (Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem. (Ex: LlmAgent do ADK)" },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)", icon: <Workflow size={16} />, description: "Controla a execução de outros agentes ou tarefas em padrões predefinidos (sequencial, paralelo, loop) de forma determinística. Não usa LLM para controle de fluxo. (Ex: SequentialAgent, ParallelAgent do ADK)" },
-  { id: "custom", label: "Agente Personalizado (Lógica via Genkit)", icon: <FileJson size={16} />, description: "Implementa lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados. (Ex: Estendendo BaseAgent do ADK)" },
+  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem. (Ex: LlmAgent do ADK)" },
+  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Controla a execução de outros agentes ou tarefas em padrões predefinidos (sequencial, paralelo, loop) de forma determinística. Não usa LLM para controle de fluxo. (Ex: SequentialAgent, ParallelAgent do ADK)" },
+  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implementa lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados. (Ex: Estendendo BaseAgent do ADK)" },
 ];
 
 export interface AgentConfigBase {
@@ -1256,21 +1256,38 @@ export default function AgentBuilderPage() {
                         <CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle>
                         <CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente paralelo."})}>
+                       <CardContent className="space-y-3">
+                        <Alert variant="default" className="mt-3 mb-4 bg-background/50 border-border/70">
+                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                            <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
+                            <AlertDescription className="text-xs">
+                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente.
+                                Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução.
+                                Se você precisar combinar os resultados ou fazer com que eles compartilhem dados, geralmente você precisará: <br/>
+                                1. Fazer com que cada subagente use uma 'Chave de Saída' única para salvar seu resultado individual. <br/>
+                                2. Adicionar um Agente Sequencial subsequente que leia essas 'Chaves de Saída' e processe/mescle os resultados.
+                            </AlertDescription>
+                        </Alert>
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
                           <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela
                         </Button>
                          <div className="p-3 border rounded-md bg-background/70 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span>
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar tarefa paralela."})}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" 
+                                onClick={() => toast({ title: "Em breve!", description: "Configurar Tarefa Paralela: Aqui você definiria as instruções para este subagente, incluindo a output_key que ele usará para armazenar seu resultado individual. Lembre-se que ele rodará em paralelo e, por padrão, de forma isolada de outras tarefas paralelas."})}>
                                 <Settings size={14} />
                               </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover tarefa."})}>
                                 <Trash2 size={14} />
                               </Button>
                             </div>
+                          </div>
+                           <div className="pl-0 space-y-1 mt-1.5"> {/* Adjusted padding to align with GripVertical */}
+                            <Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label>
+                            <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: resultado_imagem_gerada" />
+                            <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela.</p>
                           </div>
                         </div>
                       </CardContent>
@@ -1688,5 +1705,7 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
+    
 
     
