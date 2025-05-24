@@ -14,7 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger,
+  // SidebarTrigger, // SidebarTrigger é para ser usado no conteúdo principal, não aqui
   SidebarInset,
   useSidebar,
 } from '@/components/ui/sidebar';
@@ -35,32 +35,35 @@ const navItems: NavItem[] = [
   { href: '/api-key-vault', icon: KeyRound, label: 'Cofre de Chaves API' },
 ];
 
+// Este componente agora só renderiza o conteúdo principal.
+// O header global foi simplificado e tornado mobile-only.
 function MainLayout({ children }: { children: ReactNode }) {
   const { toggleSidebar } = useSidebar();
-  // headerHeightClass logic can be simplified or managed with CSS variables if complex.
-  // For now, a fixed height is used as an example.
-  const headerHeightClass = "h-16";
-
   return (
-    <SidebarInset>
-      <header className={`sticky top-0 z-40 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur-sm md:px-6 ${headerHeightClass}`}>
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Toggle Sidebar">
+    // SidebarInset é o <main> HTML tag que envolve o conteúdo da página.
+    // Ele já possui flex-1 e flex-col para ocupar o espaço.
+    <SidebarInset> 
+      {/* Cabeçalho apenas para mobile, para o botão de toggle da sidebar */}
+      <header 
+        className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
+      >
+        <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
           <PanelLeft className="h-5 w-5" />
         </Button>
-        <div className="flex-1">
-          {/* Page title or other header elements can go here */}
-        </div>
       </header>
-      <main className="flex-1 flex-col overflow-auto p-4 md:p-6">
-        {children}
-      </main>
+      {/* 
+        O conteúdo da página (children) é renderizado diretamente aqui.
+        As páginas individuais (ex: HomePage, AgentBuilderPage) agora são responsáveis 
+        pelo seu próprio padding interno e gerenciamento de scroll, se necessário.
+      */}
+      {children}
     </SidebarInset>
   );
 }
 
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname(); // Call usePathname directly in AppLayout
+  const pathname = usePathname(); // Chamada do hook no escopo correto
 
   return (
     <SidebarProvider defaultOpen>
@@ -78,7 +81,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <Link href={item.href} legacyBehavior passHref>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href} // pathname is now defined in this scope
+                    isActive={pathname === item.href}
                     className="justify-start"
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
