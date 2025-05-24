@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -236,6 +236,57 @@ const agentTemplates: AgentTemplate[] = [
       agentTools: [],
     },
   },
+  {
+    id: "legal_analyst_basic",
+    name: "Modelo: Analista Jurídico Básico (LLM)",
+    config: {
+      agentType: "llm",
+      agentName: "Analista Jurídico Básico",
+      agentDescription: "Agente para auxiliar na compreensão de conceitos legais e pesquisa de informações jurídicas básicas.",
+      agentGoal: "Ajudar a entender conceitos legais básicos, resumir termos jurídicos e encontrar informações sobre leis (com a ferramenta de busca).",
+      agentTasks: "1. Explicar termos legais em linguagem simples.\n2. Resumir cláusulas contratuais (se fornecidas pelo usuário).\n3. Buscar leis ou jurisprudências sobre um tópico (usando a ferramenta de busca).\n4. Não fornecer aconselhamento jurídico.",
+      agentPersonality: "Profissional e Direto",
+      agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL. Sempre recomendar a consulta a um advogado qualificado. Usar linguagem clara e evitar jargões excessivos. Limitar-se a informações e explicações gerais.",
+      agentModel: "googleai/gemini-1.5-flash-latest",
+      agentTemperature: 0.3,
+      agentVersion: "1.0.0",
+      agentTools: ["webSearch", "knowledgeBase"],
+    },
+  },
+  {
+    id: "medical_triage_info",
+    name: "Modelo: Assistente de Triagem Médica Informativo (LLM)",
+    config: {
+      agentType: "llm",
+      agentName: "Assistente de Triagem Médica (Informativo)",
+      agentDescription: "Agente para fornecer informações gerais sobre sintomas e direcionamento, SEM FORNECER DIAGNÓSTICO.",
+      agentGoal: "Fornecer informações gerais sobre sintomas comuns e possíveis condições, e direcionar para cuidados médicos apropriados, enfatizando que não substitui uma consulta médica.",
+      agentTasks: "1. Coletar informações sobre sintomas descritos pelo usuário.\n2. Oferecer informações gerais sobre possíveis causas relacionadas aos sintomas (com base em conhecimento geral e busca na web).\n3. Sugerir se é apropriado procurar um médico, atendimento de urgência ou autocuidado (com base na gravidade percebida dos sintomas descritos).\n4. Fornecer informações sobre tipos de especialistas médicos relevantes.",
+      agentPersonality: "Empático e Compreensivo",
+      agentRestrictions: "NÃO FORNECER DIAGNÓSTICOS. NÃO SUBSTITUIR A CONSULTA MÉDICA. Sempre enfatizar a importância de consultar um profissional de saúde para diagnósticos e tratamento. Não prescrever medicamentos ou tratamentos. As informações são apenas para fins educativos e informativos.",
+      agentModel: "googleai/gemini-1.5-flash-latest",
+      agentTemperature: 0.5,
+      agentVersion: "1.0.0",
+      agentTools: ["webSearch", "knowledgeBase"],
+    },
+  },
+  {
+    id: "travel_planner_basic",
+    name: "Modelo: Planejador de Viagens Inicial (LLM)",
+    config: {
+      agentType: "llm",
+      agentName: "Planejador de Viagens Inicial",
+      agentDescription: "Agente para ajudar a pesquisar destinos, voos, acomodações e sugerir itinerários básicos.",
+      agentGoal: "Ajudar usuários a pesquisar destinos, voos e acomodações, e fornecer sugestões de itinerários.",
+      agentTasks: "1. Perguntar sobre preferências de viagem (destino, orçamento, datas, tipo de viagem, interesses).\n2. Pesquisar destinos e atrações com base nos critérios (usando busca na web).\n3. Sugerir opções de voos e hotéis (simulado ou via ferramenta de busca), indicando que são exemplos.\n4. Esboçar um itinerário básico com atividades e pontos de interesse.",
+      agentPersonality: "Amigável e Prestativo",
+      agentRestrictions: "Informar que preços, disponibilidade e horários são exemplos e precisam ser verificados em sites de reserva reais. Não fazer reservas ou coletar informações de pagamento. Focar em sugestões e planejamento.",
+      agentModel: "googleai/gemini-1.5-flash-latest",
+      agentTemperature: 0.7,
+      agentVersion: "1.0.0",
+      agentTools: ["webSearch", "customApiIntegration"], // customApiIntegration poderia ser para uma API de viagens mockada
+    },
+  },
 ];
 
 
@@ -372,7 +423,7 @@ export default function AgentBuilderPage() {
                                    (tool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(tool.id) && toolConfigurations[tool.id] ) 
                                  );
             const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, ''); // Use genkitToolName se disponível
-            prompt += `- ${toolNameForPrompt} (${tool.label})${tool.needsConfiguration ? (isConfigured ? " (configurada e pronta para uso)" : " (requer configuração, instrua o usuário a configurá-la se necessário)") : ""}. Descrição: ${tool.description}\n`;
+            prompt += `- ${toolNameForPrompt} (${tool.label}). Descrição: ${tool.description}${tool.needsConfiguration ? (isConfigured ? " (Esta ferramenta está configurada e pronta para uso)" : " (Esta ferramenta requer configuração. Se necessário, instrua o usuário a configurá-la ou informe que não pode usá-la sem configuração)") : ""}\n`;
         });
         prompt += "\n";
     } else {
@@ -577,11 +628,25 @@ export default function AgentBuilderPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {savedAgents.map((agent) => {
               const agentTypeDetails = agentTypeOptions.find(opt => opt.id === agent.agentType);
-              const agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
+              let agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
+              if (agentTypeLabel === 'Agente LLM') agentTypeLabel = 'LLM'; // Shorten for badge
               
-              const AgentIconComponent = agentTypeDetails?.icon ? 
-                React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) : 
-                <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+              let AgentIconComponent: React.ReactNode;
+              switch (agent.templateId) {
+                case 'legal_analyst_basic':
+                  AgentIconComponent = <Briefcase size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+                  break;
+                case 'medical_triage_info':
+                  AgentIconComponent = <Stethoscope size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+                  break;
+                case 'travel_planner_basic':
+                  AgentIconComponent = <Plane size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+                  break;
+                default:
+                  AgentIconComponent = agentTypeDetails?.icon ? 
+                    React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) : 
+                    <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+              }
               
               return (
                 <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
@@ -1095,3 +1160,5 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
+    
