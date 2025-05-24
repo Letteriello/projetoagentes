@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu } from "lucide-react"; 
-import { useState, useRef, useEffect, useActionState } from "react"; 
+import { Separator } from "@/components/ui/separator"; // Added import
+import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu } from "lucide-react";
+import { useState, useRef, useEffect, useActionState } from "react";
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext"; // Importado
@@ -36,10 +37,17 @@ const initialState = {
 };
 
 function SubmitButton() {
-  const [,,isPending] = useActionState(async () => {}, undefined); 
+  // useActionState needs to be called within the component that uses the form.
+  // To get isPending here, it should be passed as a prop or this button
+  // needs to be more tightly coupled with the form's action state.
+  // For now, let's assume isPending is passed as a prop or context if needed.
+  // const [,,isPending] = useActionState(async () => {}, undefined);
+  // This line above will cause an error if uncommented, as useActionState is already used in ChatUI
+  // and hooks cannot be called conditionally or nested in this way.
+  // We will rely on the isPending from the parent ChatUI component.
   return (
-    <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" disabled={isPending} aria-disabled={isPending}>
-      {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+    <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" aria-disabled={false /* Replace with actual isPending if passed */} >
+      {false /* Replace with actual isPending if passed */ ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
       <span className="sr-only">Enviar</span>
     </Button>
   );
@@ -49,10 +57,10 @@ export function ChatUI() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("none"); // 'none' para Assistente Geral/Gem Padrão
-  
+
   const { savedAgents } = useAgents(); // Consumindo o contexto
-  const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState); 
-  
+  const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,8 +79,9 @@ export function ChatUI() {
       ]);
       formRef.current?.reset();
       inputRef.current?.focus();
-      // @ts-ignore 
-      formState.agentResponse = null; 
+      // Reset formState fields after processing
+      // @ts-ignore
+      formState.agentResponse = null;
       // @ts-ignore
       formState.message = "";
     }
@@ -83,7 +92,7 @@ export function ChatUI() {
         variant: "destructive",
       });
        // @ts-ignore
-       formState.message = ""; 
+       formState.message = "";
     }
   }, [formState, isPending]);
 
@@ -97,26 +106,26 @@ export function ChatUI() {
 
     setMessages((prevMessages) => [
       ...prevMessages,
-      { 
-        id: (Date.now() -1).toString(), 
-        text: userInput, 
-        sender: "user", 
+      {
+        id: (Date.now() -1).toString(),
+        text: userInput,
+        sender: "user",
         gem: currentAgent ? undefined : currentGem.name, // Gem só é relevante se nenhum agente específico for usado
-        agentName: currentAgent ? currentAgent.agentName : undefined 
+        agentName: currentAgent ? currentAgent.agentName : undefined
       },
     ]);
-    
+
     // Passar configurações do agente ou do gem para a action
-    if (currentAgent) {
+    if (currentAgent && selectedAgentId !== 'none') {
       formData.set("agentSystemPrompt", currentAgent.systemPromptGenerated || "Você é um assistente prestativo.");
-      formData.set("agentModel", currentAgent.agentModel || "googleai/gemini-2.0-flash");
-      formData.set("agentTemperature", (currentAgent.agentTemperature !== undefined ? currentAgent.agentTemperature : 0.7).toString());
+      if (currentAgent.agentModel) formData.set("agentModel", currentAgent.agentModel);
+      if (currentAgent.agentTemperature !== undefined) formData.set("agentTemperature", currentAgent.agentTemperature.toString());
       // As ferramentas já estão descritas no systemPromptGenerated
     } else {
       formData.set("agentSystemPrompt", currentGem.prompt);
-      // Para o assistente geral, podemos usar o modelo e temperatura padrão do Genkit
+      // Para o assistente geral, podemos usar o modelo e temperatura padrão do Genkit (não precisa passar)
     }
-    
+
     formAction(formData);
   };
 
@@ -214,7 +223,7 @@ export function ChatUI() {
                   </div>
                 </div>
               )}
-              {formState.errors?.userInput && !isPending && ( 
+              {formState.errors?.userInput && !isPending && (
                  <div className="flex justify-end">
                     <p className="text-sm text-destructive mt-1">{formState.errors.userInput.join(", ")}</p>
                  </div>
@@ -233,7 +242,10 @@ export function ChatUI() {
           autoComplete="off"
           required
         />
-        <SubmitButton />
+        <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" disabled={isPending} aria-disabled={isPending}>
+            {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+            <span className="sr-only">Enviar</span>
+        </Button>
       </form>
     </div>
   );
