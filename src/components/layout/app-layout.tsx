@@ -48,22 +48,28 @@ function SidebarToggle() {
     return null;
   }
 
-  const isIconOnly = collapsible === 'icon' && state === 'collapsed';
+  const isExpanded = state === 'expanded';
+  const isIconOnlyMode = collapsible === 'icon';
 
+  // O botão de toggle deve estar sempre visível no modo ícone para permitir expansão,
+  // e na lateral no modo expandido para permitir colapso.
   return (
     <Button
       variant="ghost"
       size="icon"
       className={cn(
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        isIconOnly 
-          ? "h-12 w-12" // Tamanho 48x48px no modo ícone
-          : "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" // Posicionamento e tamanho no modo expandido
+        isIconOnly && isExpanded
+          ? "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" // Expandido, botão na lateral
+          : isIconOnly && !isExpanded 
+            ? "h-12 w-12" // Colapsado (modo ícone), botão maior centralizado
+            : "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" // Modo offcanvas (não é icon) ou não collapsible
+
       )}
       onClick={toggleSidebar}
-      aria-label={state === 'expanded' ? "Colapsar sidebar" : "Expandir sidebar"}
+      aria-label={isExpanded ? "Colapsar sidebar" : "Expandir sidebar"}
     >
-      {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-6 w-6" />}
+      {isExpanded ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-6 w-6" />}
     </Button>
   );
 }
@@ -92,6 +98,7 @@ function MainLayout({ children }: { children: ReactNode }) {
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
+  // useSidebar é chamado aqui para que `isSidebarIconOnly` possa ser usado pelos filhos diretos
   const { state: sidebarState, isMobile, collapsible, mounted } = useSidebar();
 
   const isSidebarIconOnly = mounted && !isMobile && collapsible === 'icon' && sidebarState === 'collapsed';
@@ -100,8 +107,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <>
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground" collapsible="icon">
         <SidebarHeader className={cn(
-          "flex items-center relative",
-          isSidebarIconOnly ? "h-14 justify-center py-2" : "h-16 justify-center p-4" 
+          "flex items-center justify-center relative",
+           isSidebarIconOnly ? "h-14 py-2" : "h-16 p-4" 
         )}>
           <SidebarToggle />
           {!isSidebarIconOnly && (
@@ -118,14 +125,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
-                    className={cn( // A centralização do botão em modo ícone é feita pelo SidebarMenuButton
-                      // isSidebarIconOnly ? "justify-center" : "justify-start"
+                    className={cn(
+                       isSidebarIconOnly ? "justify-center" : "justify-start"
                     )}
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
                     <a>
                       <item.icon className={cn(
-                        "flex-shrink-0 size-5", // Ícone sempre size-5 (20px)
+                        "flex-shrink-0 size-5", 
                         isSidebarIconOnly ? "" : "mr-2" 
                       )} />
                       {!isSidebarIconOnly && <span className="truncate">{item.label}</span>}
@@ -143,13 +150,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   className={cn(
-                    // isSidebarIconOnly ? "justify-center" : "justify-start w-full"
+                     isSidebarIconOnly ? "justify-center w-full" : "justify-start w-full"
                   )}
                   tooltip={{ children: "Minha Conta", side: "right", className: "bg-popover text-popover-foreground" }}
                   aria-label="Opções da conta"
                 >
                   <UserCircle className={cn(
-                     "flex-shrink-0 size-5",  // Ícone sempre size-5 (20px)
+                     "flex-shrink-0 size-5", 
                      isSidebarIconOnly ? "" : "mr-2" 
                   )} />
                   {!isSidebarIconOnly && <span className="truncate">Minha Conta</span>}
@@ -158,10 +165,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <DropdownMenuContent side="right" align="start" className="w-56 bg-popover text-popover-foreground">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => toast({ title: "Em breve!", description: "Página de perfil."})}>
-                  <UserCircle className="mr-2 h-4 w-4" />
-                  <span>Perfil</span>
-                </DropdownMenuItem>
+                <Link href="/profile" passHref legacyBehavior>
+                  <DropdownMenuItem>
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    <span>Perfil</span>
+                  </DropdownMenuItem>
+                </Link>
                 <Link href="/api-key-vault" passHref legacyBehavior>
                   <DropdownMenuItem>
                     <KeyRound className="mr-2 h-4 w-4" />
@@ -183,4 +192,3 @@ export function AppLayout({ children }: { children: ReactNode }) {
     </>
   );
 }
-
