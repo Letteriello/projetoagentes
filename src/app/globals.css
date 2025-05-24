@@ -99,3 +99,49 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .sidebar-item-active-glow {
+    position: relative;
+    /* overflow: hidden; is already on the button via Tailwind class */
+  }
+
+  .sidebar-item-active-glow::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 250%; /* Adjust size for desired glow spread */
+    height: 250%;
+    transform-origin: center center;
+    transform: translate(-50%, -50%) rotate(0deg);
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0%,
+      transparent 70%, /* Majority transparent */
+      hsl(var(--primary) / 0.0) 80%, /* Start of soft transparent edge of glow */
+      hsl(var(--primary) / 0.7) 85%, /* Visible glow part 1 */
+      hsl(var(--primary)) 90%,       /* Peak of glow */
+      hsl(var(--primary) / 0.7) 95%, /* Visible glow part 2 */
+      hsl(var(--primary) / 0.0) 100% /* End of soft transparent edge of glow */
+    );
+    animation: rotateGlow 4s linear infinite;
+    z-index: 0; /* Behind the button's actual background but above its container's bg */
+    border-radius: inherit; /* Inherit border-radius from parent button */
+  }
+
+  /* Ensure button content (icon, text) is above the glow pseudo-element */
+  .sidebar-item-active-glow > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  @keyframes rotateGlow {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg);
+    }
+    100% {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+}
