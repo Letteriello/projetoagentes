@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge"; // Added missing import
 import {
   Dialog,
   DialogContent,
@@ -108,7 +109,7 @@ export function AgentBuilderDialog({
   const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(initialWorkflowConfig.detailedWorkflowType);
   const [workflowDescription, setWorkflowDescription] = React.useState(initialWorkflowConfig.workflowDescription || "");
 
-  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(initialWorkflowConfig.loopMaxIterations);
+  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(initialWorkflowConfig.loopMaxIterations || undefined);
   const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<'none' | 'subagent_signal' | undefined>(initialWorkflowConfig.loopTerminationConditionType || 'none');
   const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(initialWorkflowConfig.loopExitToolName);
   const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(initialWorkflowConfig.loopExitStateKey);
@@ -145,50 +146,48 @@ export function AgentBuilderDialog({
   };
 
   React.useEffect(() => {
-    if (editingAgent) {
-      setSelectedAgentTemplateId(editingAgent.templateId || agentTemplates[0].id);
-      setAgentType(editingAgent.agentType);
-      setAgentName(editingAgent.agentName);
-      setAgentDescription(editingAgent.agentDescription);
-      setAgentVersion(editingAgent.agentVersion);
-      setCurrentAgentTools(editingAgent.agentTools);
-      setToolConfigurations(editingAgent.toolConfigsApplied || {});
+    const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId) || agentTemplates[0];
+    const baseConfig = editingAgent || currentTemplate.config;
 
-      if (editingAgent.agentType === 'llm') {
-        const config = editingAgent as LLMAgentConfig;
-        resetLLMFields(config);
-        resetWorkflowFields();
-        resetCustomLogicFields();
-      } else if (editingAgent.agentType === 'workflow') {
-        const config = editingAgent as WorkflowAgentConfig;
-        resetWorkflowFields(config);
-        resetLLMFields({
-            agentGoal: config.agentGoal || defaultLLMConfigValues.agentGoal,
-            agentTasks: config.agentTasks || defaultLLMConfigValues.agentTasks,
-            agentPersonality: config.agentPersonality || defaultLLMConfigValues.agentPersonality,
-            agentRestrictions: config.agentRestrictions || defaultLLMConfigValues.agentRestrictions,
-            agentModel: config.agentModel || defaultLLMConfigValues.agentModel,
-            agentTemperature: config.agentTemperature === undefined ? defaultLLMConfigValues.agentTemperature : config.agentTemperature,
-        });
+    setAgentType(baseConfig.agentType);
+    setAgentName(baseConfig.agentName);
+    setAgentDescription(baseConfig.agentDescription);
+    setAgentVersion(baseConfig.agentVersion);
+    setCurrentAgentTools(baseConfig.agentTools);
+    setToolConfigurations(editingAgent?.toolConfigsApplied || {});
+
+    const llmSource = editingAgent || (currentTemplate.config.agentType === 'llm' ? currentTemplate.config : defaultLLMConfigValues);
+    resetLLMFields(llmSource as Partial<LLMAgentConfig>);
+
+
+    if (editingAgent) {
+      setSelectedAgentTemplateId(editingAgent.templateId || currentTemplate.id);
+      if (editingAgent.agentType === 'workflow') {
+        resetWorkflowFields(editingAgent);
         resetCustomLogicFields();
       } else if (editingAgent.agentType === 'custom') {
-        const config = editingAgent as CustomAgentConfig;
-        resetCustomLogicFields(config);
-        resetLLMFields({
-            agentGoal: config.agentGoal || defaultLLMConfigValues.agentGoal,
-            agentTasks: config.agentTasks || defaultLLMConfigValues.agentTasks,
-            agentPersonality: config.agentPersonality || defaultLLMConfigValues.agentPersonality,
-            agentRestrictions: config.agentRestrictions || defaultLLMConfigValues.agentRestrictions,
-            agentModel: config.agentModel || defaultLLMConfigValues.agentModel,
-            agentTemperature: config.agentTemperature === undefined ? defaultLLMConfigValues.agentTemperature : config.agentTemperature,
-        });
+        resetCustomLogicFields(editingAgent);
         resetWorkflowFields();
+      } else { // llm
+        resetWorkflowFields();
+        resetCustomLogicFields();
       }
     } else {
-      handleTemplateChange(agentTemplates[0].id, true);
+      // New agent or template changed
+      if (currentTemplate.config.agentType === 'workflow') {
+        resetWorkflowFields(currentTemplate.config as WorkflowAgentConfig);
+        resetCustomLogicFields();
+      } else if (currentTemplate.config.agentType === 'custom') {
+        resetCustomLogicFields(currentTemplate.config as CustomAgentConfig);
+        resetWorkflowFields();
+      } else { // llm
+        resetWorkflowFields();
+        resetCustomLogicFields();
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingAgent, isOpen]);
+  }, [editingAgent, selectedAgentTemplateId, agentTemplates]);
+
 
   const resetLLMFields = (config: Partial<LLMAgentConfig>) => {
     setAgentGoal(config.agentGoal || defaultLLMConfigValues.agentGoal);
@@ -213,71 +212,34 @@ export function AgentBuilderDialog({
     setCustomLogicDescription(config?.customLogicDescription || "");
   };
 
-  const handleTemplateChange = (templateId: string, isInitialLoadOrNew = false) => {
-    const template = agentTemplates.find(t => t.id === templateId);
-    if (template) {
-      setSelectedAgentTemplateId(templateId);
-      const config = template.config;
-      setAgentType(config.agentType);
-
-      if ((isInitialLoadOrNew && !editingAgent) || !isInitialLoadOrNew) {
-          setAgentName(config.agentName);
-          setAgentDescription(config.agentDescription);
-          setAgentVersion(config.agentVersion);
-          setCurrentAgentTools(config.agentTools);
-          setToolConfigurations({});
-      }
-
-      if (config.agentType === 'llm') {
-        resetLLMFields(config);
-        resetWorkflowFields();
-        resetCustomLogicFields();
-      } else if (config.agentType === 'workflow') {
-        resetLLMFields(config as Partial<LLMAgentConfig>);
-        resetWorkflowFields(config);
-        resetCustomLogicFields();
-      } else if (config.agentType === 'custom') {
-        resetLLMFields(config as Partial<LLMAgentConfig>);
-        resetWorkflowFields();
-        resetCustomLogicFields(config);
-      }
-    }
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedAgentTemplateId(templateId);
+    // useEffect will handle resetting fields based on the new template
   };
 
   const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
     setAgentType(newAgentType);
-    if (newAgentType === 'llm') {
-        resetWorkflowFields();
-        resetCustomLogicFields();
-        const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId);
-        if (currentTemplate && currentTemplate.config.agentType !== 'llm' && (!editingAgent || editingAgent.agentType !== 'llm')) {
-           resetLLMFields(defaultLLMConfigValues);
-        }
-    } else if (newAgentType === 'workflow') {
-        resetCustomLogicFields();
-        if (agentType !== 'workflow' && (!editingAgent || editingAgent.agentType !== 'workflow')) {
-            resetWorkflowFields({ detailedWorkflowType: undefined, workflowDescription: "" });
-        }
-    } else if (newAgentType === 'custom') {
-        resetWorkflowFields();
-        if(agentType !== 'custom' && (!editingAgent || editingAgent.agentType !== 'custom')) {
-            resetCustomLogicFields();
-        }
-    }
+    // Fields specific to other types are reset by useEffect when template or editingAgent changes,
+    // or should be conditionally rendered.
+    // If changing type away from LLM, ensure LLM specific fields are cleared if necessary
+    // or just rely on them not being saved if not relevant to the new type.
+    // For now, we'll let the general useEffect handle it, or the save logic will pick the correct fields.
   };
 
   const constructSystemPrompt = () => {
     const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType, agentName, agentDescription, workflowDescription, detailedWorkflowType, loopMaxIterations, loopTerminationConditionType, loopExitToolName, loopExitStateKey, loopExitStateValue, customLogicDescription };
+    
     let prompt = `Você é um agente de IA. Seu nome é "${currentConfig.agentName || 'Agente'}".\n`;
 
     if (currentConfig.agentDescription) {
       prompt += `Sua descrição geral é: "${currentConfig.agentDescription}".\n`;
     }
-
+    
     const agentTypeDetail = agentTypeOptions.find(opt => opt.id === currentConfig.agentType);
     if(agentTypeDetail){
       prompt += `Seu tipo principal é ${agentTypeDetail.label.split(' (')[0].trim()}. ${agentTypeDetail.description}\n`;
     }
+
 
     if (currentConfig.agentType === 'workflow') {
         if (currentConfig.detailedWorkflowType) {
@@ -298,7 +260,8 @@ export function AgentBuilderDialog({
         }
     }
 
-    if (currentConfig.agentGoal || currentConfig.agentTasks || currentConfig.agentPersonality || currentConfig.agentRestrictions) {
+    // Adiciona instruções de LLM se houver ou se for tipo LLM
+    if (currentConfig.agentType === 'llm' || currentConfig.agentGoal || currentConfig.agentTasks || currentConfig.agentPersonality || currentConfig.agentRestrictions) {
         prompt += `\nA seguir, as instruções de comportamento para qualquer capacidade de LLM que você possua (mesmo que seu tipo principal não seja LLM, você pode usar um LLM para tarefas específicas ou descrição):\n\n`;
         if (currentConfig.agentGoal) prompt += `OBJETIVO PRINCIPAL (se usando LLM):\n${currentConfig.agentGoal}\n\n`;
         if (currentConfig.agentTasks) prompt += `TAREFAS PRINCIPAIS A SEREM REALIZADAS (se usando LLM):\n${currentConfig.agentTasks}\n\n`;
@@ -307,6 +270,7 @@ export function AgentBuilderDialog({
           prompt += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE (se usando LLM):\n${currentConfig.agentRestrictions}\n\n`;
         }
     }
+
 
     const selectedToolObjects = currentAgentTools
       .map(toolId => availableTools.find(t => t.id === toolId))
@@ -354,16 +318,24 @@ export function AgentBuilderDialog({
             if (!tool) return null;
 
             let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
-            const iconProp = tool.icon;
-            if (React.isValidElement(iconProp) && typeof iconProp.type === 'function') {
-                 const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
+            
+            // Tenta encontrar o nome do ícone pelo componente. É uma abordagem indireta.
+            // O ideal seria ter o iconName diretamente no objeto `tool`.
+            // Esta lógica assume que o `tool.icon` é um ReactElement com um tipo que corresponde a um dos componentes em `iconComponents`.
+            if (React.isValidElement(tool.icon) && typeof tool.icon.type === 'function') {
+                 const IconComponent = tool.icon.type as React.FC<React.SVGProps<SVGSVGElement>>;
                  const foundIconName = Object.keys(iconComponents).find(
                     name => iconComponents[name] === IconComponent
                  ) as keyof typeof iconComponents | undefined;
                  if (foundIconName) {
                     iconNameKey = foundIconName;
                  }
+            } else if (typeof tool.icon === 'string' && iconComponents[tool.icon as keyof typeof iconComponents]) {
+              // Se tool.icon for uma string e uma chave válida em iconComponents (fallback menos provável)
+              iconNameKey = tool.icon as keyof typeof iconComponents;
             }
+
+
             return { id: tool.id, label: tool.label, iconName: iconNameKey, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName };
         })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
@@ -405,6 +377,7 @@ export function AgentBuilderDialog({
           loopExitToolName: detailedWorkflowType === 'loop' ? loopExitToolName : undefined,
           loopExitStateKey: detailedWorkflowType === 'loop' ? loopExitStateKey : undefined,
           loopExitStateValue: detailedWorkflowType === 'loop' ? loopExitStateValue : undefined,
+          // LLM fields for workflow agent description/general capability
           agentGoal: agentGoal || undefined,
           agentTasks: agentTasks || undefined,
           agentPersonality: agentPersonality || undefined,
@@ -417,6 +390,7 @@ export function AgentBuilderDialog({
           ...agentConfigData,
           agentType: 'custom',
           customLogicDescription,
+          // LLM fields for custom agent description/general capability
           agentGoal: agentGoal || undefined,
           agentTasks: agentTasks || undefined,
           agentPersonality: agentPersonality || undefined,
@@ -429,7 +403,7 @@ export function AgentBuilderDialog({
     const completeAgentConfig: SavedAgentConfiguration = {
       id: editingAgent?.id || `agent-${Date.now()}`,
       templateId: selectedAgentTemplateId,
-      ...(agentConfigData as AgentConfig),
+      ...(agentConfigData as AgentConfig), // Type assertion
       systemPromptGenerated: systemPrompt,
       toolsDetails: selectedToolsDetails,
       toolConfigsApplied: appliedToolConfigs,
@@ -444,7 +418,7 @@ export function AgentBuilderDialog({
         return [...prevTools, toolId];
       } else {
         const newToolConfigs = { ...toolConfigurations };
-        delete newToolConfigs[toolId];
+        delete newToolConfigs[toolId]; // Remove config if tool is deselected
         setToolConfigurations(newToolConfigs);
         return prevTools.filter(id => id !== toolId);
       }
@@ -470,9 +444,10 @@ export function AgentBuilderDialog({
 
   const openToolConfigModal = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    resetModalInputs();
+    resetModalInputs(); // Reset all modal inputs first
 
     const currentConfig = toolConfigurations[tool.id] || {};
+    // Pre-fill with existing configuration for the specific tool
     if (tool.id === "webSearch") {
         setModalGoogleApiKey(currentConfig.googleApiKey || "");
         setModalGoogleCseId(currentConfig.googleCseId || "");
@@ -483,7 +458,7 @@ export function AgentBuilderDialog({
         setModalDbType(currentConfig.dbType || "");
         setModalDbConnectionString(currentConfig.dbConnectionString || "");
         setModalDbUser(currentConfig.dbUser || "");
-        setModalDbPassword(currentConfig.dbPassword || "");
+        // Do not pre-fill password for security, user should re-enter if they want to change it or confirm
         setModalDbName(currentConfig.dbName || "");
         setModalDbHost(currentConfig.dbHost || "");
         setModalDbPort(currentConfig.dbPort || "");
@@ -493,13 +468,14 @@ export function AgentBuilderDialog({
     } else if (tool.id === "calendarAccess") {
         setModalCalendarApiEndpoint(currentConfig.calendarApiEndpoint || "");
     }
+    // Add other tool pre-fills here
     setIsToolConfigModalOpen(true);
   };
 
   const handleSaveToolConfiguration = () => {
     if (!configuringTool) return;
 
-    let newConfigData: Partial<ToolConfigData> = { ...toolConfigurations[configuringTool.id] };
+    let newConfigData: Partial<ToolConfigData> = { ...toolConfigurations[configuringTool.id] }; // Start with existing or empty
 
     if (configuringTool.id === "webSearch") {
       if (!modalGoogleApiKey || !modalGoogleCseId) {
@@ -522,7 +498,7 @@ export function AgentBuilderDialog({
             dbType: modalDbType,
             dbConnectionString: modalDbConnectionString,
             dbUser: modalDbUser,
-            dbPassword: modalDbPassword,
+            dbPassword: modalDbPassword, // Password will be saved if entered
             dbName: modalDbName,
             dbHost: modalDbHost,
             dbPort: modalDbPort,
@@ -541,6 +517,7 @@ export function AgentBuilderDialog({
         }
         newConfigData = { calendarApiEndpoint: modalCalendarApiEndpoint };
     }
+    // Add saving logic for other tools here
 
     setToolConfigurations(prev => ({
       ...prev,
@@ -552,7 +529,10 @@ export function AgentBuilderDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        if (!open) setConfiguringTool(null); // Also reset configuringTool if main dialog closes
+        onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="text-2xl">
@@ -564,24 +544,23 @@ export function AgentBuilderDialog({
         </DialogHeader>
 
         <div className="flex-grow overflow-y-auto p-6 space-y-6">
+          <TooltipProvider> {/* Provider for all tooltips in this dialog */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="agentTemplate" className="flex items-center">
                   <Layers size={16} className="mr-1.5"/>Modelo de Agente Inicial (Template)
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                          <Info size={14} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Modelos pré-configuram o tipo de agente e seus campos, incluindo instruções detalhadas. {!editingAgent ? "Mudar o template reseta os campos." : "Não pode ser alterado durante a edição."}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
+                        <Info size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Modelos pré-configuram o tipo de agente e seus campos, incluindo instruções detalhadas. {!editingAgent ? "Mudar o template reseta os campos para os do novo modelo." : "Não pode ser alterado durante a edição."}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </Label>
-                <Select value={selectedAgentTemplateId} onValueChange={(value) => handleTemplateChange(value)} disabled={!!editingAgent}>
+                <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange} disabled={!!editingAgent}>
                   <SelectTrigger id="agentTemplate">
                     <SelectValue placeholder="Selecione um modelo para começar" />
                   </SelectTrigger>
@@ -597,18 +576,16 @@ export function AgentBuilderDialog({
               <div className="space-y-2">
                 <Label htmlFor="agentType" className="flex items-center">
                   <Share2 size={16} className="mr-1.5"/>Tipo de Agente
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                          <Info size={14} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
+                        <Info size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
                          <p>{agentTypeOptions.find(opt => opt.id === agentType)?.description || "Define a arquitetura e o comportamento fundamental do agente."}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                    </TooltipContent>
+                  </Tooltip>
                 </Label>
                 <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentConfig["agentType"])}>
                   <SelectTrigger id="agentType">
@@ -635,8 +612,7 @@ export function AgentBuilderDialog({
             <div className="space-y-2">
                 <Label htmlFor="agentDescription" className="flex items-center">
                     Descrição Geral do Agente
-                    <TooltipProvider>
-                        <Tooltip>
+                    <Tooltip>
                         <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
                             <Info size={14} />
@@ -645,8 +621,7 @@ export function AgentBuilderDialog({
                         <TooltipContent className="max-w-xs">
                             <p>Esta descrição será incluída no prompt do sistema do agente e pode ser usada por outros agentes para delegação de tarefas.</p>
                         </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    </Tooltip>
                 </Label>
                 <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo geral deste agente..." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} />
             </div>
@@ -690,23 +665,20 @@ export function AgentBuilderDialog({
 
             <div>
               <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {agentType !== 'llm' && !agentModel && '(Opcional para este tipo)'}</h3>
-              <p className="text-sm text-muted-foreground mb-4">Se este agente utilizar um Modelo de Linguagem Grande (LLM) para alguma de suas funções, configure-o aqui.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="agentModel" className="flex items-center">
                         Modelo de IA (via Genkit)
-                        <TooltipProvider>
-                            <Tooltip>
+                        <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
                                 <Info size={14} />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                                <p>Modelos Google são integrados. Outros (OpenRouter, etc.) requerem um fluxo Genkit dedicado no backend e podem não funcionar no chat padrão sem essa customização.</p>
+                                <p>Modelos Google são integrados. Outros (OpenRouter, etc.) requerem um fluxo Genkit dedicado no backend e podem não funcionar no chat padrão sem essa customização. A configuração aqui serve para documentar a intenção e guiar o prompt do sistema.</p>
                             </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
+                        </Tooltip>
                     </Label>
                     <Select value={agentModel} onValueChange={setAgentModel}>
                         <SelectTrigger id="agentModel"><SelectValue placeholder="Selecione um modelo (opcional)" /></SelectTrigger>
@@ -724,8 +696,7 @@ export function AgentBuilderDialog({
                 <div className="space-y-2">
                     <Label htmlFor="agentTemperature" className="flex items-center">
                         Temperatura: {agentTemperature[0].toFixed(1)}
-                        <TooltipProvider>
-                            <Tooltip>
+                        <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
                                 <Info size={14} />
@@ -734,8 +705,7 @@ export function AgentBuilderDialog({
                             <TooltipContent className="max-w-xs">
                                 <p>Controla a criatividade. Baixo = focado, Alto = criativo.</p>
                             </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
+                        </Tooltip>
                     </Label>
                     <Slider id="agentTemperature" min={0} max={1} step={0.1} value={agentTemperature} onValueChange={setAgentTemperature} />
                 </div>
@@ -793,13 +763,11 @@ export function AgentBuilderDialog({
                             <CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <Alert variant="default" className="mt-3 mb-4 bg-card border-border/70">
+                           <Alert variant="default" className="mt-3 mb-4 bg-card border-border/70">
                                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                 <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
                                 <AlertDescription className="text-xs">
-                                    Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente.
-                                    Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução.
-                                    Para coletar e processar esses resultados, geralmente é necessário:
+                                   Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. Para coletar e processar esses resultados, geralmente é necessário:
                                     <br />1. Que cada subagente paralelo use uma 'Chave de Saída' (`output_key`) única para salvar seu resultado individual (ex: no estado da sessão).
                                     <br />2. Adicionar um Agente Sequencial como a próxima etapa no fluxo de trabalho. Este Agente Sequencial pode então conter um `CustomAgent` ou `LlmAgent` para realizar a lógica de combinação, análise ou tomada de decisão com base nos múltiplos resultados paralelos.
                                 </AlertDescription>
@@ -926,20 +894,21 @@ export function AgentBuilderDialog({
                   <p className="text-sm text-muted-foreground">Capacite seu agente com funcionalidades para interagir com o mundo exterior. A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.</p>
                   <div className="space-y-3 pt-2">
                     {availableTools.map((tool) => {
-                        const Icon = getToolIconComponent( (tool.icon as React.ReactElement<{iconName?: keyof typeof iconComponents}>)?.props?.iconName);
-                        const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] &&
-                                            ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
-                                                (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
-                                                (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
-                                                (tool.id === 'knowledgeBase' && toolConfigurations[tool.id]?.knowledgeBaseId) ||
-                                                (tool.id === 'calendarAccess' && toolConfigurations[tool.id]?.calendarApiEndpoint) ||
-                                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfigurations[tool.id] || {}).length > 0)
+                        const isToolSelected = currentAgentTools.includes(tool.id);
+                        const toolConfig = toolConfigurations[tool.id];
+                        const isConfigured = tool.needsConfiguration && toolConfig &&
+                                            ( (tool.id === 'webSearch' && toolConfig.googleApiKey && toolConfig.googleCseId) ||
+                                                (tool.id === 'customApiIntegration' && toolConfig.openapiSpecUrl) ||
+                                                (tool.id === 'databaseAccess' && (toolConfig.dbConnectionString || (toolConfig.dbHost && toolConfig.dbName))) ||
+                                                (tool.id === 'knowledgeBase' && toolConfig.knowledgeBaseId) ||
+                                                (tool.id === 'calendarAccess' && toolConfig.calendarApiEndpoint) ||
+                                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
                                             );
                         return (
                         <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors border-border/50">
                             <Checkbox
                                 id={`tool-${tool.id}`}
-                                checked={currentAgentTools.includes(tool.id)}
+                                checked={isToolSelected}
                                 onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
                                 className="mt-1 mr-3 shrink-0"
                             />
@@ -951,7 +920,7 @@ export function AgentBuilderDialog({
                                 </Label>
                                 <p className="text-xs text-muted-foreground mt-0.5 pl-7">{tool.description}</p>
                             </div>
-                            {tool.needsConfiguration && currentAgentTools.includes(tool.id) && (
+                            {tool.needsConfiguration && isToolSelected && (
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -973,7 +942,15 @@ export function AgentBuilderDialog({
                         {currentAgentTools.map(toolId => {
                             const tool = availableTools.find(t => t.id === toolId);
                             if (!tool) return null;
-                            const isToolConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]);
+                            const toolConfig = toolConfigurations[tool.id];
+                            const isToolConfigured = tool.needsConfiguration && toolConfig &&
+                                                ( (tool.id === 'webSearch' && toolConfig.googleApiKey && toolConfig.googleCseId) ||
+                                                    (tool.id === 'customApiIntegration' && toolConfig.openapiSpecUrl) ||
+                                                    (tool.id === 'databaseAccess' && (toolConfig.dbConnectionString || (toolConfig.dbHost && toolConfig.dbName))) ||
+                                                    (tool.id === 'knowledgeBase' && toolConfig.knowledgeBaseId) ||
+                                                    (tool.id === 'calendarAccess' && toolConfig.calendarApiEndpoint) ||
+                                                    (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
+                                                );
                             return (
                                 <Badge key={toolId} variant={isToolConfigured && tool.needsConfiguration ? "default" : "secondary"} className={cn(isToolConfigured && tool.needsConfiguration && "bg-green-600/20 border-green-500/50 text-green-700 hover:bg-green-600/30", "whitespace-nowrap")}>
                                     {React.cloneElement(tool.icon as React.ReactElement, { size: 12, className: "mr-1.5 inline-block"})}
@@ -981,7 +958,7 @@ export function AgentBuilderDialog({
                                     {tool.needsConfiguration && (
                                         <ConfigureIcon
                                             size={12}
-                                            className={`ml-1.5 ${isToolConfigured ? 'text-green-500' : 'text-blue-500'}`}
+                                            className={`ml-1.5 ${isToolConfigured ? 'text-green-500' : 'text-muted-foreground group-hover:text-primary'}`}
                                             title={isToolConfigured ? "Configurada" : "Requer configuração"}
                                         />
                                     )}
@@ -994,6 +971,7 @@ export function AgentBuilderDialog({
                 </CardContent>
               </Card>
             </div>
+           </TooltipProvider>
         </div>
 
         <DialogFooter className="p-6 pt-4 border-t">
