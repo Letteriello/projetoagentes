@@ -5,8 +5,12 @@ config();
 // O fluxo ai-configuration-assistant.ts foi removido, então a importação abaixo também é removida.
 // import '@/ai/flows/ai-configuration-assistant.ts';
 
+// Importa o fluxo de chat e a nova ferramenta de busca
+import '@/ai/flows/chat-flow.ts';
+import '@/ai/tools/web-search-tool.ts';
+
+
 // Se houver outros fluxos de desenvolvimento para importar, eles podem ser adicionados aqui.
-// Por exemplo: import '@/ai/flows/chat-flow.ts';
 // No entanto, geralmente os fluxos são importados onde são usados (ex: Server Actions)
 // ou o Genkit CLI pode descobri-los automaticamente se estiverem em um diretório padrão
 // dependendo da configuração do Genkit.

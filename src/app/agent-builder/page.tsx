@@ -34,10 +34,11 @@ export interface AvailableTool {
   icon: React.ReactNode;
   description: string;
   needsConfiguration?: boolean;
+  genkitToolName?: string; // Nome da ferramenta como definida no Genkit (ex: performWebSearch)
 }
 
 export const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit (requer Chave API Google e CSE ID).", needsConfiguration: true },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit (requer Chave API Google e CSE ID).", needsConfiguration: true, genkitToolName: "performWebSearch" },
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
   { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração).", needsConfiguration: true },
   { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit e autenticação).", needsConfiguration: true },
@@ -124,7 +125,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string; // Apenas para LLMAgentConfig
-  toolsDetails: Array<{ id: string; label: string; needsConfiguration?: boolean }>;
+  toolsDetails: Array<{ id: string; label: string; needsConfiguration?: boolean; genkitToolName?: string; }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
 
@@ -368,10 +369,10 @@ export default function AgentBuilderPage() {
             const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && 
                                  ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
                                    (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
-                                   // Adicionar aqui outras checagens específicas para ferramentas configuráveis, se houver.
-                                   (tool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(tool.id) && toolConfigurations[tool.id] ) // Assume que outras ferramentas só precisam de `toolConfigurations[tool.id]` para serem consideradas configuradas.
+                                   (tool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(tool.id) && toolConfigurations[tool.id] ) 
                                  );
-            prompt += `- ${tool.label}${tool.needsConfiguration ? (isConfigured ? " (configurada e pronta para uso)" : " (requer configuração, instrua o usuário a configurá-la se necessário)") : ""}\n`;
+            const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, ''); // Use genkitToolName se disponível
+            prompt += `- ${toolNameForPrompt} (${tool.label})${tool.needsConfiguration ? (isConfigured ? " (configurada e pronta para uso)" : " (requer configuração, instrua o usuário a configurá-la se necessário)") : ""}. Descrição: ${tool.description}\n`;
         });
         prompt += "\n";
     } else {
@@ -380,7 +381,7 @@ export default function AgentBuilderPage() {
 
     prompt += "Instruções Gerais de Interação:\n";
     prompt += "- Responda de forma concisa e direta ao ponto, a menos que o tom da personalidade solicite o contrário.\n";
-    prompt += "- Se precisar usar uma ferramenta, indique claramente qual ferramenta seria usada e porquê ANTES de simular a sua execução ou pedir para o usuário aguardar.\n";
+    prompt += "- Se precisar usar uma ferramenta, indique claramente qual ferramenta seria usada (usando seu nome como 'performWebSearch' ou o nome da ferramenta Genkit relevante) e porquê ANTES de simular a sua execução ou pedir para o usuário aguardar.\n";
     prompt += "- Seja transparente sobre suas capacidades e limitações. Se não puder realizar uma tarefa, explique o motivo.\n";
 
     return prompt.trim() || "Você é um assistente prestativo."; // Fallback
@@ -413,7 +414,7 @@ export default function AgentBuilderPage() {
     const selectedToolsDetails = currentAgentTools 
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
-            return tool ? { id: tool.id, label: tool.label, needsConfiguration: tool.needsConfiguration } : null;
+            return tool ? { id: tool.id, label: tool.label, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName } : null;
         })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
 
