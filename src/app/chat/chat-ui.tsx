@@ -7,17 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, User, Bot, SparklesIcon, Settings2, HardDrive } from "lucide-react"; // Updated icons
-import { useState, useRef, useEffect, useTransition, useActionState } from "react"; // Changed import
+import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu } from "lucide-react"; 
+import { useState, useRef, useEffect, useActionState } from "react"; 
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
+import { useAgents } from "@/contexts/AgentsContext"; // Importado
+import type { SavedAgentConfiguration } from "@/app/agent-builder/page"; // Importado
 
 interface Message {
   id: string;
   text: string;
   sender: "user" | "agent" | "system";
-  gem?: string;
-  agent?: string;
+  gem?: string; // Nome da personalidade/gem selecionada
+  agentName?: string; // Nome do agente selecionado
 }
 
 const initialGems = [
@@ -27,12 +29,6 @@ const initialGems = [
   { id: "researcher", name: "Pesquisador Analítico", prompt: "Você é um pesquisador analítico, foque em dados e informações factuais." },
 ];
 
-const initialAgents = [
-  { id: "agent_placeholder_1", name: "Agente de Suporte ao Cliente (ADK)" },
-  { id: "agent_placeholder_2", name: "Agente de Vendas (ADK)" },
-  { id: "agent_custom_flow", name: "Fluxo Personalizado (Genkit)" },
-];
-
 const initialState = {
   message: "",
   agentResponse: null,
@@ -40,10 +36,10 @@ const initialState = {
 };
 
 function SubmitButton() {
-  const { pending } = useActionState(async () => {}, undefined); // useActionState expects an async function
+  const [,,isPending] = useActionState(async () => {}, undefined); 
   return (
-    <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary" disabled={pending} aria-disabled={pending}>
-      {pending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+    <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" disabled={isPending} aria-disabled={isPending}>
+      {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
       <span className="sr-only">Enviar</span>
     </Button>
   );
@@ -51,9 +47,11 @@ function SubmitButton() {
 
 export function ChatUI() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedGem, setSelectedGem] = useState<string>(initialGems[0].id);
-  const [selectedAgent, setSelectedAgent] = useState<string>(initialAgents[0].id);
-  const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState); // Updated hook and order
+  const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("none"); // 'none' para Assistente Geral/Gem Padrão
+  
+  const { savedAgents } = useAgents(); // Consumindo o contexto
+  const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState); 
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -73,8 +71,7 @@ export function ChatUI() {
       ]);
       formRef.current?.reset();
       inputRef.current?.focus();
-       // Reset message in formState to prevent re-adding on subsequent successful submissions without new input
-      // @ts-ignore // formState is mutable here for this reset purpose
+      // @ts-ignore 
       formState.agentResponse = null; 
       // @ts-ignore
       formState.message = "";
@@ -85,7 +82,6 @@ export function ChatUI() {
         description: formState.message,
         variant: "destructive",
       });
-       // Reset message in formState to prevent re-showing toast
        // @ts-ignore
        formState.message = ""; 
     }
@@ -96,14 +92,30 @@ export function ChatUI() {
     const userInput = formData.get("userInput") as string;
     if (!userInput?.trim()) return;
 
+    const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
+    const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
+
     setMessages((prevMessages) => [
       ...prevMessages,
-      { id: (Date.now() -1).toString(), text: userInput, sender: "user", gem: selectedGem, agent: selectedAgent },
+      { 
+        id: (Date.now() -1).toString(), 
+        text: userInput, 
+        sender: "user", 
+        gem: currentAgent ? undefined : currentGem.name, // Gem só é relevante se nenhum agente específico for usado
+        agentName: currentAgent ? currentAgent.agentName : undefined 
+      },
     ]);
-
-    const gemDetails = initialGems.find(g => g.id === selectedGem);
-    formData.set("gemPrompt", gemDetails?.prompt || "Você é um assistente prestativo.");
-    formData.set("selectedAgent", selectedAgent);
+    
+    // Passar configurações do agente ou do gem para a action
+    if (currentAgent) {
+      formData.set("agentSystemPrompt", currentAgent.systemPromptGenerated || "Você é um assistente prestativo.");
+      formData.set("agentModel", currentAgent.agentModel || "googleai/gemini-2.0-flash");
+      formData.set("agentTemperature", (currentAgent.agentTemperature !== undefined ? currentAgent.agentTemperature : 0.7).toString());
+      // As ferramentas já estão descritas no systemPromptGenerated
+    } else {
+      formData.set("agentSystemPrompt", currentGem.prompt);
+      // Para o assistente geral, podemos usar o modelo e temperatura padrão do Genkit
+    }
     
     formAction(formData);
   };
@@ -113,9 +125,12 @@ export function ChatUI() {
     <div className="flex-1 flex flex-col overflow-hidden p-4 md:p-6 gap-4 bg-background">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label htmlFor="gem-selector" className="text-xs font-medium text-muted-foreground px-1">Personalidade (Gem)</Label>
-          <Select value={selectedGem} onValueChange={setSelectedGem}>
-            <SelectTrigger id="gem-selector" className="bg-card border-border focus:ring-primary/50">
+          <Label htmlFor="gem-selector" className="text-xs font-medium text-muted-foreground px-1">
+            <SparklesIcon size={14} className="inline-block mr-1.5 text-primary/70" />
+            Personalidade Base (Gem)
+          </Label>
+          <Select value={selectedGemId} onValueChange={setSelectedGemId} disabled={selectedAgentId !== 'none'}>
+            <SelectTrigger id="gem-selector" className="bg-card border-border focus:ring-primary/50 disabled:opacity-70">
               <SelectValue placeholder="Selecione uma personalidade" />
             </SelectTrigger>
             <SelectContent>
@@ -126,21 +141,29 @@ export function ChatUI() {
               ))}
             </SelectContent>
           </Select>
+           <p className="text-xs text-muted-foreground px-1">Usado se nenhum Agente específico for selecionado.</p>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="agent-selector" className="text-xs font-medium text-muted-foreground px-1">Agente</Label>
-          <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+          <Label htmlFor="agent-selector" className="text-xs font-medium text-muted-foreground px-1">
+            <Cpu size={14} className="inline-block mr-1.5 text-primary/70" />
+            Agente Específico
+          </Label>
+          <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
             <SelectTrigger id="agent-selector" className="bg-card border-border focus:ring-primary/50">
               <SelectValue placeholder="Selecione um agente" />
             </SelectTrigger>
             <SelectContent>
-              {initialAgents.map((agent) => (
+              <SelectItem value="none">Assistente Geral (Usar Gem)</SelectItem>
+              <Separator />
+              {savedAgents.length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Meus Agentes Criados</Label>}
+              {savedAgents.map((agent) => (
                 <SelectItem key={agent.id} value={agent.id}>
-                  {agent.name}
+                  {agent.agentName} ({agent.agentType})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+           <p className="text-xs text-muted-foreground px-1">Substitui a personalidade Gem pela configuração do agente.</p>
         </div>
       </div>
 
@@ -168,9 +191,9 @@ export function ChatUI() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                    {msg.sender === "user" && (
+                    {msg.sender === "user" && (msg.agentName || msg.gem) && (
                        <p className="text-xs opacity-60 mt-1.5 pt-1.5 border-t border-primary-foreground/20">
-                        Enviado para: {initialGems.find(g => g.id === msg.gem)?.name} &bull; {initialAgents.find(a => a.id === msg.agent)?.name}
+                        Enviado para: {msg.agentName ? `Agente: ${msg.agentName}` : `Gem: ${msg.gem}`}
                        </p>
                     )}
                   </div>
@@ -187,11 +210,11 @@ export function ChatUI() {
                         <Bot className="h-5 w-5 animate-pulse" />
                     </div>
                   <div className="p-3 rounded-xl bg-muted max-w-[70%] shadow-sm rounded-bl-none">
-                    <p className="text-sm text-muted-foreground">Digitando...</p>
+                    <p className="text-sm text-muted-foreground">Pensando...</p>
                   </div>
                 </div>
               )}
-              {formState.errors?.userInput && !isPending && ( // Only show if not pending and errors exist
+              {formState.errors?.userInput && !isPending && ( 
                  <div className="flex justify-end">
                     <p className="text-sm text-destructive mt-1">{formState.errors.userInput.join(", ")}</p>
                  </div>
@@ -215,5 +238,3 @@ export function ChatUI() {
     </div>
   );
 }
-
-    

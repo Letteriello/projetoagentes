@@ -15,7 +15,8 @@ import {z} from 'genkit';
 const BasicChatInputSchema = z.object({
   userMessage: z.string().describe('A mensagem do usuário para o agente.'),
   systemPrompt: z.string().optional().describe('O prompt do sistema para guiar o comportamento do agente.'),
-  // agentId: z.string().optional().describe('O ID do agente configurado para usar (para lógica futura).'),
+  modelName: z.string().optional().describe('O nome do modelo de IA a ser usado (ex: googleai/gemini-1.5-pro-latest).'),
+  temperature: z.number().optional().describe('A temperatura para a geração do modelo (ex: 0.7).'),
 });
 export type BasicChatInput = z.infer<typeof BasicChatInputSchema>;
 
@@ -39,26 +40,27 @@ const chatPrompt = ai.definePrompt({
   // e o prompt do sistema.
   prompt: (input: BasicChatInput) => {
     const messages = [];
+    // O systemPrompt agora vem do agente configurado ou do Gem selecionado
     if (input.systemPrompt) {
       messages.push({ role: 'system', content: input.systemPrompt });
+    } else {
+      messages.push({ role: 'system', content: "Você é um assistente prestativo."}); // Fallback
     }
     messages.push({ role: 'user', content: input.userMessage });
     
-    // Por enquanto, este prompt espera uma única resposta em `agentResponse`.
-    // Se quisermos um histórico de chat mais complexo, teríamos que ajustar
-    // o esquema de saída e a lógica aqui.
     return {
       messages,
       output: {
-        format: 'json',
+        format: 'json', // Ainda esperamos JSON, pois o schema de saída é um objeto
         schema: BasicChatOutputSchema,
       },
     };
   },
-  // Configuração do modelo, se necessário (ex: temperatura)
-  // config: {
-  //   temperature: 0.7,
-  // },
+  // Configurações do modelo podem ser sobrescritas aqui ou passadas dinamicamente
+  config: {
+    // A temperatura padrão pode ser definida aqui, mas será sobrescrita se input.temperature for fornecido
+    temperature: 0.7, 
+  },
 });
 
 // Definição do fluxo Genkit
@@ -69,22 +71,21 @@ const internalChatFlow = ai.defineFlow(
     outputSchema: BasicChatOutputSchema,
   },
   async (input: BasicChatInput) => {
-    // console.log("Fluxo: Recebido input:", input);
+    
+    const modelToUse = input.modelName || ai.getModel(); // Usa o modelo do input ou o padrão do Genkit
+    const temperatureToUse = input.temperature; // Usa a temperatura do input, se definida
 
-    // Aqui, em uma implementação mais avançada, você poderia:
-    // 1. Carregar a configuração do agente com base no `input.agentId`.
-    // 2. Usar um modelo específico ou ferramentas específicas para esse agente.
-    // 3. Manter um histórico de chat mais longo.
-
-    const llmResponse = await chatPrompt(input);
+    const llmResponse = await chatPrompt(input, {
+        model: modelToUse, // Passa o modelo dinamicamente
+        config: temperatureToUse !== undefined ? { temperature: temperatureToUse } : undefined, // Passa a temperatura se definida
+      }
+    );
     const output = llmResponse.output();
 
     if (!output) {
       throw new Error("O modelo não retornou uma saída válida.");
     }
     
-    // console.log("Fluxo: Resposta do LLM (output):", output);
     return output;
   }
 );
-

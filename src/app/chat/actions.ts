@@ -6,8 +6,9 @@ import { z } from 'zod';
 
 const ChatMessageSchema = z.object({
   userInput: z.string().min(1, { message: "A mensagem não pode estar vazia." }),
-  gemPrompt: z.string().optional(),
-  selectedAgent: z.string().optional(),
+  agentSystemPrompt: z.string().optional(),
+  agentModel: z.string().optional(),
+  agentTemperature: z.coerce.number().optional(), // Coerce string from FormData to number
 });
 
 interface ChatFormState {
@@ -24,8 +25,9 @@ export async function submitChatMessage(
 ): Promise<ChatFormState> {
   const validatedFields = ChatMessageSchema.safeParse({
     userInput: formData.get('userInput'),
-    gemPrompt: formData.get('gemPrompt'),
-    selectedAgent: formData.get('selectedAgent'),
+    agentSystemPrompt: formData.get('agentSystemPrompt'),
+    agentModel: formData.get('agentModel'),
+    agentTemperature: formData.get('agentTemperature'),
   });
 
   if (!validatedFields.success) {
@@ -36,18 +38,17 @@ export async function submitChatMessage(
     };
   }
 
-  const { userInput, gemPrompt, selectedAgent } = validatedFields.data;
+  const { userInput, agentSystemPrompt, agentModel, agentTemperature } = validatedFields.data;
 
   const input: BasicChatInput = {
     userMessage: userInput,
-    systemPrompt: gemPrompt || "Você é um assistente prestativo.", // Default if not provided
-    // agentId: selectedAgent, // We'll use this later for agent-specific logic
+    systemPrompt: agentSystemPrompt, // Será o systemPrompt do agente ou do Gem
+    modelName: agentModel, // Modelo específico do agente
+    temperature: agentTemperature, // Temperatura específica do agente
   };
 
   try {
-    // console.log("Chamando basicChatFlow com:", input);
     const result: BasicChatOutput = await basicChatFlow(input);
-    // console.log("Resultado do basicChatFlow:", result);
     return {
       message: "Resposta recebida.",
       agentResponse: result.agentResponse,
@@ -55,10 +56,14 @@ export async function submitChatMessage(
     };
   } catch (error) {
     console.error("Erro ao chamar o fluxo de chat:", error);
+    let errorMessage = "Ocorreu um erro ao processar sua mensagem. Tente novamente.";
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
     return {
-      message: "Ocorreu um erro ao processar sua mensagem. Tente novamente.",
+      message: errorMessage,
       agentResponse: null,
-      errors: { userInput: ["Falha ao comunicar com o agente."] },
+      errors: { userInput: ["Falha ao comunicar com o agente: " + errorMessage] },
     };
   }
 }

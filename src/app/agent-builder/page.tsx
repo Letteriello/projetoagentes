@@ -25,8 +25,10 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import { useAgents } from '@/contexts/AgentsContext'; // Importado
 
-interface AvailableTool {
+// Definindo as interfaces aqui para que possam ser exportadas e usadas pelo AgentsContext
+export interface AvailableTool {
   id: string;
   label: string;
   icon: React.ReactNode;
@@ -34,7 +36,7 @@ interface AvailableTool {
   needsConfiguration?: boolean;
 }
 
-const availableTools: AvailableTool[] = [
+export const availableTools: AvailableTool[] = [
   { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit (requer Chave API Google e CSE ID).", needsConfiguration: true },
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
   { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração).", needsConfiguration: true },
@@ -44,7 +46,7 @@ const availableTools: AvailableTool[] = [
   { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
 
-const agentToneOptions = [
+export const agentToneOptions = [
     { id: "friendly", label: "Amigável e Prestativo" },
     { id: "professional", label: "Profissional e Direto" },
     { id: "formal", label: "Formal e Educado" },
@@ -56,20 +58,20 @@ const agentToneOptions = [
     { id: "creative", label: "Criativo e Inspirador" },
 ];
 
-const agentTypeOptions = [
+export const agentTypeOptions = [
   { id: "llm", label: "Agente LLM (Foco em Linguagem e Decisão)" },
   { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)" },
   { id: "custom", label: "Agente Personalizado (Lógica Customizada via Genkit)" },
 ];
 
-interface AgentConfigBase {
+export interface AgentConfigBase {
   agentName: string;
   agentDescription: string;
   agentVersion: string;
   agentTools: string[];
 }
 
-interface LLMAgentConfig extends AgentConfigBase {
+export interface LLMAgentConfig extends AgentConfigBase {
   agentType: "llm";
   agentGoal: string;
   agentTasks: string;
@@ -79,10 +81,9 @@ interface LLMAgentConfig extends AgentConfigBase {
   agentTemperature: number;
 }
 
-interface WorkflowAgentConfig extends AgentConfigBase {
+export interface WorkflowAgentConfig extends AgentConfigBase {
   agentType: "workflow";
   workflowDescription: string;
-  // Campos de LLM podem ser opcionais ou não aplicáveis para workflow puro
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -91,10 +92,9 @@ interface WorkflowAgentConfig extends AgentConfigBase {
   agentTemperature?: number;
 }
 
-interface CustomAgentConfig extends AgentConfigBase {
+export interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
-   // Campos de LLM podem ser opcionais ou não aplicáveis
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -103,23 +103,22 @@ interface CustomAgentConfig extends AgentConfigBase {
   agentTemperature?: number;
 }
 
-type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig;
+export type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig;
 
-interface AgentTemplate {
+export interface AgentTemplate {
   id: string;
   name: string;
   config: AgentConfig;
 }
 
-interface ToolConfigData {
+export interface ToolConfigData {
   googleApiKey?: string;
   googleCseId?: string;
   openapiSpecUrl?: string;
   openapiApiKey?: string;
-  // Futuros campos para outras ferramentas
 }
 
-interface SavedAgentConfiguration extends AgentConfig {
+export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string;
@@ -239,6 +238,7 @@ const agentTemplates: AgentTemplate[] = [
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
+  const { savedAgents, setSavedAgents } = useAgents(); // Usando o contexto
 
   const [selectedAgentTemplateId, setSelectedAgentTemplateId] = React.useState<string>(agentTemplates[0].id);
   const [agentType, setAgentType] = React.useState<AgentConfig["agentType"]>(agentTemplates[0].config.agentType);
@@ -246,7 +246,7 @@ export default function AgentBuilderPage() {
   const [agentName, setAgentName] = React.useState(agentTemplates[0].config.agentName);
   const [agentDescription, setAgentDescription] = React.useState(agentTemplates[0].config.agentDescription);
   const [agentVersion, setAgentVersion] = React.useState(agentTemplates[0].config.agentVersion);
-  const [agentTools, setAgentTools] = React.useState<string[]>(agentTemplates[0].config.agentTools);
+  const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(agentTemplates[0].config.agentTools);
 
   // LLM Specific State
   const [agentGoal, setAgentGoal] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentGoal || "" );
@@ -261,8 +261,6 @@ export default function AgentBuilderPage() {
 
   // Custom Specific State
   const [customLogicDescription, setCustomLogicDescription] = React.useState("");
-
-  const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
 
   // State for tool configurations
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
@@ -300,7 +298,7 @@ export default function AgentBuilderPage() {
       setAgentName(template.config.agentName);
       setAgentDescription(template.config.agentDescription);
       setAgentVersion(template.config.agentVersion);
-      setAgentTools(template.config.agentTools);
+      setCurrentAgentTools(template.config.agentTools); 
 
       if (template.config.agentType === 'llm') {
         const llmConfig = template.config as LLMAgentConfig;
@@ -347,14 +345,14 @@ export default function AgentBuilderPage() {
       prompt += `Restrições Importantes:\n${agentRestrictions}\n\n`;
     }
 
-    const selectedToolObjects = agentTools
+    const selectedToolObjects = currentAgentTools 
       .map(toolId => availableTools.find(t => t.id === toolId))
       .filter(Boolean) as AvailableTool[];
 
     if (selectedToolObjects.length > 0) {
         prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n`;
         selectedToolObjects.forEach(tool => {
-            prompt += `- ${tool.label}${tool.needsConfiguration ? " (configurada e pronta para uso se os parâmetros foram fornecidos)" : ""}\n`;
+            prompt += `- ${tool.label}${tool.needsConfiguration && toolConfigurations[tool.id] ? " (configurada e pronta para uso)" : tool.needsConfiguration ? " (requer configuração)" : ""}\n`;
         });
         prompt += "\n";
     } else {
@@ -376,7 +374,7 @@ export default function AgentBuilderPage() {
     setAgentName(customTemplate.config.agentName);
     setAgentDescription(customTemplate.config.agentDescription);
     setAgentVersion(customTemplate.config.agentVersion);
-    setAgentTools(customTemplate.config.agentTools);
+    setCurrentAgentTools(customTemplate.config.agentTools); 
     setToolConfigurations({}); 
 
     resetLLMFields(defaultLLMConfig);
@@ -386,7 +384,7 @@ export default function AgentBuilderPage() {
     toast({
       title: "Formulário Limpo",
       description: "Você pode começar a configurar um novo agente.",
-      action: <Info className="text-blue-500" />,
+      action: <Info className="text-primary" />,
     });
   };
 
@@ -401,15 +399,18 @@ export default function AgentBuilderPage() {
     }
 
     const systemPrompt = agentType === 'llm' ? constructSystemPrompt() : undefined;
-    const selectedToolsDetails = agentTools
+    const selectedToolsDetails = currentAgentTools 
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
-            return tool ? { id: tool.id, label: tool.label, icon: tool.icon, needsConfiguration: tool.needsConfiguration } : null;
+            // ReactNode não pode ser serializado ou clonado profundamente de forma simples para o contexto.
+            // Vamos armazenar apenas a informação necessária para renderizar (id, label, needsConfig).
+            // O ícone pode ser recuperado da `availableTools` ao renderizar.
+            return tool ? { id: tool.id, label: tool.label, needsConfiguration: tool.needsConfiguration } : null;
         })
-        .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
+        .filter(Boolean) as unknown as SavedAgentConfiguration['toolsDetails']; // Ajuste de tipo temporário
 
     const appliedToolConfigs: Record<string, ToolConfigData> = {};
-    agentTools.forEach(toolId => {
+    currentAgentTools.forEach(toolId => { 
       if (toolConfigurations[toolId]) {
         appliedToolConfigs[toolId] = toolConfigurations[toolId];
       }
@@ -423,7 +424,7 @@ export default function AgentBuilderPage() {
         agentName,
         agentDescription,
         agentVersion,
-        agentTools,
+        agentTools: currentAgentTools, 
         toolsDetails: selectedToolsDetails,
         toolConfigsApplied: appliedToolConfigs,
     };
@@ -445,12 +446,24 @@ export default function AgentBuilderPage() {
         ...baseSavedConfig,
         agentType: 'workflow',
         workflowDescription,
+        agentGoal: undefined,
+        agentTasks: undefined,
+        agentPersonality: undefined,
+        agentRestrictions: undefined,
+        agentModel: undefined,
+        agentTemperature: undefined,
       };
     } else { 
       newAgentConfiguration = {
         ...baseSavedConfig,
         agentType: 'custom',
         customLogicDescription,
+        agentGoal: undefined,
+        agentTasks: undefined,
+        agentPersonality: undefined,
+        agentRestrictions: undefined,
+        agentModel: undefined,
+        agentTemperature: undefined,
       };
     }
 
@@ -464,7 +477,7 @@ export default function AgentBuilderPage() {
   };
 
   const handleToolSelectionChange = (toolId: string, checked: boolean) => {
-    setAgentTools(prevTools => {
+    setCurrentAgentTools(prevTools => { 
       if (checked) {
         return [...prevTools, toolId];
       } else {
@@ -485,7 +498,7 @@ export default function AgentBuilderPage() {
 
   const openToolConfigModal = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    resetModalInputs(); // Reset inputs before opening
+    resetModalInputs(); 
 
     const currentConfig = toolConfigurations[tool.id] || {};
     if (tool.id === "webSearch") {
@@ -516,7 +529,6 @@ export default function AgentBuilderPage() {
       [configuringTool.id]: newConfigData as ToolConfigData,
     }));
     setIsToolConfigModalOpen(false);
-    // Don't reset configuringTool here, allow modal to close first
     toast({ title: `Configuração salva para ${configuringTool.label}`});
   };
 
@@ -538,7 +550,7 @@ export default function AgentBuilderPage() {
         A plataforma visa permitir a criação de diversos tipos de agentes, com o objetivo futuro de suportar sistemas multiagentes complexos.
       </p>
 
-      <Card>
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Configuração do Agente</CardTitle>
           <CardDescription>Defina as propriedades e configurações principais para o seu agente. Você pode começar com um modelo/template que pré-configura o tipo de agente e seus campos, ou criar um agente personalizado do zero.</CardDescription>
@@ -765,7 +777,7 @@ export default function AgentBuilderPage() {
 
           <div className="space-y-4">
             <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</Label>
-            <Card className="bg-card">
+            <Card className="bg-muted/30">
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Capacite seu agente com diversas ferramentas. Estas são funcionalidades que o agente (especialmente Agentes LLM) pode decidir usar para interagir com o mundo exterior, buscar informações ou realizar tarefas. A implementação real de cada ferramenta geralmente requer a criação de um fluxo Genkit correspondente e, para serviços externos, chaves API gerenciadas no "Cofre de Chaves API".
@@ -775,7 +787,7 @@ export default function AgentBuilderPage() {
                     <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
                       <Checkbox
                         id={`tool-${tool.id}`}
-                        checked={agentTools.includes(tool.id)}
+                        checked={currentAgentTools.includes(tool.id)} 
                         onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
                         className="mt-1"
                       />
@@ -786,7 +798,7 @@ export default function AgentBuilderPage() {
                         </Label>
                         <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
                       </div>
-                       {tool.needsConfiguration && agentTools.includes(tool.id) && (
+                       {tool.needsConfiguration && currentAgentTools.includes(tool.id) && ( 
                          <Button 
                             variant="outline" 
                             size="sm" 
@@ -801,20 +813,21 @@ export default function AgentBuilderPage() {
                   ))}
                 </div>
 
-                {agentTools.length > 0 && (
+                {currentAgentTools.length > 0 && ( 
                   <div className="mt-4 pt-3 border-t">
                     <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
                     <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                      {agentTools.map(toolId => {
+                      {currentAgentTools.map(toolId => { 
                           const tool = availableTools.find(t => t.id === toolId);
+                          const toolIcon = tool ? React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5 inline-block" }) : null;
                           return tool ? (
                             <li key={toolId} className="flex items-center">
-                                {React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5"})}
+                                {toolIcon}
                                 {tool.label}
                                 {tool.needsConfiguration && (
                                     <ConfigureIcon 
                                         size={12} 
-                                        className={`ml-1.5 ${toolConfigurations[toolId] ? 'text-green-500' : 'text-muted-foreground'}`}
+                                        className={`ml-1.5 ${toolConfigurations[toolId] ? 'text-green-500' : 'text-blue-500'}`}
                                         titleAccess={toolConfigurations[toolId] ? "Configurada" : "Requer configuração"}
                                     />
                                 )}
@@ -841,11 +854,11 @@ export default function AgentBuilderPage() {
           if (!open) setConfiguringTool(null); 
           setIsToolConfigModalOpen(open);
         }}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Configurar: {configuringTool.label}</DialogTitle>
               <DialogDescription>
-                Forneça os detalhes de configuração para a ferramenta {configuringTool.label}.
+                Forneça os detalhes de configuração para a ferramenta {configuringTool.label}. Estes dados serão usados pelo agente quando ele precisar desta capacidade.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -887,7 +900,7 @@ export default function AgentBuilderPage() {
                     <p className="text-xs text-muted-foreground">O link direto para o arquivo de especificação da API.</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="modalOpenapiApiKey">Chave de API (Opcional)</Label>
+                    <Label htmlFor="modalOpenapiApiKey">Chave de API da API Externa (Opcional)</Label>
                     <Input 
                       id="modalOpenapiApiKey" 
                       value={modalOpenapiApiKey}
@@ -895,7 +908,7 @@ export default function AgentBuilderPage() {
                       placeholder="Se a API requer uma chave de autenticação"
                       type="password"
                     />
-                    <p className="text-xs text-muted-foreground">Necessária se a API OpenAPI for protegida por uma chave.</p>
+                     <p className="text-xs text-muted-foreground">Estas informações serão usadas pelo agente para interagir com a API externa especificada.</p>
                   </div>
                 </>
               )}
@@ -920,97 +933,101 @@ export default function AgentBuilderPage() {
               <Layers className="w-7 h-7 text-primary" /> Meus Agentes Criados
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {savedAgents.map((agent) => (
-                <Card key={agent.id} className="flex flex-col bg-card">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                        <Cpu size={20} className="text-primary" />
-                        {agent.agentName || "Agente Sem Nome"}
-                        </CardTitle>
-                        <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-1 rounded-full">
-                            {agentTypeOptions.find(opt => opt.id === agent.agentType)?.label.split('(')[0].trim() || agent.agentType}
-                        </span>
-                    </div>
-                    <CardDescription className="line-clamp-2 h-[2.5em] pt-1">
-                      {agent.agentDescription || "Sem descrição."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 flex-grow">
-                    {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentGoal && (
-                        <div>
-                            <h4 className="text-sm font-medium mb-1">Objetivo (LLM):</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
-                                {(agent as LLMAgentConfig).agentGoal}
-                            </p>
-                        </div>
-                    )}
-                     {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentModel && (
-                        <div>
-                            <h4 className="text-sm font-medium mb-1">Modelo de IA:</h4>
-                            <p className="text-xs text-muted-foreground">{(agent as LLMAgentConfig).agentModel}</p>
-                        </div>
-                    )}
-                    {agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).workflowDescription && (
-                        <div>
-                            <h4 className="text-sm font-medium mb-1">Descrição do Fluxo:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
-                                {(agent as WorkflowAgentConfig).workflowDescription}
-                            </p>
-                        </div>
-                    )}
-                    {agent.agentType === 'custom' && (agent as CustomAgentConfig).customLogicDescription && (
-                        <div>
-                            <h4 className="text-sm font-medium mb-1">Lógica Personalizada:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
-                                {(agent as CustomAgentConfig).customLogicDescription}
-                            </p>
-                        </div>
-                    )}
-                     {agent.toolsDetails.length > 0 && (
-                        <div className="pt-2">
-                            <h4 className="text-sm font-medium mb-1.5">Ferramentas:</h4>
-                            <div className="flex flex-wrap gap-1.5">
-                                {agent.toolsDetails.map(toolDetail => (
-                                    <Button
-                                        key={toolDetail.id}
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-muted group"
-                                        onClick={toolDetail.needsConfiguration ? () => {
-                                            const fullTool = availableTools.find(t => t.id === toolDetail.id);
-                                            if (fullTool) openToolConfigModal(fullTool);
-                                        } : undefined}
-                                        disabled={!toolDetail.needsConfiguration && !agent.toolConfigsApplied?.[toolDetail.id]}
-                                    >
-                                        {React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12, className: "mr-0.5"})}
-                                        {toolDetail.label}
-                                        {toolDetail.needsConfiguration && (
-                                            <ConfigureIcon 
-                                                size={10} 
-                                                className={`ml-1 opacity-70 group-hover:opacity-100 ${agent.toolConfigsApplied?.[toolDetail.id] ? 'text-green-500' : 'text-muted-foreground'}`}
-                                                titleAccess={agent.toolConfigsApplied?.[toolDetail.id] ? "Configurada" : "Requer Configuração"}
-                                            />
-                                        )}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="gap-2 mt-auto pt-4 border-t">
-                    <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de edição de agente."})}>
-                      <Edit size={16} className="mr-1.5" /> Editar
-                    </Button>
-                     <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat."})}>
-                      <MessageSquare size={16} className="mr-1.5" /> Testar
-                    </Button>
-                    <Button variant="destructive" size="sm" className="ml-auto" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de exclusão de agente."})}>
-                      <Trash2 size={16} className="mr-1.5" /> Excluir
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
+              {savedAgents.map((agent) => {
+                const agentTypeLabel = agentTypeOptions.find(opt => opt.id === agent.agentType)?.label.split('(')[0].trim() || agent.agentType;
+                return (
+                  <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                          <Cpu size={20} className="text-primary" />
+                          {agent.agentName || "Agente Sem Nome"}
+                          </CardTitle>
+                          <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-1 rounded-full">
+                              {agentTypeLabel}
+                          </span>
+                      </div>
+                      <CardDescription className="line-clamp-2 h-[2.5em] pt-1">
+                        {agent.agentDescription || "Sem descrição."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 flex-grow">
+                      {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentGoal && (
+                          <div>
+                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Objetivo (LLM):</h4>
+                              <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
+                                  {(agent as LLMAgentConfig).agentGoal}
+                              </p>
+                          </div>
+                      )}
+                       {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentModel && (
+                          <div>
+                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Modelo de IA:</h4>
+                              <p className="text-xs text-muted-foreground">{(agent as LLMAgentConfig).agentModel}</p>
+                          </div>
+                      )}
+                      {agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).workflowDescription && (
+                          <div>
+                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Descrição do Fluxo:</h4>
+                              <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
+                                  {(agent as WorkflowAgentConfig).workflowDescription}
+                              </p>
+                          </div>
+                      )}
+                      {agent.agentType === 'custom' && (agent as CustomAgentConfig).customLogicDescription && (
+                          <div>
+                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Lógica Personalizada:</h4>
+                              <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
+                                  {(agent as CustomAgentConfig).customLogicDescription}
+                              </p>
+                          </div>
+                      )}
+                       {agent.toolsDetails.length > 0 && (
+                          <div className="pt-2">
+                              <h4 className="text-sm font-semibold mb-1.5 text-foreground/80">Ferramentas:</h4>
+                              <div className="flex flex-wrap gap-1.5">
+                                  {agent.toolsDetails.map(toolDetail => {
+                                      const fullTool = availableTools.find(t => t.id === toolDetail.id);
+                                      const toolIcon = fullTool ? React.cloneElement(fullTool.icon as React.ReactElement, { size: 12, className: "mr-0.5" }) : null;
+                                      return (
+                                          <Button
+                                              key={toolDetail.id}
+                                              variant="outline"
+                                              size="sm"
+                                              className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-muted group"
+                                              onClick={toolDetail.needsConfiguration && fullTool ? () => openToolConfigModal(fullTool) : undefined}
+                                              disabled={toolDetail.needsConfiguration && !agent.toolConfigsApplied?.[toolDetail.id] && !fullTool}
+                                          >
+                                              {toolIcon}
+                                              {toolDetail.label}
+                                              {toolDetail.needsConfiguration && (
+                                                  <ConfigureIcon 
+                                                      size={10} 
+                                                      className={`ml-1 opacity-70 group-hover:opacity-100 ${agent.toolConfigsApplied?.[toolDetail.id] ? 'text-green-500' : 'text-blue-500'}`}
+                                                      titleAccess={agent.toolConfigsApplied?.[toolDetail.id] ? "Configurada" : "Requer Configuração"}
+                                                  />
+                                              )}
+                                          </Button>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      )}
+                    </CardContent>
+                    <CardFooter className="gap-2 mt-auto pt-4 border-t">
+                      <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de edição de agente."})}>
+                        <Edit size={16} className="mr-1.5" /> Editar
+                      </Button>
+                       <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat."})}>
+                        <MessageSquare size={16} className="mr-1.5" /> Testar
+                      </Button>
+                      <Button variant="destructive" size="sm" className="ml-auto" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de exclusão de agente."})}>
+                        <Trash2 size={16} className="mr-1.5" /> Excluir
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1018,4 +1035,3 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
