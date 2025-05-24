@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy } from "lucide-react"; // Adicionado ClipboardCopy
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -26,7 +26,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { useAgents } from '@/contexts/AgentsContext';
-import { Badge } from "@/components/ui/badge"; // Importado Badge
+import { Badge } from "@/components/ui/badge";
 
 export interface AvailableTool {
   id: string;
@@ -122,7 +122,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string;
-  toolsDetails: Array<{ id: string; label: string; needsConfiguration?: boolean }>; // Ícone será recuperado de availableTools
+  toolsDetails: Array<{ id: string; label: string; needsConfiguration?: boolean }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
 
@@ -389,7 +389,6 @@ export default function AgentBuilderPage() {
     toast({
       title: "Formulário Limpo",
       description: "Você pode começar a configurar um novo agente.",
-      action: <Info className="text-primary" />,
     });
   };
 
@@ -846,7 +845,7 @@ export default function AgentBuilderPage() {
                                     <ConfigureIcon 
                                         size={12} 
                                         className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`}
-                                        titleAccess={isConfigured ? "Configurada" : "Requer configuração"}
+                                        title={isConfigured ? "Configurada" : "Requer configuração"}
                                     />
                                 )}
                             </li>
@@ -954,13 +953,16 @@ export default function AgentBuilderPage() {
               {savedAgents.map((agent) => {
                 const agentTypeDetails = agentTypeOptions.find(opt => opt.id === agent.agentType);
                 const agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
-                const agentTypeIcon = agentTypeDetails?.icon ? React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-2 self-start mt-1 w-10 h-10" }) : <Cpu size={20} className="text-primary mr-2 self-start mt-1 w-10 h-10" />;
+                
+                const AgentIconComponent = agentTypeDetails?.icon ? 
+                  React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) : 
+                  <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
                 
                 return (
                   <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
                     <CardHeader className="pb-3">
                       <div className="flex items-start">
-                         {agentTypeIcon}
+                         {AgentIconComponent}
                         <div className="flex-1">
                           <div className="flex justify-between items-start mb-1">
                             <CardTitle className="text-lg font-semibold text-foreground">
@@ -1032,6 +1034,7 @@ export default function AgentBuilderPage() {
                                                   <ConfigureIcon 
                                                       size={10} 
                                                       className={`ml-1 ${isConfigured ? 'text-green-400' : 'text-blue-400'}`}
+                                                      title={isConfigured ? "Configurada" : "Requer Configuração"}
                                                   />
                                               )}
                                           </Badge>
@@ -1062,5 +1065,3 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
-    
