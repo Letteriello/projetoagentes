@@ -40,10 +40,10 @@ export interface AvailableTool {
 export const availableTools: AvailableTool[] = [
   { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit (requer Chave API Google e CSE ID).", needsConfiguration: true, genkitToolName: "performWebSearch" },
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração).", needsConfiguration: true },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração para especificar a fonte de dados).", needsConfiguration: true },
   { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit e autenticação).", needsConfiguration: true },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit e possivelmente chaves API).", needsConfiguration: true },
-  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão).", needsConfiguration: true },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit, URL do esquema e possivelmente chaves API).", needsConfiguration: true },
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão detalhada).", needsConfiguration: true },
   { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
 
@@ -115,17 +115,33 @@ export interface AgentTemplate {
 }
 
 export interface ToolConfigData {
+  // Google Search
   googleApiKey?: string;
   googleCseId?: string;
+  // OpenAPI
   openapiSpecUrl?: string;
   openapiApiKey?: string;
+  // Database Access
+  dbType?: string;
+  dbConnectionString?: string;
+  dbUser?: string;
+  dbPassword?: string;
+  dbName?: string;
+  dbHost?: string;
+  dbPort?: string;
+  dbDescription?: string;
+  // Knowledge Base
+  knowledgeBaseId?: string;
+  // Calendar Access
+  calendarApiEndpoint?: string;
 }
+
 
 export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string; // Apenas para LLMAgentConfig
-  toolsDetails: Array<{ id: string; label: string; needsConfiguration?: boolean; genkitToolName?: string; }>;
+  toolsDetails: Array<{ id: string; label: string; icon?: React.ReactNode; needsConfiguration?: boolean; genkitToolName?: string; }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
 
@@ -321,11 +337,22 @@ export default function AgentBuilderPage() {
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
   const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
   
-  // Temporary state for modal inputs
+  // Temporary state for tool config modal inputs
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState("");
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
   const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState("");
   const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState("");
+  const [modalDbType, setModalDbType] = React.useState("");
+  const [modalDbConnectionString, setModalDbConnectionString] = React.useState("");
+  const [modalDbUser, setModalDbUser] = React.useState("");
+  const [modalDbPassword, setModalDbPassword] = React.useState("");
+  const [modalDbName, setModalDbName] = React.useState("");
+  const [modalDbHost, setModalDbHost] = React.useState("");
+  const [modalDbPort, setModalDbPort] = React.useState("");
+  const [modalDbDescription, setModalDbDescription] = React.useState("");
+  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState("");
+  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState("");
+
 
   // State for Agent Builder Modal
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
@@ -384,30 +411,24 @@ export default function AgentBuilderPage() {
         resetCustomLogicFields();
         const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId);
         if (!currentTemplate || currentTemplate.config.agentType !== 'llm') {
-           // Se o template selecionado não é LLM, ou se estamos começando do zero, usamos o defaultLLMConfig.
-           // Se o template for um Workflow ou Custom que *tem* campos LLM, eles já foram setados pelo handleTemplateChange.
-           // Aqui, a intenção é mais garantir que se o usuário muda *diretamente* para LLM, ele tenha um bom ponto de partida.
            resetLLMFields(defaultLLMConfig);
         }
     } else if (newAgentType === 'workflow') {
         resetCustomLogicFields();
-        // Se quiser que os campos LLM sejam limpos ao mudar para workflow, adicione aqui.
-        // resetLLMFields({}); // Isso limparia. Por ora, eles podem persistir se vierem de um template.
     } else if (newAgentType === 'custom') {
         resetWorkflowFields();
-        // Similar a workflow, os campos LLM podem persistir ou serem limpos.
-        // resetLLMFields({});
     }
   };
 
   const constructSystemPrompt = () => {
     if (agentType !== 'llm') return "";
 
-    let prompt = `Objetivo Principal: ${agentGoal || "Não definido."}\n\n`;
-    prompt += `Tarefas Principais:\n${agentTasks || "Nenhuma tarefa específica definida."}\n\n`;
-    prompt += `Personalidade/Tom: ${agentPersonality || "Neutro."}\n\n`;
+    let prompt = `Você é um agente de IA com as seguintes características e responsabilidades:\n\n`;
+    prompt += `OBJETIVO PRINCIPAL:\n${agentGoal || "Não definido. Aja como um assistente geral."}\n\n`;
+    prompt += `TAREFAS PRINCIPAIS A SEREM REALIZADAS:\n${agentTasks || "Responder às solicitações do usuário da melhor forma possível."}\n\n`;
+    prompt += `PERSONALIDADE/TOM DE COMUNICAÇÃO:\n${agentPersonality || "Neutro e prestativo."}\n\n`;
     if (agentRestrictions) {
-      prompt += `Restrições Importantes:\n${agentRestrictions}\n\n`;
+      prompt += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE:\n${agentRestrictions}\n\n`;
     }
 
     const selectedToolObjects = currentAgentTools 
@@ -415,39 +436,42 @@ export default function AgentBuilderPage() {
       .filter(Boolean) as AvailableTool[];
 
     if (selectedToolObjects.length > 0) {
-        prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n`;
+        prompt += `FERRAMENTAS DISPONÍVEIS (Você deve decidir quando e como usá-las. Se uma ferramenta estiver marcada como 'requer configuração' e não estiver explicitamente configurada, informe ao usuário que não pode usá-la ou peça para configurá-la):\n`;
         selectedToolObjects.forEach(tool => {
             const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && 
                                  ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
                                    (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
-                                   (tool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(tool.id) && toolConfigurations[tool.id] ) 
+                                   (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
+                                   (tool.id === 'knowledgeBase' && toolConfigurations[tool.id]?.knowledgeBaseId) ||
+                                   (tool.id === 'calendarAccess' && toolConfigurations[tool.id]?.calendarApiEndpoint) ||
+                                   (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && toolConfigurations[tool.id] ) 
                                  );
             const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, ''); // Use genkitToolName se disponível
-            prompt += `- ${toolNameForPrompt} (${tool.label}). Descrição: ${tool.description}${tool.needsConfiguration ? (isConfigured ? " (Esta ferramenta está configurada e pronta para uso)" : " (Esta ferramenta requer configuração. Se necessário, instrua o usuário a configurá-la ou informe que não pode usá-la sem configuração)") : ""}\n`;
+            prompt += `- Nome da Ferramenta para uso: '${toolNameForPrompt}'. Descrição: ${tool.description}${tool.needsConfiguration ? (isConfigured ? " (Status: Configurada e pronta para uso)" : " (Status: Requer configuração. Verifique antes de usar ou informe a necessidade de configuração)") : ""}\n`;
         });
         prompt += "\n";
     } else {
         prompt += `Nenhuma ferramenta externa está configurada para este agente.\n\n`;
     }
 
-    prompt += "Instruções Gerais de Interação:\n";
+    prompt += "INSTRUÇÕES ADICIONAIS DE INTERAÇÃO:\n";
     prompt += "- Responda de forma concisa e direta ao ponto, a menos que o tom da personalidade solicite o contrário.\n";
-    prompt += "- Se precisar usar uma ferramenta, indique claramente qual ferramenta seria usada (usando seu nome como 'performWebSearch' ou o nome da ferramenta Genkit relevante) e porquê ANTES de simular a sua execução ou pedir para o usuário aguardar.\n";
+    prompt += "- Se você precisar usar uma ferramenta, anuncie claramente qual ferramenta (usando o 'Nome da Ferramenta para uso' fornecido acima) e por que você a usaria ANTES de simular sua execução ou pedir ao usuário para aguardar. Após a simulação (ou se a execução real for implementada), apresente os resultados obtidos pela ferramenta.\n";
     prompt += "- Seja transparente sobre suas capacidades e limitações. Se não puder realizar uma tarefa, explique o motivo.\n";
+    prompt += "- Se uma ferramenta necessária não estiver configurada, informe ao usuário educadamente.\n";
+
 
     return prompt.trim() || "Você é um assistente prestativo."; // Fallback
   };
 
-  const handleCreateNewAgent = () => { // Esta função agora será chamada ao ABRIR o modal para um novo agente
+  const handleCreateNewAgent = () => { 
     const customTemplate = agentTemplates.find(t => t.id === "custom_llm") || agentTemplates[0];
-    handleTemplateChange(customTemplate.id); // Isso já reseta os campos para o template "Começar do Zero"
+    handleTemplateChange(customTemplate.id); 
     setToolConfigurations({}); 
-
-    // Não precisa mais do toast aqui, pois o modal vai abrir.
   };
 
   const openCreateAgentModal = () => {
-    handleCreateNewAgent(); // Garante que o formulário no modal está limpo/resetado
+    handleCreateNewAgent(); 
     setIsBuilderModalOpen(true);
   };
 
@@ -465,7 +489,7 @@ export default function AgentBuilderPage() {
     const selectedToolsDetails = currentAgentTools 
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
-            return tool ? { id: tool.id, label: tool.label, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName } : null;
+            return tool ? { id: tool.id, label: tool.label, icon: tool.icon, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName } : null;
         })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
 
@@ -506,7 +530,6 @@ export default function AgentBuilderPage() {
         ...baseSavedConfig,
         agentType: 'workflow',
         workflowDescription,
-        // Limpa campos específicos de LLM se o tipo for workflow
         agentGoal: undefined, 
         agentTasks: undefined,
         agentPersonality: undefined,
@@ -520,7 +543,6 @@ export default function AgentBuilderPage() {
         ...baseSavedConfig,
         agentType: 'custom',
         customLogicDescription,
-        // Limpa campos específicos de LLM se o tipo for custom
         agentGoal: undefined,
         agentTasks: undefined,
         agentPersonality: undefined,
@@ -532,7 +554,7 @@ export default function AgentBuilderPage() {
     }
 
     setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
-    setIsBuilderModalOpen(false); // Fecha o modal após salvar
+    setIsBuilderModalOpen(false); 
 
     toast({
       title: "Configuração Salva!",
@@ -546,7 +568,7 @@ export default function AgentBuilderPage() {
         return [...prevTools, toolId];
       } else {
         const newToolConfigs = { ...toolConfigurations };
-        delete newToolConfigs[toolId]; // Remove a configuração da ferramenta se ela for desmarcada
+        delete newToolConfigs[toolId]; 
         setToolConfigurations(newToolConfigs);
         return prevTools.filter(id => id !== toolId);
       }
@@ -558,6 +580,16 @@ export default function AgentBuilderPage() {
     setModalGoogleCseId("");
     setModalOpenapiSpecUrl("");
     setModalOpenapiApiKey("");
+    setModalDbType("");
+    setModalDbConnectionString("");
+    setModalDbUser("");
+    setModalDbPassword("");
+    setModalDbName("");
+    setModalDbHost("");
+    setModalDbPort("");
+    setModalDbDescription("");
+    setModalKnowledgeBaseId("");
+    setModalCalendarApiEndpoint("");
   }
 
   const openToolConfigModal = (tool: AvailableTool) => {
@@ -571,6 +603,19 @@ export default function AgentBuilderPage() {
     } else if (tool.id === "customApiIntegration") {
         setModalOpenapiSpecUrl(currentConfig.openapiSpecUrl || "");
         setModalOpenapiApiKey(currentConfig.openapiApiKey || "");
+    } else if (tool.id === "databaseAccess") {
+        setModalDbType(currentConfig.dbType || "");
+        setModalDbConnectionString(currentConfig.dbConnectionString || "");
+        setModalDbUser(currentConfig.dbUser || "");
+        setModalDbPassword(currentConfig.dbPassword || "");
+        setModalDbName(currentConfig.dbName || "");
+        setModalDbHost(currentConfig.dbHost || "");
+        setModalDbPort(currentConfig.dbPort || "");
+        setModalDbDescription(currentConfig.dbDescription || "");
+    } else if (tool.id === "knowledgeBase") {
+        setModalKnowledgeBaseId(currentConfig.knowledgeBaseId || "");
+    } else if (tool.id === "calendarAccess") {
+        setModalCalendarApiEndpoint(currentConfig.calendarApiEndpoint || "");
     }
     setIsToolConfigModalOpen(true);
   };
@@ -593,7 +638,34 @@ export default function AgentBuilderPage() {
         return;
       }
       newConfigData.openapiSpecUrl = modalOpenapiSpecUrl;
-      newConfigData.openapiApiKey = modalOpenapiApiKey; // Permite salvar mesmo que vazio
+      newConfigData.openapiApiKey = modalOpenapiApiKey; 
+    } else if (configuringTool.id === "databaseAccess") {
+        if (!modalDbType || (!modalDbConnectionString && (!modalDbHost || !modalDbName))) {
+             toast({ title: "Campos Obrigatórios", description: "Tipo de Banco e (String de Conexão ou Host/Nome do Banco) são obrigatórios.", variant: "destructive" });
+            return;
+        }
+        newConfigData = {
+            dbType: modalDbType,
+            dbConnectionString: modalDbConnectionString,
+            dbUser: modalDbUser,
+            dbPassword: modalDbPassword,
+            dbName: modalDbName,
+            dbHost: modalDbHost,
+            dbPort: modalDbPort,
+            dbDescription: modalDbDescription,
+        };
+    } else if (configuringTool.id === "knowledgeBase") {
+        if (!modalKnowledgeBaseId) {
+            toast({ title: "Campo Obrigatório", description: "ID da Base de Conhecimento é obrigatório.", variant: "destructive" });
+            return;
+        }
+        newConfigData.knowledgeBaseId = modalKnowledgeBaseId;
+    } else if (configuringTool.id === "calendarAccess") {
+        if (!modalCalendarApiEndpoint) {
+            toast({ title: "Campo Obrigatório", description: "Endpoint da API de Calendário é obrigatório.", variant: "destructive" });
+            return;
+        }
+        newConfigData.calendarApiEndpoint = modalCalendarApiEndpoint;
     }
     
     setToolConfigurations(prev => ({
@@ -629,7 +701,7 @@ export default function AgentBuilderPage() {
             {savedAgents.map((agent) => {
               const agentTypeDetails = agentTypeOptions.find(opt => opt.id === agent.agentType);
               let agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
-              if (agentTypeLabel === 'Agente LLM') agentTypeLabel = 'LLM'; // Shorten for badge
+              if (agentTypeLabel === 'Agente LLM') agentTypeLabel = 'LLM'; 
               
               let AgentIconComponent: React.ReactNode;
               switch (agent.templateId) {
@@ -705,11 +777,14 @@ export default function AgentBuilderPage() {
                             <div className="flex flex-wrap gap-1.5">
                                 {agent.toolsDetails.map(toolDetail => {
                                     const fullTool = availableTools.find(t => t.id === toolDetail.id);
-                                    const toolIcon = fullTool ? React.cloneElement(fullTool.icon as React.ReactElement, { size: 12 }) : null;
+                                    const toolIcon = toolDetail.icon ? React.cloneElement(toolDetail.icon as React.ReactElement, { size: 12 }) : null;
                                     const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] &&
                                                         ( (fullTool.id === 'webSearch' && agent.toolConfigsApplied[fullTool.id]?.googleApiKey && agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
                                                           (fullTool.id === 'customApiIntegration' && agent.toolConfigsApplied[fullTool.id]?.openapiSpecUrl) ||
-                                                           (fullTool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(fullTool.id) && agent.toolConfigsApplied[fullTool.id])
+                                                          (fullTool.id === 'databaseAccess' && (agent.toolConfigsApplied[fullTool.id]?.dbConnectionString || (agent.toolConfigsApplied[fullTool.id]?.dbHost && agent.toolConfigsApplied[fullTool.id]?.dbName))) ||
+                                                          (fullTool.id === 'knowledgeBase' && agent.toolConfigsApplied[fullTool.id]?.knowledgeBaseId) ||
+                                                          (fullTool.id === 'calendarAccess' && agent.toolConfigsApplied[fullTool.id]?.calendarApiEndpoint) ||
+                                                           (fullTool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(fullTool.id) && agent.toolConfigsApplied[fullTool.id])
                                                         );
                                     return (
                                         <Badge
@@ -1030,7 +1105,10 @@ export default function AgentBuilderPage() {
                             {toolConfigurations[tool.id] && 
                               ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
                                 (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
-                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(tool.id) && toolConfigurations[tool.id])
+                                (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
+                                (tool.id === 'knowledgeBase' && toolConfigurations[tool.id]?.knowledgeBaseId) ||
+                                (tool.id === 'calendarAccess' && toolConfigurations[tool.id]?.calendarApiEndpoint) ||
+                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && toolConfigurations[tool.id])
                               ) ? "Reconfigurar" : "Configurar"}
                           </Button>
                         )}
@@ -1048,7 +1126,10 @@ export default function AgentBuilderPage() {
                             const isConfigured = tool?.needsConfiguration && toolConfigurations[tool.id] && 
                                                 ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
                                                   (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
-                                                  (tool.needsConfiguration && !['webSearch', 'customApiIntegration'].includes(tool.id) && toolConfigurations[tool.id])
+                                                  (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
+                                                  (tool.id === 'knowledgeBase' && toolConfigurations[tool.id]?.knowledgeBaseId) ||
+                                                  (tool.id === 'calendarAccess' && toolConfigurations[tool.id]?.calendarApiEndpoint) ||
+                                                  (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && toolConfigurations[tool.id])
                                                 );
                             return tool ? (
                               <li key={toolId} className="flex items-center">
@@ -1070,7 +1151,6 @@ export default function AgentBuilderPage() {
                 </CardContent>
               </Card>
             </div>
-            {/* Form content ends here */}
           </div>
 
           <DialogFooter className="p-6 pt-4 border-t">
@@ -1088,14 +1168,14 @@ export default function AgentBuilderPage() {
           if (!open) setConfiguringTool(null); 
           setIsToolConfigModalOpen(open);
         }}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg"> {/* Increased width for more fields */}
             <DialogHeader>
               <DialogTitle>Configurar: {configuringTool.label}</DialogTitle>
               <DialogDescription>
                 Forneça os detalhes de configuração para a ferramenta {configuringTool.label}.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
               {configuringTool.id === "webSearch" && (
                 <>
                   <div className="space-y-2">
@@ -1146,7 +1226,102 @@ export default function AgentBuilderPage() {
                   </div>
                 </>
               )}
-              {/* Adicionar aqui configurações para outras ferramentas se necessário */}
+              {configuringTool.id === "databaseAccess" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="modalDbType">Tipo de Banco de Dados</Label>
+                    <Select value={modalDbType} onValueChange={setModalDbType}>
+                        <SelectTrigger id="modalDbType">
+                            <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                            <SelectItem value="mysql">MySQL</SelectItem>
+                            <SelectItem value="sqlserver">SQL Server</SelectItem>
+                            <SelectItem value="sqlite">SQLite</SelectItem>
+                            <SelectItem value="other">Outro (especificar string de conexão)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                  </div>
+                  {modalDbType !== 'other' && modalDbType !== 'sqlite' && (
+                    <>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="modalDbHost">Host</Label>
+                                <Input id="modalDbHost" value={modalDbHost} onChange={(e) => setModalDbHost(e.target.value)} placeholder="ex: localhost ou endereço do servidor" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modalDbPort">Porta</Label>
+                                <Input id="modalDbPort" type="number" value={modalDbPort} onChange={(e) => setModalDbPort(e.target.value)} placeholder="ex: 5432" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="modalDbName">Nome do Banco de Dados</Label>
+                            <Input id="modalDbName" value={modalDbName} onChange={(e) => setModalDbName(e.target.value)} placeholder="ex: meu_banco_de_dados" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="modalDbUser">Usuário</Label>
+                                <Input id="modalDbUser" value={modalDbUser} onChange={(e) => setModalDbUser(e.target.value)} placeholder="ex: admin_usuario" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modalDbPassword">Senha</Label>
+                                <Input id="modalDbPassword" type="password" value={modalDbPassword} onChange={(e) => setModalDbPassword(e.target.value)} />
+                            </div>
+                        </div>
+                    </>
+                  )}
+                  {(modalDbType === 'other' || modalDbType === 'sqlite') && (
+                    <div className="space-y-2">
+                        <Label htmlFor="modalDbConnectionString">String de Conexão (ou Caminho para SQLite)</Label>
+                        <Input 
+                        id="modalDbConnectionString" 
+                        value={modalDbConnectionString} 
+                        onChange={(e) => setModalDbConnectionString(e.target.value)}
+                        placeholder={modalDbType === 'sqlite' ? "ex: /caminho/para/meu_banco.db" : "ex: postgresql://user:pass@host:port/db"}
+                        />
+                         <p className="text-xs text-muted-foreground">
+                            {modalDbType === 'sqlite' ? 'Caminho absoluto ou relativo para o arquivo do banco de dados SQLite.' : 'Formato completo da string de conexão.'}
+                        </p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="modalDbDescription">Descrição do Banco/Tabelas (Opcional)</Label>
+                    <Textarea 
+                        id="modalDbDescription" 
+                        value={modalDbDescription} 
+                        onChange={(e) => setModalDbDescription(e.target.value)}
+                        placeholder="Ex: Contém tabelas de clientes e pedidos. Tabela 'clientes' tem colunas: id, nome, email."
+                        rows={3} 
+                    />
+                    <p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto dos dados disponíveis.</p>
+                  </div>
+                </>
+              )}
+               {configuringTool.id === "knowledgeBase" && (
+                <div className="space-y-2">
+                    <Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label>
+                    <Input 
+                      id="modalKnowledgeBaseId" 
+                      value={modalKnowledgeBaseId} 
+                      onChange={(e) => setModalKnowledgeBaseId(e.target.value)}
+                      placeholder="ex: documentos_produto_xyz ou faq_servico_abc" 
+                    />
+                    <p className="text-xs text-muted-foreground">Identificador único para a base de conhecimento que o agente deve consultar (ex: Vertex AI Search Datastore ID, nome de coleção Pinecone, etc.).</p>
+                </div>
+              )}
+              {configuringTool.id === "calendarAccess" && (
+                <div className="space-y-2">
+                    <Label htmlFor="modalCalendarApiEndpoint">Endpoint da API de Calendário ou ID do Fluxo Genkit</Label>
+                    <Input 
+                      id="modalCalendarApiEndpoint" 
+                      value={modalCalendarApiEndpoint} 
+                      onChange={(e) => setModalCalendarApiEndpoint(e.target.value)}
+                      placeholder="ex: https://api.example.com/calendar ou nome_do_fluxo_genkit_calendario" 
+                    />
+                    <p className="text-xs text-muted-foreground">URL do endpoint da API ou o identificador do fluxo Genkit responsável pelo acesso à agenda. Pode requerer autenticação OAuth configurada separadamente no backend.</p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <DialogClose asChild>
