@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Cpu, MessageSquare, KeyRound, Settings, PanelLeft, UserCircle, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, Home } from 'lucide-react'; // PanelLeft foi removido pois SidebarToggle o substitui
 import {
   Sidebar,
   SidebarHeader,
@@ -14,7 +14,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  useSidebar,
+  useSidebar, // Import useSidebar
+  SidebarProvider
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -35,16 +36,18 @@ interface NavItem {
   label: string;
 }
 
+// Removido "Início" e ajustado href de "Agentes"
 const navItems: NavItem[] = [
   { href: '/agent-builder', icon: Cpu, label: 'Agentes' },
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
+  // "Cofre de Chaves API" foi movido para o menu "Minha Conta"
 ];
 
-// Componente interno para o toggle da sidebar
+// Componente interno para o toggle da sidebar, usando o contexto
 function SidebarToggle() {
-  const { toggleSidebar, state, isMobile, collapsible } = useSidebar();
+  const { state, toggleSidebar, collapsible, isMobile, mounted } = useSidebar();
 
-  if (isMobile || collapsible === 'none') {
+  if (!mounted || isMobile || collapsible === 'none') {
     return null;
   }
 
@@ -52,52 +55,65 @@ function SidebarToggle() {
     <Button
       variant="ghost"
       size="icon"
-      className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute right-2 top-1/2 -translate-y-1/2"
+      className={cn(
+        "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+         // Posicionamento condicional para centralizar no modo ícone
+        (collapsible === 'icon' && state === 'collapsed')
+          ? "relative" // Deixa o flex do pai centralizar
+          : "absolute right-2 top-1/2 -translate-y-1/2" 
+      )}
       onClick={toggleSidebar}
-      aria-label="Toggle Sidebar"
+      aria-label={state === 'expanded' ? "Colapsar sidebar" : "Expandir sidebar"}
     >
       {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-5 w-5" />}
     </Button>
   );
 }
 
+
 function MainLayout({ children }: { children: ReactNode }) {
-  const { toggleSidebar, isMobile } = useSidebar();
+  const { toggleSidebar, isMobile, mounted } = useSidebar();
 
   return (
     <SidebarInset>
-      {isMobile === true && (
+      {/* Header móvel simplificado, apenas com botão de toggle da sidebar */}
+      {mounted && isMobile && (
         <header
           className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
         >
           <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
-            <PanelLeft className="h-5 w-5" />
+            <ChevronsRight className="h-5 w-5" /> {/* Ou outro ícone como PanelLeft */}
           </Button>
         </header>
       )}
+      {/* Conteúdo principal da página */}
       {children}
     </SidebarInset>
   );
 }
 
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  const { state: sidebarState, isMobile, collapsible } = useSidebar();
+  // Hooks do useSidebar agora são chamados dentro dos componentes que os utilizam diretamente (SidebarToggle, ou aqui para isSidebarIconOnly)
+  const { state: sidebarState, isMobile, collapsible, mounted } = useSidebar();
 
-  const isSidebarIconOnly = !isMobile && sidebarState === 'collapsed' && collapsible === 'icon';
+  // Determina se a sidebar está no modo "apenas ícone"
+  // Adicionado 'mounted' para garantir que isMobile e collapsible já foram determinados
+  const isSidebarIconOnly = mounted && !isMobile && collapsible === 'icon' && sidebarState === 'collapsed';
 
   return (
     <>
-      <Sidebar
-        className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
-        collapsible="icon"
-      >
+      <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground" collapsible="icon">
         <SidebarHeader className="p-4 flex items-center justify-center h-16 relative">
-          <Link href="/agent-builder" className="hover:text-sidebar-primary/90 transition-colors flex items-center gap-2">
-            {!isSidebarIconOnly && <span className="aida-logo-text">Aida</span>}
-          </Link>
+          {/* O SidebarToggle agora é um componente que usa o contexto */}
           <SidebarToggle />
+          {!isSidebarIconOnly && (
+            <Link href="/agent-builder" className="hover:text-sidebar-primary/90 transition-colors">
+              <span className="aida-logo-text">Aida</span>
+            </Link>
+          )}
         </SidebarHeader>
         <SidebarContent className="flex-1">
           <SidebarMenu>
@@ -108,15 +124,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     asChild
                     isActive={pathname === item.href}
                     className={cn(
-                      "justify-start", // Padrão para expandido
-                       isSidebarIconOnly && "justify-center" // Centraliza quando só ícone
+                      "justify-start", 
+                       isSidebarIconOnly && "justify-center" 
                     )}
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
                     <a>
                       <item.icon className={cn(
-                        "size-5 flex-shrink-0", // Tamanho consistente do ícone 20px
-                        !isSidebarIconOnly && "mr-2" // Margem apenas se o texto estiver visível
+                        "flex-shrink-0",
+                        isSidebarIconOnly ? "size-5" : "size-5 mr-2" // Tamanho consistente
                       )} />
                       {!isSidebarIconOnly && <span className="truncate">{item.label}</span>}
                     </a>
@@ -134,14 +150,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <SidebarMenuButton
                   className={cn(
                     "justify-start w-full",
-                     isSidebarIconOnly && "justify-center" // Centraliza quando só ícone
+                     isSidebarIconOnly && "justify-center" 
                   )}
                   tooltip={{ children: "Minha Conta", side: "right", className: "bg-popover text-popover-foreground" }}
                   aria-label="Opções da conta"
                 >
                   <UserCircle className={cn(
-                     "size-5 flex-shrink-0", // Tamanho consistente do ícone 20px
-                     !isSidebarIconOnly && "mr-2" // Margem apenas se o texto estiver visível
+                     "flex-shrink-0",
+                     isSidebarIconOnly ? "size-5" : "size-5 mr-2" // Tamanho consistente
                   )} />
                   {!isSidebarIconOnly && <span className="truncate">Minha Conta</span>}
                 </SidebarMenuButton>
