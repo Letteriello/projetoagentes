@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X, UploadCloud, FileUp } from "lucide-react";
+import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X, UploadCloud, FileUp, Code2 } from "lucide-react";
 import { useState, useRef, useEffect, useActionState, ChangeEvent } from "react";
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
@@ -13,16 +13,7 @@ import { useAgents } from "@/contexts/AgentsContext";
 import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builder/page";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ChatMessage {
   id: string;
@@ -60,7 +51,8 @@ export function ChatUI() {
 
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [isAttachFileModalOpen, setIsAttachFileModalOpen] = useState(false);
+  
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false); // Control Popover state
 
   const { savedAgents } = useAgents();
   const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
@@ -102,11 +94,11 @@ export function ChatUI() {
       };
       setMessages((prevMessages) => [...prevMessages, newAgentMessageUI]);
       setChatHistory((prevHistory) => [...prevHistory, newAgentMessageHistory]);
-      formRef.current?.reset(); // Reseta o campo de input
-      if (inputRef.current) inputRef.current.value = ""; // Limpa o valor do input explicitamente
+      formRef.current?.reset(); 
+      if (inputRef.current) inputRef.current.value = ""; 
       setSelectedFileDataUri(null);
       setSelectedFileName(null);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // Limpa o input de arquivo
+      if (fileInputRef.current) fileInputRef.current.value = ""; 
       // @ts-ignore
       formState.agentResponse = null;
       // @ts-ignore
@@ -173,9 +165,9 @@ export function ChatUI() {
 
     setMessages((prevMessages) => [...prevMessages, newUserMessageUI]);
     
-    // Envia o histórico ANTES da mensagem atual do usuário
-    formData.set("chatHistoryJson", JSON.stringify(chatHistory));
-    setChatHistory((prevHistory) => [...prevHistory, newUserMessageHistory]); // Atualiza o histórico para o próximo turno
+    const currentHistory = [...chatHistory, newUserMessageHistory];
+    formData.set("chatHistoryJson", JSON.stringify(currentHistory));
+    setChatHistory(currentHistory); 
 
     if (selectedFileDataUri) {
       formData.set("fileDataUri", selectedFileDataUri);
@@ -184,7 +176,7 @@ export function ChatUI() {
     const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
 
     if (currentAgent && selectedAgentId !== 'none') {
-      const llmAgentConfig = currentAgent as LLMAgentConfig; // Assumindo que é um LLM Agent para simplicidade
+      const llmAgentConfig = currentAgent as LLMAgentConfig; 
       formData.set("agentSystemPrompt", llmAgentConfig.systemPromptGenerated || "Você é um assistente prestativo.");
       if (llmAgentConfig.agentModel) formData.set("agentModel", llmAgentConfig.agentModel!);
       if (llmAgentConfig.agentTemperature !== undefined) formData.set("agentTemperature", llmAgentConfig.agentTemperature!.toString());
@@ -217,7 +209,7 @@ export function ChatUI() {
         <div className="flex items-center gap-1.5 md:gap-2">
           <Select
             value={selectedAgentId}
-            onValueChange={(value) => { setSelectedAgentId(value); }}
+            onValueChange={(value) => { setSelectedAgentId(value); handleNewConversation(); }}
           >
             <SelectTrigger
               id="agent-selector"
@@ -241,7 +233,7 @@ export function ChatUI() {
           </Select>
           <Select
             value={selectedGemId}
-            onValueChange={(value) => { setSelectedGemId(value); }}
+            onValueChange={(value) => { setSelectedGemId(value); handleNewConversation(); }}
             disabled={selectedAgentId !== 'none'}
           >
             <SelectTrigger
@@ -357,69 +349,58 @@ export function ChatUI() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*" // Apenas imagens por enquanto
+            accept="image/*" 
             className="hidden"
           />
-          <Dialog open={isAttachFileModalOpen} onOpenChange={setIsAttachFileModalOpen}>
-            <DialogTrigger asChild>
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="text-muted-foreground hover:text-primary h-8 w-8"
-                onClick={() => setIsAttachFileModalOpen(true)}
                 aria-label="Anexar arquivo"
                 disabled={isPending}
               >
                 <Paperclip className="h-5 w-5" />
               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Anexar Arquivo</DialogTitle>
-                <DialogDescription>
-                  Escolha como deseja adicionar um arquivo à sua mensagem.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start py-6 text-left"
-                  onClick={() => {
-                    toast({ title: "Em breve!", description: "Integração com Google Drive e autenticação serão implementadas futuramente." });
-                    setIsAttachFileModalOpen(false);
-                  }}
-                >
-                  <UploadCloud className="mr-3 h-6 w-6 text-primary" />
-                  <div>
-                    <p className="font-semibold">Importar do Google Drive</p>
-                    <p className="text-xs text-muted-foreground">Conecte seu Drive (requer autenticação).</p>
-                  </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start py-6 text-left"
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                    setIsAttachFileModalOpen(false);
-                  }}
-                >
-                  <FileUp className="mr-3 h-6 w-6 text-primary" />
-                   <div>
-                    <p className="font-semibold">Arquivos do Computador</p>
-                    <p className="text-xs text-muted-foreground">Procure imagens no seu dispositivo.</p>
-                  </div>
-                </Button>
-              </div>
-              <DialogFooter className="sm:justify-start">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">
-                    Cancelar
-                  </Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2 space-y-1 bg-popover text-popover-foreground rounded-lg shadow-xl" side="top" align="start">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-sm h-9 px-3 py-2"
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setIsPopoverOpen(false);
+                }}
+              >
+                <FileUp className="mr-2 h-4 w-4" />
+                Enviar arquivos
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-sm h-9 px-3 py-2"
+                onClick={() => {
+                  toast({ title: "Em breve!", description: "Integração com Google Drive será implementada." });
+                  setIsPopoverOpen(false);
+                }}
+              >
+                <UploadCloud className="mr-2 h-4 w-4" /> 
+                Adicionar do Drive
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-sm h-9 px-3 py-2"
+                onClick={() => {
+                  toast({ title: "Em breve!", description: "Funcionalidade de importar código." });
+                  setIsPopoverOpen(false);
+                }}
+              >
+                <Code2 className="mr-2 h-4 w-4" />
+                Importar código
+              </Button>
+            </PopoverContent>
+          </Popover>
 
           <Button
             type="button"
@@ -441,7 +422,7 @@ export function ChatUI() {
             disabled={isPending}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && (inputRef.current?.value?.trim() || selectedFileDataUri)) {
-                e.preventDefault(); // Evita nova linha
+                e.preventDefault(); 
                 if (formRef.current) {
                    handleFormSubmit(new FormData(formRef.current));
                 }
@@ -462,5 +443,3 @@ export function ChatUI() {
     </div>
   );
 }
-
-    
