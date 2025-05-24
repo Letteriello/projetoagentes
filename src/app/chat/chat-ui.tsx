@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu, RefreshCcw } from "lucide-react"; // Added RefreshCcw
+import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu, RefreshCcw, MessageSquare } from "lucide-react";
 import { useState, useRef, useEffect, useActionState } from "react";
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ interface ChatMessage {
   id: string;
   text: string;
   sender: "user" | "agent" | "system";
-  role: "user" | "model"; // For Genkit history
+  role: "user" | "model"; 
 }
 
 const initialGems = [
@@ -37,7 +37,7 @@ const initialState = {
 
 export function ChatUI() {
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'model', content: string }>>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]); // UI messages, includes sender for styling
+  const [messages, setMessages] = useState<ChatMessage[]>([]); 
   const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("none");
   const [activeChatTarget, setActiveChatTarget] = useState<string>(initialGems[0].name);
@@ -52,10 +52,10 @@ export function ChatUI() {
   useEffect(() => {
     if (selectedAgentId !== 'none') {
       const agent = savedAgents.find(a => a.id === selectedAgentId);
-      setActiveChatTarget(agent ? `Agente: ${agent.agentName}` : "Agente não encontrado");
+      setActiveChatTarget(agent ? `${agent.agentName}` : "Agente não encontrado");
     } else {
       const gem = initialGems.find(g => g.id === selectedGemId);
-      setActiveChatTarget(gem ? `Gem: ${gem.name}` : "Gem não encontrado");
+      setActiveChatTarget(gem ? `${gem.name} (Gem)` : "Gem não encontrado");
     }
   }, [selectedAgentId, selectedGemId, savedAgents]);
 
@@ -97,29 +97,32 @@ export function ChatUI() {
     const userInput = formData.get("userInput") as string;
     if (!userInput?.trim()) return;
 
-    const newUserMessage: ChatMessage = {
+    const newUserMessageUI: ChatMessage = {
       id: (Date.now() - 1).toString(),
       text: userInput,
       sender: "user",
       role: "user",
     };
-    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
-    const currentChatHistory = [...chatHistory, { role: "user" as const, content: userInput }];
-    setChatHistory(currentChatHistory);
+    setMessages((prevMessages) => [...prevMessages, newUserMessageUI]);
+    
+    const currentTurnHistory = [...chatHistory, { role: "user" as const, content: userInput }];
+    setChatHistory(currentTurnHistory);
 
-    formData.set("chatHistoryJson", JSON.stringify(currentChatHistory));
+    formData.set("chatHistoryJson", JSON.stringify(currentTurnHistory));
 
     const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
 
-    if (currentAgent && selectedAgentId !== 'none') {
-      formData.set("agentSystemPrompt", (currentAgent as LLMAgentConfig).systemPromptGenerated || "Você é um assistente prestativo.");
-      if ((currentAgent as LLMAgentConfig).agentModel) formData.set("agentModel", (currentAgent as LLMAgentConfig).agentModel!);
-      if ((currentAgent as LLMAgentConfig).agentTemperature !== undefined) formData.set("agentTemperature", (currentAgent as LLMAgentConfig).agentTemperature!.toString());
+    if (currentAgent && selectedAgentId !== 'none' && currentAgent.agentType === 'llm') {
+      const llmAgentConfig = currentAgent as LLMAgentConfig;
+      formData.set("agentSystemPrompt", llmAgentConfig.systemPromptGenerated || "Você é um assistente prestativo.");
+      if (llmAgentConfig.agentModel) formData.set("agentModel", llmAgentConfig.agentModel!);
+      if (llmAgentConfig.agentTemperature !== undefined) formData.set("agentTemperature", llmAgentConfig.agentTemperature!.toString());
     } else {
       const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
       formData.set("agentSystemPrompt", currentGem.prompt);
+      // Se nenhum agente específico ou um agente não-LLM for selecionado, podemos limpar/ignorar agentModel e agentTemperature
+      // ou usar padrões do Genkit, o que o chat-flow.ts já faz.
     }
-
     formAction(formData);
   };
 
@@ -131,68 +134,57 @@ export function ChatUI() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden p-4 md:p-6 gap-4 bg-background">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-        <div className="space-y-1 md:col-span-1">
-          <Label htmlFor="gem-selector" className="text-xs font-medium text-muted-foreground px-1">
-            <SparklesIcon size={14} className="inline-block mr-1.5 text-primary/70" />
-            Personalidade Base (Gem)
-          </Label>
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      {/* Cabeçalho do Chat */}
+      <div className="flex items-center justify-between p-3 md:p-4 border-b border-border sticky top-0 bg-background/80 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-2">
+            <MessageSquare className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-semibold text-foreground">
+              {activeChatTarget || "Chat com Agentes"}
+            </h1>
+        </div>
+        <div className="flex items-center gap-2 md:gap-3">
           <Select 
             value={selectedGemId} 
-            onValueChange={(value) => { setSelectedGemId(value); if(selectedAgentId === 'none') { const gem = initialGems.find(g => g.id === value); setActiveChatTarget(gem ? `Gem: ${gem.name}`:'');} }} 
+            onValueChange={(value) => { setSelectedGemId(value); if(selectedAgentId === 'none') { const gem = initialGems.find(g => g.id === value); setActiveChatTarget(gem ? `${gem.name} (Gem)`:'');} }} 
             disabled={selectedAgentId !== 'none'}
           >
-            <SelectTrigger id="gem-selector" className="bg-card border-border focus:ring-primary/50 disabled:opacity-70">
-              <SelectValue placeholder="Selecione uma personalidade" />
+            <SelectTrigger id="gem-selector" className="w-auto md:w-[180px] h-9 text-xs bg-card border-border focus:ring-primary/50 disabled:opacity-70">
+              <SelectValue placeholder="Personalidade" />
             </SelectTrigger>
             <SelectContent>
               {initialGems.map((gem) => (
-                <SelectItem key={gem.id} value={gem.id}>
+                <SelectItem key={gem.id} value={gem.id} className="text-xs">
                   {gem.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-1 md:col-span-1">
-          <Label htmlFor="agent-selector" className="text-xs font-medium text-muted-foreground px-1">
-            <Cpu size={14} className="inline-block mr-1.5 text-primary/70" />
-            Agente Específico
-          </Label>
           <Select 
             value={selectedAgentId} 
-            onValueChange={(value) => { setSelectedAgentId(value); const agent = savedAgents.find(a => a.id === value); if(agent) { setActiveChatTarget(`Agente: ${agent.agentName}`); } else if (value === 'none') { const gem = initialGems.find(g => g.id === selectedGemId); setActiveChatTarget(gem ? `Gem: ${gem.name}`:''); } }}
+            onValueChange={(value) => { setSelectedAgentId(value); const agent = savedAgents.find(a => a.id === value); if(agent) { setActiveChatTarget(`${agent.agentName}`); } else if (value === 'none') { const gem = initialGems.find(g => g.id === selectedGemId); setActiveChatTarget(gem ? `${gem.name} (Gem)`:''); } }}
           >
-            <SelectTrigger id="agent-selector" className="bg-card border-border focus:ring-primary/50">
-              <SelectValue placeholder="Selecione um agente" />
+            <SelectTrigger id="agent-selector" className="w-auto md:w-[200px] h-9 text-xs bg-card border-border focus:ring-primary/50">
+              <SelectValue placeholder="Agente Específico" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Assistente Geral (Usar Gem)</SelectItem>
-              <Separator />
-              {savedAgents.length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Meus Agentes Criados</Label>}
+              <SelectItem value="none" className="text-xs">Assistente Geral (Usar Gem)</SelectItem>
+              {savedAgents.length > 0 && <Separator className="my-1" />}
+              {savedAgents.length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Meus Agentes</Label>}
               {savedAgents.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.agentName} ({agent.agentType})
+                <SelectItem key={agent.id} value={agent.id} className="text-xs">
+                  {agent.agentName} <span className="text-muted-foreground/80 ml-1">({agent.agentType})</span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="md:col-span-1 flex justify-end items-center md:mt-5">
-            <Button variant="outline" size="sm" onClick={handleNewConversation}>
-                <RefreshCcw size={14} className="mr-2"/> Nova Conversa
-            </Button>
+          <Button variant="outline" size="sm" onClick={handleNewConversation} className="h-9 text-xs">
+              <RefreshCcw size={14} className="mr-1.5 hidden sm:inline-block"/> Nova
+          </Button>
         </div>
       </div>
         
-      {activeChatTarget && (
-        <div className="text-center text-sm text-muted-foreground py-2 border-b border-border">
-          Conversando com: <span className="font-semibold text-foreground">{activeChatTarget}</span>
-        </div>
-      )}
-
-      <Card className="flex-1 flex flex-col overflow-hidden shadow-sm border-border bg-card">
+      <Card className="flex-1 flex flex-col overflow-hidden shadow-none border-none rounded-none bg-transparent">
         <CardContent className="flex-1 p-0 overflow-hidden">
           <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
             <div className="space-y-6">
@@ -244,21 +236,23 @@ export function ChatUI() {
         </CardContent>
       </Card>
 
-      <form ref={formRef} action={handleFormSubmit} className="flex items-center gap-3 p-2 bg-card border border-border rounded-xl shadow-sm">
-        <Input
-          ref={inputRef}
-          name="userInput"
-          placeholder="Digite sua mensagem..."
-          className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
-          autoComplete="off"
-          required
-          disabled={isPending}
-        />
-        <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" disabled={isPending} aria-disabled={isPending}>
-          {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
-          <span className="sr-only">Enviar</span>
-        </Button>
-      </form>
+      <div className="p-2 md:p-3 border-t border-border bg-background">
+        <form ref={formRef} action={handleFormSubmit} className="flex items-center gap-3 p-1 bg-card border border-border rounded-xl shadow-sm">
+          <Input
+            ref={inputRef}
+            name="userInput"
+            placeholder="Digite sua mensagem..."
+            className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm h-10"
+            autoComplete="off"
+            required
+            disabled={isPending}
+          />
+          <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50 h-9 w-9" disabled={isPending} aria-disabled={isPending}>
+            {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+            <span className="sr-only">Enviar</span>
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

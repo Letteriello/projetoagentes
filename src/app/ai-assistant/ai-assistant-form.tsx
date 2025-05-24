@@ -1,22 +1,22 @@
 
 "use client";
 
-import { useActionState } from "react"; // Changed from useFormState and useFormStatus
+import { useActionState } from "react";
 import { getAgentConfigurationSuggestion } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useRef } from "react"; // Removed useFormState, useFormStatus. Kept useEffect, useRef. Added useActionState above.
+import { useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardCopy } from "lucide-react"; // Adicionado ClipboardCopy
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const initialState = {
   message: "",
 };
 
-function SubmitButton({ isPending }: { isPending: boolean }) { // Accept isPending as a prop
+function SubmitButton({ isPending }: { isPending: boolean }) {
   return (
     <Button type="submit" disabled={isPending} aria-disabled={isPending}>
       {isPending ? "Obtendo Sugestão..." : "Obter Sugestão"}
@@ -25,21 +25,20 @@ function SubmitButton({ isPending }: { isPending: boolean }) { // Accept isPendi
 }
 
 export function AiAssistantForm() {
-  const [state, formAction, isPending] = useActionState(getAgentConfigurationSuggestion, initialState); // Changed to useActionState
+  const [state, formAction, isPending] = useActionState(getAgentConfigurationSuggestion, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (state.message) {
       if (state.suggestedConfiguration || state.message === "Sugestão recebida com sucesso!") {
-         if (formRef.current && !state.errors) { // Only show toast and reset if successful
+         if (formRef.current && !state.errors) { 
           toast({
             title: "Sucesso!",
             description: state.message,
             variant: "default",
             action: <CheckCircle2 className="text-green-500" />,
           });
-          // formRef.current.reset(); // Optional: reset form on success
         }
       } else if (state.errors || state.message !== "Sugestão recebida com sucesso!") {
          toast({
@@ -51,6 +50,19 @@ export function AiAssistantForm() {
       }
     }
   }, [state, toast]);
+
+  const handleCopyConfiguration = () => {
+    if (state.suggestedConfiguration) {
+      navigator.clipboard.writeText(state.suggestedConfiguration)
+        .then(() => {
+          toast({ title: "Copiado!", description: "Configuração sugerida copiada para a área de transferência." });
+        })
+        .catch(err => {
+          toast({ title: "Falha ao copiar", description: "Não foi possível copiar a configuração.", variant: "destructive" });
+          console.error('Failed to copy: ', err);
+        });
+    }
+  };
 
   return (
     <form ref={formRef} action={formAction} className="space-y-6">
@@ -78,7 +90,7 @@ export function AiAssistantForm() {
           </div>
         </CardContent>
         <CardFooter>
-          <SubmitButton isPending={isPending} /> {/* Pass isPending to SubmitButton */}
+          <SubmitButton isPending={isPending} />
         </CardFooter>
       </Card>
 
@@ -86,21 +98,27 @@ export function AiAssistantForm() {
         <Card>
           <CardHeader>
             <CardTitle>Configuração Sugerida</CardTitle>
-            <CardDescription>Com base no seu objetivo de tarefa, aqui está uma configuração sugerida usando componentes do Google ADK.</CardDescription>
+            <CardDescription>Com base no seu objetivo de tarefa, aqui está uma sugestão de configuração.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea
-              readOnly
-              value={state.suggestedConfiguration}
-              rows={10}
-              className="font-mono text-sm bg-muted/50"
-            />
+            <div className="relative">
+              <Textarea
+                readOnly
+                value={state.suggestedConfiguration}
+                rows={10}
+                className="font-mono text-sm bg-muted/40 p-4 rounded-md pr-12" // Added pr-12 for button space
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute top-2 right-2 h-7 w-7"
+                onClick={handleCopyConfiguration}
+                aria-label="Copiar configuração"
+              >
+                <ClipboardCopy className="h-4 w-4" />
+              </Button>
+            </div>
           </CardContent>
-          <CardFooter>
-             <Button variant="outline" onClick={() => navigator.clipboard.writeText(state.suggestedConfiguration || '')}>
-              Copiar Configuração
-            </Button>
-          </CardFooter>
         </Card>
       )}
        {state.message && !state.suggestedConfiguration && state.errors && (
@@ -113,3 +131,5 @@ export function AiAssistantForm() {
     </form>
   );
 }
+
+    

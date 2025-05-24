@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy } from "lucide-react"; // Adicionado ClipboardCopy
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -25,9 +25,9 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
-import { useAgents } from '@/contexts/AgentsContext'; // Importado
+import { useAgents } from '@/contexts/AgentsContext';
+import { Badge } from "@/components/ui/badge"; // Importado Badge
 
-// Definindo as interfaces aqui para que possam ser exportadas e usadas pelo AgentsContext
 export interface AvailableTool {
   id: string;
   label: string;
@@ -59,9 +59,9 @@ export const agentToneOptions = [
 ];
 
 export const agentTypeOptions = [
-  { id: "llm", label: "Agente LLM (Foco em Linguagem e Decisão)" },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)" },
-  { id: "custom", label: "Agente Personalizado (Lógica Customizada via Genkit)" },
+  { id: "llm", label: "Agente LLM (Foco em Linguagem e Decisão)", icon: <Brain size={16} /> },
+  { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)", icon: <Workflow size={16} /> },
+  { id: "custom", label: "Agente Personalizado (Lógica Customizada via Genkit)", icon: <FileJson size={16} /> },
 ];
 
 export interface AgentConfigBase {
@@ -122,7 +122,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string;
-  toolsDetails: Array<{ id: string; label: string; icon: React.ReactNode; needsConfiguration?: boolean }>;
+  toolsDetails: Array<{ id: string; label: string; needsConfiguration?: boolean }>; // Ícone será recuperado de availableTools
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
 
@@ -238,7 +238,7 @@ const agentTemplates: AgentTemplate[] = [
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
-  const { savedAgents, setSavedAgents } = useAgents(); // Usando o contexto
+  const { savedAgents, setSavedAgents } = useAgents();
 
   const [selectedAgentTemplateId, setSelectedAgentTemplateId] = React.useState<string>(agentTemplates[0].id);
   const [agentType, setAgentType] = React.useState<AgentConfig["agentType"]>(agentTemplates[0].config.agentType);
@@ -352,7 +352,12 @@ export default function AgentBuilderPage() {
     if (selectedToolObjects.length > 0) {
         prompt += `Ferramentas Disponíveis para uso (o agente deve decidir quando usá-las com base na conversa e nos objetivos):\n`;
         selectedToolObjects.forEach(tool => {
-            prompt += `- ${tool.label}${tool.needsConfiguration && toolConfigurations[tool.id] ? " (configurada e pronta para uso)" : tool.needsConfiguration ? " (requer configuração)" : ""}\n`;
+            const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && 
+                                 ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
+                                   (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
+                                   (!['webSearch', 'customApiIntegration'].includes(tool.id)) // Assume outras ferramentas configuráveis não têm checagem específica aqui
+                                 );
+            prompt += `- ${tool.label}${tool.needsConfiguration ? (isConfigured ? " (configurada e pronta para uso)" : " (requer configuração)") : ""}\n`;
         });
         prompt += "\n";
     } else {
@@ -402,12 +407,9 @@ export default function AgentBuilderPage() {
     const selectedToolsDetails = currentAgentTools 
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
-            // ReactNode não pode ser serializado ou clonado profundamente de forma simples para o contexto.
-            // Vamos armazenar apenas a informação necessária para renderizar (id, label, needsConfig).
-            // O ícone pode ser recuperado da `availableTools` ao renderizar.
             return tool ? { id: tool.id, label: tool.label, needsConfiguration: tool.needsConfiguration } : null;
         })
-        .filter(Boolean) as unknown as SavedAgentConfiguration['toolsDetails']; // Ajuste de tipo temporário
+        .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
 
     const appliedToolConfigs: Record<string, ToolConfigData> = {};
     currentAgentTools.forEach(toolId => { 
@@ -469,7 +471,6 @@ export default function AgentBuilderPage() {
 
     setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
 
-    console.log("Configuração do Agente Salva:", newAgentConfiguration);
     toast({
       title: "Configuração Salva!",
       description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label}) foi adicionado à lista.`,
@@ -517,9 +518,17 @@ export default function AgentBuilderPage() {
     let newConfigData: Partial<ToolConfigData> = { ...toolConfigurations[configuringTool.id] };
 
     if (configuringTool.id === "webSearch") {
+      if (!modalGoogleApiKey || !modalGoogleCseId) {
+        toast({ title: "Campos Obrigatórios", description: "Chave API e CSE ID são obrigatórios para Busca na Web.", variant: "destructive" });
+        return;
+      }
       newConfigData.googleApiKey = modalGoogleApiKey;
       newConfigData.googleCseId = modalGoogleCseId;
     } else if (configuringTool.id === "customApiIntegration") {
+      if (!modalOpenapiSpecUrl) {
+        toast({ title: "Campo Obrigatório", description: "URL do Esquema OpenAPI é obrigatória.", variant: "destructive" });
+        return;
+      }
       newConfigData.openapiSpecUrl = modalOpenapiSpecUrl;
       newConfigData.openapiApiKey = modalOpenapiApiKey;
     }
@@ -806,7 +815,11 @@ export default function AgentBuilderPage() {
                             onClick={() => openToolConfigModal(tool)}
                          >
                            <ConfigureIcon size={14} className="mr-1.5" /> 
-                           {toolConfigurations[tool.id] ? "Reconfigurar" : "Configurar"}
+                           {toolConfigurations[tool.id] && 
+                            ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
+                              (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
+                              (!['webSearch', 'customApiIntegration'].includes(tool.id)) // Assume outras ferramentas configuráveis não têm checagem específica aqui
+                            ) ? "Reconfigurar" : "Configurar"}
                          </Button>
                        )}
                     </div>
@@ -820,6 +833,11 @@ export default function AgentBuilderPage() {
                       {currentAgentTools.map(toolId => { 
                           const tool = availableTools.find(t => t.id === toolId);
                           const toolIcon = tool ? React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5 inline-block" }) : null;
+                          const isConfigured = tool?.needsConfiguration && toolConfigurations[tool.id] && 
+                                              ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
+                                                (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
+                                                (!['webSearch', 'customApiIntegration'].includes(tool.id))
+                                              );
                           return tool ? (
                             <li key={toolId} className="flex items-center">
                                 {toolIcon}
@@ -827,8 +845,8 @@ export default function AgentBuilderPage() {
                                 {tool.needsConfiguration && (
                                     <ConfigureIcon 
                                         size={12} 
-                                        className={`ml-1.5 ${toolConfigurations[toolId] ? 'text-green-500' : 'text-blue-500'}`}
-                                        titleAccess={toolConfigurations[toolId] ? "Configurada" : "Requer configuração"}
+                                        className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`}
+                                        titleAccess={isConfigured ? "Configurada" : "Requer configuração"}
                                     />
                                 )}
                             </li>
@@ -934,27 +952,34 @@ export default function AgentBuilderPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {savedAgents.map((agent) => {
-                const agentTypeLabel = agentTypeOptions.find(opt => opt.id === agent.agentType)?.label.split('(')[0].trim() || agent.agentType;
+                const agentTypeDetails = agentTypeOptions.find(opt => opt.id === agent.agentType);
+                const agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
+                const agentTypeIcon = agentTypeDetails?.icon ? React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-2 self-start mt-1 w-10 h-10" }) : <Cpu size={20} className="text-primary mr-2 self-start mt-1 w-10 h-10" />;
+                
                 return (
-                  <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                          <CardTitle className="flex items-center gap-2 text-lg">
-                          <Cpu size={20} className="text-primary" />
-                          {agent.agentName || "Agente Sem Nome"}
-                          </CardTitle>
-                          <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-1 rounded-full">
-                              {agentTypeLabel}
-                          </span>
+                  <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start">
+                         {agentTypeIcon}
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start mb-1">
+                            <CardTitle className="text-lg font-semibold text-foreground">
+                              {agent.agentName || "Agente Sem Nome"}
+                            </CardTitle>
+                            <Badge variant="secondary" className="text-xs h-6">
+                                {agentTypeLabel}
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-2 h-[2.5em]">
+                            {agent.agentDescription || "Sem descrição."}
+                          </CardDescription>
+                        </div>
                       </div>
-                      <CardDescription className="line-clamp-2 h-[2.5em] pt-1">
-                        {agent.agentDescription || "Sem descrição."}
-                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3 flex-grow">
+                    <CardContent className="space-y-3 flex-grow pt-0">
                       {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentGoal && (
                           <div>
-                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Objetivo (LLM):</h4>
+                              <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Objetivo:</h4>
                               <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
                                   {(agent as LLMAgentConfig).agentGoal}
                               </p>
@@ -962,13 +987,13 @@ export default function AgentBuilderPage() {
                       )}
                        {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentModel && (
                           <div>
-                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Modelo de IA:</h4>
+                              <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Modelo de IA:</h4>
                               <p className="text-xs text-muted-foreground">{(agent as LLMAgentConfig).agentModel}</p>
                           </div>
                       )}
                       {agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).workflowDescription && (
                           <div>
-                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Descrição do Fluxo:</h4>
+                              <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Descrição do Fluxo:</h4>
                               <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
                                   {(agent as WorkflowAgentConfig).workflowDescription}
                               </p>
@@ -976,7 +1001,7 @@ export default function AgentBuilderPage() {
                       )}
                       {agent.agentType === 'custom' && (agent as CustomAgentConfig).customLogicDescription && (
                           <div>
-                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Lógica Personalizada:</h4>
+                              <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Lógica Personalizada:</h4>
                               <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
                                   {(agent as CustomAgentConfig).customLogicDescription}
                               </p>
@@ -984,30 +1009,32 @@ export default function AgentBuilderPage() {
                       )}
                        {agent.toolsDetails.length > 0 && (
                           <div className="pt-2">
-                              <h4 className="text-sm font-semibold mb-1.5 text-foreground/80">Ferramentas:</h4>
+                              <h4 className="text-sm font-semibold mb-1 text-foreground/80">Ferramentas:</h4>
                               <div className="flex flex-wrap gap-1.5">
                                   {agent.toolsDetails.map(toolDetail => {
                                       const fullTool = availableTools.find(t => t.id === toolDetail.id);
-                                      const toolIcon = fullTool ? React.cloneElement(fullTool.icon as React.ReactElement, { size: 12, className: "mr-0.5" }) : null;
+                                      const toolIcon = fullTool ? React.cloneElement(fullTool.icon as React.ReactElement, { size: 12 }) : null;
+                                      const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] &&
+                                                          ( (fullTool.id === 'webSearch' && agent.toolConfigsApplied[fullTool.id]?.googleApiKey && agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
+                                                            (fullTool.id === 'customApiIntegration' && agent.toolConfigsApplied[fullTool.id]?.openapiSpecUrl) ||
+                                                            (!['webSearch', 'customApiIntegration'].includes(fullTool.id))
+                                                          );
                                       return (
-                                          <Button
+                                          <Badge
                                               key={toolDetail.id}
-                                              variant="outline"
-                                              size="sm"
-                                              className="text-xs h-7 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-muted group"
-                                              onClick={toolDetail.needsConfiguration && fullTool ? () => openToolConfigModal(fullTool) : undefined}
-                                              disabled={toolDetail.needsConfiguration && !agent.toolConfigsApplied?.[toolDetail.id] && !fullTool}
+                                              variant={isConfigured && fullTool?.needsConfiguration ? "default" : "secondary"}
+                                              className="text-xs h-6 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default mr-1 mb-1"
+                                              title={toolDetail.label + (fullTool?.needsConfiguration ? (isConfigured ? " (Configurada)" : " (Requer Configuração)") : "")}
                                           >
                                               {toolIcon}
-                                              {toolDetail.label}
-                                              {toolDetail.needsConfiguration && (
+                                              <span className="truncate max-w-[100px]">{toolDetail.label}</span>
+                                              {fullTool?.needsConfiguration && (
                                                   <ConfigureIcon 
                                                       size={10} 
-                                                      className={`ml-1 opacity-70 group-hover:opacity-100 ${agent.toolConfigsApplied?.[toolDetail.id] ? 'text-green-500' : 'text-blue-500'}`}
-                                                      titleAccess={agent.toolConfigsApplied?.[toolDetail.id] ? "Configurada" : "Requer Configuração"}
+                                                      className={`ml-1 ${isConfigured ? 'text-green-400' : 'text-blue-400'}`}
                                                   />
                                               )}
-                                          </Button>
+                                          </Badge>
                                       );
                                   })}
                               </div>
@@ -1035,3 +1062,5 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
+    
