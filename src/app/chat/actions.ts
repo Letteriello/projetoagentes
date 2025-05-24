@@ -5,19 +5,25 @@ import { basicChatFlow, BasicChatInput, BasicChatOutput } from '@/ai/flows/chat-
 import { z } from 'zod';
 
 const ChatMessageSchema = z.object({
-  userInput: z.string().min(1, { message: "A mensagem não pode estar vazia." }),
+  userInput: z.string(), // Can be empty if fileDataUri is present
   agentSystemPrompt: z.string().optional(),
   agentModel: z.string().optional(),
   agentTemperature: z.coerce.number().optional(),
-  chatHistoryJson: z.string().optional(), // Histórico como JSON string
+  chatHistoryJson: z.string().optional(),
+  fileDataUri: z.string().optional(), // New field for image data URI
+}).refine(data => !!data.userInput?.trim() || !!data.fileDataUri, {
+  message: "A mensagem ou um arquivo deve ser fornecido.",
+  path: ["userInput"], // Attach error to userInput for simplicity, or handle more specifically
 });
+
 
 interface ChatFormState {
   message: string;
   agentResponse?: string | null;
   errors?: {
     userInput?: string[];
-    chatHistoryJson?: string[]; // Added for potential future validation
+    chatHistoryJson?: string[];
+    fileDataUri?: string[];
   } | null;
 }
 
@@ -31,6 +37,7 @@ export async function submitChatMessage(
     agentModel: formData.get('agentModel'),
     agentTemperature: formData.get('agentTemperature'),
     chatHistoryJson: formData.get('chatHistoryJson'),
+    fileDataUri: formData.get('fileDataUri'),
   });
 
   if (!validatedFields.success) {
@@ -41,7 +48,7 @@ export async function submitChatMessage(
     };
   }
 
-  const { userInput, agentSystemPrompt, agentModel, agentTemperature, chatHistoryJson } = validatedFields.data;
+  const { userInput, agentSystemPrompt, agentModel, agentTemperature, chatHistoryJson, fileDataUri } = validatedFields.data;
 
   let history: Array<{ role: 'user' | 'model'; content: string }> | undefined = undefined;
   if (chatHistoryJson) {
@@ -58,11 +65,12 @@ export async function submitChatMessage(
   }
 
   const input: BasicChatInput = {
-    userMessage: userInput,
+    userMessage: userInput || "", // User input can be empty if a file is sent
     systemPrompt: agentSystemPrompt,
     modelName: agentModel,
     temperature: agentTemperature,
     history: history,
+    fileDataUri: fileDataUri, // Pass the file data URI
   };
 
   try {
@@ -85,5 +93,3 @@ export async function submitChatMessage(
     };
   }
 }
-
-    

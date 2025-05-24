@@ -1,9 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Fluxo de chat básico para interagir com um modelo de IA, com suporte a histórico.
+ * @fileOverview Fluxo de chat básico para interagir com um modelo de IA, com suporte a histórico e envio de imagens.
  *
- * - basicChatFlow - Uma função que lida com uma única troca de chat, considerando o histórico.
+ * - basicChatFlow - Uma função que lida com uma única troca de chat, considerando o histórico e possível imagem.
  * - BasicChatInput - O tipo de entrada para basicChatFlow.
  * - BasicChatOutput - O tipo de retorno para basicChatFlow.
  */
@@ -13,14 +13,15 @@ import { z } from 'genkit';
 
 // Esquema interno para a entrada do fluxo de chat (não exportado)
 const BasicChatInputSchema = z.object({
-  userMessage: z.string().describe('A mensagem do usuário para o agente.'),
+  userMessage: z.string().describe('A mensagem do usuário para o agente. Pode ser vazia se fileDataUri for fornecido.'),
   systemPrompt: z.string().optional().describe('O prompt do sistema para guiar o comportamento do agente.'),
   modelName: z.string().optional().describe('O nome do modelo de IA a ser usado (ex: googleai/gemini-1.5-pro-latest).'),
   temperature: z.number().optional().describe('A temperatura para a geração do modelo (ex: 0.7).'),
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
-    content: z.string(),
+    content: z.string(), // History content remains text-based for this iteration for simplicity
   })).optional().describe('O histórico da conversa até o momento.'),
+  fileDataUri: z.string().optional().describe("Uma imagem como data URI. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
 });
 export type BasicChatInput = z.infer<typeof BasicChatInputSchema>;
 
@@ -37,86 +38,76 @@ export async function basicChatFlow(input: BasicChatInput): Promise<BasicChatOut
 
 // Definição do prompt Genkit
 const chatPrompt = ai.definePrompt({
-  name: 'basicChatPromptWithHistory',
-  // Não precisamos definir input/output schema aqui se a função de prompt
-  // lida com a construção da estrutura que o modelo espera.
-  // input: { schema: BasicChatInputSchema }, 
-  // output: { schema: BasicChatOutputSchema }, 
+  name: 'basicChatPromptWithHistoryAndImage',
   prompt: (input: BasicChatInput) => {
-    const messages: Array<{ role: string, content: string | Array<{text?: string, media?: {url: string}}> }> = []; // Ajuste para o tipo esperado pelo Genkit/Gemini
+    // Genkit expects MessagePart content to be string | MessageContentPart[]
+    // MessageContentPart is { text: string } | { media: { url: string, contentType?: string } } | ...
+    const messages: Array<{ role: string, content: string | Array<{text?: string, media?: {url: string, contentType?: string}}> }> = [];
 
-    // Adiciona o prompt do sistema como primeira mensagem, se fornecido
-    // Alguns modelos preferem o system prompt dentro do primeiro 'user' ou como uma instrução geral.
-    // Para Gemini, é comum iniciar com um prompt de sistema ou role 'user' com instruções.
-    // Se o modelo realmente suportar role 'system', pode ser usado. Por ora, vamos assumir que o prompt de sistema é prepended.
     const systemInstruction = input.systemPrompt || "Você é um assistente prestativo.";
-    
-    // Adiciona o histórico, se existir
+
+    // Add system prompt as the first user message or a dedicated system message if supported
+    // For Gemini, often it's part of the first user message content or instructions.
+    messages.push({ role: 'user', content: [{ text: systemInstruction }] });
+
+
     if (input.history && input.history.length > 0) {
-        // A primeira mensagem do histórico pode já ser o system prompt. 
-        // Vamos garantir que o system prompt definido (do agente ou gem) tenha prioridade.
-        // Uma abordagem é colocar o systemPrompt como a primeira mensagem do array.
-        // Para modelos como Gemini, o histórico vem antes da última mensagem do usuário.
+      input.history.forEach(msg => {
+        // Assuming history content is always text for now for simplicity.
+        // Future: history messages could also be multimodal.
+        messages.push({ role: msg.role, content: [{ text: msg.content }] });
+      });
+    }
 
-        // Adiciona o system prompt como primeira mensagem do histórico.
-        // Se o histórico já contiver um prompt de sistema (ex: a primeira mensagem do usuário tem instruções),
-        // a lógica aqui pode precisar ser mais sofisticada para mesclar ou priorizar.
-        // Por simplicidade, vamos assumir que o systemPrompt fornecido é o guia principal.
-        // E o histórico é simplesmente o que veio antes.
+    // Construct current user message part (text + optional image)
+    const currentUserMessageParts: Array<{text?: string, media?: {url: string, contentType?: string}}> = [];
+    if (input.userMessage) {
+      currentUserMessageParts.push({ text: input.userMessage });
+    }
+    if (input.fileDataUri) {
+      // Extract MIME type if present, otherwise let Genkit/model infer
+      const mimeTypeMatch = input.fileDataUri.match(/^data:(image\/[^;]+);base64,/);
+      const contentType = mimeTypeMatch ? mimeTypeMatch[1] : undefined;
+      currentUserMessageParts.push({ media: { url: input.fileDataUri, contentType } });
+    }
 
-        // A forma mais simples é concatenar o systemPrompt no início da primeira mensagem do usuário se não houver system role
-        // ou garantir que ele seja a primeira mensagem do history se a role 'system' for usada.
-        // Para compatibilidade com Genkit esperando MessagePart[], vamos usar a estrutura {role, content}
-        
-        messages.push({ role: 'user', content: systemInstruction }); // Coloca o system prompt como primeira mensagem 'user'
-
-        input.history.forEach(msg => {
-          // Se o system prompt já foi adicionado como primeira mensagem user,
-          // e a primeira mensagem do histórico também é um system prompt, evitamos duplicidade.
-          // Esta lógica pode ser refinada. Por agora, vamos adicionar o histórico como está.
-          if (messages.length > 0 && messages[0].content === systemInstruction && msg.role === 'user' && msg.content.startsWith(systemInstruction)) {
-            //  Não adiciona se for a mesma instrução inicial, para evitar redundância.
-          } else {
-            messages.push({ role: msg.role, content: msg.content });
-          }
-        });
-    } else {
-      // Se não há histórico, o system prompt é a primeira interação do usuário.
-      messages.push({ role: 'user', content: systemInstruction });
+    // Add the current user message if it has content (text or image)
+    if (currentUserMessageParts.length > 0) {
+      messages.push({ role: 'user', content: currentUserMessageParts });
+    } else if (messages.length === 1 && messages[0].content === systemInstruction) {
+      // If only system prompt is there and no user input/image, add a generic follow-up.
+      // This case should ideally be handled by client-side validation (input or file required).
+      // For safety, if an empty message somehow reaches here, we give it some text.
+      messages.push({ role: 'user', content: [{text: " "}] }); // Send a space to ensure the turn isn't empty
     }
     
-    // Adiciona a última mensagem do usuário, certificando-se de que ela não seja igual ao system prompt se este foi o único item
-     if (!(messages.length === 1 && messages[0].content === input.userMessage && messages[0].content === systemInstruction)) {
-       // Verifica se a última mensagem no histórico já é a userMessage atual (caso o history já inclua a última msg)
-       if(!(input.history && input.history.length > 0 && input.history[input.history.length -1].role === 'user' && input.history[input.history.length -1].content === input.userMessage)) {
-         messages.push({ role: 'user', content: input.userMessage });
-       }
-     }
-
-
     return {
-      messages, // Genkit espera um array de MessagePart
-      output: { // Ainda esperamos a estrutura de output definida
+      messages,
+      output: { 
         format: 'json',
         schema: BasicChatOutputSchema,
       },
     };
   },
   config: {
-    temperature: 0.7, // Padrão, pode ser sobrescrito
+    temperature: 0.7, // Default, can be overridden
   },
 });
 
 // Definição do fluxo Genkit
 const internalChatFlow = ai.defineFlow(
   {
-    name: 'internalChatFlowWithHistory',
+    name: 'internalChatFlowWithHistoryAndImage',
     inputSchema: BasicChatInputSchema,
     outputSchema: BasicChatOutputSchema,
   },
   async (input: BasicChatInput) => {
-    const modelToUse = input.modelName || ai.getModel();
+    const modelToUse = input.modelName || ai.getModel(); // ai.getModel() gets default from genkit.ts
     const temperatureToUse = input.temperature;
+
+    // Ensure the model used supports multimodal input if an image is provided.
+    // The default gemini-2.0-flash in genkit.ts is multimodal.
+    // If a modelName is provided, it should also be multimodal if fileDataUri is present.
 
     const llmResponse = await chatPrompt(input, {
       model: modelToUse,
@@ -127,9 +118,7 @@ const internalChatFlow = ai.defineFlow(
     if (!output) {
       throw new Error("O modelo não retornou uma saída válida.");
     }
-    
+
     return output;
   }
 );
-
-    
