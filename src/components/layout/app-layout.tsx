@@ -1,119 +1,123 @@
 
 "use client";
+
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarTrigger,
-  SidebarMenu,
-  SidebarMenuItem,
+import { Home, Cpu, MessageSquare, KeyRound, Settings, LayoutGrid, PanelLeft } from 'lucide-react';
+import { 
+  SidebarProvider, 
+  Sidebar, 
+  SidebarHeader, 
+  SidebarContent, 
+  SidebarFooter, 
+  SidebarMenu, 
+  SidebarMenuItem, 
   SidebarMenuButton,
+  SidebarTrigger,
   SidebarInset,
-} from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import { Cpu, KeyRound, Github, Settings2, UserCircle, MessageSquare } from 'lucide-react';
+  useSidebar,
+} from '@/components/ui/sidebar'; // Ajustado para importar o que é necessário
 import { AppLogo } from '@/components/icons/logo';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
 interface NavItem {
   href: string;
-  icon: ReactNode;
+  icon: React.ElementType;
   label: string;
-  tooltip: string;
 }
 
 const navItems: NavItem[] = [
-  { href: '/agent-builder', icon: <Cpu />, label: 'Construtor de Agentes', tooltip: 'Construir Agentes' },
-  { href: '/chat', icon: <MessageSquare />, label: 'Chat com Agentes', tooltip: 'Interagir com Agentes' },
-  { href: '/api-key-vault', icon: <KeyRound />, label: 'Cofre de Chaves API', tooltip: 'Gerenciar Chaves API' },
+  { href: '/', icon: LayoutGrid, label: 'Início' },
+  { href: '/agent-builder', icon: Cpu, label: 'Construtor de Agentes' },
+  { href: '/chat', icon: MessageSquare, label: 'Chat com Agentes' },
+  { href: '/api-key-vault', icon: KeyRound, label: 'Cofre de Chaves API' },
 ];
 
-export function AppLayout({ children }: { children: ReactNode }) {
+function MainLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { state, open, toggleSidebar } = useSidebar();
+
+  // Define a altura do cabeçalho dinamicamente com base no estado da barra lateral e no breakpoint
+  // Estas são estimativas e podem precisar de ajuste com base no seu CSS/design real
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768; // md breakpoint
+  let headerHeightClass = "h-16"; // theme(spacing.16)
+  
+  // Este é um exemplo. Você pode precisar de uma lógica mais robusta para --header-height se ela for usada em CSS.
+  // Por enquanto, vamos apenas garantir que o layout principal se ajuste.
+  // A lógica de --header-height na página de chat foi removida pois o cabeçalho do chat está dentro de ChatUI.
 
   return (
+    <SidebarInset>
+      <header className={`sticky top-0 z-40 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur-sm md:px-6 ${headerHeightClass}`}>
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Toggle Sidebar">
+          <PanelLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          {/* Você pode adicionar um título de página aqui ou deixar em branco */}
+        </div>
+        {/* Outros elementos do cabeçalho, como perfil do usuário, podem ir aqui */}
+      </header>
+      <main className="flex-1 flex-col overflow-auto p-4 md:p-6">
+        {children}
+      </main>
+    </SidebarInset>
+  );
+}
+
+
+export function AppLayout({ children }: { children: ReactNode }) {
+  return (
     <SidebarProvider defaultOpen>
-      <Sidebar>
+      <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="p-4">
-          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-            <Button variant="ghost" size="icon" className="shrink-0 group-data-[collapsible=icon]:hidden rounded-full aspect-square asChild" asChild>
-              <Link href="/"><AppLogo /></Link>
-            </Button>
-            <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">AgentVerse</span>
-            <div className="flex-1 group-data-[collapsible=icon]:hidden" />
-            <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
-          </div>
+          <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-sidebar-primary hover:text-sidebar-primary/90 transition-colors">
+            <AppLogo className="h-7 w-7" />
+            <span>AgentVerse</span>
+          </Link>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="flex-1">
           <SidebarMenu>
             {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith(item.href)}
-                  tooltip={{ children: item.tooltip, className: "group-data-[collapsible=icon]:flex hidden" }}
-                >
-                  <Link href={item.href}>
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
+              <SidebarMenuItem key={item.label}>
+                <Link href={item.href} legacyBehavior passHref>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === item.href}
+                    className="justify-start"
+                    tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
+                  >
+                    <a>
+                      <item.icon className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </Link>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="p-4 border-t border-sidebar-border">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center p-2">
-                 <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://placehold.co/100x100.png" alt="Avatar do Usuário" data-ai-hint="avatar usuário" />
-                    <AvatarFallback>AV</AvatarFallback>
-                  </Avatar>
-                <span className="ml-2 group-data-[collapsible=icon]:hidden">Nome do Usuário</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="start" className="w-56">
-              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <UserCircle className="mr-2 h-4 w-4" />
-                <span>Perfil</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings2 className="mr-2 h-4 w-4" />
-                <span>Configurações</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <span>Sair</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <SidebarFooter className="p-2">
+          <Separator className="my-2 bg-sidebar-border" />
+          <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton 
+                    className="justify-start"
+                    tooltip={{ children: "Configurações", side: "right", className: "bg-popover text-popover-foreground"}}
+                >
+                    <Settings className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Configurações</span>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="flex flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-6 md:hidden">
-          <SidebarTrigger />
-          <h1 className="text-lg font-semibold">AgentVerse</h1>
-        </header>
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          {children}
-        </main>
-      </SidebarInset>
+      <MainLayout>
+        {children}
+      </MainLayout>
     </SidebarProvider>
   );
 }
+
+  

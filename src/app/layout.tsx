@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased font-sans`}>
+      <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
         <AgentsProvider> {/* Envolve com o Provider */}
           <AppLayout>
             {children}
