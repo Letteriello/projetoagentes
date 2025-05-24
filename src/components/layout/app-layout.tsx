@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Cpu, MessageSquare, KeyRound, Settings, LayoutGrid, PanelLeft, UserCircle, PanelLeftClose, PanelRightOpen, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Cpu, MessageSquare, KeyRound, Settings, PanelLeft, UserCircle, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils'; // Import cn
 
 interface NavItem {
   href: string;
@@ -35,11 +36,9 @@ interface NavItem {
   label: string;
 }
 
-// Removido "Início"
 const navItems: NavItem[] = [
   { href: '/agents', icon: Cpu, label: 'Agentes' },
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
-  // "Chaves API" foi movido para o menu "Minha Conta"
 ];
 
 function MainLayout({ children }: { children: ReactNode }) {
@@ -66,14 +65,16 @@ function SidebarToggle() {
   const { toggleSidebar, state, isMobile, open } = useSidebar();
   
   if (isMobile) {
-    return null; // O toggle móvel está no MainLayout header
+    return null; 
   }
 
+  // Este botão deve estar sempre visível em desktop para permitir abrir/fechar.
+  // A classe 'group-data-[collapsible=icon]:hidden' estava no ícone errado ou aplicada de forma a esconder o toggle.
   return (
     <Button
       variant="ghost"
       size="icon"
-      className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute right-2 top-1/2 -translate-y-1/2 group-data-[collapsible=icon]:hidden"
+      className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute right-2 top-1/2 -translate-y-1/2"
       onClick={toggleSidebar}
       aria-label="Toggle Sidebar"
     >
@@ -86,22 +87,21 @@ function SidebarToggle() {
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  const { state: sidebarState, isMobile, collapsible } = useSidebar(); // Adicionado para controlar visibilidade do texto
+  const { state: sidebarState, isMobile, collapsible } = useSidebar();
 
   const isSidebarIconOnly = !isMobile && sidebarState === 'collapsed' && collapsible === 'icon';
 
   return (
-    <SidebarProvider defaultOpen>
+    <>
       <Sidebar 
         className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
-        collapsible="icon" // Habilitar modo ícone
+        collapsible="icon"
       >
         <SidebarHeader className="p-4 flex items-center justify-center h-16 relative">
           <Link href="/agents" className="hover:text-sidebar-primary/90 transition-colors flex items-center gap-2">
-            {/* Ícone pode ser adicionado aqui se desejado no futuro, por enquanto, apenas o texto */}
             {!isSidebarIconOnly && <span className="aida-logo-text">Aida</span>}
           </Link>
-          {!isMobile && <SidebarToggle />} 
+          <SidebarToggle /> 
         </SidebarHeader>
         <SidebarContent className="flex-1">
           <SidebarMenu>
@@ -115,7 +115,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
                     <a>
-                      <item.icon className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <item.icon className={cn(
+                        "mr-2 flex-shrink-0",
+                        isSidebarIconOnly ? "size-6" : "size-4" // Ícone maior no modo colapsado
+                      )} />
                       {!isSidebarIconOnly && <span className="truncate">{item.label}</span>}
                     </a>
                   </SidebarMenuButton>
@@ -134,7 +137,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   tooltip={{ children: "Minha Conta", side: "right", className: "bg-popover text-popover-foreground" }}
                   aria-label="Opções da conta"
                 >
-                  <UserCircle className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <UserCircle className={cn(
+                    "mr-2 flex-shrink-0",
+                    isSidebarIconOnly ? "size-6" : "size-4" // Ícone maior no modo colapsado
+                  )} />
                   {!isSidebarIconOnly && <span className="truncate">Minha Conta</span>}
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -163,6 +169,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <MainLayout>
         {children}
       </MainLayout>
-    </SidebarProvider>
+    </>
   );
 }
