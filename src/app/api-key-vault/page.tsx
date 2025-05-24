@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils"; // Import cn
 
 interface ApiKeyEntry {
   id: string;
@@ -142,7 +143,7 @@ export default function ApiKeyVaultPage() {
           if (!isOpen) resetAddKeyForm();
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => setIsAddKeyDialogOpen(true)}>
+            <Button onClick={() => setIsAddKeyDialogOpen(true)} className="button-live-glow">
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Nova Chave API
             </Button>
           </DialogTrigger>
@@ -204,7 +205,7 @@ export default function ApiKeyVaultPage() {
                 setIsAddKeyDialogOpen(false);
                 resetAddKeyForm();
               }}>Cancelar</Button>
-              <Button type="submit" onClick={handleAddApiKey}>Salvar Chave</Button>
+              <Button type="submit" onClick={handleAddApiKey} className="button-live-glow">Salvar Chave</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -307,7 +308,7 @@ export default function ApiKeyVaultPage() {
               <AlertDialogAction
                 onClick={confirmDeleteApiKey}
                 disabled={deleteConfirmText.toLowerCase() !== "deletar"}
-                className={deleteConfirmText.toLowerCase() !== "deletar" ? "bg-destructive/50" : "bg-destructive hover:bg-destructive/90"}
+                className={cn("bg-destructive hover:bg-destructive/90", deleteConfirmText.toLowerCase() !== "deletar" && "opacity-50 cursor-not-allowed")}
               >
                 Confirmar Exclusão
               </AlertDialogAction>
@@ -318,5 +319,3 @@ export default function ApiKeyVaultPage() {
     </div>
   );
 }
-
-    

@@ -9,6 +9,7 @@ import Image from "next/image"; // Keep if used elsewhere, or remove
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
 import { Badge } from "@/components/ui/badge"; // Keep if used elsewhere, or remove
+import { cn } from "@/lib/utils"; // Import cn
 
 // Import dos novos componentes
 import { AgentCard } from '@/components/agent-builder/agent-card';
@@ -27,13 +28,13 @@ export interface AvailableTool {
 }
 
 export const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar na internet (via Genkit). Requer configuração.", needsConfiguration: true, genkitToolName: "performWebSearch" },
-  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite realizar cálculos matemáticos (via função Genkit)." },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit).", needsConfiguration: true },
-  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth).", needsConfiguration: true },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit).", needsConfiguration: true, genkitToolName: "invokeOpenAPI" },
-  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit).", needsConfiguration: true, genkitToolName: "queryDatabase" },
-  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.", needsConfiguration: true, genkitToolName: "performWebSearch" },
+  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite realizar cálculos matemáticos (via função Genkit).", genkitToolName: "calculator" },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.", needsConfiguration: true, genkitToolName: "queryKnowledgeBase" },
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.", needsConfiguration: true, genkitToolName: "accessCalendar" },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.", needsConfiguration: true, genkitToolName: "invokeOpenAPI" },
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.", needsConfiguration: true, genkitToolName: "queryDatabase" },
+  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.", needsConfiguration: true, genkitToolName: "executeCode" },
 ];
 
 export const agentToneOptions = [
@@ -80,11 +81,11 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   loopExitToolName?: string;
   loopExitStateKey?: string;
   loopExitStateValue?: string;
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
+  agentGoal?: string; // Meta-objetivo do workflow
+  agentTasks?: string; // Tarefas de alto nível do workflow
+  agentPersonality?: string; // Tom geral, se aplicável
+  agentRestrictions?: string; // Restrições do workflow
+  agentModel?: string; // Modelo LLM para descrições ou meta-lógica
   agentTemperature?: number;
 }
 
@@ -182,15 +183,15 @@ export const agentTemplates: AgentTemplate[] = [
   },
   {
     id: "legal_analyst_basic", name: "Modelo: Analista Jurídico Básico (LLM)",
-    config: { agentType: "llm", agentName: "Analista Jurídico Básico", agentDescription: "Auxilia na compreensão de conceitos legais e pesquisa básica.", agentGoal: "Ajudar a entender conceitos legais, resumir termos, encontrar leis.", agentTasks: "1. Explicar termos legais.\n2. Resumir cláusulas (se fornecidas).\n3. Buscar leis/jurisprudência (com busca web).\n4. NÃO FORNECER ACONSELHAMENTO LEGAL.", agentPersonality: "Profissional e Direto", agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL. Recomendar advogado. Usar linguagem clara.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.3, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
+    config: { agentType: "llm", agentName: "Analista Jurídico Básico", agentDescription: "Auxilia na compreensão de conceitos legais e pesquisa básica. Sua descrição geral é: \"Sou um agente de IA projetado para ajudar com informações legais básicas. Não forneço aconselhamento legal.\"", agentGoal: "Ajudar a entender conceitos legais, resumir termos, encontrar leis.", agentTasks: "1. Explicar termos legais.\n2. Resumir cláusulas (se fornecidas).\n3. Buscar leis/jurisprudência (com busca web).\n4. NÃO FORNECER ACONSELHAMENTO LEGAL.", agentPersonality: "Profissional e Direto", agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL. Recomendar advogado. Usar linguagem clara.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.3, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
   },
   {
     id: "medical_triage_info", name: "Modelo: Assistente de Triagem Médica Informativo (LLM)",
-    config: { agentType: "llm", agentName: "Assistente de Triagem Médica (Informativo)", agentDescription: "Fornece informações gerais sobre sintomas, SEM DIAGNÓSTICO.", agentGoal: "Informar sobre sintomas, direcionar para cuidados, NÃO SUBSTITUI CONSULTA.", agentTasks: "1. Coletar sintomas.\n2. Informar sobre possíveis causas (com busca web).\n3. Sugerir nível de cuidado.\n4. Informar sobre especialistas.", agentPersonality: "Empático e Compreensivo", agentRestrictions: "NÃO FAZER DIAGNÓSTICOS. NÃO SUBSTITUIR CONSULTA MÉDICA. Enfatizar consulta a profissional. Não prescrever.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.5, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
+    config: { agentType: "llm", agentName: "Assistente de Triagem Médica (Informativo)", agentDescription: "Fornece informações gerais sobre sintomas, SEM DIAGNÓSTICO. Sua descrição geral é: \"Sou um agente de IA para fornecer informações gerais sobre saúde. Não substituo um profissional médico.\"", agentGoal: "Informar sobre sintomas, direcionar para cuidados, NÃO SUBSTITUI CONSULTA.", agentTasks: "1. Coletar sintomas.\n2. Informar sobre possíveis causas (com busca web).\n3. Sugerir nível de cuidado.\n4. Informar sobre especialistas.", agentPersonality: "Empático e Compreensivo", agentRestrictions: "NÃO FAZER DIAGNÓSTICOS. NÃO SUBSTITUIR CONSULTA MÉDICA. Enfatizar consulta a profissional. Não prescrever.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.5, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
   },
   {
     id: "travel_planner_basic", name: "Modelo: Planejador de Viagens Inicial (LLM)",
-    config: { agentType: "llm", agentName: "Planejador de Viagens Inicial", agentDescription: "Ajuda a pesquisar destinos, voos, acomodações e sugerir itinerários.", agentGoal: "Ajudar usuários a pesquisar e planejar viagens.", agentTasks: "1. Perguntar preferências (destino, orçamento, datas, interesses).\n2. Pesquisar destinos/atrações (com busca web).\n3. Sugerir voos/hotéis (exemplos).\n4. Esboçar itinerário básico.", agentPersonality: "Amigável e Prestativo", agentRestrictions: "Informar que preços/disponibilidade são exemplos. Não fazer reservas. Focar em sugestões.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.7, agentVersion: "1.0.0", agentTools: ["webSearch", "customApiIntegration"] },
+    config: { agentType: "llm", agentName: "Planejador de Viagens Inicial", agentDescription: "Ajuda a pesquisar destinos, voos, acomodações e sugerir itinerários. Sua descrição geral é: \"Sou um assistente de IA para ajudar no planejamento inicial de viagens.\"", agentGoal: "Ajudar usuários a pesquisar e planejar viagens.", agentTasks: "1. Perguntar preferências (destino, orçamento, datas, interesses).\n2. Pesquisar destinos/atrações (com busca web).\n3. Sugerir voos/hotéis (exemplos).\n4. Esboçar itinerário básico.", agentPersonality: "Amigável e Prestativo", agentRestrictions: "Informar que preços/disponibilidade são exemplos. Não fazer reservas. Focar em sugestões.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.7, agentVersion: "1.0.0", agentTools: ["webSearch", "customApiIntegration"] },
   },
 ];
 
@@ -201,6 +202,7 @@ export default function AgentBuilderPage() {
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgentId, setEditingAgentId] = React.useState<string | null>(null);
+  // Mantém a configuração do agente sendo editado ou criado no modal
   const [currentEditingAgent, setCurrentEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
 
 
@@ -211,12 +213,13 @@ export default function AgentBuilderPage() {
   };
 
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
-    setCurrentEditingAgent(agentToEdit);
+    setCurrentEditingAgent(agentToEdit); // Passa o agente completo para o modal
     setEditingAgentId(agentToEdit.id);
     setIsBuilderModalOpen(true);
   };
 
   const handleSaveAgent = (agentConfig: SavedAgentConfiguration) => {
+    // A lógica de ID e templateId já deve estar no agentConfig vindo do Dialog
     if (editingAgentId) {
       setSavedAgents(prevAgents =>
         prevAgents.map(agent =>
@@ -227,13 +230,13 @@ export default function AgentBuilderPage() {
     } else {
       setSavedAgents(prevAgents => [...prevAgents, agentConfig]);
       toast({
-        title: "Configuração Salva!",
+        title: "Agente Criado!",
         description: `O agente "${agentConfig.agentName}" foi adicionado à sua lista.`,
       });
     }
     setEditingAgentId(null);
     setCurrentEditingAgent(null);
-    //setIsBuilderModalOpen(false); // O Dialog no AgentBuilderDialog já faz isso via onOpenChange
+    // setIsBuilderModalOpen(false); // O Dialog no AgentBuilderDialog já faz isso via onOpenChange
   };
   
   const handleDeleteAgent = (agentIdToDelete: string) => {
@@ -250,7 +253,7 @@ export default function AgentBuilderPage() {
           <Cpu className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Meus Agentes</h1>
         </div>
-        <Button onClick={handleOpenCreateAgentModal}>
+        <Button onClick={handleOpenCreateAgentModal} className="button-live-glow">
           Novo Agente
         </Button>
       </header>
@@ -268,10 +271,10 @@ export default function AgentBuilderPage() {
                 agent={agent}
                 onEdit={handleEditAgent}
                 onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
-                onDelete={handleDeleteAgent} // Adicionar confirmação aqui
-                availableTools={availableTools}
-                agentTypeOptions={agentTypeOptions}
-                iconComponents={iconComponents}
+                onDelete={handleDeleteAgent} 
+                availableTools={availableTools} // Passando availableTools
+                agentTypeOptions={agentTypeOptions} // Passando agentTypeOptions
+                // iconComponents não é mais necessário aqui, pois AgentCard define os seus
               />
             ))}
           </div>
@@ -283,7 +286,7 @@ export default function AgentBuilderPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Comece clicando no botão acima para configurar seu primeiro agente de IA.
           </p>
-          <Button onClick={handleOpenCreateAgentModal} className="mt-6">
+          <Button onClick={handleOpenCreateAgentModal} className="mt-6 button-live-glow">
             <PlusCircle className="mr-2 h-4 w-4" /> Criar seu primeiro agente
           </Button>
         </div>
@@ -294,12 +297,12 @@ export default function AgentBuilderPage() {
         isOpen={isBuilderModalOpen}
         onOpenChange={(isOpen) => {
           setIsBuilderModalOpen(isOpen);
-          if (!isOpen) {
+          if (!isOpen) { // Se o modal for fechado (por qualquer motivo)
             setEditingAgentId(null);
             setCurrentEditingAgent(null);
           }
         }}
-        editingAgent={currentEditingAgent}
+        editingAgent={currentEditingAgent} // Passa o agente inteiro para edição ou null para criação
         onSave={handleSaveAgent}
         agentTemplates={agentTemplates}
         availableTools={availableTools}
@@ -310,5 +313,3 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
-    

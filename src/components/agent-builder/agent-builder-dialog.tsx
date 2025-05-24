@@ -24,6 +24,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils"; // Import cn
 
 import type { 
   SavedAgentConfiguration, 
@@ -186,7 +187,7 @@ export function AgentBuilderDialog({
       handleTemplateChange(agentTemplates[0].id, true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingAgent, agentTemplates]); // Depend on editingAgent and templates to re-initialize
+  }, [editingAgent, agentTemplates, isOpen]); // Adicionado isOpen para re-inicializar quando o modal abre para criar
 
   const resetLLMFields = (config: Partial<LLMAgentConfig>) => {
     setAgentGoal(config.agentGoal || defaultLLMConfigValues.agentGoal);
@@ -211,19 +212,20 @@ export function AgentBuilderDialog({
     setCustomLogicDescription(config?.customLogicDescription || "");
   };
 
-  const handleTemplateChange = (templateId: string, isInitialLoad = false) => {
+  const handleTemplateChange = (templateId: string, isInitialLoadOrNew = false) => {
     const template = agentTemplates.find(t => t.id === templateId);
     if (template) {
       setSelectedAgentTemplateId(templateId);
       const config = template.config;
       setAgentType(config.agentType);
-      setAgentName(isInitialLoad && editingAgent ? editingAgent.agentName : config.agentName);
-      setAgentDescription(isInitialLoad && editingAgent ? editingAgent.agentDescription : config.agentDescription);
-      setAgentVersion(isInitialLoad && editingAgent ? editingAgent.agentVersion : config.agentVersion);
-      setCurrentAgentTools(isInitialLoad && editingAgent ? editingAgent.agentTools : config.agentTools);
       
-      if (!isInitialLoad || !editingAgent) { // Only reset tool configs if not initial load of an editing agent
-        setToolConfigurations({});
+      // Se não estiver editando (isInitialLoadOrNew é true E não há editingAgent), OU se estiver mudando de template explicitamente (isInitialLoadOrNew é false)
+      if ((isInitialLoadOrNew && !editingAgent) || !isInitialLoadOrNew) {
+          setAgentName(config.agentName);
+          setAgentDescription(config.agentDescription);
+          setAgentVersion(config.agentVersion);
+          setCurrentAgentTools(config.agentTools);
+          setToolConfigurations({}); // Reset tool configurations ao mudar de template explicitamente
       }
 
 
@@ -268,12 +270,6 @@ export function AgentBuilderDialog({
   const constructSystemPrompt = () => {
     const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType, agentName, agentDescription, workflowDescription, detailedWorkflowType, loopMaxIterations, loopTerminationConditionType, loopExitToolName, loopExitStateKey, loopExitStateValue, customLogicDescription }; 
     
-    if (currentConfig.agentType !== 'llm' && !currentConfig.agentGoal && !currentConfig.agentTasks && !currentConfig.agentPersonality && !currentConfig.agentModel) {
-        if (currentConfig.agentType === 'workflow' && !currentConfig.workflowDescription) return undefined;
-        if (currentConfig.agentType === 'custom' && !currentConfig.customLogicDescription) return undefined;
-        if (currentConfig.agentType !== 'workflow' && currentConfig.agentType !== 'custom') return undefined;
-    }
-    
     let prompt = `Você é um agente de IA. Seu nome é "${currentConfig.agentName || 'Agente'}".\n`;
     if (currentConfig.agentDescription) {
       prompt += `Sua descrição geral é: "${currentConfig.agentDescription}".\n`;
@@ -296,7 +292,7 @@ export function AgentBuilderDialog({
             prompt += `O loop repetirá no máximo ${currentConfig.loopMaxIterations} vezes.\n`;
         }
         if(currentConfig.detailedWorkflowType === 'loop' && currentConfig.loopTerminationConditionType === 'subagent_signal') {
-            prompt += `O loop também pode terminar se um subagente sinalizar (ex: via ferramenta '${currentConfig.loopExitToolName || 'exit_loop'}' ou estado '${currentConfig.loopExitStateKey || 'status'}' atingir '${currentConfig.loopExitStateValue || 'FINALIZADO'}').\n`;
+            prompt += `O loop também pode terminar se um subagente sinalizar (ex: via ferramenta '${currentConfig.loopExitToolName || 'exit_loop'}' ou estado '${currentConfig.loopExitStateKey || 'status_documento'}' atingir '${currentConfig.loopExitStateValue || 'FINALIZADO'}').\n`;
         }
     } else if (currentConfig.agentType === 'custom') {
         if (currentConfig.customLogicDescription) {
@@ -333,7 +329,7 @@ export function AgentBuilderDialog({
                 );
 
             const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, '');
-            prompt += `- Nome da Ferramenta para uso: '${toolNameForPrompt}'. Descrição: ${tool.description}${tool.needsConfiguration ? (isConfigured ? " (Status: Configurada e pronta para uso)" : " (Status: Requer configuração. Verifique antes de usar ou informe a necessidade de configuração)") : ""}\n`;
+            prompt += `- Nome da Ferramenta para uso: '${toolNameForPrompt}'. Descrição: ${tool.description} ${tool.needsConfiguration ? (isConfigured ? "(Status: Configurada e pronta para uso)" : "(Status: Requer configuração. Verifique antes de usar ou informe a necessidade de configuração)") : ""}\n`;
         });
         prompt += "\n";
     } else {
@@ -588,7 +584,7 @@ export function AgentBuilderDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Modelos pré-configuram o tipo de agente e seus campos, incluindo instruções detalhadas. Não pode ser alterado durante a edição.</p>
+                <p className="text-xs text-muted-foreground">Modelos pré-configuram o tipo de agente e seus campos, incluindo instruções detalhadas. {!editingAgent ? "Mudar o template reseta os campos." : "Não pode ser alterado durante a edição."}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agentType" className="flex items-center gap-1.5"><Share2 size={16}/>Tipo de Agente</Label>
@@ -600,7 +596,7 @@ export function AgentBuilderDialog({
                     {agentTypeOptions.map(option => (
                       <SelectItem key={option.id} value={option.id}>
                          <div className="flex items-center">
-                           {React.cloneElement(option.icon as React.ReactElement, { className: "mr-2 h-4 w-4 text-muted-foreground"})}
+                           {option.icon ? React.cloneElement(option.icon as React.ReactElement, { className: "mr-2 h-4 w-4 text-muted-foreground"}) : <Cpu size={16} className="mr-2 h-4 w-4 text-muted-foreground"/>}
                            {option.label}
                          </div>
                       </SelectItem>
@@ -621,6 +617,7 @@ export function AgentBuilderDialog({
             <div className="space-y-2">
               <Label htmlFor="agentDescription">Descrição Geral do Agente</Label>
               <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo geral deste agente..." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} />
+               <p className="text-xs text-muted-foreground">Esta descrição será incluída no prompt do sistema do agente e pode ser usada por outros agentes para delegação de tarefas.</p>
             </div>
 
             <Separator />
@@ -668,7 +665,7 @@ export function AgentBuilderDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
-                  <p className="text-xs text-muted-foreground">Escolha o modelo Gemini. Outros (ex: OpenRouter) requerem fluxo Genkit dedicado.</p>
+                  <p className="text-xs text-muted-foreground">Modelos Google são integrados. Outros (OpenRouter, etc.) requerem um fluxo Genkit dedicado no backend e podem não funcionar no chat padrão sem essa customização.</p>
                   <Select value={agentModel} onValueChange={setAgentModel}>
                     <SelectTrigger id="agentModel"><SelectValue placeholder="Selecione um modelo (opcional)" /></SelectTrigger>
                     <SelectContent>
@@ -696,7 +693,7 @@ export function AgentBuilderDialog({
                 <Separator />
                 <div>
                   <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Workflow className="w-5 h-5 text-primary/80" /> Configuração do Fluxo de Trabalho</h3>
-                   <Alert className="mb-4">
+                   <Alert className="mb-4 bg-card border-border/60">
                     <Workflow className="h-4 w-4" />
                     <AlertTitle>{agentTypeOptions.find(opt => opt.id === 'workflow')?.label.split('(')[0].trim() || "Agente de Fluxo de Trabalho"}</AlertTitle>
                     <AlertDescription>Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si, tornando-os ideais para processos estruturados que exigem execução previsível.</AlertDescription>
@@ -718,11 +715,11 @@ export function AgentBuilderDialog({
                   </div>
 
                   {detailedWorkflowType === 'sequential' && (
-                    <Card className="bg-muted/30">
+                    <Card className="bg-muted/30 border-border/50">
                       <CardHeader><CardTitle className="text-base">Configurar Etapas Sequenciais</CardTitle><CardDescription className="text-xs">Defina a ordem dos subagentes. A saída de uma etapa pode ser usada pela próxima.</CardDescription></CardHeader>
                       <CardContent className="space-y-3">
                         <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente sequencial."})}><PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Etapa</Button>
-                        <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                        <div className="p-3 border rounded-md bg-background/70 space-y-2 border-border/50">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2"><GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/><span className="text-sm">Ex: Agente de Análise de Sentimento (Tipo: LLM, ID: agent_sentiment)</span></div>
                             <div className="flex items-center gap-1">
@@ -730,32 +727,32 @@ export function AgentBuilderDialog({
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover etapa."})}><Trash2 size={14} /></Button>
                             </div>
                           </div>
-                           <div className="pl-6 space-y-1"><Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label><Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: sentimento_analisado" /><p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p></div>
+                           <div className="pl-6 space-y-1"><Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label><Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: sentimento_analisado" /><p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p></div>
                         </div>
                       </CardContent>
                     </Card>
                   )}
                   {detailedWorkflowType === 'parallel' && ( 
-                    <Card className="bg-muted/30"> 
+                    <Card className="bg-muted/30 border-border/50"> 
                         <CardHeader>
                             <CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle>
                             <CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <Alert variant="default" className="mt-3 mb-4 bg-background/50 border-border/70">
+                            <Alert variant="default" className="mt-3 mb-4 bg-card border-border/70">
                                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                                <AlertTitle className="text-sm font-medium">Importante: Execução Independente</AlertTitle>
+                                <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
                                 <AlertDescription className="text-xs">
-                                    Os subagentes configurados aqui serão executados em paralelo e operam de forma independente. 
-                                    Não há compartilhamento automático de histórico ou estado entre eles durante a execução. 
-                                    Para combinar os resultados, cada subagente deve usar uma 'Chave de Saída' única para salvar seu resultado (ex: no estado da sessão).
-                                    Geralmente, um Agente Sequencial é usado como a próxima etapa para ler essas 'Chaves de Saída' e processar/mesclar os resultados.
+                                    Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução.
+                                    Para coletar e processar esses resultados, geralmente é necessário:
+                                    <br />1. Que cada subagente paralelo use uma 'Chave de Saída' (`output_key`) única para salvar seu resultado individual (ex: no estado da sessão).
+                                    <br />2. Adicionar um Agente Sequencial como a próxima etapa no fluxo de trabalho. Este Agente Sequencial pode então conter um `CustomAgent` ou `LlmAgent` para realizar a lógica de combinação, análise ou tomada de decisão com base nos múltiplos resultados paralelos.
                                 </AlertDescription>
                             </Alert>
                             <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
                                 <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela
                             </Button>
-                            <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                            <div className="p-3 border rounded-md bg-background/70 space-y-2 border-border/50">
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span>
                                     <div className="flex items-center gap-1">
@@ -769,7 +766,7 @@ export function AgentBuilderDialog({
                                 </div>
                                 <div className="pl-0 space-y-1 mt-1.5">
                                     <Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label>
-                                    <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: resultado_imagem_gerada" />
+                                    <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: resultado_imagem_gerada" />
                                     <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela (ex: salvo no estado da sessão).</p>
                                 </div>
                             </div>
@@ -777,7 +774,7 @@ export function AgentBuilderDialog({
                     </Card> 
                   )}
                   {detailedWorkflowType === 'loop' && ( 
-                    <Card className="bg-muted/30">
+                    <Card className="bg-muted/30 border-border/50">
                         <CardHeader>
                             <CardTitle className="text-base">Configurar Loop de Execução</CardTitle>
                             <CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription>
@@ -796,7 +793,7 @@ export function AgentBuilderDialog({
                                 </RadioGroup>
                             </div>
                             {loopTerminationConditionType === 'subagent_signal' && (
-                                <Alert variant="default" className="mt-3 bg-background/50 border-border/70">
+                                <Alert variant="default" className="mt-3 bg-card border-border/70">
                                     <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                     <AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle>
                                     <AlertDescription className="text-xs">
@@ -804,9 +801,9 @@ export function AgentBuilderDialog({
                                         Configure o subagente apropriado com essa lógica e, opcionalmente, indique abaixo qual ferramenta ou valor de estado é esperado para o término.
                                     </AlertDescription>
                                     <div className="mt-3 space-y-2 pl-1">
-                                        <div><Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label><Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/30" /></div>
-                                        <div><Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label><Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/30" /></div>
-                                        <div><Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label><Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/30" /></div>
+                                        <div><Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label><Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" /></div>
+                                        <div><Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label><Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" /></div>
+                                        <div><Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label><Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" /></div>
                                     </div>
                                 </Alert>
                             )}
@@ -815,7 +812,7 @@ export function AgentBuilderDialog({
                             <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente ao loop."})}>
                                 <PlusCircle size={16} className="mr-2" /> Adicionar Subagente ao Loop
                             </Button>
-                            <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                            <div className="p-3 border rounded-md bg-background/70 space-y-2 border-border/50">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2"><GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/><span className="text-sm">Ex: Agente de Coleta de Dados (Tipo: LLM, ID: agent_data_collector)</span></div>
                                     <div className="flex items-center gap-1">
@@ -829,7 +826,7 @@ export function AgentBuilderDialog({
                                 </div>
                                 <div className="pl-6 space-y-1">
                                     <Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
-                                    <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: dados_coletados_iteracao" />
+                                    <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: dados_coletados_iteracao" />
                                     <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) dentro da iteração ou após o loop.</p>
                                 </div>
                             </div>
@@ -846,10 +843,10 @@ export function AgentBuilderDialog({
                 <Separator />
                 <div>
                   <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><FileJson className="w-5 h-5 text-primary/80" /> Configuração do Agente Personalizado</h3>
-                  <Alert className="mb-4">
+                  <Alert className="mb-4 bg-card border-border/60">
                     <FileJson className="h-4 w-4" />
                     <AlertTitle>{agentTypeOptions.find(opt => opt.id === 'custom')?.label.split('(')[0].trim() || "Agente Personalizado"}</AlertTitle>
-                    <AlertDescription>Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes (como LlmAgent ou LoopAgent) e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar _run_async_impl).</AlertDescription>
+                     <AlertDescription>Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes (como LlmAgent ou LoopAgent) e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar _run_async_impl).</AlertDescription>
                   </Alert>
                   <div className="space-y-2">
                     <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
@@ -872,63 +869,74 @@ export function AgentBuilderDialog({
             {/* Seção de Ferramentas do Agente */}
             <div className="space-y-4">
               <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</Label>
-              <Card className="bg-muted/30">
+              <Card className="bg-muted/30 border-border/50">
                 <CardContent className="p-4 space-y-3">
                   <p className="text-sm text-muted-foreground">Capacite seu agente com funcionalidades para interagir com o mundo exterior. A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.</p>
                   <div className="space-y-3 pt-2">
-                    {availableTools.map((tool) => (
-                        <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                    {availableTools.map((tool) => {
+                       const Icon = getToolIconComponent( (tool.icon as React.ReactElement<{iconName?: keyof typeof iconComponents}>)?.props?.iconName); // Tentativa de extrair, pode precisar de ajuste
+                        const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] &&
+                                            ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
+                                                (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
+                                                (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
+                                                (tool.id === 'knowledgeBase' && toolConfigurations[tool.id]?.knowledgeBaseId) ||
+                                                (tool.id === 'calendarAccess' && toolConfigurations[tool.id]?.calendarApiEndpoint) ||
+                                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfigurations[tool.id] || {}).length > 0)
+                                            );
+                        return (
+                        <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors border-border/50">
                             <Checkbox 
                                 id={`tool-${tool.id}`} 
                                 checked={currentAgentTools.includes(tool.id)} 
                                 onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)} 
-                                className="mt-1" 
+                                className="mt-1 mr-3 shrink-0" 
                             />
-                            <div className="ml-3 flex-grow">
+                            <div className="flex-grow">
                                 <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 16, className: "mr-2"})}
+                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 18, className: "mr-2 text-primary/90"})}
                                     {tool.label}
-                                    {tool.needsConfiguration && <ConfigureIcon size={14} className="ml-2 text-muted-foreground group-hover:text-primary transition-colors" title="Requer Configuração"/>}
+                                    {tool.needsConfiguration && <ConfigureIcon size={14} className={cn("ml-2 text-muted-foreground group-hover:text-primary transition-colors", isConfigured && "text-green-500")} title={isConfigured ? "Configurada" : "Requer Configuração"}/>}
                                 </Label>
-                                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5 pl-7">{tool.description}</p>
                             </div>
                             {tool.needsConfiguration && currentAgentTools.includes(tool.id) && (
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="ml-auto shrink-0" 
+                                className={cn("ml-auto shrink-0 h-8 px-3", isConfigured && "border-green-500/50 hover:border-green-500 text-green-600 hover:text-green-500 hover:bg-green-500/10")}
                                 onClick={() => openToolConfigModal(tool)}
                             >
-                                <ConfigureIcon size={14} className="mr-1.5" />
-                                {toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]) ? "Reconfigurar" : "Configurar"}
+                                <ConfigureIcon size={14} className={cn("mr-1.5", isConfigured && "text-green-500")} />
+                                {isConfigured ? "Reconfigurar" : "Configurar"}
                             </Button>
                             )}
                         </div>
-                    ))}
+                    );
+                    })}
                   </div>
                   {currentAgentTools.length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
+                    <div className="mt-4 pt-3 border-t border-border/50">
                       <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
-                      <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                      <div className="flex flex-wrap gap-2">
                         {currentAgentTools.map(toolId => {
                             const tool = availableTools.find(t => t.id === toolId);
                             if (!tool) return null;
-                            const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]);
+                            const isToolConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]);
                             return ( 
-                                <li key={toolId} className="flex items-center">
-                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5 inline-block"})} 
+                                <Badge key={toolId} variant={isToolConfigured && tool.needsConfiguration ? "default" : "secondary"} className={cn(isToolConfigured && tool.needsConfiguration && "bg-green-600/20 border-green-500/50 text-green-700 hover:bg-green-600/30", "whitespace-nowrap")}>
+                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 12, className: "mr-1.5 inline-block"})} 
                                     {tool.label} 
                                     {tool.needsConfiguration && (
                                         <ConfigureIcon 
                                             size={12} 
-                                            className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`} 
-                                            title={isConfigured ? "Configurada" : "Requer configuração"}
+                                            className={`ml-1.5 ${isToolConfigured ? 'text-green-500' : 'text-blue-500'}`} 
+                                            title={isToolConfigured ? "Configurada" : "Requer configuração"}
                                         /> 
                                     )}
-                                </li> 
+                                </Badge> 
                             );
                         })}
-                      </ul>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -938,8 +946,8 @@ export function AgentBuilderDialog({
 
         <DialogFooter className="p-6 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleInternalSave}>
-            <Save className="mr-2 h-4 w-4" /> {editingAgent ? "Salvar Alterações" : "Salvar Configuração"}
+          <Button onClick={handleInternalSave} className="button-live-glow">
+            <Save className="mr-2 h-4 w-4" /> {editingAgent ? "Salvar Alterações" : "Salvar e Criar Agente"}
           </Button>
         </DialogFooter>
 
@@ -952,7 +960,7 @@ export function AgentBuilderDialog({
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                 <DialogTitle>Configurar: {configuringTool.label}</DialogTitle>
-                <DialogDescription>Forneça os detalhes de configuração para a ferramenta {configuringTool.label}.</DialogDescription>
+                <DialogDescription>{configuringTool.description} Forneça os detalhes de configuração abaixo.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
                 {configuringTool.id === "webSearch" && ( 
@@ -960,12 +968,12 @@ export function AgentBuilderDialog({
                         <div className="space-y-2">
                             <Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label>
                             <Input id="modalGoogleApiKey" value={modalGoogleApiKey} onChange={(e) => setModalGoogleApiKey(e.target.value)} placeholder="Cole sua chave API aqui" type="password"/>
-                            <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações.</p>
+                            <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações. Será usada a variável de ambiente GOOGLE_API_KEY se esta não for fornecida ou se a ferramenta for configurada para tal.</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
                             <Input id="modalGoogleCseId" value={modalGoogleCseId} onChange={(e) => setModalGoogleCseId(e.target.value)} placeholder="Cole seu CSE ID aqui"/>
-                            <p className="text-xs text-muted-foreground">Identifica seu mecanismo de busca personalizado.</p>
+                            <p className="text-xs text-muted-foreground">Identifica seu mecanismo de busca personalizado. Será usada a variável de ambiente GOOGLE_CSE_ID se esta não for fornecida ou se a ferramenta for configurada para tal.</p>
                         </div> 
                     </> 
                 )}
@@ -1040,7 +1048,7 @@ export function AgentBuilderDialog({
                 </div>
                 <DialogFooter>
                 <DialogClose asChild><Button variant="outline" onClick={() => { setIsToolConfigModalOpen(false); setConfiguringTool(null);}}>Cancelar</Button></DialogClose>
-                <Button onClick={handleSaveToolConfiguration}>Salvar Configuração</Button>
+                <Button onClick={handleSaveToolConfiguration} className="button-live-glow">Salvar Configuração</Button>
                 </DialogFooter>
             </DialogContent>
             </Dialog>
@@ -1049,6 +1057,3 @@ export function AgentBuilderDialog({
     </Dialog>
   );
 }
-
-
-      

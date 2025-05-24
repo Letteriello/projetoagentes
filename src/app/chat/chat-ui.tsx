@@ -14,8 +14,8 @@ import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builde
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator"; // Importado
-import { Label } from "@/components/ui/label"; // Importado
+import { Separator } from "@/components/ui/separator"; 
+import { Label } from "@/components/ui/label"; 
 
 interface ChatMessageUI {
   id: string;
@@ -27,7 +27,7 @@ interface ChatMessageUI {
 
 interface ChatHistoryMessage {
   role: 'user' | 'model';
-  content: string;
+  content: any; // Pode ser string ou array de partes (texto/mídia)
 }
 
 const initialGems = [
@@ -90,10 +90,11 @@ export function ChatUI() {
       };
       const newAgentMessageHistory: ChatHistoryMessage = {
         role: "model",
-        content: formState.agentResponse!,
+        content: [{ text: formState.agentResponse! }],
       };
       setMessages((prevMessages) => [...prevMessages, newAgentMessageUI]);
       setChatHistory((prevHistory) => [...prevHistory, newAgentMessageHistory]);
+      
       formRef.current?.reset(); 
       if (inputRef.current) inputRef.current.value = ""; 
       setSelectedFileDataUri(null);
@@ -113,6 +114,7 @@ export function ChatUI() {
       // @ts-ignore
       formState.message = "";
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formState, isPending]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -147,29 +149,40 @@ export function ChatUI() {
         return;
     }
 
-    const userMessageContent = userInput || ""; 
-    const historyContentForUser = userMessageContent + (selectedFileName ? `\n[Arquivo anexado: ${selectedFileName}]` : "");
+    const userMessageText = userInput || ""; 
 
     const newUserMessageUI: ChatMessageUI = {
       id: (Date.now() - 1).toString(),
-      text: userMessageContent,
+      text: userMessageText,
       sender: "user",
       imageUrl: selectedFileDataUri || undefined,
       fileName: selectedFileName || undefined,
     };
+
+    const userMessageContentParts: Array<{text?: string, media?: {url: string, contentType?: string}}> = [];
+    if (userMessageText.trim() !== "") {
+        userMessageContentParts.push({ text: userMessageText });
+    }
+    if (selectedFileDataUri) {
+        const mimeTypeMatch = selectedFileDataUri.match(/^data:(image\/[^;]+);base64,/);
+        const contentType = mimeTypeMatch ? mimeTypeMatch[1] : undefined;
+        userMessageContentParts.push({ media: { url: selectedFileDataUri, contentType } });
+    }
+    
     const newUserMessageHistory: ChatHistoryMessage = {
       role: "user",
-      content: historyContentForUser,
+      content: userMessageContentParts.length > 0 ? userMessageContentParts : [{text: " "}], // Garante que content não é vazio
     };
+
 
     setMessages((prevMessages) => [...prevMessages, newUserMessageUI]);
     
     const currentHistory = [...chatHistory, newUserMessageHistory];
-    formData.set("chatHistoryJson", JSON.stringify(currentHistory)); // Envia histórico para o backend
-    setChatHistory(currentHistory); // Atualiza histórico local para o próximo turno
+    formData.set("chatHistoryJson", JSON.stringify(currentHistory)); 
+    setChatHistory(currentHistory); 
 
     if (selectedFileDataUri) {
-      formData.set("fileDataUri", selectedFileDataUri);
+      formData.set("fileDataUri", selectedFileDataUri); // Continua enviando como string separada, o backend trata
     }
 
     const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
@@ -179,21 +192,20 @@ export function ChatUI() {
       formData.set("agentSystemPrompt", llmAgentConfig.systemPromptGenerated || "Você é um assistente prestativo.");
       if (llmAgentConfig.agentModel) formData.set("agentModel", llmAgentConfig.agentModel!);
       if (llmAgentConfig.agentTemperature !== undefined) formData.set("agentTemperature", llmAgentConfig.agentTemperature!.toString());
-      // Passar detalhes das ferramentas do agente
+      
       if (currentAgent.toolsDetails) {
         formData.set("agentToolsDetailsJson", JSON.stringify(currentAgent.toolsDetails));
       }
     } else {
       const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
       formData.set("agentSystemPrompt", currentGem.prompt);
-      // Para o assistente geral, não passamos agentToolsDetailsJson, então o fluxo usará um conjunto padrão ou nenhum.
     }
     formAction(formData);
   };
 
   const handleNewConversation = () => {
     setMessages([]);
-    setChatHistory([]); // Limpa o histórico para o backend também
+    setChatHistory([]); 
     setSelectedFileDataUri(null);
     setSelectedFileName(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -436,7 +448,7 @@ export function ChatUI() {
           <Button
             type="submit"
             size="icon"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg disabled:opacity-60 h-8 w-8"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg disabled:opacity-60 h-8 w-8 button-live-glow"
             disabled={isPending || (!inputRef.current?.value?.trim() && !selectedFileDataUri)}
             aria-label="Enviar mensagem"
           >
@@ -447,5 +459,3 @@ export function ChatUI() {
     </div>
   );
 }
-
-    
