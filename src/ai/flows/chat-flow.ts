@@ -41,23 +41,12 @@ export async function basicChatFlow(input: BasicChatInput): Promise<BasicChatOut
 const chatPrompt = ai.definePrompt(
   {
     name: 'basicChatPromptWithHistoryImageAndTools',
-    // Adiciona a ferramenta de busca na web
     tools: [performWebSearchTool],
-    // Não estamos usando o `prompt` callback aqui, pois a estrutura de `messages` é mais complexa e dinâmica.
-    // A lógica de construção de `messages` será feita dentro do `internalChatFlow` antes de chamar o modelo.
   },
   async (input: BasicChatInput) => {
     // Esta função de prompt agora é mais um placeholder,
     // a lógica de construção de mensagens está dentro do fluxo para maior controle.
-    // O Genkit espera que o prompt retorne a entrada para o modelo, que pode ser apenas as mensagens.
-    // A configuração de output (schema e format) é agora passada no `generate` call.
-    return {
-      // messages: [], // Será construído no fluxo
-      // output: { // Será definido no `generate`
-      //   format: 'json',
-      //   schema: BasicChatOutputSchema,
-      // },
-    };
+    return {}; // Retorna objeto vazio, pois a lógica de prompt está no fluxo.
   }
 );
 
@@ -70,30 +59,48 @@ const internalChatFlow = ai.defineFlow(
     outputSchema: BasicChatOutputSchema,
   },
   async (input: BasicChatInput) => {
-    const modelToUse = input.modelName || ai.getModel(); // ai.getModel() gets default from genkit.ts
+    const modelToUse = input.modelName || ai.getModel();
     const temperatureToUse = input.temperature;
 
-    // Construir o array de mensagens para o LLM
-    const messages: Array<{ role: string, content: string | Array<{text?: string, media?: {url: string, contentType?: string}}> }> = [];
+    // Tratamento para modelos que exigem configuração customizada no backend
+    if (['openrouter/custom', 'requestly/custom', 'custom-http/genkit'].includes(modelToUse)) {
+      let providerName = "um provedor personalizado";
+      if (modelToUse === 'openrouter/custom') providerName = "OpenRouter";
+      if (modelToUse === 'requestly/custom') providerName = "Requestly";
+      if (modelToUse === 'custom-http/genkit') providerName = "um endpoint HTTP customizado";
+      
+      return { 
+        agentResponse: `Este agente está configurado para usar ${providerName}. A integração completa para este tipo de configuração (que requer um fluxo Genkit customizado no backend) ainda não está implementada no sistema de chat padrão. Para usar este agente com todas as suas capacidades, um fluxo Genkit específico precisa ser desenvolvido e invocado.` 
+      };
+    }
+
+    const messages: Array<{ role: string, content: any | Array<{text?: string, media?: {url: string, contentType?: string}}> }> = [];
 
     let systemInstruction = input.systemPrompt || "Você é um assistente prestativo.";
     
-    // Adiciona instrução sobre a ferramenta de busca se não estiver já no systemPrompt do agente
-    // (O systemPrompt do agente já será atualizado para incluir isso)
-    if (!systemInstruction.toLowerCase().includes('performwebsearch')) {
+    if (!systemInstruction.toLowerCase().includes('performwebsearch') && 
+        (input.systemPrompt?.toLowerCase().includes('ferramentas disponíveis') || !input.systemPrompt ) // Add if tools are generally mentioned or no specific system prompt
+       ) {
         systemInstruction += "\n\nVocê tem uma ferramenta chamada 'performWebSearch' que pode usar para pesquisar informações atuais ou tópicos que não conhece. Se precisar, use-a informando a consulta de busca.";
     }
-
-    messages.push({ role: 'user', content: [{ text: systemInstruction }] }); // Tratar system prompt como primeira mensagem do usuário
+    // Para modelos Gemini, o system prompt geralmente é a primeira mensagem do usuário ou uma mensagem com role 'system'
+    // dependendo da versão e como o modelo é invocado.
+    // Para consistência, vamos adicionar como a primeira mensagem do 'user'.
+    messages.push({ role: 'user', content: [{ text: systemInstruction }] }); 
 
     if (input.history && input.history.length > 0) {
       input.history.forEach(msg => {
-        messages.push({ role: msg.role, content: [{ text: msg.content }] });
+         // Evitar adicionar o prompt do sistema do histórico novamente se ele já foi o primeiro
+        if (messages.length > 0 && messages[0].role === 'user' && typeof messages[0].content === 'object' && (messages[0].content as Array<any>)[0].text === msg.content) {
+          // Não adiciona se for idêntico à instrução de sistema já inserida
+        } else {
+          messages.push({ role: msg.role, content: [{ text: msg.content }] });
+        }
       });
     }
 
     const currentUserMessageParts: Array<{text?: string, media?: {url: string, contentType?: string}}> = [];
-    if (input.userMessage) {
+    if (input.userMessage && input.userMessage.trim() !== "") {
       currentUserMessageParts.push({ text: input.userMessage });
     }
     if (input.fileDataUri) {
@@ -104,14 +111,17 @@ const internalChatFlow = ai.defineFlow(
 
     if (currentUserMessageParts.length > 0) {
       messages.push({ role: 'user', content: currentUserMessageParts });
-    } else if (messages.length === 1) { // Apenas a instrução de sistema
-      messages.push({ role: 'user', content: [{text: " "}] }); // Garante que não está vazio
+    } else if (messages.length === 1 && messages[0].role === 'user') { 
+      // Apenas a instrução de sistema e nenhuma mensagem atual do usuário
+      // Adiciona uma mensagem vazia para garantir que o modelo tenha algo para responder,
+      // ou dependendo do modelo, pode ser melhor não enviar nada. Para Gemini, é bom ter um input.
+      messages.push({ role: 'user', content: [{text: " "}] });
     }
     
     const llmResponse = await ai.generate({
         model: modelToUse,
-        prompt: { messages }, // Passa o array de mensagens construído
-        tools: [performWebSearchTool], // Garante que a ferramenta está disponível para esta chamada
+        prompt: { messages }, 
+        tools: [performWebSearchTool], 
         config: temperatureToUse !== undefined ? { temperature: temperatureToUse } : undefined,
         output: {
             format: 'json',
@@ -123,7 +133,6 @@ const internalChatFlow = ai.defineFlow(
 
     if (!output || !output.agentResponse) {
       console.error("Fluxo: Resposta do LLM inválida ou vazia", llmResponse.usage, llmResponse.candidates);
-      // Tenta obter texto simples se a resposta JSON falhar
       const plainText = llmResponse.text;
       if (plainText) {
         return { agentResponse: plainText };

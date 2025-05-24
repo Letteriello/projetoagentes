@@ -34,11 +34,11 @@ export interface AvailableTool {
   icon: React.ReactNode;
   description: string;
   needsConfiguration?: boolean;
-  genkitToolName?: string; // Nome da ferramenta como definida no Genkit (ex: performWebSearch)
+  genkitToolName?: string; 
 }
 
 export const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet via Genkit (requer Chave API Google e CSE ID).", needsConfiguration: true, genkitToolName: "performWebSearch" },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet (via Genkit). Exige configuração da chave API Google e CSE ID.", needsConfiguration: true, genkitToolName: "performWebSearch" },
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
   { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração para especificar a fonte de dados).", needsConfiguration: true },
   { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit e autenticação).", needsConfiguration: true },
@@ -85,19 +85,17 @@ export interface LLMAgentConfig extends AgentConfigBase {
 export interface WorkflowAgentConfig extends AgentConfigBase {
   agentType: "workflow";
   workflowDescription: string;
-  // Campos opcionais de LLM, podem ser herdados ou não, dependendo da lógica do workflow
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
   agentRestrictions?: string;
-  agentModel?: string; // Pode ser usado por etapas do workflow
-  agentTemperature?: number; // Pode ser usado por etapas do workflow
+  agentModel?: string; 
+  agentTemperature?: number; 
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
-  // Campos opcionais de LLM
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -115,13 +113,10 @@ export interface AgentTemplate {
 }
 
 export interface ToolConfigData {
-  // Google Search
   googleApiKey?: string;
   googleCseId?: string;
-  // OpenAPI
   openapiSpecUrl?: string;
   openapiApiKey?: string;
-  // Database Access
   dbType?: string;
   dbConnectionString?: string;
   dbUser?: string;
@@ -130,9 +125,7 @@ export interface ToolConfigData {
   dbHost?: string;
   dbPort?: string;
   dbDescription?: string;
-  // Knowledge Base
   knowledgeBaseId?: string;
-  // Calendar Access
   calendarApiEndpoint?: string;
 }
 
@@ -140,7 +133,7 @@ export interface ToolConfigData {
 export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
-  systemPromptGenerated?: string; // Apenas para LLMAgentConfig
+  systemPromptGenerated?: string; 
   toolsDetails: Array<{ id: string; label: string; iconName?: keyof typeof iconComponents | 'default'; needsConfiguration?: boolean; genkitToolName?: string; }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
@@ -164,7 +157,7 @@ const defaultLLMConfig: Omit<LLMAgentConfig, keyof AgentConfigBase | 'agentType'
   agentTemperature: 0.7,
 };
 
-const agentTemplates: AgentTemplate[] = [
+export const agentTemplates: AgentTemplate[] = [
   {
     id: "custom_llm",
     name: "LLM Personalizado (Começar do Zero)",
@@ -390,7 +383,7 @@ export default function AgentBuilderPage() {
       setAgentDescription(template.config.agentDescription);
       setAgentVersion(template.config.agentVersion);
       setCurrentAgentTools(template.config.agentTools); 
-      setToolConfigurations({}); // Reset tool configurations when template changes
+      setToolConfigurations({}); 
 
       if (template.config.agentType === 'llm') {
         const llmConfig = template.config as LLMAgentConfig;
@@ -470,7 +463,7 @@ export default function AgentBuilderPage() {
     prompt += "- Se uma ferramenta necessária não estiver configurada, informe ao usuário educadamente.\n";
 
 
-    return prompt.trim() || "Você é um assistente prestativo."; // Fallback
+    return prompt.trim() || "Você é um assistente prestativo."; 
   };
 
   const handleCreateNewAgent = () => { 
@@ -508,7 +501,6 @@ export default function AgentBuilderPage() {
     } else if (agentToEdit.agentType === 'workflow') {
       const workflowConfig = agentToEdit as WorkflowAgentConfig;
       setWorkflowDescription(workflowConfig.workflowDescription || "");
-      // Populate optional LLM fields if they exist
       resetLLMFields({
         agentGoal: workflowConfig.agentGoal,
         agentTasks: workflowConfig.agentTasks,
@@ -550,7 +542,6 @@ export default function AgentBuilderPage() {
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
-            // Determine iconName based on tool.id or use a default
             let iconName: keyof typeof iconComponents | 'default' = 'Default';
             if (tool.id === 'webSearch') iconName = 'Search';
             else if (tool.id === 'calculator') iconName = 'Calculator';
@@ -577,7 +568,7 @@ export default function AgentBuilderPage() {
         agentDescription,
         agentVersion,
         agentTools: currentAgentTools,
-        agentType, // This is key for differentiating
+        agentType, 
     };
     
     if (agentType === 'llm') {
@@ -594,7 +585,6 @@ export default function AgentBuilderPage() {
       agentConfigData = {
         ...agentConfigData,
         workflowDescription,
-        // Optional LLM fields for workflow can be added here if needed
         agentGoal: agentGoal || undefined,
         agentTasks: agentTasks || undefined,
         agentPersonality: agentPersonality || undefined,
@@ -602,11 +592,10 @@ export default function AgentBuilderPage() {
         agentModel: agentModel || undefined,
         agentTemperature: agentTemperature[0] ?? undefined,
       };
-    } else { // Custom Agent
+    } else { 
       agentConfigData = {
         ...agentConfigData,
         customLogicDescription,
-        // Optional LLM fields for custom
         agentGoal: agentGoal || undefined,
         agentTasks: agentTasks || undefined,
         agentPersonality: agentPersonality || undefined,
@@ -621,9 +610,9 @@ export default function AgentBuilderPage() {
             prevAgents.map(agent => 
                 agent.id === editingAgentId ? 
                 { 
-                    ...agent, // Preserve original ID and potentially other meta-fields
-                    ...(agentConfigData as AgentConfig), // Spread the specific config type
-                    agentType, // Ensure agentType is correctly set
+                    ...agent, 
+                    ...(agentConfigData as AgentConfig), 
+                    agentType, 
                     templateId: selectedAgentTemplateId,
                     systemPromptGenerated: systemPrompt,
                     toolsDetails: selectedToolsDetails,
@@ -636,8 +625,8 @@ export default function AgentBuilderPage() {
         const newAgentConfiguration: SavedAgentConfiguration = {
             id: `agent-${Date.now()}`,
             templateId: selectedAgentTemplateId,
-            ...(agentConfigData as AgentConfig), // Spread the specific config type
-            agentType, // Ensure agentType is correctly set
+            ...(agentConfigData as AgentConfig), 
+            agentType, 
             systemPromptGenerated: systemPrompt,
             toolsDetails: selectedToolsDetails,
             toolConfigsApplied: appliedToolConfigs,
@@ -933,7 +922,7 @@ export default function AgentBuilderPage() {
 
       <Dialog open={isBuilderModalOpen} onOpenChange={(isOpen) => { 
           setIsBuilderModalOpen(isOpen); 
-          if (!isOpen) setEditingAgentId(null); // Reset editing state if modal is closed
+          if (!isOpen) setEditingAgentId(null); 
       }}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -1066,7 +1055,7 @@ export default function AgentBuilderPage() {
                     <div className="space-y-2">
                       <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
                       <p className="text-xs text-muted-foreground">
-                        Escolha o modelo Gemini do Google para o agente LLM. A integração com outros modelos (ex: OpenRouter) pode requerer configuração como Ferramenta Genkit.
+                        Escolha o modelo Gemini para o agente. Outros (ex: OpenRouter) requerem fluxo Genkit dedicado e não funcionarão no chat padrão.
                       </p>
                       <Select value={agentModel} onValueChange={setAgentModel}>
                         <SelectTrigger id="agentModel">
@@ -1077,9 +1066,9 @@ export default function AgentBuilderPage() {
                           <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
                           <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
                           <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
-                          <SelectItem value="openrouter/custom">OpenRouter (requer configuração como Ferramenta Genkit)</SelectItem>
-                          <SelectItem value="requestly/custom">Requestly Mock (requer configuração como Ferramenta Genkit)</SelectItem>
-                          <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (via Ferramenta Genkit)</SelectItem>
+                          <SelectItem value="openrouter/custom">OpenRouter (requer fluxo Genkit dedicado; não funcional no chat padrão)</SelectItem>
+                          <SelectItem value="requestly/custom">Requestly Mock (requer fluxo Genkit dedicado; não funcional no chat padrão)</SelectItem>
+                          <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (requer fluxo Genkit dedicado; não funcional no chat padrão)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1270,7 +1259,6 @@ export default function AgentBuilderPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Tool Configuration Modal */}
       {isToolConfigModalOpen && configuringTool && (
         <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => {
           if (!open) setConfiguringTool(null); 
