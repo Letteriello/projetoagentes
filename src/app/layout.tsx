@@ -5,6 +5,7 @@ import './globals.css';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Toaster } from "@/components/ui/toaster";
 import { AgentsProvider } from '@/contexts/AgentsContext'; // Importado
+import { SidebarProvider } from '@/components/ui/sidebar'; // Import SidebarProvider
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -21,10 +22,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
-        <AgentsProvider> {/* Envolve com o Provider */}
-          <AppLayout>
-            {children}
-          </AppLayout>
+        <AgentsProvider> {/* Envolve com o Provider de Agentes */}
+          <SidebarProvider defaultOpen> {/* Envolve com o SidebarProvider */}
+            <AppLayout>
+              {children}
+            </AppLayout>
+          </SidebarProvider>
         </AgentsProvider>
         <Toaster />
       </body>
