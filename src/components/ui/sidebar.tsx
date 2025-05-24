@@ -33,7 +33,7 @@ type SidebarContext = {
   setOpen: (open: boolean) => void
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
-  isMobile: boolean
+  isMobile?: boolean // Can be undefined initially
   toggleSidebar: () => void
 }
 
@@ -71,8 +71,6 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
 
-    // This is the internal state of the sidebar.
-    // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
     const setOpen = React.useCallback(
@@ -84,20 +82,17 @@ const SidebarProvider = React.forwardRef<
           _setOpen(openState)
         }
 
-        // This sets the cookie to keep the sidebar state.
         document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
       },
       [setOpenProp, open]
     )
 
-    // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
-      return isMobile
-        ? setOpenMobile((open) => !open)
-        : setOpen((open) => !open)
+      return isMobile === true // only toggle if isMobile is determined
+        ? setOpenMobile((current) => !current)
+        : setOpen((current) => !current)
     }, [isMobile, setOpen, setOpenMobile])
 
-    // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (
@@ -113,8 +108,6 @@ const SidebarProvider = React.forwardRef<
       return () => window.removeEventListener("keydown", handleKeyDown)
     }, [toggleSidebar])
 
-    // We add a state so that we can do data-state="expanded" or "collapsed".
-    // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed"
 
     const contextValue = React.useMemo<SidebarContext>(
@@ -193,7 +186,8 @@ const Sidebar = React.forwardRef<
       )
     }
 
-    if (isMobile) {
+    // Render Sheet for mobile only when isMobile is true
+    if (isMobile === true) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
@@ -212,17 +206,21 @@ const Sidebar = React.forwardRef<
         </Sheet>
       )
     }
-
+    
+    // Render desktop version if isMobile is false or undefined (server/initial client)
+    // The `hidden md:block` classes handle visibility based on viewport.
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className={cn(
+            "group peer text-sidebar-foreground", 
+            isMobile === undefined ? "block" : "hidden md:block" // Ensure it's rendered on server
+        )}
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
       >
-        {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
             "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
@@ -235,11 +233,11 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            "duration-200 fixed inset-y-0 z-10 h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            isMobile === undefined ? "flex" : "hidden md:flex", // Ensure consistent rendering for server and initial client
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-            // Adjust the padding for floating and inset variants.
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
               : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -462,7 +460,6 @@ const SidebarGroupAction = React.forwardRef<
       data-sidebar="group-action"
       className={cn(
         "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "group-data-[collapsible=icon]:hidden",
         className
@@ -522,7 +519,7 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-12 text-sm", 
+        default: "h-12 text-sm",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
       },
@@ -550,15 +547,20 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
-      children, 
+      children,
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
-    const { isMobile, state } = useSidebar()
+    const { isMobile, state } = useSidebar() // isMobile can be undefined initially
 
-    const button = (
+    const [clientMounted, setClientMounted] = React.useState(false)
+    React.useEffect(() => {
+      setClientMounted(true)
+    }, [])
+
+    const buttonElement = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
@@ -568,28 +570,33 @@ const SidebarMenuButton = React.forwardRef<
           sidebarMenuButtonVariants({ variant, size, className }),
           isActive && "sidebar-item-active-glow"
         )}
-        {...props} // children are passed here
-      />
+        {...props}
+      >
+        {children}
+      </Comp>
     )
 
     if (!tooltip) {
-      return button
+      return buttonElement
     }
 
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
+    // Only render the Tooltip on the client after it has mounted
+    if (!clientMounted) {
+      return buttonElement // Render button without Tooltip on server and initial client render
     }
+
+    const tooltipContentProps = typeof tooltip === "string" ? { children: tooltip } : tooltip
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
+          // Show tooltip only on desktop (isMobile === false) when sidebar is collapsed (state === "collapsed")
+          // If isMobile is undefined (should be false here due to clientMounted guard, but for safety), treat as desktop.
+          hidden={(isMobile === true) || state !== "collapsed"}
+          {...tooltipContentProps}
         />
       </Tooltip>
     )
@@ -612,11 +619,10 @@ const SidebarMenuAction = React.forwardRef<
       data-sidebar="menu-action"
       className={cn(
         "absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-3", 
-        "peer-data-[size=lg]/menu-button:top-2.5", 
+        "peer-data-[size=default]/menu-button:top-3",
+        "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
           "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
@@ -639,8 +645,8 @@ const SidebarMenuBadge = React.forwardRef<
       "absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-sidebar-foreground select-none pointer-events-none",
       "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
       "peer-data-[size=sm]/menu-button:top-1",
-      "peer-data-[size=default]/menu-button:top-3", 
-      "peer-data-[size=lg]/menu-button:top-2.5", 
+      "peer-data-[size=default]/menu-button:top-3",
+      "peer-data-[size=lg]/menu-button:top-2.5",
       "group-data-[collapsible=icon]:hidden",
       className
     )}
@@ -655,7 +661,6 @@ const SidebarMenuSkeleton = React.forwardRef<
     showIcon?: boolean
   }
 >(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`
   }, [])
@@ -766,3 +771,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+      
