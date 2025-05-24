@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAgents } from '@/contexts/AgentsContext';
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
 
 export interface AvailableTool {
   id: string;
@@ -60,9 +62,9 @@ export const agentToneOptions = [
 ];
 
 export const agentTypeOptions = [
-  { id: "llm", label: "Agente LLM (Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem." },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)", icon: <Workflow size={16} />, description: "Controla a execução de outros agentes ou tarefas em padrões predefinidos (sequencial, paralelo, loop) de forma determinística. Não usa LLM para controle de fluxo." },
-  { id: "custom", label: "Agente Personalizado (Lógica via Genkit)", icon: <FileJson size={16} />, description: "Implementa lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados. Requer desenvolvimento de código." },
+  { id: "llm", label: "Agente LLM (Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem. (Ex: LlmAgent do ADK)" },
+  { id: "workflow", label: "Agente de Fluxo de Trabalho (Workflow)", icon: <Workflow size={16} />, description: "Controla a execução de outros agentes ou tarefas em padrões predefinidos (sequencial, paralelo, loop) de forma determinística. Não usa LLM para controle de fluxo. (Ex: SequentialAgent, ParallelAgent do ADK)" },
+  { id: "custom", label: "Agente Personalizado (Lógica via Genkit)", icon: <FileJson size={16} />, description: "Implementa lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados. (Ex: Estendendo BaseAgent do ADK)" },
 ];
 
 export interface AgentConfigBase {
@@ -84,7 +86,13 @@ export interface LLMAgentConfig extends AgentConfigBase {
 
 export interface WorkflowAgentConfig extends AgentConfigBase {
   agentType: "workflow";
+  detailedWorkflowType?: "sequential" | "parallel" | "loop";
   workflowDescription: string;
+  loopMaxIterations?: number;
+  loopTerminationConditionType?: "none" | "subagent_signal";
+  loopExitToolName?: string;
+  loopExitStateKey?: string;
+  loopExitStateValue?: string;
   // Campos de LLM podem ser opcionais se um workflow puder ter um LLM para alguma etapa,
   // mas o controle principal do fluxo não é por LLM.
   agentGoal?: string;
@@ -142,7 +150,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
 }
 
 const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane
+  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, GripVertical
 };
 
 const getToolIconComponent = (iconName?: keyof typeof iconComponents | 'default') => {
@@ -333,10 +341,33 @@ export default function AgentBuilderPage() {
   const [agentTemperature, setAgentTemperature] = React.useState( [(agentTemplates[0].config as LLMAgentConfig).agentTemperature || 0.7] );
 
   // Workflow Specific State
-  const [workflowDescription, setWorkflowDescription] = React.useState("");
+  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(
+    (agentTemplates[0].config.agentType === 'workflow' ? (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType : undefined)
+  );
+  const [workflowDescription, setWorkflowDescription] = React.useState(
+     (agentTemplates[0].config.agentType === 'workflow' ? (agentTemplates[0].config as WorkflowAgentConfig).workflowDescription : "")
+  );
+  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(
+    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopMaxIterations : undefined)
+  );
+  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<'none' | 'subagent_signal' | undefined>(
+    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopTerminationConditionType || 'none' : 'none')
+  );
+  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(
+    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopExitToolName : undefined)
+  );
+  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(
+     (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopExitStateKey : undefined)
+  );
+  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(
+    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopExitStateValue : undefined)
+  );
+
 
   // Custom Specific State
-  const [customLogicDescription, setCustomLogicDescription] = React.useState("");
+  const [customLogicDescription, setCustomLogicDescription] = React.useState(
+    (agentTemplates[0].config.agentType === 'custom' ? (agentTemplates[0].config as CustomAgentConfig).customLogicDescription : "")
+  );
 
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
@@ -370,83 +401,111 @@ export default function AgentBuilderPage() {
     setAgentTemperature([config.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : config.agentTemperature]);
   };
 
-  const resetWorkflowFields = () => {
-    setWorkflowDescription("");
+  const resetWorkflowFields = (config?: Partial<WorkflowAgentConfig>) => {
+    setWorkflowDescription(config?.workflowDescription || "");
+    setDetailedWorkflowType(config?.detailedWorkflowType || undefined);
+    setLoopMaxIterations(config?.loopMaxIterations || undefined);
+    setLoopTerminationConditionType(config?.loopTerminationConditionType || 'none');
+    setLoopExitToolName(config?.loopExitToolName || undefined);
+    setLoopExitStateKey(config?.loopExitStateKey || undefined);
+    setLoopExitStateValue(config?.loopExitStateValue || undefined);
   }
-  const resetCustomLogicFields = () => {
-    setCustomLogicDescription("");
+  const resetCustomLogicFields = (config?: Partial<CustomAgentConfig>) => {
+    setCustomLogicDescription(config?.customLogicDescription || "");
   }
 
   const handleTemplateChange = (templateId: string) => {
     const template = agentTemplates.find(t => t.id === templateId);
     if (template) {
       setSelectedAgentTemplateId(templateId);
-      setAgentType(template.config.agentType);
-      setAgentName(template.config.agentName);
-      setAgentDescription(template.config.agentDescription);
-      setAgentVersion(template.config.agentVersion);
-      setCurrentAgentTools(template.config.agentTools);
+      const config = template.config;
+      setAgentType(config.agentType);
+      setAgentName(config.agentName);
+      setAgentDescription(config.agentDescription);
+      setAgentVersion(config.agentVersion);
+      setCurrentAgentTools(config.agentTools);
       setToolConfigurations({}); // Reset tool configs when template changes
 
-      if (template.config.agentType === 'llm') {
-        const llmConfig = template.config as LLMAgentConfig;
-        resetLLMFields(llmConfig);
+      if (config.agentType === 'llm') {
+        resetLLMFields(config);
         resetWorkflowFields();
         resetCustomLogicFields();
-      } else if (template.config.agentType === 'workflow') {
-        const workflowConfig = template.config as WorkflowAgentConfig;
-        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>); // Keep LLM fields if present in template
-        setWorkflowDescription(workflowConfig.workflowDescription || "");
+      } else if (config.agentType === 'workflow') {
+        resetLLMFields(config as Partial<LLMAgentConfig>); 
+        resetWorkflowFields(config);
         resetCustomLogicFields();
-      } else if (template.config.agentType === 'custom') {
-        const customConfig = template.config as CustomAgentConfig;
-        resetLLMFields(customConfig as Partial<LLMAgentConfig>); // Keep LLM fields if present in template
+      } else if (config.agentType === 'custom') {
+        resetLLMFields(config as Partial<LLMAgentConfig>); 
         resetWorkflowFields();
-        setCustomLogicDescription(customConfig.customLogicDescription || "");
+        resetCustomLogicFields(config);
       }
     }
   };
 
   const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
     setAgentType(newAgentType);
-    // Ao mudar o tipo de agente, não limpamos mais os campos de LLM,
-    // pois um workflow ou custom agent ainda pode usar um LLM para algumas tarefas.
-    // Apenas limpamos os campos específicos do tipo anterior.
     if (newAgentType === 'llm') {
         resetWorkflowFields();
         resetCustomLogicFields();
-        // Se o template atual não era LLM, preenche com defaults de LLM
         const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId);
         if (currentTemplate && currentTemplate.config.agentType !== 'llm') {
            resetLLMFields(defaultLLMConfig);
         }
     } else if (newAgentType === 'workflow') {
         resetCustomLogicFields();
+        // Initialize workflow specific fields if not already set by a template
+        if (agentType !== 'workflow') { // Only reset if changing TO workflow
+            resetWorkflowFields({
+                detailedWorkflowType: undefined,
+                workflowDescription: "",
+                loopMaxIterations: undefined,
+                loopTerminationConditionType: 'none',
+            });
+        }
     } else if (newAgentType === 'custom') {
         resetWorkflowFields();
     }
   };
 
   const constructSystemPrompt = () => {
-    if (agentType !== 'llm' && !agentGoal && !agentTasks && !agentPersonality) { // Não gera prompt de sistema se não for LLM E campos relevantes estiverem vazios
-        return undefined; // Ou uma string vazia, dependendo de como o backend trata
+    const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType }; 
+    if (currentConfig.agentType !== 'llm' && !currentConfig.agentGoal && !currentConfig.agentTasks && !currentConfig.agentPersonality) {
+        // For non-LLM agents, if LLM instruction fields are empty, we don't need to generate a system prompt for LLM behavior.
+        // However, if they ARE filled, it implies the Workflow/Custom agent might use an LLM internally for some task,
+        // so we'd still generate a prompt.
+        return undefined; 
     }
 
-    let prompt = `Você é um agente de IA. `;
-    if (agentType === 'llm') {
-        prompt += `Seu tipo principal é LLM (Modelo de Linguagem Grande). `;
-    } else if (agentType === 'workflow') {
-        prompt += `Seu tipo principal é Agente de Fluxo de Trabalho. `;
-    } else if (agentType === 'custom') {
-        prompt += `Seu tipo principal é Agente Personalizado. `;
+    let prompt = `Você é um agente de IA. Seu nome é "${agentName || 'Agente'}".\n`;
+    if (currentConfig.agentType === 'llm') {
+        prompt += `Seu tipo principal é LLM (Modelo de Linguagem Grande), focado em linguagem e decisão.\n`;
+    } else if (currentConfig.agentType === 'workflow') {
+        prompt += `Seu tipo principal é Agente de Fluxo de Trabalho, focado em orquestrar tarefas de forma determinística.\n`;
+        if (detailedWorkflowType) {
+            prompt += `Subtipo de fluxo de trabalho: ${detailedWorkflowType}.\n`;
+        }
+        if (workflowDescription) {
+             prompt += `Descrição do fluxo: ${workflowDescription}.\n`;
+        }
+        if(detailedWorkflowType === 'loop' && loopMaxIterations) {
+            prompt += `O loop repetirá no máximo ${loopMaxIterations} vezes.\n`;
+        }
+        if(detailedWorkflowType === 'loop' && loopTerminationConditionType === 'subagent_signal') {
+            prompt += `O loop também pode terminar se um subagente sinalizar (ex: via ferramenta '${loopExitToolName || 'exit_loop'}' ou estado '${loopExitStateKey || 'status'}' atingir '${loopExitStateValue || 'FINALIZADO'}').\n`;
+        }
+    } else if (currentConfig.agentType === 'custom') {
+        prompt += `Seu tipo principal é Agente Personalizado, com lógica de backend customizada via Genkit.\n`;
+        if (customLogicDescription) {
+            prompt += `Descrição da lógica customizada: ${customLogicDescription}.\n`;
+        }
     }
-    prompt += `A seguir, suas características e responsabilidades:\n\n`;
+    prompt += `\nA seguir, as instruções de comportamento para qualquer capacidade de LLM que você possua (mesmo que seu tipo principal não seja LLM, você pode usar um LLM para tarefas específicas):\n\n`;
 
-    if (agentGoal) prompt += `OBJETIVO PRINCIPAL:\n${agentGoal}\n\n`;
-    if (agentTasks) prompt += `TAREFAS PRINCIPAIS A SEREM REALIZADAS:\n${agentTasks}\n\n`;
-    if (agentPersonality) prompt += `PERSONALIDADE/TOM DE COMUNICAÇÃO:\n${agentPersonality}\n\n`;
-    if (agentRestrictions) {
-      prompt += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE:\n${agentRestrictions}\n\n`;
+    if (currentConfig.agentGoal) prompt += `OBJETIVO PRINCIPAL (se usando LLM):\n${currentConfig.agentGoal}\n\n`;
+    if (currentConfig.agentTasks) prompt += `TAREFAS PRINCIPAIS A SEREM REALIZADAS (se usando LLM):\n${currentConfig.agentTasks}\n\n`;
+    if (currentConfig.agentPersonality) prompt += `PERSONALIDADE/TOM DE COMUNICAÇÃO (se usando LLM):\n${currentConfig.agentPersonality}\n\n`;
+    if (currentConfig.agentRestrictions) {
+      prompt += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE (se usando LLM):\n${currentConfig.agentRestrictions}\n\n`;
     }
 
     const selectedToolObjects = currentAgentTools
@@ -454,7 +513,7 @@ export default function AgentBuilderPage() {
       .filter(Boolean) as AvailableTool[];
 
     if (selectedToolObjects.length > 0) {
-        prompt += `FERRAMENTAS DISPONÍVEIS (Você deve decidir quando e como usá-las. Se uma ferramenta estiver marcada como 'requer configuração' e não estiver explicitamente configurada, informe ao usuário que não pode usá-la ou peça para configurá-la):\n`;
+        prompt += `FERRAMENTAS DISPONÍVEIS PARA USO PELO LLM (Você deve decidir quando e como usá-las. Se uma ferramenta estiver marcada como 'requer configuração' e não estiver explicitamente configurada, informe ao usuário que não pode usá-la ou peça para configurá-la):\n`;
         selectedToolObjects.forEach(tool => {
             const currentToolConfig = toolConfigurations[tool.id];
             const isConfigured = tool.needsConfiguration && currentToolConfig &&
@@ -463,7 +522,7 @@ export default function AgentBuilderPage() {
                   (tool.id === 'databaseAccess' && (currentToolConfig.dbConnectionString || (currentToolConfig.dbHost && currentToolConfig.dbName))) ||
                   (tool.id === 'knowledgeBase' && currentToolConfig.knowledgeBaseId) ||
                   (tool.id === 'calendarAccess' && currentToolConfig.calendarApiEndpoint) ||
-                  (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(currentToolConfig).length > 0 ) // Verifica se há alguma chave preenchida
+                  (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(currentToolConfig).length > 0 ) 
                 );
 
             const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, '');
@@ -471,15 +530,14 @@ export default function AgentBuilderPage() {
         });
         prompt += "\n";
     } else {
-        prompt += `Nenhuma ferramenta externa está configurada para este agente.\n\n`;
+        prompt += `Nenhuma ferramenta externa está configurada para este agente para uso por um LLM.\n\n`;
     }
 
-    prompt += "INSTRUÇÕES ADICIONAIS DE INTERAÇÃO:\n";
+    prompt += "INSTRUÇÕES ADICIONAIS DE INTERAÇÃO (se usando LLM):\n";
     prompt += "- Responda de forma concisa e direta ao ponto, a menos que o tom da personalidade solicite o contrário.\n";
     prompt += "- Se você precisar usar uma ferramenta, anuncie claramente qual ferramenta (usando o 'Nome da Ferramenta para uso' fornecido acima) e por que você a usaria ANTES de simular sua execução ou pedir ao usuário para aguardar. Após a simulação (ou se a execução real for implementada), apresente os resultados obtidos pela ferramenta.\n";
     prompt += "- Seja transparente sobre suas capacidades e limitações. Se não puder realizar uma tarefa, explique o motivo.\n";
     prompt += "- Se uma ferramenta necessária não estiver configurada, informe ao usuário educadamente.\n";
-
 
     return prompt.trim();
   };
@@ -489,6 +547,9 @@ export default function AgentBuilderPage() {
     handleTemplateChange(customTemplate.id);
     setToolConfigurations({});
     setEditingAgentId(null);
+    // Reset workflow specific fields as well for a truly new agent
+    resetWorkflowFields(); // This now also resets loop termination fields to default
+    resetCustomLogicFields(); // Ensure custom logic fields are also reset
   };
 
   const openCreateAgentModal = () => {
@@ -498,7 +559,7 @@ export default function AgentBuilderPage() {
 
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
     setEditingAgentId(agentToEdit.id);
-    setSelectedAgentTemplateId(agentToEdit.templateId || 'custom_llm');
+    setSelectedAgentTemplateId(agentToEdit.templateId || 'custom_llm'); 
     setAgentType(agentToEdit.agentType);
     setAgentName(agentToEdit.agentName);
     setAgentDescription(agentToEdit.agentDescription);
@@ -507,14 +568,13 @@ export default function AgentBuilderPage() {
     setToolConfigurations(agentToEdit.toolConfigsApplied || {});
 
     if (agentToEdit.agentType === 'llm') {
-      const llmConfig = agentToEdit as LLMAgentConfig;
-      resetLLMFields(llmConfig);
-      resetWorkflowFields();
-      resetCustomLogicFields();
+      resetLLMFields(agentToEdit as LLMAgentConfig);
+      resetWorkflowFields(); 
+      resetCustomLogicFields(); 
     } else if (agentToEdit.agentType === 'workflow') {
       const workflowConfig = agentToEdit as WorkflowAgentConfig;
-      setWorkflowDescription(workflowConfig.workflowDescription || "");
-      resetLLMFields({ // Preenche campos de LLM se existirem, senão usa defaults
+      resetWorkflowFields(workflowConfig);
+      resetLLMFields({ 
         agentGoal: workflowConfig.agentGoal || defaultLLMConfig.agentGoal,
         agentTasks: workflowConfig.agentTasks || defaultLLMConfig.agentTasks,
         agentPersonality: workflowConfig.agentPersonality || defaultLLMConfig.agentPersonality,
@@ -522,11 +582,11 @@ export default function AgentBuilderPage() {
         agentModel: workflowConfig.agentModel || defaultLLMConfig.agentModel,
         agentTemperature: workflowConfig.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : workflowConfig.agentTemperature,
       });
-      resetCustomLogicFields();
+      resetCustomLogicFields(); 
     } else if (agentToEdit.agentType === 'custom') {
       const customConfig = agentToEdit as CustomAgentConfig;
-      setCustomLogicDescription(customConfig.customLogicDescription || "");
-      resetLLMFields({ // Preenche campos de LLM se existirem, senão usa defaults
+      resetCustomLogicFields(customConfig);
+      resetLLMFields({ 
         agentGoal: customConfig.agentGoal || defaultLLMConfig.agentGoal,
         agentTasks: customConfig.agentTasks || defaultLLMConfig.agentTasks,
         agentPersonality: customConfig.agentPersonality || defaultLLMConfig.agentPersonality,
@@ -534,7 +594,7 @@ export default function AgentBuilderPage() {
         agentModel: customConfig.agentModel || defaultLLMConfig.agentModel,
         agentTemperature: customConfig.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : customConfig.agentTemperature,
       });
-      resetWorkflowFields();
+      resetWorkflowFields(); 
     }
     setIsBuilderModalOpen(true);
   };
@@ -554,7 +614,7 @@ export default function AgentBuilderPage() {
             
             let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
             const iconProp = tool.icon;
-            if (iconProp && typeof iconProp === 'object' && 'type' in iconProp && typeof iconProp.type === 'function') {
+            if (React.isValidElement(iconProp) && typeof iconProp.type === 'function') { 
                  const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
                  const foundIconName = Object.keys(iconComponents).find(
                     name => iconComponents[name] === IconComponent
@@ -576,38 +636,48 @@ export default function AgentBuilderPage() {
       }
     });
 
-    let agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'templateId' | 'toolsDetails' | 'toolConfigsApplied' | 'systemPromptGenerated'> = {
+    let agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'templateId' | 'toolsDetails' | 'toolConfigsApplied' | 'systemPromptGenerated'> & {agentType: AgentConfig["agentType"]} = {
         agentName,
         agentDescription,
         agentVersion,
         agentTools: currentAgentTools,
-        agentType,
+        agentType, 
     };
+    
 
     if (agentType === 'llm') {
       agentConfigData = {
         ...agentConfigData,
+        agentType: 'llm', 
         agentGoal,
         agentTasks,
         agentPersonality,
         agentRestrictions,
         agentModel,
         agentTemperature: agentTemperature[0],
-      } as LLMAgentConfig;
+      };
     } else if (agentType === 'workflow') {
       agentConfigData = {
         ...agentConfigData,
+        agentType: 'workflow', 
+        detailedWorkflowType,
         workflowDescription,
+        loopMaxIterations: detailedWorkflowType === 'loop' ? loopMaxIterations : undefined,
+        loopTerminationConditionType: detailedWorkflowType === 'loop' ? loopTerminationConditionType : undefined,
+        loopExitToolName: detailedWorkflowType === 'loop' ? loopExitToolName : undefined,
+        loopExitStateKey: detailedWorkflowType === 'loop' ? loopExitStateKey : undefined,
+        loopExitStateValue: detailedWorkflowType === 'loop' ? loopExitStateValue : undefined,
         agentGoal: agentGoal || undefined, 
         agentTasks: agentTasks || undefined,
         agentPersonality: agentPersonality || undefined,
         agentRestrictions: agentRestrictions || undefined,
         agentModel: agentModel || undefined,
         agentTemperature: agentTemperature[0] ?? undefined,
-      } as WorkflowAgentConfig;
+      };
     } else { // custom
       agentConfigData = {
         ...agentConfigData,
+        agentType: 'custom', 
         customLogicDescription,
         agentGoal: agentGoal || undefined, 
         agentTasks: agentTasks || undefined,
@@ -615,7 +685,7 @@ export default function AgentBuilderPage() {
         agentRestrictions: agentRestrictions || undefined,
         agentModel: agentModel || undefined,
         agentTemperature: agentTemperature[0] ?? undefined,
-      } as CustomAgentConfig;
+      };
     }
 
     if (editingAgentId) {
@@ -645,7 +715,7 @@ export default function AgentBuilderPage() {
         setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
         toast({
           title: "Configuração Salva!",
-          description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label}) foi adicionado à sua lista.`,
+          description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label.split('(')[0].trim()}) foi adicionado à sua lista.`,
         });
     }
 
@@ -792,22 +862,23 @@ export default function AgentBuilderPage() {
               const agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
 
               let AgentIconComponent: React.ReactNode;
-              switch (agent.templateId) {
-                case 'legal_analyst_basic':
-                  AgentIconComponent = <Briefcase size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
-                  break;
-                case 'medical_triage_info':
-                  AgentIconComponent = <Stethoscope size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
-                  break;
-                case 'travel_planner_basic':
-                  AgentIconComponent = <Plane size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
-                  break;
-                default:
+              
+              let specificIconType: keyof typeof iconComponents | undefined = undefined;
+
+              if (agent.templateId === 'legal_analyst_basic') specificIconType = 'Briefcase';
+              else if (agent.templateId === 'medical_triage_info') specificIconType = 'Stethoscope';
+              else if (agent.templateId === 'travel_planner_basic') specificIconType = 'Plane';
+              
+              if (specificIconType) {
+                 const SpecificIcon = iconComponents[specificIconType];
+                 AgentIconComponent = SpecificIcon ? <SpecificIcon size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" /> : <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+              } else {
                   const IconFromType = agentTypeDetails?.icon ?
                     React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) :
                     <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
                   AgentIconComponent = IconFromType;
               }
+
 
               return (
                 <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
@@ -838,10 +909,12 @@ export default function AgentBuilderPage() {
                             </p>
                         </div>
                     )}
-                      {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentModel && (
+                      {(agent.agentType === 'llm' || (agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).agentModel) || (agent.agentType === 'custom' && (agent as CustomAgentConfig).agentModel)) && (
                         <div>
                             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Modelo de IA:</h4>
-                            <p className="text-xs text-muted-foreground">{(agent as LLMAgentConfig).agentModel}</p>
+                            <p className="text-xs text-muted-foreground">
+                                { (agent as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel }
+                            </p>
                         </div>
                     )}
                     {agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).workflowDescription && (
@@ -849,6 +922,7 @@ export default function AgentBuilderPage() {
                             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Descrição do Fluxo:</h4>
                             <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
                                 {(agent as WorkflowAgentConfig).workflowDescription}
+                                { (agent as WorkflowAgentConfig).detailedWorkflowType && <span className="block text-xs text-primary/70">Tipo: {(agent as WorkflowAgentConfig).detailedWorkflowType}</span>}
                             </p>
                         </div>
                     )}
@@ -1006,9 +1080,12 @@ export default function AgentBuilderPage() {
             <Separator />
 
             <div>
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções {agentType !== 'llm' && '(Opcional para este tipo)'}</h3>
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções {agentType !== 'llm' && !(agentGoal || agentTasks || agentPersonality || agentRestrictions) && '(Opcional para este tipo)'}</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Forneça instruções claras para guiar o comportamento de decisão do agente. As respostas abaixo ajudarão a construir o "Prompt do Sistema" ideal.
+                {agentType === 'llm'
+                  ? "Forneça instruções claras para guiar o comportamento de decisão do agente. As respostas abaixo ajudarão a construir o \"Prompt do Sistema\" ideal."
+                  : "Se este agente utilizar um Modelo de Linguagem para alguma de suas funções ou para descrever seu comportamento geral, configure aqui."
+                }
               </p>
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -1059,7 +1136,7 @@ export default function AgentBuilderPage() {
             </div>
             <Separator />
             <div>
-              <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {agentType !== 'llm' && '(Opcional para este tipo)'}</h3>
+              <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {agentType !== 'llm' && !agentModel && '(Opcional para este tipo)'}</h3>
                <p className="text-sm text-muted-foreground mb-4">
                   Se este agente utilizar um Modelo de Linguagem Grande (LLM) para alguma de suas funções, configure-o aqui.
                 </p>
@@ -1106,24 +1183,187 @@ export default function AgentBuilderPage() {
                 <Separator />
                 <div>
                   <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Workflow className="w-5 h-5 text-primary/80" /> Configuração do Fluxo de Trabalho</h3>
-                  <Alert className="mb-4">
+                   <Alert className="mb-4">
                     <Workflow className="h-4 w-4" />
-                    <AlertTitle>Agente de Fluxo de Trabalho</AlertTitle>
+                    <AlertTitle>Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)</AlertTitle>
                     <AlertDescription>
-                      Agentes de fluxo de trabalho (Ex: SequentialAgent, ParallelAgent do ADK) controlam a execução de outros agentes ou tarefas em padrões predefinidos e determinísticos.
-                      Descreva o fluxo abaixo. A implementação detalhada das etapas e orquestração ocorreria via código Genkit. Uma UI dedicada para construção visual de fluxos é planejada para o futuro.
+                      Agentes de fluxo de trabalho controlam a execução de outros agentes ou tarefas em padrões predefinidos e determinísticos. A implementação detalhada das etapas e orquestração ocorreria via código Genkit.
                     </AlertDescription>
                   </Alert>
-                  <div className="space-y-2">
-                    <Label htmlFor="workflowDescription">Descrição do Fluxo de Trabalho e Etapas</Label>
+                  <div className="space-y-2 mb-4">
+                    <Label htmlFor="workflowDescription">Descrição Geral do Fluxo de Trabalho</Label>
                     <Textarea
                       id="workflowDescription"
-                      placeholder="Descreva as etapas, a ordem (sequencial, paralelo, loop) e a lógica do seu fluxo de trabalho..."
+                      placeholder="Descreva o objetivo geral e o funcionamento esperado deste fluxo de trabalho..."
                       value={workflowDescription}
                       onChange={(e) => setWorkflowDescription(e.target.value)}
-                      rows={6}
+                      rows={3}
                     />
                   </div>
+                  <div className="space-y-2 mb-6">
+                    <Label htmlFor="detailedWorkflowType">Tipo de Fluxo Detalhado</Label>
+                    <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}>
+                      <SelectTrigger id="detailedWorkflowType">
+                        <SelectValue placeholder="Selecione o tipo de fluxo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sequential">Sequencial (Executar em ordem)</SelectItem>
+                        <SelectItem value="parallel">Paralelo (Executar simultaneamente)</SelectItem>
+                        <SelectItem value="loop">Loop (Repetir até condição)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {detailedWorkflowType === 'sequential' && (
+                    <Card className="bg-muted/30">
+                      <CardHeader>
+                        <CardTitle className="text-base">Configurar Etapas Sequenciais</CardTitle>
+                        <CardDescription className="text-xs">Defina a ordem dos subagentes. A saída de uma etapa pode ser usada pela próxima.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente sequencial."})}>
+                          <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Etapa
+                        </Button>
+                        <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/>
+                              <span className="text-sm">Ex: Agente de Análise de Sentimento (Tipo: LLM, ID: agent_sentiment)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" 
+                                onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa: Aqui você definiria as instruções específicas para este subagente, incluindo como ele pode usar chaves de saída de etapas anteriores (ex: {resultado_etapa_anterior}) e qual chave de saída (output_key) ele próprio fornecerá."})}>
+                                <Settings size={14} />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover etapa."})}>
+                                <Trash2 size={14} />
+                              </Button>
+                            </div>
+                          </div>
+                           <div className="pl-6 space-y-1">
+                            <Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
+                            <Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: sentimento_analisado" />
+                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa em etapas futuras (ex: {"{sentimento_analisado}"}).</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {detailedWorkflowType === 'parallel' && (
+                    <Card className="bg-muted/30">
+                      <CardHeader>
+                        <CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle>
+                        <CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente paralelo."})}>
+                          <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela
+                        </Button>
+                         <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar tarefa paralela."})}>
+                                <Settings size={14} />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover tarefa."})}>
+                                <Trash2 size={14} />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {detailedWorkflowType === 'loop' && (
+                    <Card className="bg-muted/30">
+                      <CardHeader>
+                        <CardTitle className="text-base">Configurar Loop de Execução</CardTitle>
+                        <CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="loopMaxIterations">Número Máximo de Iterações (Opcional)</Label>
+                          <Input
+                            id="loopMaxIterations"
+                            type="number"
+                            min="1"
+                            placeholder="Ex: 5"
+                            value={loopMaxIterations || ""}
+                            onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)}
+                            className="h-9"
+                          />
+                           <p className="text-xs text-muted-foreground">Deixe em branco para loops baseados em outras condições (a serem definidas na lógica do agente).</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-1.5">Condição de Término Adicional (Opcional):</Label>
+                            <RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)}>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="none" id="loop-cond-none" />
+                                    <Label htmlFor="loop-cond-none" className="font-normal">Nenhuma (apenas máximo de iterações)</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="subagent_signal" id="loop-cond-signal" />
+                                    <Label htmlFor="loop-cond-signal" className="font-normal">Sinalização por Subagente</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                        {loopTerminationConditionType === 'subagent_signal' && (
+                            <Alert variant="default" className="mt-3 bg-background/50 border-border/70">
+                                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                                <AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle>
+                                <AlertDescription className="text-xs">
+                                    Um subagente dentro do loop pode sinalizar o término (ex: usando uma ferramenta como 'exit_loop' ou retornando um valor/estado particular).
+                                    Configure o subagente apropriado com essa lógica e, opcionalmente, especifique abaixo a ferramenta ou o valor de estado esperado para o término.
+                                </AlertDescription>
+                                <div className="mt-3 space-y-2 pl-1">
+                                    <div>
+                                        <Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label>
+                                        <Input id="loopExitTool" disabled readOnly placeholder="exit_loop" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} className="h-7 text-xs mt-0.5 bg-muted/30" />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label>
+                                        <Input id="loopExitStateKey" disabled readOnly placeholder="status_documento" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} className="h-7 text-xs mt-0.5 bg-muted/30" />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label>
+                                        <Input id="loopExitStateValue" disabled readOnly placeholder="FINALIZADO" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} className="h-7 text-xs mt-0.5 bg-muted/30" />
+                                    </div>
+                                </div>
+                            </Alert>
+                        )}
+                        <Separator className="my-3"/>
+                        <h4 className="text-sm font-medium pt-1">Subagente(s) na Sequência do Loop:</h4>
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente ao loop."})}>
+                          <PlusCircle size={16} className="mr-2" /> Adicionar Subagente ao Loop
+                        </Button>
+                        <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-2">
+                                <GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/>
+                                <span className="text-sm">Ex: Agente de Coleta de Dados (Tipo: LLM, ID: agent_data_collector)</span>
+                             </div>
+                             <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" 
+                                onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa do Loop: Aqui você definiria as instruções para este subagente, como ele usa output_keys de etapas anteriores na mesma iteração, qual output_key ele produz, e se ele tem um papel em sinalizar o término do loop (ex: usando uma ferramenta como 'exit_loop' ou verificando uma condição)." })}>
+                                <Settings size={14} />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover subagente."})}>
+                                <Trash2 size={14} />
+                              </Button>
+                            </div>
+                          </div>
+                           <div className="pl-6 space-y-1">
+                            <Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
+                            <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: dados_coletados_iteracao" />
+                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa em etapas futuras da mesma iteração.</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </>
             )}
@@ -1135,7 +1375,7 @@ export default function AgentBuilderPage() {
                   <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><FileJson className="w-5 h-5 text-primary/80" /> Configuração do Agente Personalizado</h3>
                   <Alert className="mb-4">
                     <FileJson className="h-4 w-4" />
-                    <AlertTitle>Agente Personalizado (BaseAgent Estendido)</AlertTitle>
+                    <AlertTitle>Agente Personalizado (Ex: BaseAgent Estendido do ADK)</AlertTitle>
                     <AlertDescription>
                       Implemente lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados (equivalente a estender a BaseAgent do ADK). Requer desenvolvimento de código no backend.
                     </AlertDescription>
@@ -1224,7 +1464,7 @@ export default function AgentBuilderPage() {
 
                             let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
                             const iconProp = tool.icon;
-                            if (iconProp && typeof iconProp === 'object' && 'type' in iconProp && typeof iconProp.type === 'function') {
+                             if (React.isValidElement(iconProp) && typeof iconProp.type === 'function') {
                                 const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
                                 const foundIconName = Object.keys(iconComponents).find(
                                     name => iconComponents[name] === IconComponent
@@ -1448,6 +1688,5 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
 
     
