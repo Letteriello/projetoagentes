@@ -3,25 +3,25 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"; // Card-related imports
-import { Cpu, PlusCircle, Layers, Edit, MessageSquare, Trash2, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical } from "lucide-react";
-import Image from "next/image"; // Keep if used elsewhere, or remove
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Cpu, PlusCircle, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
-import { Badge } from "@/components/ui/badge"; // Keep if used elsewhere, or remove
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils";
 
-// Import dos novos componentes
 import { AgentCard } from '@/components/agent-builder/agent-card';
 import { AgentBuilderDialog } from '@/components/agent-builder/agent-builder-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-
-// Estas definições de tipo e constantes serão mantidas aqui e passadas como props
-// para o AgentBuilderDialog e AgentCard.
 export interface AvailableTool {
   id: string;
   label: string;
-  icon: React.ReactNode; // ReactNode para o ícone
+  icon: React.ReactNode;
   description: string;
   needsConfiguration?: boolean;
   genkitToolName?: string;
@@ -81,22 +81,22 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   loopExitToolName?: string;
   loopExitStateKey?: string;
   loopExitStateValue?: string;
-  agentGoal?: string; // Meta-objetivo do workflow
-  agentTasks?: string; // Tarefas de alto nível do workflow
-  agentPersonality?: string; // Tom geral, se aplicável
-  agentRestrictions?: string; // Restrições do workflow
-  agentModel?: string; // Modelo LLM para descrições ou meta-lógica
+  agentGoal?: string; 
+  agentTasks?: string; 
+  agentPersonality?: string; 
+  agentRestrictions?: string; 
+  agentModel?: string; 
   agentTemperature?: number;
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
+  agentGoal?: string; 
+  agentTasks?: string; 
+  agentPersonality?: string; 
+  agentRestrictions?: string; 
+  agentModel?: string; 
   agentTemperature?: number;
 }
 
@@ -163,35 +163,131 @@ export const agentTemplates: AgentTemplate[] = [
   },
   {
     id: "support", name: "Modelo: Agente de Suporte ao Cliente (LLM)",
-    config: { agentType: "llm", agentName: "Agente de Suporte ao Cliente", agentDescription: "Agente prestativo para responder perguntas comuns e ajudar com problemas.", agentGoal: "Fornecer suporte rápido e eficiente, esclarecendo dúvidas.", agentTasks: "1. Responder FAQs.\n2. Solucionar problemas básicos.\n3. Direcionar para documentação.\n4. Escalonar para humanos se necessário.", agentPersonality: "Empático e Compreensivo", agentRestrictions: "Nunca fornecer informações financeiras pessoais. Manter tom profissional.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.5, agentVersion: "1.0.0", agentTools: ["knowledgeBase", "webSearch"] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Agente de Suporte ao Cliente", 
+      agentDescription: "Agente prestativo para responder perguntas comuns e ajudar com problemas. Delega tarefas complexas a outros agentes ou humanos quando necessário.", 
+      agentGoal: "Fornecer suporte rápido e eficiente, esclarecendo dúvidas comuns dos clientes sobre produtos e serviços.", 
+      agentTasks: "1. Responder a perguntas frequentes (FAQs) sobre funcionalidades, preços e políticas.\n2. Solucionar problemas básicos de usuários seguindo um script predefinido.\n3. Coletar informações do cliente para abrir um ticket de suporte se o problema for complexo.\n4. Direcionar o usuário para a documentação relevante ou tutoriais.\n5. Escalonar para um agente humano se não conseguir resolver o problema ou se o cliente solicitar.", 
+      agentPersonality: "Empático e Compreensivo", 
+      agentRestrictions: "Nunca fornecer informações financeiras ou pessoais do cliente, a menos que seja para confirmar a identidade para um processo seguro. Manter um tom profissional e cortês. Limitar o escopo das respostas aos produtos e serviços da empresa.", 
+      agentModel: "googleai/gemini-1.5-flash-latest", 
+      agentTemperature: 0.5, 
+      agentVersion: "1.0.0", 
+      agentTools: ["knowledgeBase", "webSearch"] 
+    },
   },
   {
     id: "recommendation", name: "Modelo: Agente de Recomendações (LLM)",
-    config: { agentType: "llm", agentName: "Agente de Recomendações de Produtos", agentDescription: "Ajuda usuários a descobrir produtos/serviços.", agentGoal: "Aumentar engajamento sugerindo itens relevantes.", agentTasks: "1. Perguntar preferências.\n2. Sugerir produtos do catálogo.\n3. Comparar produtos.\n4. Fornecer links/informações.", agentPersonality: "Amigável e Prestativo", agentRestrictions: "Apenas recomendar produtos do catálogo. Não inventar características.", agentModel: "googleai/gemini-1.5-pro-latest", agentTemperature: 0.7, agentVersion: "1.0.0", agentTools: ["knowledgeBase"] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Agente de Recomendações de Produtos", 
+      agentDescription: "Ajuda usuários a descobrir produtos/serviços com base em suas preferências e histórico. Sua descrição para outros agentes é: 'Sou um especialista em recomendações de produtos, capaz de analisar preferências e sugerir os itens mais relevantes do catálogo.'", 
+      agentGoal: "Aumentar o engajamento do usuário e as vendas, sugerindo produtos ou serviços que sejam altamente relevantes para suas necessidades e interesses.", 
+      agentTasks: "1. Perguntar sobre as preferências do usuário (ex: tipo de produto, faixa de preço, marca, características desejadas).\n2. Analisar o histórico de compras ou navegação do usuário (se disponível e permitido).\n3. Sugerir 2-3 produtos do catálogo que melhor se encaixem nas preferências.\n4. Comparar os produtos sugeridos, destacando prós e contras de cada um.\n5. Fornecer links diretos para as páginas dos produtos recomendados.", 
+      agentPersonality: "Amigável e Prestativo", 
+      agentRestrictions: "Apenas recomendar produtos disponíveis no catálogo atual. Não inventar características ou benefícios dos produtos. Se não encontrar uma recomendação adequada, informar o usuário e talvez pedir mais detalhes.", 
+      agentModel: "googleai/gemini-1.5-pro-latest", 
+      agentTemperature: 0.7, 
+      agentVersion: "1.0.0", 
+      agentTools: ["knowledgeBase"] 
+    },
   },
   {
     id: "writer", name: "Modelo: Assistente de Escrita Criativa (LLM)",
-    config: { agentType: "llm", agentName: "Assistente de Escrita Criativa", agentDescription: "Ajuda a gerar ideias e rascunhos de conteúdo original.", agentGoal: "Auxiliar na criação de posts, e-mails, descrições.", agentTasks: "1. Brainstorming de tópicos.\n2. Gerar parágrafos.\n3. Sugerir títulos.\n4. Resumir textos.", agentPersonality: "Criativo e Inspirador", agentRestrictions: "Evitar plágio. Citar fontes externas.", agentModel: "googleai/gemini-1.5-pro-latest", agentTemperature: 0.8, agentVersion: "1.0.0", agentTools: ["webSearch"] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Assistente de Escrita Criativa", 
+      agentDescription: "Ajuda a gerar ideias, rascunhos de conteúdo original, e superar bloqueios criativos. Pode ser delegado para tarefas de brainstorming ou geração de texto.", 
+      agentGoal: "Auxiliar usuários na criação de diversos tipos de conteúdo textual, como posts para blogs, e-mails marketing, descrições de produtos, ou até mesmo ideias para histórias.", 
+      agentTasks: "1. Realizar brainstorming de tópicos com base em uma palavra-chave ou tema fornecido.\n2. Gerar parágrafos iniciais ou seções de texto sobre um assunto.\n3. Sugerir diferentes títulos ou chamadas para um conteúdo.\n4. Resumir textos longos em pontos-chave.\n5. Ajudar a refinar o tom ou estilo de um texto existente.", 
+      agentPersonality: "Criativo e Inspirador", 
+      agentRestrictions: "Evitar plágio a todo custo. Se usar informações de fontes externas (requer ferramenta de busca), deve ser capaz de citá-las ou indicar a necessidade de verificação. Não gerar conteúdo ofensivo ou inadequado.", 
+      agentModel: "googleai/gemini-1.5-pro-latest", 
+      agentTemperature: 0.8, 
+      agentVersion: "1.0.0", 
+      agentTools: ["webSearch"] 
+    },
   },
   {
     id: "grammar_checker", name: "Modelo: Revisor de Gramática e Estilo (LLM)",
-    config: { agentType: "llm", agentName: "Revisor de Gramática e Estilo", agentDescription: "Revisa textos, corrige erros e melhora clareza.", agentGoal: "Aprimorar textos, tornando-os corretos e claros.", agentTasks: "1. Corrigir gramática/ortografia.\n2. Sugerir melhorias frasais.\n3. Verificar pontuação.\n4. Feedback sobre tom/estilo.", agentPersonality: "Analítico e Detalhista", agentRestrictions: "Focar na revisão. Não alterar significado. Explicar correções.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.3, agentVersion: "1.0.0", agentTools: [] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Revisor de Gramática e Estilo", 
+      agentDescription: "Revisa textos, corrige erros ortográficos, gramaticais, de pontuação e melhora a clareza e o estilo da escrita. É focado em precisão linguística.", 
+      agentGoal: "Aprimorar a qualidade de textos, tornando-os gramaticalmente corretos, claros, concisos e estilisticamente adequados ao propósito.", 
+      agentTasks: "1. Identificar e corrigir erros de ortografia e gramática.\n2. Sugerir melhorias na estrutura frasal para maior clareza e fluidez.\n3. Verificar e corrigir a pontuação.\n4. Oferecer feedback sobre o tom e o estilo do texto, sugerindo alternativas se necessário.\n5. Explicar brevemente as correções mais importantes para fins de aprendizado do usuário.", 
+      agentPersonality: "Analítico e Detalhista", 
+      agentRestrictions: "Focar exclusivamente na revisão do texto fornecido. Não alterar o significado original do conteúdo. Não adicionar informações novas. Se uma frase for ambígua, apontar a ambiguidade em vez de reescrevê-la com uma interpretação arbitrária.", 
+      agentModel: "googleai/gemini-1.5-flash-latest", 
+      agentTemperature: 0.3, 
+      agentVersion: "1.0.0", 
+      agentTools: [] 
+    },
   },
   {
     id: "translator_pt_en", name: "Modelo: Tradutor Simples (Português-Inglês) (LLM)",
-    config: { agentType: "llm", agentName: "Tradutor Português-Inglês", agentDescription: "Traduz textos entre português e inglês.", agentGoal: "Fornecer traduções precisas e naturais.", agentTasks: "1. Traduzir PT-EN.\n2. Traduzir EN-PT.\n3. Manter contexto e significado.", agentPersonality: "Conciso e Objetivo", agentRestrictions: "Limitar-se à tradução. Não interpretar. Indicar expressões idiomáticas.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.4, agentVersion: "1.0.0", agentTools: [] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Tradutor Português-Inglês", 
+      agentDescription: "Realiza traduções de textos entre Português (Brasil) e Inglês (Americano), buscando naturalidade e precisão. Adequado para traduções rápidas de frases ou parágrafos.", 
+      agentGoal: "Fornecer traduções precisas e naturais de textos entre o português brasileiro e o inglês americano.", 
+      agentTasks: "1. Receber texto em português e traduzi-lo para o inglês.\n2. Receber texto em inglês e traduzi-lo para o português.\n3. Manter o contexto e o significado original do texto durante a tradução.\n4. Lidar com expressões idiomáticas de forma adequada, se possível, ou indicar a dificuldade.", 
+      agentPersonality: "Conciso e Objetivo", 
+      agentRestrictions: "Limitar-se estritamente à tradução. Não interpretar, expandir ou resumir o texto original. Se encontrar termos muito técnicos ou culturais de difícil tradução direta, pode indicar a necessidade de revisão por um tradutor humano para contextos críticos.", 
+      agentModel: "googleai/gemini-1.5-flash-latest", 
+      agentTemperature: 0.4, 
+      agentVersion: "1.0.0", 
+      agentTools: [] 
+    },
   },
   {
     id: "legal_analyst_basic", name: "Modelo: Analista Jurídico Básico (LLM)",
-    config: { agentType: "llm", agentName: "Analista Jurídico Básico", agentDescription: "Auxilia na compreensão de conceitos legais e pesquisa básica. Sua descrição geral é: \"Sou um agente de IA projetado para ajudar com informações legais básicas. Não forneço aconselhamento legal.\"", agentGoal: "Ajudar a entender conceitos legais, resumir termos, encontrar leis.", agentTasks: "1. Explicar termos legais.\n2. Resumir cláusulas (se fornecidas).\n3. Buscar leis/jurisprudência (com busca web).\n4. NÃO FORNECER ACONSELHAMENTO LEGAL.", agentPersonality: "Profissional e Direto", agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL. Recomendar advogado. Usar linguagem clara.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.3, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Analista Jurídico Básico", 
+      agentDescription: "Auxilia na compreensão de conceitos legais básicos e pesquisa de informações jurídicas gerais. Sua descrição para outros agentes é: \"Sou um agente de IA projetado para ajudar com informações legais básicas. Não forneço aconselhamento legal e sempre recomendo a consulta a um profissional.\"", 
+      agentGoal: "Ajudar usuários leigos a entenderem conceitos legais, resumir termos de forma simples e encontrar informações sobre leis ou jurisprudência (com o uso da ferramenta de busca), sem fornecer aconselhamento legal.", 
+      agentTasks: "1. Explicar termos legais comuns em linguagem acessível.\n2. Resumir cláusulas de documentos (se o texto for fornecido pelo usuário), identificando pontos chave.\n3. Utilizar a ferramenta de busca na web para encontrar leis, decretos ou artigos sobre um tópico jurídico específico.\n4. Enfatizar repetidamente que as informações fornecidas são para fins educativos e NÃO constituem aconselhamento legal.", 
+      agentPersonality: "Profissional e Direto", 
+      agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL SOB NENHUMA CIRCUNSTÂNCIA. Sempre recomendar que o usuário consulte um advogado qualificado para questões legais. Usar linguagem clara e evitar interpretações da lei. Citar fontes (ex: links de leis) quando utilizar a ferramenta de busca.", 
+      agentModel: "googleai/gemini-1.5-flash-latest", 
+      agentTemperature: 0.3, 
+      agentVersion: "1.0.0", 
+      agentTools: ["webSearch", "knowledgeBase"] 
+    },
   },
   {
     id: "medical_triage_info", name: "Modelo: Assistente de Triagem Médica Informativo (LLM)",
-    config: { agentType: "llm", agentName: "Assistente de Triagem Médica (Informativo)", agentDescription: "Fornece informações gerais sobre sintomas, SEM DIAGNÓSTICO. Sua descrição geral é: \"Sou um agente de IA para fornecer informações gerais sobre saúde. Não substituo um profissional médico.\"", agentGoal: "Informar sobre sintomas, direcionar para cuidados, NÃO SUBSTITUI CONSULTA.", agentTasks: "1. Coletar sintomas.\n2. Informar sobre possíveis causas (com busca web).\n3. Sugerir nível de cuidado.\n4. Informar sobre especialistas.", agentPersonality: "Empático e Compreensivo", agentRestrictions: "NÃO FAZER DIAGNÓSTICOS. NÃO SUBSTITUIR CONSULTA MÉDICA. Enfatizar consulta a profissional. Não prescrever.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.5, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Assistente de Triagem Médica (Informativo)", 
+      agentDescription: "Fornece informações gerais sobre sintomas, possíveis condições e direciona para cuidados, SEM FAZER DIAGNÓSTICOS. Sua descrição para outros agentes é: \"Sou um agente de IA para fornecer informações gerais sobre saúde e sintomas. Não substituo um profissional médico e sempre oriento a busca por consulta especializada.\"", 
+      agentGoal: "Informar usuários sobre sintomas comuns, possíveis causas gerais (com base em conhecimento público e busca na web), e ajudar a entender quando procurar diferentes níveis de cuidado médico. NÃO SUBSTITUI UMA CONSULTA MÉDICA.", 
+      agentTasks: "1. Coletar informações sobre os sintomas que o usuário está experienciando.\n2. Com base nos sintomas, utilizar a ferramenta de busca na web para encontrar informações gerais sobre possíveis condições associadas (evitando linguagem de diagnóstico).\n3. Sugerir níveis de cuidado apropriados (ex: autocuidado, marcar consulta médica, procurar atendimento de urgência), com base na gravidade aparente dos sintomas descritos e informações de fontes confiáveis.\n4. Fornecer informações sobre tipos de especialistas médicos que podem ser relevantes para os sintomas descritos.\n5. Sempre, e repetidamente, enfatizar que as informações são apenas para fins educativos e que um diagnóstico e tratamento só podem ser fornecidos por um profissional de saúde qualificado.", 
+      agentPersonality: "Empático e Compreensivo", 
+      agentRestrictions: "NÃO FAZER DIAGNÓSTICOS. NÃO PRESCREVER MEDICAMENTOS OU TRATAMENTOS. NÃO SUBSTITUIR UMA CONSULTA MÉDICA. Enfatizar que as informações são gerais e não personalizadas. Orientar fortemente a busca por um profissional de saúde para qualquer preocupação médica.", 
+      agentModel: "googleai/gemini-1.5-flash-latest", 
+      agentTemperature: 0.5, 
+      agentVersion: "1.0.0", 
+      agentTools: ["webSearch", "knowledgeBase"] 
+    },
   },
   {
     id: "travel_planner_basic", name: "Modelo: Planejador de Viagens Inicial (LLM)",
-    config: { agentType: "llm", agentName: "Planejador de Viagens Inicial", agentDescription: "Ajuda a pesquisar destinos, voos, acomodações e sugerir itinerários. Sua descrição geral é: \"Sou um assistente de IA para ajudar no planejamento inicial de viagens.\"", agentGoal: "Ajudar usuários a pesquisar e planejar viagens.", agentTasks: "1. Perguntar preferências (destino, orçamento, datas, interesses).\n2. Pesquisar destinos/atrações (com busca web).\n3. Sugerir voos/hotéis (exemplos).\n4. Esboçar itinerário básico.", agentPersonality: "Amigável e Prestativo", agentRestrictions: "Informar que preços/disponibilidade são exemplos. Não fazer reservas. Focar em sugestões.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.7, agentVersion: "1.0.0", agentTools: ["webSearch", "customApiIntegration"] },
+    config: { 
+      agentType: "llm", 
+      agentName: "Planejador de Viagens Inicial", 
+      agentDescription: "Ajuda usuários a pesquisar destinos, voos, acomodações e sugerir itinerários básicos. Pode ser usado por outros agentes para obter sugestões de viagem. Descrição: \"Sou um assistente de IA para ajudar no planejamento inicial de viagens, pesquisando destinos e opções.\"", 
+      agentGoal: "Ajudar usuários a pesquisar e esboçar planos para suas viagens, fornecendo sugestões de destinos, atrações, e estimativas de custos (se possível com ferramentas).", 
+      agentTasks: "1. Coletar preferências do usuário: destino desejado (ou tipo de destino), orçamento aproximado, datas de viagem, interesses (ex: praia, aventura, cultura).\n2. Utilizar a ferramenta de busca na web para pesquisar destinos que se encaixem nos critérios e listar principais atrações.\n3. (Se uma ferramenta de API de viagens estiver configurada) Pesquisar exemplos de voos e acomodações, informando que são exemplos e os preços podem variar.\n4. Esboçar um itinerário básico de 3-5 dias para um destino sugerido.\n5. Fornecer dicas gerais sobre o destino (ex: melhor época para visitar, moeda).", 
+      agentPersonality: "Amigável e Prestativo", 
+      agentRestrictions: "Sempre informar que preços de voos/hotéis e disponibilidade são apenas exemplos e devem ser verificados em plataformas de reserva. Não realizar nenhuma reserva ou transação financeira. Focar em sugestões e planejamento inicial. Se usar uma API externa, respeitar os termos de uso.", 
+      agentModel: "googleai/gemini-1.5-flash-latest", 
+      agentTemperature: 0.7, 
+      agentVersion: "1.0.0", 
+      agentTools: ["webSearch", "customApiIntegration"] 
+    },
   },
 ];
 
@@ -201,29 +297,24 @@ export default function AgentBuilderPage() {
   const { savedAgents, setSavedAgents } = useAgents();
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
-  const [editingAgentId, setEditingAgentId] = React.useState<string | null>(null);
-  // Mantém a configuração do agente sendo editado ou criado no modal
-  const [currentEditingAgent, setCurrentEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
+  const [editingAgent, setEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
 
 
   const handleOpenCreateAgentModal = () => {
-    setCurrentEditingAgent(null); // Garante que estamos criando um novo
-    setEditingAgentId(null);
+    setEditingAgent(null); 
     setIsBuilderModalOpen(true);
   };
 
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
-    setCurrentEditingAgent(agentToEdit); // Passa o agente completo para o modal
-    setEditingAgentId(agentToEdit.id);
+    setEditingAgent(agentToEdit); 
     setIsBuilderModalOpen(true);
   };
 
   const handleSaveAgent = (agentConfig: SavedAgentConfiguration) => {
-    // A lógica de ID e templateId já deve estar no agentConfig vindo do Dialog
-    if (editingAgentId) {
+    if (editingAgent) {
       setSavedAgents(prevAgents =>
         prevAgents.map(agent =>
-          agent.id === editingAgentId ? agentConfig : agent
+          agent.id === editingAgent.id ? agentConfig : agent
         )
       );
       toast({ title: "Agente Atualizado!", description: `O agente "${agentConfig.agentName}" foi atualizado.` });
@@ -234,13 +325,10 @@ export default function AgentBuilderPage() {
         description: `O agente "${agentConfig.agentName}" foi adicionado à sua lista.`,
       });
     }
-    setEditingAgentId(null);
-    setCurrentEditingAgent(null);
-    // setIsBuilderModalOpen(false); // O Dialog no AgentBuilderDialog já faz isso via onOpenChange
+    setEditingAgent(null);
   };
   
   const handleDeleteAgent = (agentIdToDelete: string) => {
-    // Adicionar modal de confirmação aqui seria ideal
     setSavedAgents(prev => prev.filter(agent => agent.id !== agentIdToDelete));
     toast({title: "Agente Excluído", description: "O agente foi removido da lista."});
   }
@@ -252,15 +340,23 @@ export default function AgentBuilderPage() {
         <div className="flex items-center gap-3">
           <Cpu className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Meus Agentes</h1>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                  <Info className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs bg-popover text-popover-foreground">
+                <p>Gerencie seus agentes de IA existentes ou crie novos para automatizar tarefas e otimizar seus fluxos de trabalho.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <Button onClick={handleOpenCreateAgentModal} className="button-live-glow">
           Novo Agente
         </Button>
       </header>
-
-      <p className="text-muted-foreground">
-        Gerencie seus agentes de IA existentes ou crie novos para automatizar tarefas e otimizar seus fluxos de trabalho.
-      </p>
 
       {savedAgents.length > 0 ? (
         <div className="space-y-6">
@@ -269,12 +365,11 @@ export default function AgentBuilderPage() {
               <AgentCard
                 key={agent.id}
                 agent={agent}
-                onEdit={handleEditAgent}
+                onEdit={() => handleEditAgent(agent)}
                 onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
-                onDelete={handleDeleteAgent} 
-                availableTools={availableTools} // Passando availableTools
-                agentTypeOptions={agentTypeOptions} // Passando agentTypeOptions
-                // iconComponents não é mais necessário aqui, pois AgentCard define os seus
+                onDelete={() => handleDeleteAgent(agent.id)} 
+                availableTools={availableTools}
+                agentTypeOptions={agentTypeOptions}
               />
             ))}
           </div>
@@ -292,17 +387,15 @@ export default function AgentBuilderPage() {
         </div>
       )}
 
-      {/* O AgentBuilderDialog é renderizado aqui, controlado por isBuilderModalOpen */}
       <AgentBuilderDialog
         isOpen={isBuilderModalOpen}
         onOpenChange={(isOpen) => {
           setIsBuilderModalOpen(isOpen);
-          if (!isOpen) { // Se o modal for fechado (por qualquer motivo)
-            setEditingAgentId(null);
-            setCurrentEditingAgent(null);
+          if (!isOpen) { 
+            setEditingAgent(null);
           }
         }}
-        editingAgent={currentEditingAgent} // Passa o agente inteiro para edição ou null para criação
+        editingAgent={editingAgent} 
         onSave={handleSaveAgent}
         agentTemplates={agentTemplates}
         availableTools={availableTools}
@@ -313,3 +406,5 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
+    
