@@ -44,8 +44,8 @@ export const availableTools: AvailableTool[] = [
   { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
   { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração para especificar a fonte de dados).", needsConfiguration: true },
   { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit e autenticação).", needsConfiguration: true },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit, URL do esquema e possivelmente chaves API).", needsConfiguration: true },
-  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão detalhada).", needsConfiguration: true },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit, URL do esquema e possivelmente chaves API).", needsConfiguration: true, genkitToolName: "invokeOpenAPI" },
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão detalhada).", needsConfiguration: true, genkitToolName: "queryDatabase" },
   { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
 
@@ -62,9 +62,9 @@ export const agentToneOptions = [
 ];
 
 export const agentTypeOptions = [
-  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem. (Ex: LlmAgent do ADK)" },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Controla a execução de outros agentes ou tarefas em padrões predefinidos (sequencial, paralelo, loop) de forma determinística. Não usa LLM para controle de fluxo. (Ex: SequentialAgent, ParallelAgent do ADK)" },
-  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implementa lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados. (Ex: Estendendo BaseAgent do ADK)" },
+  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem. (Ex: LlmAgent do ADK). A descrição do agente é usada por outros agentes LLM para decidir se devem delegar uma tarefa a ele." },
+  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si, resultando em padrões de execução previsíveis. (Ex: SequentialAgent, ParallelAgent, LoopAgent do ADK)" },
+  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar _run_async_impl)." },
 ];
 
 export interface AgentConfigBase {
@@ -468,19 +468,20 @@ export default function AgentBuilderPage() {
   };
 
   const constructSystemPrompt = () => {
-    const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType }; 
+    const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType, agentName, agentDescription }; 
     if (currentConfig.agentType !== 'llm' && !currentConfig.agentGoal && !currentConfig.agentTasks && !currentConfig.agentPersonality) {
-        // For non-LLM agents, if LLM instruction fields are empty, we don't need to generate a system prompt for LLM behavior.
-        // However, if they ARE filled, it implies the Workflow/Custom agent might use an LLM internally for some task,
-        // so we'd still generate a prompt.
         return undefined; 
     }
 
-    let prompt = `Você é um agente de IA. Seu nome é "${agentName || 'Agente'}".\n`;
+    let prompt = `Você é um agente de IA. Seu nome é "${currentConfig.agentName || 'Agente'}".\n`;
+    if (currentConfig.agentDescription) {
+      prompt += `Sua descrição geral é: "${currentConfig.agentDescription}".\n`;
+    }
+
     if (currentConfig.agentType === 'llm') {
         prompt += `Seu tipo principal é LLM (Modelo de Linguagem Grande), focado em linguagem e decisão.\n`;
     } else if (currentConfig.agentType === 'workflow') {
-        prompt += `Seu tipo principal é Agente de Fluxo de Trabalho, focado em orquestrar tarefas de forma determinística.\n`;
+        prompt += `Seu tipo principal é Agente de Fluxo de Trabalho, focado em orquestrar tarefas de forma determinística (não usa LLM para o controle de fluxo em si).\n`;
         if (detailedWorkflowType) {
             prompt += `Subtipo de fluxo de trabalho: ${detailedWorkflowType}.\n`;
         }
@@ -494,7 +495,7 @@ export default function AgentBuilderPage() {
             prompt += `O loop também pode terminar se um subagente sinalizar (ex: via ferramenta '${loopExitToolName || 'exit_loop'}' ou estado '${loopExitStateKey || 'status'}' atingir '${loopExitStateValue || 'FINALIZADO'}').\n`;
         }
     } else if (currentConfig.agentType === 'custom') {
-        prompt += `Seu tipo principal é Agente Personalizado, com lógica de backend customizada via Genkit.\n`;
+        prompt += `Seu tipo principal é Agente Personalizado, com lógica de backend customizada via Genkit (equivalente a estender BaseAgent, implementando _run_async_impl). Tipicamente orquestram outros agentes.\n`;
         if (customLogicDescription) {
             prompt += `Descrição da lógica customizada: ${customLogicDescription}.\n`;
         }
@@ -547,9 +548,8 @@ export default function AgentBuilderPage() {
     handleTemplateChange(customTemplate.id);
     setToolConfigurations({});
     setEditingAgentId(null);
-    // Reset workflow specific fields as well for a truly new agent
-    resetWorkflowFields(); // This now also resets loop termination fields to default
-    resetCustomLogicFields(); // Ensure custom logic fields are also reset
+    resetWorkflowFields(); 
+    resetCustomLogicFields(); 
   };
 
   const openCreateAgentModal = () => {
@@ -894,7 +894,7 @@ export default function AgentBuilderPage() {
                               {agentTypeLabel}
                           </Badge>
                         </div>
-                        <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-2 h-[2.5em]">
+                        <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
                           {agent.agentDescription || "Sem descrição."}
                         </CardDescription>
                       </div>
@@ -904,7 +904,7 @@ export default function AgentBuilderPage() {
                     {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentGoal && (
                         <div>
                             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Objetivo:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-2 h-[2.25em]">
+                            <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
                                 {(agent as LLMAgentConfig).agentGoal}
                             </p>
                         </div>
@@ -920,7 +920,7 @@ export default function AgentBuilderPage() {
                     {agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).workflowDescription && (
                         <div>
                             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Descrição do Fluxo:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
+                            <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
                                 {(agent as WorkflowAgentConfig).workflowDescription}
                                 { (agent as WorkflowAgentConfig).detailedWorkflowType && <span className="block text-xs text-primary/70">Tipo: {(agent as WorkflowAgentConfig).detailedWorkflowType}</span>}
                             </p>
@@ -929,7 +929,7 @@ export default function AgentBuilderPage() {
                     {agent.agentType === 'custom' && (agent as CustomAgentConfig).customLogicDescription && (
                         <div>
                             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Lógica Personalizada:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 h-[3.375em]">
+                            <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
                                 {(agent as CustomAgentConfig).customLogicDescription}
                             </p>
                         </div>
@@ -955,11 +955,11 @@ export default function AgentBuilderPage() {
                                         <Badge
                                             key={toolDetail.id}
                                             variant={isConfigured && fullTool?.needsConfiguration ? "default" : "secondary"}
-                                            className="text-xs h-6 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default mr-1 mb-1"
+                                            className="text-xs h-6 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default"
                                             title={toolDetail.label + (fullTool?.needsConfiguration ? (isConfigured ? " (Configurada)" : " (Requer Configuração)") : "")}
                                         >
                                             {toolIcon}
-                                            <span className="truncate max-w-[100px]">{toolDetail.label}</span>
+                                            <span className="truncate group-hover:whitespace-normal group-hover:max-w-none">{toolDetail.label}</span>
                                             {fullTool?.needsConfiguration && (
                                                 <ConfigureIcon
                                                     size={10}
@@ -1187,7 +1187,7 @@ export default function AgentBuilderPage() {
                     <Workflow className="h-4 w-4" />
                     <AlertTitle>Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)</AlertTitle>
                     <AlertDescription>
-                      Agentes de fluxo de trabalho controlam a execução de outros agentes ou tarefas em padrões predefinidos e determinísticos. A implementação detalhada das etapas e orquestração ocorreria via código Genkit.
+                      Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si, resultando em padrões de execução previsíveis.
                     </AlertDescription>
                   </Alert>
                   <div className="space-y-2 mb-4">
@@ -1243,7 +1243,7 @@ export default function AgentBuilderPage() {
                            <div className="pl-6 space-y-1">
                             <Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
                             <Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: sentimento_analisado" />
-                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa em etapas futuras (ex: {"{sentimento_analisado}"}).</p>
+                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p>
                           </div>
                         </div>
                       </CardContent>
@@ -1261,11 +1261,10 @@ export default function AgentBuilderPage() {
                             <AlertCircle className="h-4 w-4 text-muted-foreground" />
                             <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
                             <AlertDescription className="text-xs">
-                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente.
-                                Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução.
-                                Se você precisar combinar os resultados ou fazer com que eles compartilhem dados, geralmente você precisará: <br/>
-                                1. Fazer com que cada subagente use uma 'Chave de Saída' única para salvar seu resultado individual. <br/>
-                                2. Adicionar um Agente Sequencial subsequente que leia essas 'Chaves de Saída' e processe/mescle os resultados.
+                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. 
+                                Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. 
+                                Para coletar e processar os resultados, cada subagente paralelo deve usar uma "Chave de Saída" (`output_key`) para salvar seu resultado individual (ex: no estado da sessão). 
+                                Geralmente, um Agente Sequencial é usado como a próxima etapa no fluxo de trabalho geral para ler essas "Chaves de Saída" e então processar/mesclar os resultados usando um CustomAgent ou LlmAgent.
                             </AlertDescription>
                         </Alert>
                         <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
@@ -1284,10 +1283,10 @@ export default function AgentBuilderPage() {
                               </Button>
                             </div>
                           </div>
-                           <div className="pl-0 space-y-1 mt-1.5"> {/* Adjusted padding to align with GripVertical */}
+                           <div className="pl-0 space-y-1 mt-1.5"> 
                             <Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label>
                             <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: resultado_imagem_gerada" />
-                            <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela.</p>
+                            <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela (ex: salvo no estado da sessão).</p>
                           </div>
                         </div>
                       </CardContent>
@@ -1338,15 +1337,15 @@ export default function AgentBuilderPage() {
                                 <div className="mt-3 space-y-2 pl-1">
                                     <div>
                                         <Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label>
-                                        <Input id="loopExitTool" disabled readOnly placeholder="exit_loop" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} className="h-7 text-xs mt-0.5 bg-muted/30" />
+                                        <Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/30" />
                                     </div>
                                     <div>
                                         <Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label>
-                                        <Input id="loopExitStateKey" disabled readOnly placeholder="status_documento" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} className="h-7 text-xs mt-0.5 bg-muted/30" />
+                                        <Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/30" />
                                     </div>
                                     <div>
                                         <Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label>
-                                        <Input id="loopExitStateValue" disabled readOnly placeholder="FINALIZADO" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} className="h-7 text-xs mt-0.5 bg-muted/30" />
+                                        <Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/30" />
                                     </div>
                                 </div>
                             </Alert>
@@ -1375,7 +1374,7 @@ export default function AgentBuilderPage() {
                            <div className="pl-6 space-y-1">
                             <Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
                             <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: dados_coletados_iteracao" />
-                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa em etapas futuras da mesma iteração.</p>
+                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras da mesma iteração ou após o loop.</p>
                           </div>
                         </div>
                       </CardContent>
@@ -1394,7 +1393,7 @@ export default function AgentBuilderPage() {
                     <FileJson className="h-4 w-4" />
                     <AlertTitle>Agente Personalizado (Ex: BaseAgent Estendido do ADK)</AlertTitle>
                     <AlertDescription>
-                      Implemente lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados (equivalente a estender a BaseAgent do ADK). Requer desenvolvimento de código no backend.
+                      Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes (como LlmAgent ou LoopAgent) e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar <code>_run_async_impl</code>).
                     </AlertDescription>
                   </Alert>
                   <div className="space-y-2">
@@ -1709,3 +1708,5 @@ export default function AgentBuilderPage() {
     
 
     
+
+  
