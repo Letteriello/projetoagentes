@@ -147,28 +147,26 @@
 
   /* Estilos para o logo "Aida" */
   .aida-logo-text {
-    font-weight: 700; /* bold */
+    font-weight: 600; /* semibold, mais suave que bold */
     text-transform: uppercase;
-    letter-spacing: 0.1em; /* Aumentado para um visual mais espaçado e moderno */
+    letter-spacing: 0.1em; 
     position: relative; 
-    animation: pulse-glow-text 3s ease-in-out infinite;
-    font-size: 1.75rem; /* Equivalente a text-2xl, ou um pouco mais */
-    line-height: 1; /* Para melhor controle vertical com fonte maior */
+    animation: pulse-glow-text 4s ease-in-out infinite; /* Duração maior para pulso mais lento */
+    font-size: 1.75rem; 
+    line-height: 1; 
     color: hsl(var(--sidebar-primary)); 
   }
 
   @keyframes pulse-glow-text {
     0%, 100% {
       text-shadow: 
-        0 0 7px hsl(var(--sidebar-primary) / 0.9), /* Aumentado o brilho */
-        0 0 14px hsl(var(--sidebar-primary) / 0.7),
-        0 0 21px hsl(var(--sidebar-primary) / 0.5);
+        0 0 3px hsl(var(--sidebar-primary) / 0.4), /* Mais sutil: menor raio, menor opacidade */
+        0 0 6px hsl(var(--sidebar-primary) / 0.2); /* Camada de brilho ainda mais suave */
     }
     50% {
       text-shadow: 
-        0 0 10px hsl(var(--sidebar-accent) / 1.0), /* Aumentado o brilho */
-        0 0 20px hsl(var(--sidebar-accent) / 0.8),
-        0 0 30px hsl(var(--sidebar-accent) / 0.6);
+        0 0 5px hsl(var(--sidebar-primary) / 0.6), /* Pico de brilho mais contido */
+        0 0 10px hsl(var(--sidebar-primary) / 0.35); /* Segunda camada mais contida */
     }
   }
 }
