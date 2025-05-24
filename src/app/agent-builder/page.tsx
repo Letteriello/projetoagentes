@@ -251,7 +251,7 @@ export default function AgentBuilderPage() {
           <h1 className="text-3xl font-bold">Meus Agentes</h1>
         </div>
         <Button onClick={handleOpenCreateAgentModal}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Criar Novo Agente
+          Novo Agente
         </Button>
       </header>
 
