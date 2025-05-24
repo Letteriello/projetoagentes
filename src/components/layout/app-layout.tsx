@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils'; // Import cn
+import { cn } from '@/lib/utils';
 
 interface NavItem {
   href: string;
@@ -37,13 +37,37 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/agents', icon: Cpu, label: 'Agentes' },
+  { href: '/agent-builder', icon: Cpu, label: 'Agentes' }, // Corrigido para /agent-builder
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
 ];
 
+// Componente interno para o toggle da sidebar, para isolar o uso do hook useSidebar
+function SidebarToggle() {
+  const { toggleSidebar, state, isMobile, open } = useSidebar();
+  
+  if (isMobile) {
+    // Em mobile, o toggle é o PanelLeft no MainLayout
+    return null; 
+  }
+
+  // Este botão deve estar sempre visível em desktop para permitir abrir/fechar.
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute right-2 top-1/2 -translate-y-1/2"
+      onClick={toggleSidebar}
+      aria-label="Toggle Sidebar"
+    >
+      {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-5 w-5" />}
+    </Button>
+  );
+}
+
+
 function MainLayout({ children }: { children: ReactNode }) {
   const { toggleSidebar, isMobile } = useSidebar();
-  const renderMobileToggle = isMobile === true;
+  const renderMobileToggle = isMobile === true; // Apenas renderiza se isMobile for explicitamente true
 
   return (
     <SidebarInset>
@@ -61,32 +85,10 @@ function MainLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function SidebarToggle() {
-  const { toggleSidebar, state, isMobile, open } = useSidebar();
-  
-  if (isMobile) {
-    return null; 
-  }
-
-  // Este botão deve estar sempre visível em desktop para permitir abrir/fechar.
-  // A classe 'group-data-[collapsible=icon]:hidden' estava no ícone errado ou aplicada de forma a esconder o toggle.
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute right-2 top-1/2 -translate-y-1/2"
-      onClick={toggleSidebar}
-      aria-label="Toggle Sidebar"
-    >
-      {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-5 w-5" />}
-    </Button>
-  );
-}
-
-
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
+  // Hooks useSidebar são chamados aqui, pois AppLayout é filho de SidebarProvider
   const { state: sidebarState, isMobile, collapsible } = useSidebar();
 
   const isSidebarIconOnly = !isMobile && sidebarState === 'collapsed' && collapsible === 'icon';
@@ -95,12 +97,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <>
       <Sidebar 
         className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
-        collapsible="icon"
+        collapsible="icon" // Define o modo de colapso padrão
       >
         <SidebarHeader className="p-4 flex items-center justify-center h-16 relative">
-          <Link href="/agents" className="hover:text-sidebar-primary/90 transition-colors flex items-center gap-2">
+          <Link href="/agent-builder" className="hover:text-sidebar-primary/90 transition-colors flex items-center gap-2">
             {!isSidebarIconOnly && <span className="aida-logo-text">Aida</span>}
           </Link>
+          {/* SidebarToggle agora é um componente separado que usa o contexto */}
           <SidebarToggle /> 
         </SidebarHeader>
         <SidebarContent className="flex-1">
