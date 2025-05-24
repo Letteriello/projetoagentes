@@ -34,7 +34,7 @@ export interface AvailableTool {
   icon: React.ReactNode;
   description: string;
   needsConfiguration?: boolean;
-  genkitToolName?: string; 
+  genkitToolName?: string;
 }
 
 export const availableTools: AvailableTool[] = [
@@ -89,8 +89,8 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   agentTasks?: string;
   agentPersonality?: string;
   agentRestrictions?: string;
-  agentModel?: string; 
-  agentTemperature?: number; 
+  agentModel?: string;
+  agentTemperature?: number;
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
@@ -133,7 +133,7 @@ export interface ToolConfigData {
 export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
-  systemPromptGenerated?: string; 
+  systemPromptGenerated?: string;
   toolsDetails: Array<{ id: string; label: string; iconName?: keyof typeof iconComponents | 'default'; needsConfiguration?: boolean; genkitToolName?: string; }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
@@ -303,7 +303,7 @@ export const agentTemplates: AgentTemplate[] = [
       agentModel: "googleai/gemini-1.5-flash-latest",
       agentTemperature: 0.7,
       agentVersion: "1.0.0",
-      agentTools: ["webSearch", "customApiIntegration"], 
+      agentTools: ["webSearch", "customApiIntegration"],
     },
   },
 ];
@@ -338,7 +338,7 @@ export default function AgentBuilderPage() {
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
   const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
-  
+
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState("");
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
   const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState("");
@@ -382,8 +382,8 @@ export default function AgentBuilderPage() {
       setAgentName(template.config.agentName);
       setAgentDescription(template.config.agentDescription);
       setAgentVersion(template.config.agentVersion);
-      setCurrentAgentTools(template.config.agentTools); 
-      setToolConfigurations({}); 
+      setCurrentAgentTools(template.config.agentTools);
+      setToolConfigurations({});
 
       if (template.config.agentType === 'llm') {
         const llmConfig = template.config as LLMAgentConfig;
@@ -392,12 +392,12 @@ export default function AgentBuilderPage() {
         resetCustomLogicFields();
       } else if (template.config.agentType === 'workflow') {
         const workflowConfig = template.config as WorkflowAgentConfig;
-        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>); 
+        resetLLMFields(workflowConfig as Partial<LLMAgentConfig>);
         setWorkflowDescription(workflowConfig.workflowDescription || "");
         resetCustomLogicFields();
       } else if (template.config.agentType === 'custom') {
         const customConfig = template.config as CustomAgentConfig;
-        resetLLMFields(customConfig as Partial<LLMAgentConfig>); 
+        resetLLMFields(customConfig as Partial<LLMAgentConfig>);
         resetWorkflowFields();
         setCustomLogicDescription(customConfig.customLogicDescription || "");
       }
@@ -431,7 +431,7 @@ export default function AgentBuilderPage() {
       prompt += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE:\n${agentRestrictions}\n\n`;
     }
 
-    const selectedToolObjects = currentAgentTools 
+    const selectedToolObjects = currentAgentTools
       .map(toolId => availableTools.find(t => t.id === toolId))
       .filter(Boolean) as AvailableTool[];
 
@@ -463,18 +463,18 @@ export default function AgentBuilderPage() {
     prompt += "- Se uma ferramenta necessária não estiver configurada, informe ao usuário educadamente.\n";
 
 
-    return prompt.trim() || "Você é um assistente prestativo."; 
+    return prompt.trim() || "Você é um assistente prestativo.";
   };
 
-  const handleCreateNewAgent = () => { 
+  const handleCreateNewAgent = () => {
     const customTemplate = agentTemplates.find(t => t.id === "custom_llm") || agentTemplates[0];
-    handleTemplateChange(customTemplate.id); 
-    setToolConfigurations({}); 
+    handleTemplateChange(customTemplate.id);
+    setToolConfigurations({});
     setEditingAgentId(null);
   };
 
   const openCreateAgentModal = () => {
-    handleCreateNewAgent(); 
+    handleCreateNewAgent();
     setIsBuilderModalOpen(true);
   };
 
@@ -538,7 +538,7 @@ export default function AgentBuilderPage() {
     }
 
     const systemPrompt = agentType === 'llm' ? constructSystemPrompt() : undefined;
-    const selectedToolsDetails = currentAgentTools 
+    const selectedToolsDetails = currentAgentTools
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
@@ -557,7 +557,7 @@ export default function AgentBuilderPage() {
 
 
     const appliedToolConfigs: Record<string, ToolConfigData> = {};
-    currentAgentTools.forEach(toolId => { 
+    currentAgentTools.forEach(toolId => {
       if (toolConfigurations[toolId]) {
         appliedToolConfigs[toolId] = toolConfigurations[toolId];
       }
@@ -568,9 +568,9 @@ export default function AgentBuilderPage() {
         agentDescription,
         agentVersion,
         agentTools: currentAgentTools,
-        agentType, 
+        agentType,
     };
-    
+
     if (agentType === 'llm') {
       agentConfigData = {
         ...agentConfigData,
@@ -592,7 +592,7 @@ export default function AgentBuilderPage() {
         agentModel: agentModel || undefined,
         agentTemperature: agentTemperature[0] ?? undefined,
       };
-    } else { 
+    } else {
       agentConfigData = {
         ...agentConfigData,
         customLogicDescription,
@@ -604,15 +604,15 @@ export default function AgentBuilderPage() {
         agentTemperature: agentTemperature[0] ?? undefined,
       };
     }
-    
+
     if (editingAgentId) {
-        setSavedAgents(prevAgents => 
-            prevAgents.map(agent => 
-                agent.id === editingAgentId ? 
-                { 
-                    ...agent, 
-                    ...(agentConfigData as AgentConfig), 
-                    agentType, 
+        setSavedAgents(prevAgents =>
+            prevAgents.map(agent =>
+                agent.id === editingAgentId ?
+                {
+                    ...agent,
+                    ...(agentConfigData as AgentConfig),
+                    agentType,
                     templateId: selectedAgentTemplateId,
                     systemPromptGenerated: systemPrompt,
                     toolsDetails: selectedToolsDetails,
@@ -625,8 +625,8 @@ export default function AgentBuilderPage() {
         const newAgentConfiguration: SavedAgentConfiguration = {
             id: `agent-${Date.now()}`,
             templateId: selectedAgentTemplateId,
-            ...(agentConfigData as AgentConfig), 
-            agentType, 
+            ...(agentConfigData as AgentConfig),
+            agentType,
             systemPromptGenerated: systemPrompt,
             toolsDetails: selectedToolsDetails,
             toolConfigsApplied: appliedToolConfigs,
@@ -637,18 +637,18 @@ export default function AgentBuilderPage() {
           description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label}) foi adicionado à sua lista.`,
         });
     }
-    
+
     setEditingAgentId(null);
-    setIsBuilderModalOpen(false); 
+    setIsBuilderModalOpen(false);
   };
 
   const handleToolSelectionChange = (toolId: string, checked: boolean) => {
-    setCurrentAgentTools(prevTools => { 
+    setCurrentAgentTools(prevTools => {
       if (checked) {
         return [...prevTools, toolId];
       } else {
         const newToolConfigs = { ...toolConfigurations };
-        delete newToolConfigs[toolId]; 
+        delete newToolConfigs[toolId];
         setToolConfigurations(newToolConfigs);
         return prevTools.filter(id => id !== toolId);
       }
@@ -674,7 +674,7 @@ export default function AgentBuilderPage() {
 
   const openToolConfigModal = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    resetModalInputs(); 
+    resetModalInputs();
 
     const currentConfig = toolConfigurations[tool.id] || {};
     if (tool.id === "webSearch") {
@@ -718,7 +718,7 @@ export default function AgentBuilderPage() {
         return;
       }
       newConfigData.openapiSpecUrl = modalOpenapiSpecUrl;
-      newConfigData.openapiApiKey = modalOpenapiApiKey; 
+      newConfigData.openapiApiKey = modalOpenapiApiKey;
     } else if (configuringTool.id === "databaseAccess") {
         if (!modalDbType || (!modalDbConnectionString && (!modalDbHost || !modalDbName))) {
              toast({ title: "Campos Obrigatórios", description: "Tipo de Banco e (String de Conexão ou Host/Nome do Banco) são obrigatórios.", variant: "destructive" });
@@ -747,7 +747,7 @@ export default function AgentBuilderPage() {
         }
         newConfigData.calendarApiEndpoint = modalCalendarApiEndpoint;
     }
-    
+
     setToolConfigurations(prev => ({
       ...prev,
       [configuringTool.id]: newConfigData as ToolConfigData,
@@ -759,7 +759,7 @@ export default function AgentBuilderPage() {
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Cpu className="h-8 w-8 text-primary" />
@@ -780,8 +780,8 @@ export default function AgentBuilderPage() {
             {savedAgents.map((agent) => {
               const agentTypeDetails = agentTypeOptions.find(opt => opt.id === agent.agentType);
               let agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
-              if (agentTypeLabel === 'Agente LLM') agentTypeLabel = 'LLM'; 
-              
+              if (agentTypeLabel === 'Agente LLM') agentTypeLabel = 'LLM';
+
               let AgentIconComponent: React.ReactNode;
               switch (agent.templateId) {
                 case 'legal_analyst_basic':
@@ -794,12 +794,12 @@ export default function AgentBuilderPage() {
                   AgentIconComponent = <Plane size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
                   break;
                 default:
-                  const IconFromType = agentTypeDetails?.icon ? 
-                    React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) : 
+                  const IconFromType = agentTypeDetails?.icon ?
+                    React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) :
                     <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
                   AgentIconComponent = IconFromType;
               }
-              
+
               return (
                 <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
                   <CardHeader className="pb-3">
@@ -859,7 +859,7 @@ export default function AgentBuilderPage() {
                                     const fullTool = availableTools.find(t => t.id === toolDetail.id);
                                     const IconComponent = getToolIconComponent(toolDetail.iconName);
                                     const toolIcon = <IconComponent size={12} />;
-                                    
+
                                     const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] &&
                                                         ( (fullTool.id === 'webSearch' && agent.toolConfigsApplied[fullTool.id]?.googleApiKey && agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
                                                           (fullTool.id === 'customApiIntegration' && agent.toolConfigsApplied[fullTool.id]?.openapiSpecUrl) ||
@@ -878,8 +878,8 @@ export default function AgentBuilderPage() {
                                             {toolIcon}
                                             <span className="truncate max-w-[100px]">{toolDetail.label}</span>
                                             {fullTool?.needsConfiguration && (
-                                                <ConfigureIcon 
-                                                    size={10} 
+                                                <ConfigureIcon
+                                                    size={10}
                                                     className={`ml-1 ${isConfigured ? 'text-green-400' : 'text-blue-400'}`}
                                                     title={isConfigured ? "Configurada" : "Requer configuração"}
                                                 />
@@ -920,9 +920,9 @@ export default function AgentBuilderPage() {
         </div>
       )}
 
-      <Dialog open={isBuilderModalOpen} onOpenChange={(isOpen) => { 
-          setIsBuilderModalOpen(isOpen); 
-          if (!isOpen) setEditingAgentId(null); 
+      <Dialog open={isBuilderModalOpen} onOpenChange={(isOpen) => {
+          setIsBuilderModalOpen(isOpen);
+          if (!isOpen) setEditingAgentId(null);
       }}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b">
@@ -933,7 +933,7 @@ export default function AgentBuilderPage() {
               {editingAgentId ? "Modifique as propriedades e configurações do seu agente." : "Defina as propriedades e configurações para seu novo agente. Comece com um modelo ou configure do zero."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="flex-grow overflow-y-auto p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1167,27 +1167,27 @@ export default function AgentBuilderPage() {
                       <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
                         <Checkbox
                           id={`tool-${tool.id}`}
-                          checked={currentAgentTools.includes(tool.id)} 
+                          checked={currentAgentTools.includes(tool.id)}
                           onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
                           className="mt-1"
                         />
                         <div className="ml-3 flex-grow">
                           <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                            {React.cloneElement(tool.icon as React.ReactElement, { size: 16, className: "mr-2"})} 
+                            {React.cloneElement(tool.icon as React.ReactElement, { size: 16, className: "mr-2"})}
                             {tool.label}
                             {tool.needsConfiguration && <ConfigureIcon size={14} className="ml-2 text-muted-foreground group-hover:text-primary transition-colors" />}
                           </Label>
                           <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
                         </div>
-                        {tool.needsConfiguration && currentAgentTools.includes(tool.id) && ( 
-                          <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="ml-auto shrink-0" 
+                        {tool.needsConfiguration && currentAgentTools.includes(tool.id) && (
+                          <Button
+                              variant="outline"
+                              size="sm"
+                              className="ml-auto shrink-0"
                               onClick={() => openToolConfigModal(tool)}
                           >
-                            <ConfigureIcon size={14} className="mr-1.5" /> 
-                            {toolConfigurations[tool.id] && 
+                            <ConfigureIcon size={14} className="mr-1.5" />
+                            {toolConfigurations[tool.id] &&
                               ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
                                 (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
                                 (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
@@ -1201,11 +1201,11 @@ export default function AgentBuilderPage() {
                     ))}
                   </div>
 
-                  {currentAgentTools.length > 0 && ( 
+                  {currentAgentTools.length > 0 && (
                     <div className="mt-4 pt-3 border-t">
                       <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
                       <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                        {currentAgentTools.map(toolId => { 
+                        {currentAgentTools.map(toolId => {
                             const tool = availableTools.find(t => t.id === toolId);
                             if (!tool) return null;
                             const IconComponent = getToolIconComponent(
@@ -1220,7 +1220,7 @@ export default function AgentBuilderPage() {
                             const toolIcon = <IconComponent size={14} className="mr-1.5 inline-block" />;
 
                             const currentToolConfig = toolConfigurations[tool.id];
-                            const isConfigured = tool.needsConfiguration && currentToolConfig && 
+                            const isConfigured = tool.needsConfiguration && currentToolConfig &&
                                                 ( (tool.id === 'webSearch' && currentToolConfig.googleApiKey && currentToolConfig.googleCseId) ||
                                                   (tool.id === 'customApiIntegration' && currentToolConfig.openapiSpecUrl) ||
                                                   (tool.id === 'databaseAccess' && (currentToolConfig.dbConnectionString || (currentToolConfig.dbHost && currentToolConfig.dbName))) ||
@@ -1233,8 +1233,8 @@ export default function AgentBuilderPage() {
                                   {toolIcon}
                                   {tool.label}
                                   {tool.needsConfiguration && (
-                                      <ConfigureIcon 
-                                          size={12} 
+                                      <ConfigureIcon
+                                          size={12}
                                           className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`}
                                           title={isConfigured ? "Configurada" : "Requer configuração"}
                                       />
@@ -1261,7 +1261,7 @@ export default function AgentBuilderPage() {
 
       {isToolConfigModalOpen && configuringTool && (
         <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => {
-          if (!open) setConfiguringTool(null); 
+          if (!open) setConfiguringTool(null);
           setIsToolConfigModalOpen(open);
         }}>
           <DialogContent className="sm:max-w-lg">
@@ -1276,22 +1276,22 @@ export default function AgentBuilderPage() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label>
-                    <Input 
-                      id="modalGoogleApiKey" 
-                      value={modalGoogleApiKey} 
+                    <Input
+                      id="modalGoogleApiKey"
+                      value={modalGoogleApiKey}
                       onChange={(e) => setModalGoogleApiKey(e.target.value)}
-                      placeholder="Cole sua chave API aqui (ex: AIza...)" 
+                      placeholder="Cole sua chave API aqui (ex: AIza...)"
                       type="password"
                     />
                     <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações à API de busca.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
-                    <Input 
-                      id="modalGoogleCseId" 
+                    <Input
+                      id="modalGoogleCseId"
                       value={modalGoogleCseId}
                       onChange={(e) => setModalGoogleCseId(e.target.value)}
-                      placeholder="Cole seu CSE ID aqui (ex: 0123...)" 
+                      placeholder="Cole seu CSE ID aqui (ex: 0123...)"
                     />
                     <p className="text-xs text-muted-foreground">Identifica qual mecanismo de busca personalizado você deseja usar.</p>
                   </div>
@@ -1301,18 +1301,18 @@ export default function AgentBuilderPage() {
                  <>
                   <div className="space-y-2">
                     <Label htmlFor="modalOpenapiSpecUrl">URL do Esquema OpenAPI (JSON ou YAML)</Label>
-                    <Input 
-                      id="modalOpenapiSpecUrl" 
-                      value={modalOpenapiSpecUrl} 
+                    <Input
+                      id="modalOpenapiSpecUrl"
+                      value={modalOpenapiSpecUrl}
                       onChange={(e) => setModalOpenapiSpecUrl(e.target.value)}
-                      placeholder="ex: https://petstore.swagger.io/v2/swagger.json" 
+                      placeholder="ex: https://petstore.swagger.io/v2/swagger.json"
                     />
                     <p className="text-xs text-muted-foreground">O link direto para o arquivo de especificação da API.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="modalOpenapiApiKey">Chave de API da API Externa (Opcional)</Label>
-                    <Input 
-                      id="modalOpenapiApiKey" 
+                    <Input
+                      id="modalOpenapiApiKey"
                       value={modalOpenapiApiKey}
                       onChange={(e) => setModalOpenapiApiKey(e.target.value)}
                       placeholder="Se a API requer uma chave de autenticação"
@@ -1370,9 +1370,9 @@ export default function AgentBuilderPage() {
                   {(modalDbType === 'other' || modalDbType === 'sqlite') && (
                     <div className="space-y-2">
                         <Label htmlFor="modalDbConnectionString">String de Conexão (ou Caminho para SQLite)</Label>
-                        <Input 
-                        id="modalDbConnectionString" 
-                        value={modalDbConnectionString} 
+                        <Input
+                        id="modalDbConnectionString"
+                        value={modalDbConnectionString}
                         onChange={(e) => setModalDbConnectionString(e.target.value)}
                         placeholder={modalDbType === 'sqlite' ? "ex: /caminho/para/meu_banco.db" : "ex: postgresql://user:pass@host:port/db"}
                         />
@@ -1383,12 +1383,12 @@ export default function AgentBuilderPage() {
                   )}
                   <div className="space-y-2">
                     <Label htmlFor="modalDbDescription">Descrição do Banco/Tabelas (Opcional)</Label>
-                    <Textarea 
-                        id="modalDbDescription" 
-                        value={modalDbDescription} 
+                    <Textarea
+                        id="modalDbDescription"
+                        value={modalDbDescription}
                         onChange={(e) => setModalDbDescription(e.target.value)}
                         placeholder="Ex: Contém tabelas de clientes e pedidos. Tabela 'clientes' tem colunas: id, nome, email."
-                        rows={3} 
+                        rows={3}
                     />
                     <p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto dos dados disponíveis.</p>
                   </div>
@@ -1397,11 +1397,11 @@ export default function AgentBuilderPage() {
                {configuringTool.id === "knowledgeBase" && (
                 <div className="space-y-2">
                     <Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label>
-                    <Input 
-                      id="modalKnowledgeBaseId" 
-                      value={modalKnowledgeBaseId} 
+                    <Input
+                      id="modalKnowledgeBaseId"
+                      value={modalKnowledgeBaseId}
                       onChange={(e) => setModalKnowledgeBaseId(e.target.value)}
-                      placeholder="ex: documentos_produto_xyz ou faq_servico_abc" 
+                      placeholder="ex: documentos_produto_xyz ou faq_servico_abc"
                     />
                     <p className="text-xs text-muted-foreground">Identificador único para a base de conhecimento que o agente deve consultar (ex: Vertex AI Search Datastore ID, nome de coleção Pinecone, etc.).</p>
                 </div>
@@ -1409,11 +1409,11 @@ export default function AgentBuilderPage() {
               {configuringTool.id === "calendarAccess" && (
                 <div className="space-y-2">
                     <Label htmlFor="modalCalendarApiEndpoint">Endpoint da API de Calendário ou ID do Fluxo Genkit</Label>
-                    <Input 
-                      id="modalCalendarApiEndpoint" 
-                      value={modalCalendarApiEndpoint} 
+                    <Input
+                      id="modalCalendarApiEndpoint"
+                      value={modalCalendarApiEndpoint}
                       onChange={(e) => setModalCalendarApiEndpoint(e.target.value)}
-                      placeholder="ex: https://api.example.com/calendar ou nome_do_fluxo_genkit_calendario" 
+                      placeholder="ex: https://api.example.com/calendar ou nome_do_fluxo_genkit_calendario"
                     />
                     <p className="text-xs text-muted-foreground">URL do endpoint da API ou o identificador do fluxo Genkit responsável pelo acesso à agenda. Pode requerer autenticação OAuth configurada separadamente no backend.</p>
                 </div>

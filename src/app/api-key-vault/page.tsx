@@ -24,7 +24,7 @@ interface ApiKeyEntry {
   id: string;
   serviceName: string;
   apiKeyFragment: string;
-  apiKeyFull?: string; 
+  apiKeyFull?: string;
   dateAdded: string;
   isKeyVisible: boolean;
 }
@@ -56,7 +56,7 @@ export default function ApiKeyVaultPage() {
       toast({ title: "Erro", description: "Por favor, insira uma chave API.", variant: "destructive" });
       return;
     }
-    
+
     let serviceName = selectedProvider;
     if (selectedProvider === "other" && customServiceName) {
       serviceName = customServiceName;
@@ -98,7 +98,7 @@ export default function ApiKeyVaultPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <KeyRound className="h-8 w-8 text-primary" />
@@ -143,10 +143,10 @@ export default function ApiKeyVaultPage() {
                   <Label htmlFor="customServiceName" className="text-right">
                     Nome do Serviço
                   </Label>
-                  <Input 
-                    id="customServiceName" 
-                    placeholder="ex: Meu Serviço Customizado" 
-                    className="col-span-3" 
+                  <Input
+                    id="customServiceName"
+                    placeholder="ex: Meu Serviço Customizado"
+                    className="col-span-3"
                     value={customServiceName}
                     onChange={(e) => setCustomServiceName(e.target.value)}
                   />
@@ -156,11 +156,11 @@ export default function ApiKeyVaultPage() {
                 <Label htmlFor="apiKey" className="text-right">
                   Chave API
                 </Label>
-                <Input 
-                  id="apiKey" 
-                  type="password" 
-                  placeholder="Cole sua chave API aqui" 
-                  className="col-span-3" 
+                <Input
+                  id="apiKey"
+                  type="password"
+                  placeholder="Cole sua chave API aqui"
+                  className="col-span-3"
                   value={apiKeyInputValue}
                   onChange={(e) => setApiKeyInputValue(e.target.value)}
                 />
@@ -224,10 +224,10 @@ export default function ApiKeyVaultPage() {
                       >
                         {key.isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-destructive hover:text-destructive" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
                         aria-label="Excluir Chave API"
                         onClick={() => handleDeleteApiKey(key.id, key.serviceName)} // Updated onClick
                       >
