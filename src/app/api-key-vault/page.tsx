@@ -18,12 +18,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 interface ApiKeyEntry {
   id: string;
   serviceName: string;
   apiKeyFragment: string;
-  apiKeyFull?: string; // Store full key temporarily, in a real app this would be handled securely
+  apiKeyFull?: string; 
   dateAdded: string;
   isKeyVisible: boolean;
 }
@@ -34,16 +35,13 @@ const initialApiKeys: ApiKeyEntry[] = [
   { id: "key_003", serviceName: "Shopify Admin API", apiKeyFragment: "shpat..._yU8n", apiKeyFull: "shpatzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_yU8n", dateAdded: "2024-01-05", isKeyVisible: false },
 ];
 
-// This is a placeholder page. In a real application, API keys would be stored securely,
-// likely encrypted, and handled with extreme care.
-// The UI below is for illustrative purposes only.
-
 export default function ApiKeyVaultPage() {
   const [apiKeys, setApiKeys] = React.useState<ApiKeyEntry[]>(initialApiKeys);
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
   const [selectedProvider, setSelectedProvider] = React.useState<string>("");
   const [customServiceName, setCustomServiceName] = React.useState<string>("");
   const [apiKeyInputValue, setApiKeyInputValue] = React.useState<string>("");
+  const { toast } = useToast(); // Initialize useToast
 
   const toggleKeyVisibility = (keyId: string) => {
     setApiKeys(
@@ -55,7 +53,7 @@ export default function ApiKeyVaultPage() {
 
   const handleAddApiKey = () => {
     if (!apiKeyInputValue) {
-      alert("Por favor, insira uma chave API.");
+      toast({ title: "Erro", description: "Por favor, insira uma chave API.", variant: "destructive" });
       return;
     }
     
@@ -63,13 +61,12 @@ export default function ApiKeyVaultPage() {
     if (selectedProvider === "other" && customServiceName) {
       serviceName = customServiceName;
     } else if (selectedProvider === "other" && !customServiceName) {
-      alert("Por favor, insira um nome de serviço personalizado.");
+      toast({ title: "Erro", description: "Por favor, insira um nome de serviço personalizado.", variant: "destructive" });
       return;
     }
 
-
     if (!serviceName || serviceName === "other") {
-        alert("Por favor, selecione um provedor ou forneça um nome de serviço personalizado.");
+        toast({ title: "Erro", description: "Por favor, selecione um provedor ou forneça um nome de serviço personalizado.", variant: "destructive" });
         return;
     }
 
@@ -86,6 +83,12 @@ export default function ApiKeyVaultPage() {
     setSelectedProvider("");
     setCustomServiceName("");
     setApiKeyInputValue("");
+    toast({ title: "Sucesso!", description: `Chave API para "${serviceName}" adicionada.` });
+  };
+
+  const handleDeleteApiKey = (keyId: string, keyName: string) => {
+    setApiKeys(apiKeys.filter((key) => key.id !== keyId));
+    toast({ title: "Chave Excluída", description: `A chave API "${keyName}" foi excluída.`, variant: "destructive" });
   };
 
   const resetAddKeyForm = () => {
@@ -195,31 +198,45 @@ export default function ApiKeyVaultPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {apiKeys.map((key) => (
-                <TableRow key={key.id}>
-                  <TableCell className="font-medium">{key.serviceName}</TableCell>
-                  <TableCell className="font-mono">
-                    {key.isKeyVisible ? key.apiKeyFull : key.apiKeyFragment}
-                  </TableCell>
-                  <TableCell>{key.dateAdded}</TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" aria-label="Editar Chave API">
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => toggleKeyVisibility(key.id)}
-                      aria-label="Alternar Visibilidade da Chave API"
-                    >
-                      {key.isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label="Excluir Chave API">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+              {apiKeys.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    Nenhuma chave API adicionada ainda.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                apiKeys.map((key) => (
+                  <TableRow key={key.id}>
+                    <TableCell className="font-medium">{key.serviceName}</TableCell>
+                    <TableCell className="font-mono">
+                      {key.isKeyVisible ? key.apiKeyFull : key.apiKeyFragment}
+                    </TableCell>
+                    <TableCell>{key.dateAdded}</TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="icon" aria-label="Editar Chave API" onClick={() => toast({title: "Em breve", description: "Funcionalidade de edição de chave API."})}>
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleKeyVisibility(key.id)}
+                        aria-label="Alternar Visibilidade da Chave API"
+                      >
+                        {key.isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-destructive hover:text-destructive" 
+                        aria-label="Excluir Chave API"
+                        onClick={() => handleDeleteApiKey(key.id, key.serviceName)} // Updated onClick
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
