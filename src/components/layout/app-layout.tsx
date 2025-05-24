@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, Home, PanelLeftClose, PanelRightOpen } from 'lucide-react';
+import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, PanelLeftClose, PanelRightOpen, Home } from 'lucide-react';
 import {
   Sidebar,
   SidebarHeader,
@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   useSidebar,
-  SidebarProvider
+  // SidebarProvider // Removido pois está no RootLayout
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -39,6 +39,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/agent-builder', icon: Cpu, label: 'Agentes' },
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
+  // { href: '/api-key-vault', icon: KeyRound, label: 'Chaves API' }, // Movido para o Dropdown
 ];
 
 // Componente interno para o toggle da sidebar, usando o contexto
@@ -54,7 +55,7 @@ function SidebarToggle() {
   return (
     <Button
       variant="ghost"
-      size={isIconOnly ? "icon" : "icon"} // Mantém 'icon' para o padding padrão do botão, mas ajustamos h/w
+      size="icon"
       className={cn(
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         isIconOnly 
@@ -97,6 +98,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const { state: sidebarState, isMobile, collapsible, mounted } = useSidebar();
 
+  // Determina se a sidebar está no modo "apenas ícone"
+  // Esta lógica precisa ser robusta e considerar que `collapsible` pode não ser 'icon'
   const isSidebarIconOnly = mounted && !isMobile && collapsible === 'icon' && sidebarState === 'collapsed';
 
   return (
@@ -104,7 +107,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground" collapsible="icon">
         <SidebarHeader className={cn(
           "flex items-center relative",
-          isSidebarIconOnly ? "h-14 justify-center p-2" : "h-16 justify-center p-4" // Altura e padding ajustados para modo ícone
+          isSidebarIconOnly ? "h-14 justify-center py-2" : "h-16 justify-center p-4" // Removido px-2 para iconOnly
         )}>
           <SidebarToggle />
           {!isSidebarIconOnly && (
@@ -139,7 +142,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="p-2">
+        <SidebarFooter> 
           <Separator className="my-2 bg-sidebar-border" />
           <SidebarMenu>
             <DropdownMenu>
