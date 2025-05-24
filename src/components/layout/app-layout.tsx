@@ -44,32 +44,51 @@ const navItems: NavItem[] = [
 function SidebarToggle() {
   const { state, toggleSidebar, collapsible, isMobile, mounted } = useSidebar();
 
-  if (!mounted || isMobile || collapsible === 'none') {
+  if (!mounted || collapsible === 'none') { // Hide toggle if not collapsible or not mounted
     return null;
   }
 
-  const isExpanded = state === 'expanded';
-  const isIconOnlyMode = collapsible === 'icon';
+  // Determine if it's in icon-only collapsed mode for desktop
+  // isMobile check is important here to ensure this logic applies to desktop icon mode
+  const isIconOnlyMode = !isMobile && collapsible === 'icon';
+  const isCollapsedInIconMode = isIconOnlyMode && state === 'collapsed';
+  const isExpandedInIconMode = isIconOnlyMode && state === 'expanded';
 
-  // O botão de toggle deve estar sempre visível no modo ícone para permitir expansão,
-  // e na lateral no modo expandido para permitir colapso.
+
+  // For mobile offcanvas, the toggle is usually in the MainLayout header
+  // So, this toggle is primarily for desktop icon mode or if we decide to use it for offcanvas too.
+  // Let's assume this toggle is for desktop icon mode and general collapsibility.
+  // If mobile, and collapsible is 'offcanvas', the toggle might be handled by a different button in MainLayout.
+  // For now, if it's mobile, and collapsible is 'icon' (which defaults to 'offcanvas' for mobile in provider),
+  // this specific button might not be the primary toggle.
+  // The useSidebar hook handles isMobile and sets collapsible to 'offcanvas' for mobile.
+  
+  // If it's mobile, the sidebar is a sheet, and this button might not be needed here,
+  // as the sheet has its own close mechanism and is opened by a MainLayout button.
+  // Let's only render this for non-mobile scenarios where it's collapsible.
+  if (isMobile) {
+    return null;
+  }
+
   return (
     <Button
       variant="ghost"
       size="icon"
       className={cn(
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        isIconOnly && isExpanded
-          ? "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" // Expandido, botão na lateral
-          : isIconOnly && !isExpanded 
-            ? "h-12 w-12" // Colapsado (modo ícone), botão maior centralizado
-            : "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" // Modo offcanvas (não é icon) ou não collapsible
-
+        // Positioning when sidebar is expanded (icon mode)
+        isExpandedInIconMode
+          ? "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+          // Centered styling when sidebar is collapsed (icon mode)
+          : isCollapsedInIconMode
+            ? "h-12 w-12" 
+            // Default for other collapsible modes or if not icon mode (should not happen if collapsible === 'none' is handled)
+            : "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8" 
       )}
       onClick={toggleSidebar}
-      aria-label={isExpanded ? "Colapsar sidebar" : "Expandir sidebar"}
+      aria-label={state === 'expanded' ? "Colapsar sidebar" : "Expandir sidebar"}
     >
-      {isExpanded ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-6 w-6" />}
+      {state === 'expanded' ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-6 w-6" />}
     </Button>
   );
 }
@@ -85,7 +104,8 @@ function MainLayout({ children }: { children: ReactNode }) {
           className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
         >
           <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
-            <ChevronsRight className="h-5 w-5" />
+            {/* For mobile, it's usually about opening the sheet, so ChevronsRight might be more appropriate */}
+            <ChevronsRight className="h-5 w-5" /> 
           </Button>
         </header>
       )}
@@ -110,7 +130,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           "flex items-center justify-center relative",
            isSidebarIconOnly ? "h-14 py-2" : "h-16 p-4" 
         )}>
-          <SidebarToggle />
+          <SidebarToggle /> {/* SidebarToggle now calculates its own needs */}
           {!isSidebarIconOnly && (
             <Link href="/agent-builder" className="hover:text-sidebar-primary/90 transition-colors">
               <span className="aida-logo-text">Aida</span>
