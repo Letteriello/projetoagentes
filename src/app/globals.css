@@ -144,4 +144,30 @@
       transform: translate(-50%, -50%) rotate(360deg);
     }
   }
+
+  /* Estilos para o logo "Aida" */
+  .aida-logo-text {
+    font-weight: 600; /* semibold */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    position: relative; /* Necessário se for adicionar pseudo-elementos mais complexos no futuro */
+    animation: pulse-glow-text 3s ease-in-out infinite;
+    font-size: inherit; /* Herda o text-lg do Link pai */
+    color: hsl(var(--sidebar-primary)); /* Garante a cor base do texto */
+  }
+
+  @keyframes pulse-glow-text {
+    0%, 100% {
+      text-shadow: 
+        0 0 5px hsl(var(--sidebar-primary) / 0.8),
+        0 0 10px hsl(var(--sidebar-primary) / 0.6),
+        0 0 15px hsl(var(--sidebar-primary) / 0.4);
+    }
+    50% {
+      text-shadow: 
+        0 0 8px hsl(var(--sidebar-accent) / 0.9),
+        0 0 16px hsl(var(--sidebar-accent) / 0.7),
+        0 0 24px hsl(var(--sidebar-accent) / 0.5);
+    }
+  }
 }

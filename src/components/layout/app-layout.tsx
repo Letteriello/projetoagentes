@@ -14,7 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  // SidebarTrigger, // SidebarTrigger é para ser usado no conteúdo principal, não aqui
   SidebarInset,
   useSidebar,
 } from '@/components/ui/sidebar';
@@ -38,19 +37,25 @@ const navItems: NavItem[] = [
 // Este componente agora só renderiza o conteúdo principal.
 // O header global foi simplificado e tornado mobile-only.
 function MainLayout({ children }: { children: ReactNode }) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, isMobile } = useSidebar(); // Adicionado isMobile aqui
+  
+  // Renderiza o botão de toggle apenas se for mobile e o hook já determinou o estado
+  const renderMobileToggle = isMobile === true;
+
   return (
     // SidebarInset é o <main> HTML tag que envolve o conteúdo da página.
     // Ele já possui flex-1 e flex-col para ocupar o espaço.
     <SidebarInset> 
       {/* Cabeçalho apenas para mobile, para o botão de toggle da sidebar */}
-      <header 
-        className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
-      >
-        <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
-          <PanelLeft className="h-5 w-5" />
-        </Button>
-      </header>
+      {renderMobileToggle && (
+        <header 
+          className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
+        >
+          <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Toggle Sidebar">
+            <PanelLeft className="h-5 w-5" />
+          </Button>
+        </header>
+      )}
       {/* 
         O conteúdo da página (children) é renderizado diretamente aqui.
         As páginas individuais (ex: HomePage, AgentBuilderPage) agora são responsáveis 
@@ -63,15 +68,15 @@ function MainLayout({ children }: { children: ReactNode }) {
 
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname(); // Chamada do hook no escopo correto
+  const pathname = usePathname(); 
 
   return (
     <SidebarProvider defaultOpen>
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="p-4">
-          <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-sidebar-primary hover:text-sidebar-primary/90 transition-colors">
+          <Link href="/" className="flex items-center gap-2 text-lg text-sidebar-primary hover:text-sidebar-primary/90 transition-colors">
             <AppLogo className="h-7 w-7" />
-            <span>AgentVerse</span>
+            <span className="aida-logo-text">Aida</span>
           </Link>
         </SidebarHeader>
         <SidebarContent className="flex-1">
