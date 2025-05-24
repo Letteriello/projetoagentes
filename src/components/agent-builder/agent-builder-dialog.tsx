@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; // Added missing import
 import {
   Dialog,
   DialogContent,
@@ -102,6 +103,7 @@ export function AgentBuilderDialog({
 
   const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(initialWorkflowConfig.detailedWorkflowType);
   const [workflowDescription, setWorkflowDescription] = React.useState(initialWorkflowConfig.workflowDescription || "");
+  
   const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(initialWorkflowConfig.loopMaxIterations);
   const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<'none' | 'subagent_signal' | undefined>(initialWorkflowConfig.loopTerminationConditionType || 'none');
   const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(initialWorkflowConfig.loopExitToolName);
@@ -121,6 +123,7 @@ export function AgentBuilderDialog({
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
   const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState("");
   const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState("");
+  
   const [modalDbType, setModalDbType] = React.useState("");
   const [modalDbConnectionString, setModalDbConnectionString] = React.useState("");
   const [modalDbUser, setModalDbUser] = React.useState("");
@@ -129,6 +132,7 @@ export function AgentBuilderDialog({
   const [modalDbHost, setModalDbHost] = React.useState("");
   const [modalDbPort, setModalDbPort] = React.useState("");
   const [modalDbDescription, setModalDbDescription] = React.useState("");
+  
   const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState("");
   const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState("");
 
@@ -262,8 +266,6 @@ export function AgentBuilderDialog({
   };
 
   const constructSystemPrompt = () => {
-    // ... (logic from AgentBuilderPage, adapted to use local state)
-    // This function will use agentGoal, agentTasks, etc. from the local state of this dialog
     const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType, agentName, agentDescription, workflowDescription, detailedWorkflowType, loopMaxIterations, loopTerminationConditionType, loopExitToolName, loopExitStateKey, loopExitStateValue, customLogicDescription }; 
     
     if (currentConfig.agentType !== 'llm' && !currentConfig.agentGoal && !currentConfig.agentTasks && !currentConfig.agentPersonality && !currentConfig.agentModel) {
@@ -279,7 +281,7 @@ export function AgentBuilderDialog({
 
     const agentTypeDetail = agentTypeOptions.find(opt => opt.id === currentConfig.agentType);
     if(agentTypeDetail){
-      prompt += `Seu tipo principal é: ${agentTypeDetail.label.split('(')[0].trim()}. ${agentTypeDetail.description}\n`;
+      prompt += `Seu tipo principal é ${agentTypeDetail.label.split(' (')[0].trim()}. ${agentTypeDetail.description}\n`;
     }
 
 
@@ -318,7 +320,7 @@ export function AgentBuilderDialog({
       .filter(Boolean) as AvailableTool[];
 
     if (selectedToolObjects.length > 0) {
-        prompt += `FERRAMENTAS DISPONÍVEIS PARA USO PELO LLM (Você deve decidir quando e como usá-las. Se uma ferramenta estiver marcada como 'requer configuração' e não estiver explicitamente configurada, informe ao usuário que não pode usá-la ou peça para configurá-la):\n`;
+        prompt += `FERRAMENTAS DISPONÍVEIS PARA USO PELO LLM (Você deve decidir quando e como usá-las):\n`;
         selectedToolObjects.forEach(tool => {
             const currentToolConfig = toolConfigurations[tool.id];
             const isConfigured = tool.needsConfiguration && currentToolConfig &&
@@ -697,7 +699,7 @@ export function AgentBuilderDialog({
                    <Alert className="mb-4">
                     <Workflow className="h-4 w-4" />
                     <AlertTitle>{agentTypeOptions.find(opt => opt.id === 'workflow')?.label.split('(')[0].trim() || "Agente de Fluxo de Trabalho"}</AlertTitle>
-                    <AlertDescription>{agentTypeOptions.find(opt => opt.id === 'workflow')?.description}</AlertDescription>
+                    <AlertDescription>Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si, tornando-os ideais para processos estruturados que exigem execução previsível.</AlertDescription>
                   </Alert>
                   <div className="space-y-2 mb-4">
                     <Label htmlFor="workflowDescription">Descrição Geral do Fluxo de Trabalho</Label>
@@ -733,8 +735,107 @@ export function AgentBuilderDialog({
                       </CardContent>
                     </Card>
                   )}
-                  {detailedWorkflowType === 'parallel' && ( /* UI para Parallel */ <Card className="bg-muted/30"> <CardHeader><CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle><CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription></CardHeader><CardContent className="space-y-3"><Alert variant="default" className="mt-3 mb-4 bg-background/50 border-border/70"><AlertCircle className="h-4 w-4 text-muted-foreground" /><AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle><AlertDescription className="text-xs">Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. Para coletar e processar os resultados, cada subagente paralelo deve usar uma "Chave de Saída" (`output_key`) para salvar seu resultado individual. Geralmente, um Agente Sequencial é usado como a próxima etapa no fluxo de trabalho geral para ler essas "Chaves de Saída" e então processar/mesclar os resultados.</AlertDescription></Alert><Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}><PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela</Button><div className="p-3 border rounded-md bg-background/70 space-y-2"><div className="flex items-center justify-between"><span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Tarefa Paralela: Aqui você definiria as instruções para este subagente, incluindo a output_key que ele usará para armazenar seu resultado individual."})}><Settings size={14} /></Button><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover tarefa."})}><Trash2 size={14} /></Button></div></div><div className="pl-0 space-y-1 mt-1.5"><Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label><Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: resultado_imagem_gerada" /><p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa.</p></div></div></CardContent></Card> )}
-                  {detailedWorkflowType === 'loop' && ( /* UI para Loop */ <Card className="bg-muted/30"><CardHeader><CardTitle className="text-base">Configurar Loop de Execução</CardTitle><CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="loopMaxIterations">Número Máximo de Iterações (Opcional)</Label><Input id="loopMaxIterations" type="number" min="1" placeholder="Ex: 5" value={loopMaxIterations || ""} onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)} className="h-9" /><p className="text-xs text-muted-foreground">Deixe em branco para loops baseados apenas em outras condições.</p></div><div className="space-y-2"><Label className="flex items-center gap-1.5">Condição de Término Adicional (Opcional):</Label><RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)}><div className="flex items-center space-x-2"><RadioGroupItem value="none" id="loop-cond-none" /><Label htmlFor="loop-cond-none" className="font-normal">Nenhuma (apenas máximo de iterações)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="subagent_signal" id="loop-cond-signal" /><Label htmlFor="loop-cond-signal" className="font-normal">Sinalização por Subagente</Label></div></RadioGroup></div>{loopTerminationConditionType === 'subagent_signal' && (<Alert variant="default" className="mt-3 bg-background/50 border-border/70"><AlertCircle className="h-4 w-4 text-muted-foreground" /><AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle><AlertDescription className="text-xs">Um subagente dentro do loop pode sinalizar o término. Configure-o com essa lógica e, opcionalmente, especifique abaixo a ferramenta ou estado esperado.</AlertDescription><div className="mt-3 space-y-2 pl-1"><div><Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída (Exemplo):</Label><Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/30" /></div><div><Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado (Exemplo):</Label><Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/30" /></div><div><Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado (Exemplo):</Label><Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/30" /></div></div></Alert>)}<Separator className="my-3"/><h4 className="text-sm font-medium pt-1">Subagente(s) na Sequência do Loop:</h4><Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente ao loop."})}><PlusCircle size={16} className="mr-2" /> Adicionar Subagente ao Loop</Button><div className="p-3 border rounded-md bg-background/70 space-y-2"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/><span className="text-sm">Ex: Agente de Coleta de Dados (Tipo: LLM, ID: agent_data_collector)</span></div><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa do Loop: Defina instruções, output_keys e se sinaliza término." })}><Settings size={14} /></Button><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover subagente."})}><Trash2 size={14} /></Button></div></div><div className="pl-6 space-y-1"><Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label><Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: dados_coletados_iteracao" /><p className="text-xs text-muted-foreground/80">Use para referenciar a saída desta etapa dentro da iteração ou após o loop.</p></div></div></CardContent></Card> )}
+                  {detailedWorkflowType === 'parallel' && ( 
+                    <Card className="bg-muted/30"> 
+                        <CardHeader>
+                            <CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle>
+                            <CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <Alert variant="default" className="mt-3 mb-4 bg-background/50 border-border/70">
+                                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                                <AlertTitle className="text-sm font-medium">Importante: Execução Independente</AlertTitle>
+                                <AlertDescription className="text-xs">
+                                    Os subagentes configurados aqui serão executados em paralelo e operam de forma independente. 
+                                    Não há compartilhamento automático de histórico ou estado entre eles durante a execução. 
+                                    Para combinar os resultados, cada subagente deve usar uma 'Chave de Saída' única para salvar seu resultado (ex: no estado da sessão).
+                                    Geralmente, um Agente Sequencial é usado como a próxima etapa para ler essas 'Chaves de Saída' e processar/mesclar os resultados.
+                                </AlertDescription>
+                            </Alert>
+                            <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
+                                <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela
+                            </Button>
+                            <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Tarefa Paralela: Aqui você definiria as instruções para este subagente, incluindo a output_key que ele usará para armazenar seu resultado individual. Lembre-se que ele rodará em paralelo e, por padrão, de forma isolada de outras tarefas paralelas."})}>
+                                            <Settings size={14} />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover tarefa."})}>
+                                            <Trash2 size={14} />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="pl-0 space-y-1 mt-1.5">
+                                    <Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label>
+                                    <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: resultado_imagem_gerada" />
+                                    <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela (ex: salvo no estado da sessão).</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card> 
+                  )}
+                  {detailedWorkflowType === 'loop' && ( 
+                    <Card className="bg-muted/30">
+                        <CardHeader>
+                            <CardTitle className="text-base">Configurar Loop de Execução</CardTitle>
+                            <CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="loopMaxIterations">Número Máximo de Iterações (Opcional)</Label>
+                                <Input id="loopMaxIterations" type="number" min="1" placeholder="Ex: 5" value={loopMaxIterations || ""} onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)} className="h-9" />
+                                <p className="text-xs text-muted-foreground">Deixe em branco para loops baseados apenas em outras condições.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-1.5">Condição de Término Adicional (Opcional):</Label>
+                                <RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)}>
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="loop-cond-none" /><Label htmlFor="loop-cond-none" className="font-normal">Nenhuma (apenas máximo de iterações)</Label></div>
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="subagent_signal" id="loop-cond-signal" /><Label htmlFor="loop-cond-signal" className="font-normal">Sinalização por Subagente</Label></div>
+                                </RadioGroup>
+                            </div>
+                            {loopTerminationConditionType === 'subagent_signal' && (
+                                <Alert variant="default" className="mt-3 bg-background/50 border-border/70">
+                                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                                    <AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle>
+                                    <AlertDescription className="text-xs">
+                                        Um subagente dentro do loop pode sinalizar o término (ex: usando uma ferramenta específica como 'exit_loop' ou retornando um valor/estado particular). 
+                                        Configure o subagente apropriado com essa lógica e, opcionalmente, indique abaixo qual ferramenta ou valor de estado é esperado para o término.
+                                    </AlertDescription>
+                                    <div className="mt-3 space-y-2 pl-1">
+                                        <div><Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label><Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/30" /></div>
+                                        <div><Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label><Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/30" /></div>
+                                        <div><Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label><Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/30" /></div>
+                                    </div>
+                                </Alert>
+                            )}
+                            <Separator className="my-3"/>
+                            <h4 className="text-sm font-medium pt-1">Subagente(s) na Sequência do Loop:</h4>
+                            <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente ao loop."})}>
+                                <PlusCircle size={16} className="mr-2" /> Adicionar Subagente ao Loop
+                            </Button>
+                            <div className="p-3 border rounded-md bg-background/70 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2"><GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/><span className="text-sm">Ex: Agente de Coleta de Dados (Tipo: LLM, ID: agent_data_collector)</span></div>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa do Loop: Aqui você definiria as instruções para este subagente, como ele usa output_keys de etapas anteriores na mesma iteração, qual output_key ele produz, e se ele tem um papel em sinalizar o término do loop (ex: usando uma ferramenta como 'exit_loop' ou verificando uma condição)." })}>
+                                            <Settings size={14} />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover subagente."})}>
+                                            <Trash2 size={14} />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="pl-6 space-y-1">
+                                    <Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
+                                    <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: dados_coletados_iteracao" />
+                                    <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) dentro da iteração ou após o loop.</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card> 
+                  )}
                 </div>
               </>
             )}
@@ -748,7 +849,7 @@ export function AgentBuilderDialog({
                   <Alert className="mb-4">
                     <FileJson className="h-4 w-4" />
                     <AlertTitle>{agentTypeOptions.find(opt => opt.id === 'custom')?.label.split('(')[0].trim() || "Agente Personalizado"}</AlertTitle>
-                    <AlertDescription>{agentTypeOptions.find(opt => opt.id === 'custom')?.description}</AlertDescription>
+                    <AlertDescription>Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes (como LlmAgent ou LoopAgent) e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar _run_async_impl).</AlertDescription>
                   </Alert>
                   <div className="space-y-2">
                     <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
@@ -776,23 +877,33 @@ export function AgentBuilderDialog({
                   <p className="text-sm text-muted-foreground">Capacite seu agente com funcionalidades para interagir com o mundo exterior. A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.</p>
                   <div className="space-y-3 pt-2">
                     {availableTools.map((tool) => (
-                      <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
-                        <Checkbox id={`tool-${tool.id}`} checked={currentAgentTools.includes(tool.id)} onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)} className="mt-1" />
-                        <div className="ml-3 flex-grow">
-                          <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                            {React.cloneElement(tool.icon as React.ReactElement, { size: 16, className: "mr-2"})}
-                            {tool.label}
-                            {tool.needsConfiguration && <ConfigureIcon size={14} className="ml-2 text-muted-foreground group-hover:text-primary transition-colors" title="Requer Configuração"/>}
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                        <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                            <Checkbox 
+                                id={`tool-${tool.id}`} 
+                                checked={currentAgentTools.includes(tool.id)} 
+                                onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)} 
+                                className="mt-1" 
+                            />
+                            <div className="ml-3 flex-grow">
+                                <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
+                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 16, className: "mr-2"})}
+                                    {tool.label}
+                                    {tool.needsConfiguration && <ConfigureIcon size={14} className="ml-2 text-muted-foreground group-hover:text-primary transition-colors" title="Requer Configuração"/>}
+                                </Label>
+                                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                            </div>
+                            {tool.needsConfiguration && currentAgentTools.includes(tool.id) && (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="ml-auto shrink-0" 
+                                onClick={() => openToolConfigModal(tool)}
+                            >
+                                <ConfigureIcon size={14} className="mr-1.5" />
+                                {toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]) ? "Reconfigurar" : "Configurar"}
+                            </Button>
+                            )}
                         </div>
-                        {tool.needsConfiguration && currentAgentTools.includes(tool.id) && (
-                          <Button variant="outline" size="sm" className="ml-auto shrink-0" onClick={() => openToolConfigModal(tool)}>
-                            <ConfigureIcon size={14} className="mr-1.5" />
-                            {toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]) ? "Reconfigurar" : "Configurar"}
-                          </Button>
-                        )}
-                      </div>
                     ))}
                   </div>
                   {currentAgentTools.length > 0 && (
@@ -802,10 +913,20 @@ export function AgentBuilderDialog({
                         {currentAgentTools.map(toolId => {
                             const tool = availableTools.find(t => t.id === toolId);
                             if (!tool) return null;
-                            const IconToRender = getToolIconComponent(tool.icon && (typeof (tool.icon as any).type?.displayName === 'string' ? (tool.icon as any).type.displayName.replace('Icon', '') : 'Default') as keyof typeof iconComponents | 'default');
-                            const toolIcon = <IconToRender size={14} className="mr-1.5 inline-block" />;
                             const isConfigured = tool.needsConfiguration && toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]!).some(key => !!(toolConfigurations[tool.id] as any)[key]);
-                            return ( <li key={toolId} className="flex items-center">{toolIcon} {tool.label} {tool.needsConfiguration && (<ConfigureIcon size={12} className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`} title={isConfigured ? "Configurada" : "Requer configuração"}/> )}</li> );
+                            return ( 
+                                <li key={toolId} className="flex items-center">
+                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 14, className: "mr-1.5 inline-block"})} 
+                                    {tool.label} 
+                                    {tool.needsConfiguration && (
+                                        <ConfigureIcon 
+                                            size={12} 
+                                            className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`} 
+                                            title={isConfigured ? "Configurada" : "Requer configuração"}
+                                        /> 
+                                    )}
+                                </li> 
+                            );
                         })}
                       </ul>
                     </div>
@@ -834,11 +955,88 @@ export function AgentBuilderDialog({
                 <DialogDescription>Forneça os detalhes de configuração para a ferramenta {configuringTool.label}.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-                {configuringTool.id === "webSearch" && ( /* Campos para Busca Web */ <> <div className="space-y-2"><Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label><Input id="modalGoogleApiKey" value={modalGoogleApiKey} onChange={(e) => setModalGoogleApiKey(e.target.value)} placeholder="Cole sua chave API aqui" type="password"/><p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações.</p></div><div className="space-y-2"><Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca (CSE ID)</Label><Input id="modalGoogleCseId" value={modalGoogleCseId} onChange={(e) => setModalGoogleCseId(e.target.value)} placeholder="Cole seu CSE ID aqui"/><p className="text-xs text-muted-foreground">Identifica seu mecanismo de busca personalizado.</p></div> </> )}
-                {configuringTool.id === "customApiIntegration" && ( /* Campos para OpenAPI */ <> <div className="space-y-2"><Label htmlFor="modalOpenapiSpecUrl">URL do Esquema OpenAPI (JSON ou YAML)</Label><Input id="modalOpenapiSpecUrl" value={modalOpenapiSpecUrl} onChange={(e) => setModalOpenapiSpecUrl(e.target.value)} placeholder="ex: https://petstore.swagger.io/v2/swagger.json"/><p className="text-xs text-muted-foreground">Link para o arquivo de especificação da API.</p></div><div className="space-y-2"><Label htmlFor="modalOpenapiApiKey">Chave de API da API Externa (Opcional)</Label><Input id="modalOpenapiApiKey" value={modalOpenapiApiKey} onChange={(e) => setModalOpenapiApiKey(e.target.value)} placeholder="Se a API requer autenticação" type="password"/><p className="text-xs text-muted-foreground">Usada para interagir com a API externa.</p></div> </> )}
-                {configuringTool.id === "databaseAccess" && ( /* Campos para Acesso a BD */ <> <div className="space-y-2"><Label htmlFor="modalDbType">Tipo de Banco de Dados</Label><Select value={modalDbType} onValueChange={setModalDbType}><SelectTrigger id="modalDbType"><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent><SelectItem value="postgresql">PostgreSQL</SelectItem><SelectItem value="mysql">MySQL</SelectItem><SelectItem value="sqlserver">SQL Server</SelectItem><SelectItem value="sqlite">SQLite</SelectItem><SelectItem value="other">Outro</SelectItem></SelectContent></Select></div> {(modalDbType !== 'other' && modalDbType !== 'sqlite' && modalDbType !== "") && (<> <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="modalDbHost">Host</Label><Input id="modalDbHost" value={modalDbHost} onChange={(e) => setModalDbHost(e.target.value)} placeholder="ex: localhost" /></div><div className="space-y-2"><Label htmlFor="modalDbPort">Porta</Label><Input id="modalDbPort" type="number" value={modalDbPort} onChange={(e) => setModalDbPort(e.target.value)} placeholder="ex: 5432" /></div></div><div className="space-y-2"><Label htmlFor="modalDbName">Nome do Banco</Label><Input id="modalDbName" value={modalDbName} onChange={(e) => setModalDbName(e.target.value)} placeholder="ex: meu_banco" /></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="modalDbUser">Usuário</Label><Input id="modalDbUser" value={modalDbUser} onChange={(e) => setModalDbUser(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="modalDbPassword">Senha</Label><Input id="modalDbPassword" type="password" value={modalDbPassword} onChange={(e) => setModalDbPassword(e.target.value)} /></div></div> </>)} {(modalDbType === 'other' || modalDbType === 'sqlite') && (<div className="space-y-2"><Label htmlFor="modalDbConnectionString">String de Conexão (ou Caminho)</Label><Input id="modalDbConnectionString" value={modalDbConnectionString} onChange={(e) => setModalDbConnectionString(e.target.value)} placeholder={modalDbType === 'sqlite' ? "ex: /path/to/db.sqlite" : "driver://user:pass@host/db"} /><p className="text-xs text-muted-foreground">{modalDbType === 'sqlite' ? 'Caminho para o arquivo SQLite.' : 'String de conexão completa.'}</p></div>)} <div className="space-y-2"><Label htmlFor="modalDbDescription">Descrição do Banco/Tabelas (Opcional)</Label><Textarea id="modalDbDescription" value={modalDbDescription} onChange={(e) => setModalDbDescription(e.target.value)} placeholder="Ex: Tabela 'usuarios' com colunas id, nome, email." rows={3}/><p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto dos dados.</p></div> </> )}
-                {configuringTool.id === "knowledgeBase" && ( <div className="space-y-2"><Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label><Input id="modalKnowledgeBaseId" value={modalKnowledgeBaseId} onChange={(e) => setModalKnowledgeBaseId(e.target.value)} placeholder="ex: documentos_produto_xyz"/><p className="text-xs text-muted-foreground">Identificador para a base de conhecimento.</p></div> )}
-                {configuringTool.id === "calendarAccess" && ( <div className="space-y-2"><Label htmlFor="modalCalendarApiEndpoint">Endpoint da API ou ID do Fluxo Genkit</Label><Input id="modalCalendarApiEndpoint" value={modalCalendarApiEndpoint} onChange={(e) => setModalCalendarApiEndpoint(e.target.value)} placeholder="ex: https://api.example.com/calendar"/><p className="text-xs text-muted-foreground">URL ou identificador do fluxo Genkit para agenda.</p></div> )}
+                {configuringTool.id === "webSearch" && ( 
+                    <> 
+                        <div className="space-y-2">
+                            <Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label>
+                            <Input id="modalGoogleApiKey" value={modalGoogleApiKey} onChange={(e) => setModalGoogleApiKey(e.target.value)} placeholder="Cole sua chave API aqui" type="password"/>
+                            <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
+                            <Input id="modalGoogleCseId" value={modalGoogleCseId} onChange={(e) => setModalGoogleCseId(e.target.value)} placeholder="Cole seu CSE ID aqui"/>
+                            <p className="text-xs text-muted-foreground">Identifica seu mecanismo de busca personalizado.</p>
+                        </div> 
+                    </> 
+                )}
+                {configuringTool.id === "customApiIntegration" && ( 
+                    <> 
+                        <div className="space-y-2">
+                            <Label htmlFor="modalOpenapiSpecUrl">URL do Esquema OpenAPI (JSON ou YAML)</Label>
+                            <Input id="modalOpenapiSpecUrl" value={modalOpenapiSpecUrl} onChange={(e) => setModalOpenapiSpecUrl(e.target.value)} placeholder="ex: https://petstore.swagger.io/v2/swagger.json"/>
+                            <p className="text-xs text-muted-foreground">Link para o arquivo de especificação da API.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="modalOpenapiApiKey">Chave de API da API Externa (Opcional)</Label>
+                            <Input id="modalOpenapiApiKey" value={modalOpenapiApiKey} onChange={(e) => setModalOpenapiApiKey(e.target.value)} placeholder="Se a API requer autenticação" type="password"/>
+                            <p className="text-xs text-muted-foreground">Usada para interagir com a API externa.</p>
+                        </div> 
+                    </> 
+                )}
+                {configuringTool.id === "databaseAccess" && ( 
+                    <> 
+                        <div className="space-y-2">
+                            <Label htmlFor="modalDbType">Tipo de Banco de Dados</Label>
+                            <Select value={modalDbType} onValueChange={setModalDbType}>
+                                <SelectTrigger id="modalDbType"><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                                    <SelectItem value="mysql">MySQL</SelectItem>
+                                    <SelectItem value="sqlserver">SQL Server</SelectItem>
+                                    <SelectItem value="sqlite">SQLite</SelectItem>
+                                    <SelectItem value="other">Outro</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div> 
+                        {(modalDbType !== 'other' && modalDbType !== 'sqlite' && modalDbType !== "") && (<> 
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label htmlFor="modalDbHost">Host</Label><Input id="modalDbHost" value={modalDbHost} onChange={(e) => setModalDbHost(e.target.value)} placeholder="ex: localhost" /></div>
+                                <div className="space-y-2"><Label htmlFor="modalDbPort">Porta</Label><Input id="modalDbPort" type="number" value={modalDbPort} onChange={(e) => setModalDbPort(e.target.value)} placeholder="ex: 5432" /></div>
+                            </div>
+                            <div className="space-y-2"><Label htmlFor="modalDbName">Nome do Banco</Label><Input id="modalDbName" value={modalDbName} onChange={(e) => setModalDbName(e.target.value)} placeholder="ex: meu_banco" /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2"><Label htmlFor="modalDbUser">Usuário</Label><Input id="modalDbUser" value={modalDbUser} onChange={(e) => setModalDbUser(e.target.value)} /></div>
+                                <div className="space-y-2"><Label htmlFor="modalDbPassword">Senha</Label><Input id="modalDbPassword" type="password" value={modalDbPassword} onChange={(e) => setModalDbPassword(e.target.value)} /></div>
+                            </div> 
+                        </>)} 
+                        {(modalDbType === 'other' || modalDbType === 'sqlite') && (
+                            <div className="space-y-2">
+                                <Label htmlFor="modalDbConnectionString">String de Conexão (ou Caminho)</Label>
+                                <Input id="modalDbConnectionString" value={modalDbConnectionString} onChange={(e) => setModalDbConnectionString(e.target.value)} placeholder={modalDbType === 'sqlite' ? "ex: /path/to/db.sqlite" : "driver://user:pass@host/db"} />
+                                <p className="text-xs text-muted-foreground">{modalDbType === 'sqlite' ? 'Caminho para o arquivo SQLite.' : 'String de conexão completa.'}</p>
+                            </div>
+                        )} 
+                        <div className="space-y-2">
+                            <Label htmlFor="modalDbDescription">Descrição do Banco/Tabelas (Opcional)</Label>
+                            <Textarea id="modalDbDescription" value={modalDbDescription} onChange={(e) => setModalDbDescription(e.target.value)} placeholder="Ex: Tabela 'usuarios' com colunas id, nome, email." rows={3}/>
+                            <p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto dos dados.</p>
+                        </div> 
+                    </> 
+                )}
+                {configuringTool.id === "knowledgeBase" && ( 
+                    <div className="space-y-2">
+                        <Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label>
+                        <Input id="modalKnowledgeBaseId" value={modalKnowledgeBaseId} onChange={(e) => setModalKnowledgeBaseId(e.target.value)} placeholder="ex: documentos_produto_xyz"/>
+                        <p className="text-xs text-muted-foreground">Identificador para a base de conhecimento (RAG).</p>
+                    </div> 
+                )}
+                {configuringTool.id === "calendarAccess" && ( 
+                    <div className="space-y-2">
+                        <Label htmlFor="modalCalendarApiEndpoint">Endpoint da API ou ID do Fluxo Genkit</Label>
+                        <Input id="modalCalendarApiEndpoint" value={modalCalendarApiEndpoint} onChange={(e) => setModalCalendarApiEndpoint(e.target.value)} placeholder="ex: https://api.example.com/calendar"/>
+                        <p className="text-xs text-muted-foreground">URL ou identificador do fluxo Genkit para agenda.</p>
+                    </div> 
+                )}
                 </div>
                 <DialogFooter>
                 <DialogClose asChild><Button variant="outline" onClick={() => { setIsToolConfigModalOpen(false); setConfiguringTool(null);}}>Cancelar</Button></DialogClose>
@@ -852,4 +1050,5 @@ export function AgentBuilderDialog({
   );
 }
 
-    
+
+      
