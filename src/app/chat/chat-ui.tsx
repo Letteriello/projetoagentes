@@ -5,27 +5,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X } from "lucide-react"; // Added X
-import { useState, useRef, useEffect, useActionState, ChangeEvent } from "react"; // Added ChangeEvent
+import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X, UploadCloud, FileUp } from "lucide-react";
+import { useState, useRef, useEffect, useActionState, ChangeEvent } from "react";
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builder/page";
 import { cn } from "@/lib/utils";
-import Image from "next/image"; // For image preview
+import Image from "next/image";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 interface ChatMessage {
   id: string;
   text: string;
   sender: "user" | "agent" | "system";
   role: "user" | "model";
-  imageUrl?: string; // For displaying sent image
-  fileName?: string;  // For displaying file name
+  imageUrl?: string;
+  fileName?: string;
 }
 
 interface HistoryMessage {
   role: 'user' | 'model';
-  content: string; // For now, history content remains text. Image is only for current turn.
+  content: string;
 }
 
 const initialGems = [
@@ -50,6 +60,7 @@ export function ChatUI() {
 
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [isAttachFileModalOpen, setIsAttachFileModalOpen] = useState(false);
 
   const { savedAgents } = useAgents();
   const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
@@ -60,13 +71,15 @@ export function ChatUI() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    let targetName = "Chat";
     if (selectedAgentId !== 'none') {
       const agent = savedAgents.find(a => a.id === selectedAgentId);
-      setActiveChatTarget(agent ? `${agent.agentName}` : "Agente não encontrado");
+      targetName = agent ? `${agent.agentName}` : "Agente não encontrado";
     } else {
       const gem = initialGems.find(g => g.id === selectedGemId);
-      setActiveChatTarget(gem ? `${gem.name} (Gem)` : "Gem não encontrado");
+      targetName = gem ? `${gem.name} (Gem)` : "Gem não encontrado";
     }
+    setActiveChatTarget(targetName);
   }, [selectedAgentId, selectedGemId, savedAgents]);
 
   useEffect(() => {
@@ -89,10 +102,11 @@ export function ChatUI() {
       };
       setMessages((prevMessages) => [...prevMessages, newAgentMessageUI]);
       setChatHistory((prevHistory) => [...prevHistory, newAgentMessageHistory]);
-      formRef.current?.reset();
-      inputRef.current?.focus();
-      setSelectedFileDataUri(null); // Clear file selection after successful send
+      formRef.current?.reset(); // Reseta o campo de input
+      if (inputRef.current) inputRef.current.value = ""; // Limpa o valor do input explicitamente
+      setSelectedFileDataUri(null);
       setSelectedFileName(null);
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Limpa o input de arquivo
       // @ts-ignore
       formState.agentResponse = null;
       // @ts-ignore
@@ -114,7 +128,7 @@ export function ChatUI() {
     if (file) {
       if (!file.type.startsWith("image/")) {
         toast({ title: "Tipo de arquivo inválido", description: "Por favor, selecione um arquivo de imagem.", variant: "destructive" });
-        if(fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        if(fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       const reader = new FileReader();
@@ -130,7 +144,7 @@ export function ChatUI() {
     setSelectedFileDataUri(null);
     setSelectedFileName(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Reset the file input
+      fileInputRef.current.value = "";
     }
   };
 
@@ -141,9 +155,12 @@ export function ChatUI() {
         return;
     }
 
+    const userMessageContent = userInput || "";
+    const historyContentForUser = userMessageContent + (selectedFileName ? `\n[Arquivo anexado: ${selectedFileName}]` : "");
+
     const newUserMessageUI: ChatMessage = {
       id: (Date.now() - 1).toString(),
-      text: userInput,
+      text: userMessageContent,
       sender: "user",
       role: "user",
       imageUrl: selectedFileDataUri || undefined,
@@ -151,18 +168,14 @@ export function ChatUI() {
     };
     const newUserMessageHistory: HistoryMessage = {
       role: "user",
-      // For history, we'll keep it simple for now. The image data is sent for the current turn only.
-      content: userInput + (selectedFileName ? `\n[Arquivo anexado: ${selectedFileName}]` : ""),
+      content: historyContentForUser,
     };
 
     setMessages((prevMessages) => [...prevMessages, newUserMessageUI]);
-
-    const currentTurnHistory = [...chatHistory, newUserMessageHistory];
-    // Note: We're not setting chatHistory state here directly to avoid race conditions before formAction.
-    // The history for the LLM will be built from this currentTurnHistory.
-    // After successful response, chatHistory state will be updated.
-
-    formData.set("chatHistoryJson", JSON.stringify(chatHistory)); // Send history *before* current user message for context
+    
+    // Envia o histórico ANTES da mensagem atual do usuário
+    formData.set("chatHistoryJson", JSON.stringify(chatHistory));
+    setChatHistory((prevHistory) => [...prevHistory, newUserMessageHistory]); // Atualiza o histórico para o próximo turno
 
     if (selectedFileDataUri) {
       formData.set("fileDataUri", selectedFileDataUri);
@@ -170,8 +183,8 @@ export function ChatUI() {
 
     const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
 
-    if (currentAgent && selectedAgentId !== 'none' && currentAgent.agentType === 'llm') {
-      const llmAgentConfig = currentAgent as LLMAgentConfig;
+    if (currentAgent && selectedAgentId !== 'none') {
+      const llmAgentConfig = currentAgent as LLMAgentConfig; // Assumindo que é um LLM Agent para simplicidade
       formData.set("agentSystemPrompt", llmAgentConfig.systemPromptGenerated || "Você é um assistente prestativo.");
       if (llmAgentConfig.agentModel) formData.set("agentModel", llmAgentConfig.agentModel!);
       if (llmAgentConfig.agentTemperature !== undefined) formData.set("agentTemperature", llmAgentConfig.agentTemperature!.toString());
@@ -180,7 +193,6 @@ export function ChatUI() {
       formData.set("agentSystemPrompt", currentGem.prompt);
     }
     formAction(formData);
-    // chatHistory is updated in useEffect when formState.agentResponse is received
   };
 
   const handleNewConversation = () => {
@@ -205,7 +217,7 @@ export function ChatUI() {
         <div className="flex items-center gap-1.5 md:gap-2">
           <Select
             value={selectedAgentId}
-            onValueChange={(value) => { setSelectedAgentId(value); const agent = savedAgents.find(a => a.id === value); if(agent) { setActiveChatTarget(`${agent.agentName}`); } else if (value === 'none') { const gem = initialGems.find(g => g.id === selectedGemId); setActiveChatTarget(gem ? `${gem.name} (Gem)`:''); } }}
+            onValueChange={(value) => { setSelectedAgentId(value); }}
           >
             <SelectTrigger
               id="agent-selector"
@@ -213,10 +225,10 @@ export function ChatUI() {
               aria-label="Selecionar Agente"
             >
               <Cpu size={14} className="mr-1.5 text-primary/80 hidden sm:inline-block" />
-              <SelectValue placeholder="Agente" />
+              <SelectValue placeholder="Agente Específico" />
             </SelectTrigger>
             <SelectContent className="bg-popover text-popover-foreground">
-              <SelectItem value="none" className="text-xs hover:bg-accent/50">Assistente Geral (Gem)</SelectItem>
+              <SelectItem value="none" className="text-xs hover:bg-accent/50">Assistente Geral (Usar Gem)</SelectItem>
               {savedAgents.length > 0 && <div className="my-1 h-px bg-border/50" />}
               {savedAgents.length > 0 && <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Meus Agentes</div>}
               {savedAgents.map((agent) => (
@@ -229,7 +241,7 @@ export function ChatUI() {
           </Select>
           <Select
             value={selectedGemId}
-            onValueChange={(value) => { setSelectedGemId(value); if(selectedAgentId === 'none') { const gem = initialGems.find(g => g.id === value); setActiveChatTarget(gem ? `${gem.name} (Gem)`:'');} }}
+            onValueChange={(value) => { setSelectedGemId(value); }}
             disabled={selectedAgentId !== 'none'}
           >
             <SelectTrigger
@@ -241,7 +253,7 @@ export function ChatUI() {
               aria-label="Selecionar Personalidade (Gem)"
             >
               <SparklesIcon size={14} className="mr-1.5 text-primary/80 hidden sm:inline-block"/>
-              <SelectValue placeholder="Personalidade" />
+              <SelectValue placeholder="Personalidade Base" />
             </SelectTrigger>
             <SelectContent className="bg-popover text-popover-foreground">
               {initialGems.map((gem) => (
@@ -260,6 +272,15 @@ export function ChatUI() {
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
           <div className="space-y-4">
+            {messages.length === 0 && !isPending && (
+                 <div className="flex flex-col items-center justify-center h-[calc(100%-4rem)] text-center text-muted-foreground">
+                    <MessageSquare size={48} className="mb-4 opacity-30"/>
+                    <p className="text-lg font-medium">AgentVerse Chat</p>
+                    <p className="text-sm">
+                      {activeChatTarget ? `Comece a conversar com ${activeChatTarget}.` : "Selecione um agente ou use o Assistente Geral para começar."}
+                    </p>
+                 </div>
+            )}
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -311,13 +332,6 @@ export function ChatUI() {
                 </div>
               </div>
             )}
-            {messages.length === 0 && !isPending && (
-                 <div className="flex flex-col items-center justify-center h-[calc(100%-4rem)] text-center text-muted-foreground">
-                    <MessageSquare size={48} className="mb-4 opacity-30"/>
-                    <p className="text-lg font-medium">AgentVerse Chat</p>
-                    <p className="text-sm">Selecione um agente ou use o Assistente Geral para começar.</p>
-                 </div>
-            )}
           </div>
         </ScrollArea>
       </div>
@@ -343,20 +357,70 @@ export function ChatUI() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*"
+            accept="image/*" // Apenas imagens por enquanto
             className="hidden"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-primary h-8 w-8"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Anexar arquivo"
-            disabled={isPending}
-          >
-            <Paperclip className="h-5 w-5" />
-          </Button>
+          <Dialog open={isAttachFileModalOpen} onOpenChange={setIsAttachFileModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary h-8 w-8"
+                onClick={() => setIsAttachFileModalOpen(true)}
+                aria-label="Anexar arquivo"
+                disabled={isPending}
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Anexar Arquivo</DialogTitle>
+                <DialogDescription>
+                  Escolha como deseja adicionar um arquivo à sua mensagem.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start py-6 text-left"
+                  onClick={() => {
+                    toast({ title: "Em breve!", description: "Integração com Google Drive e autenticação serão implementadas futuramente." });
+                    setIsAttachFileModalOpen(false);
+                  }}
+                >
+                  <UploadCloud className="mr-3 h-6 w-6 text-primary" />
+                  <div>
+                    <p className="font-semibold">Importar do Google Drive</p>
+                    <p className="text-xs text-muted-foreground">Conecte seu Drive (requer autenticação).</p>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start py-6 text-left"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setIsAttachFileModalOpen(false);
+                  }}
+                >
+                  <FileUp className="mr-3 h-6 w-6 text-primary" />
+                   <div>
+                    <p className="font-semibold">Arquivos do Computador</p>
+                    <p className="text-xs text-muted-foreground">Procure imagens no seu dispositivo.</p>
+                  </div>
+                </Button>
+              </div>
+              <DialogFooter className="sm:justify-start">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">
+                    Cancelar
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Button
             type="button"
             variant="ghost"
@@ -375,6 +439,14 @@ export function ChatUI() {
             className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm h-9 placeholder:text-muted-foreground/70"
             autoComplete="off"
             disabled={isPending}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && (inputRef.current?.value?.trim() || selectedFileDataUri)) {
+                e.preventDefault(); // Evita nova linha
+                if (formRef.current) {
+                   handleFormSubmit(new FormData(formRef.current));
+                }
+              }
+            }}
           />
           <Button
             type="submit"
@@ -390,3 +462,5 @@ export function ChatUI() {
     </div>
   );
 }
+
+    
