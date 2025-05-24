@@ -5,19 +5,19 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Cpu, MessageSquare, KeyRound, Settings, LayoutGrid, PanelLeft } from 'lucide-react';
-import { 
-  SidebarProvider, 
-  Sidebar, 
-  SidebarHeader, 
-  SidebarContent, 
-  SidebarFooter, 
-  SidebarMenu, 
-  SidebarMenuItem, 
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
   useSidebar,
-} from '@/components/ui/sidebar'; // Ajustado para importar o que é necessário
+} from '@/components/ui/sidebar';
 import { AppLogo } from '@/components/icons/logo';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -36,17 +36,10 @@ const navItems: NavItem[] = [
 ];
 
 function MainLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const { state, open, toggleSidebar } = useSidebar();
-
-  // Define a altura do cabeçalho dinamicamente com base no estado da barra lateral e no breakpoint
-  // Estas são estimativas e podem precisar de ajuste com base no seu CSS/design real
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768; // md breakpoint
-  let headerHeightClass = "h-16"; // theme(spacing.16)
-  
-  // Este é um exemplo. Você pode precisar de uma lógica mais robusta para --header-height se ela for usada em CSS.
-  // Por enquanto, vamos apenas garantir que o layout principal se ajuste.
-  // A lógica de --header-height na página de chat foi removida pois o cabeçalho do chat está dentro de ChatUI.
+  const { toggleSidebar } = useSidebar();
+  // headerHeightClass logic can be simplified or managed with CSS variables if complex.
+  // For now, a fixed height is used as an example.
+  const headerHeightClass = "h-16";
 
   return (
     <SidebarInset>
@@ -55,9 +48,8 @@ function MainLayout({ children }: { children: ReactNode }) {
           <PanelLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
-          {/* Você pode adicionar um título de página aqui ou deixar em branco */}
+          {/* Page title or other header elements can go here */}
         </div>
-        {/* Outros elementos do cabeçalho, como perfil do usuário, podem ir aqui */}
       </header>
       <main className="flex-1 flex-col overflow-auto p-4 md:p-6">
         {children}
@@ -68,6 +60,8 @@ function MainLayout({ children }: { children: ReactNode }) {
 
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname(); // Call usePathname directly in AppLayout
+
   return (
     <SidebarProvider defaultOpen>
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -82,9 +76,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {navItems.map((item) => (
               <SidebarMenuItem key={item.label}>
                 <Link href={item.href} legacyBehavior passHref>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === item.href}
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href} // pathname is now defined in this scope
                     className="justify-start"
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
@@ -102,7 +96,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <Separator className="my-2 bg-sidebar-border" />
           <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton 
+                <SidebarMenuButton
                     className="justify-start"
                     tooltip={{ children: "Configurações", side: "right", className: "bg-popover text-popover-foreground"}}
                 >
@@ -119,5 +113,3 @@ export function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
-
-  
