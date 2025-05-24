@@ -545,27 +545,23 @@ export default function AgentBuilderPage() {
       toast({ title: "Campo Obrigatório", description: "Nome do Agente é obrigatório.", variant: "destructive" });
       return;
     }
-    // Validação de modelo removida, pois nem todos os tipos de agente usam um modelo LLM diretamente.
-    // if (agentType === 'llm' && !agentModel) {
-    //    toast({ title: "Campo Obrigatório para Agente LLM", description: "Modelo de IA é obrigatório para Agentes LLM.", variant: "destructive" });
-    //   return;
-    // }
 
     const systemPrompt = constructSystemPrompt();
     const selectedToolsDetails = currentAgentTools
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
-            // Mapeia o nome do ícone baseado no ID da ferramenta
+            
             let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
-            if (tool.icon && typeof tool.icon === 'object' && 'type' in tool.icon) {
-                const IconComponent = tool.icon.type as React.FC;
-                const foundIconName = Object.keys(iconComponents).find(
+            const iconProp = tool.icon;
+            if (iconProp && typeof iconProp === 'object' && 'type' in iconProp && typeof iconProp.type === 'function') {
+                 const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
+                 const foundIconName = Object.keys(iconComponents).find(
                     name => iconComponents[name] === IconComponent
-                ) as keyof typeof iconComponents | undefined;
-                if (foundIconName) {
+                 ) as keyof typeof iconComponents | undefined;
+                 if (foundIconName) {
                     iconNameKey = foundIconName;
-                }
+                 }
             }
 
             return { id: tool.id, label: tool.label, iconName: iconNameKey, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName };
@@ -602,7 +598,7 @@ export default function AgentBuilderPage() {
       agentConfigData = {
         ...agentConfigData,
         workflowDescription,
-        agentGoal: agentGoal || undefined, // Pode não ter LLM
+        agentGoal: agentGoal || undefined, 
         agentTasks: agentTasks || undefined,
         agentPersonality: agentPersonality || undefined,
         agentRestrictions: agentRestrictions || undefined,
@@ -613,7 +609,7 @@ export default function AgentBuilderPage() {
       agentConfigData = {
         ...agentConfigData,
         customLogicDescription,
-        agentGoal: agentGoal || undefined, // Pode não ter LLM
+        agentGoal: agentGoal || undefined, 
         agentTasks: agentTasks || undefined,
         agentPersonality: agentPersonality || undefined,
         agentRestrictions: agentRestrictions || undefined,
@@ -627,8 +623,8 @@ export default function AgentBuilderPage() {
             prevAgents.map(agent =>
                 agent.id === editingAgentId ?
                 {
-                    ...(agentConfigData as AgentConfig), // Espalha a base
-                    id: editingAgentId, // Garante que o ID não seja perdido
+                    ...(agentConfigData as AgentConfig), 
+                    id: editingAgentId, 
                     templateId: selectedAgentTemplateId,
                     systemPromptGenerated: systemPrompt,
                     toolsDetails: selectedToolsDetails,
@@ -641,7 +637,7 @@ export default function AgentBuilderPage() {
         const newAgentConfiguration: SavedAgentConfiguration = {
             id: `agent-${Date.now()}`,
             templateId: selectedAgentTemplateId,
-            ...(agentConfigData as AgentConfig), // Espalha a base
+            ...(agentConfigData as AgentConfig), 
             systemPromptGenerated: systemPrompt,
             toolsDetails: selectedToolsDetails,
             toolConfigsApplied: appliedToolConfigs,
@@ -1009,7 +1005,6 @@ export default function AgentBuilderPage() {
 
             <Separator />
 
-            {/* Campos específicos de LLM agora são exibidos para todos os tipos, mas podem ser opcionais para workflow/custom */}
             <div>
               <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções {agentType !== 'llm' && '(Opcional para este tipo)'}</h3>
               <p className="text-sm text-muted-foreground mb-4">
@@ -1105,7 +1100,6 @@ export default function AgentBuilderPage() {
                 </div>
               </div>
             </div>
-            {/* Fim dos campos de LLM que agora são mais gerais */}
 
             {agentType === 'workflow' && (
               <>
@@ -1114,10 +1108,10 @@ export default function AgentBuilderPage() {
                   <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Workflow className="w-5 h-5 text-primary/80" /> Configuração do Fluxo de Trabalho</h3>
                   <Alert className="mb-4">
                     <Workflow className="h-4 w-4" />
-                    <AlertTitle>Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)</AlertTitle>
+                    <AlertTitle>Agente de Fluxo de Trabalho</AlertTitle>
                     <AlertDescription>
-                      Agentes de fluxo de trabalho controlam a execução de outros agentes ou tarefas em padrões predefinidos e determinísticos.
-                      Descreva o fluxo abaixo. A implementação detalhada das etapas e orquestração ocorreria via código Genkit.
+                      Agentes de fluxo de trabalho (Ex: SequentialAgent, ParallelAgent do ADK) controlam a execução de outros agentes ou tarefas em padrões predefinidos e determinísticos.
+                      Descreva o fluxo abaixo. A implementação detalhada das etapas e orquestração ocorreria via código Genkit. Uma UI dedicada para construção visual de fluxos é planejada para o futuro.
                     </AlertDescription>
                   </Alert>
                   <div className="space-y-2">
@@ -1141,9 +1135,9 @@ export default function AgentBuilderPage() {
                   <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><FileJson className="w-5 h-5 text-primary/80" /> Configuração do Agente Personalizado</h3>
                   <Alert className="mb-4">
                     <FileJson className="h-4 w-4" />
-                    <AlertTitle>Agente Personalizado (Ex: BaseAgent estendido)</AlertTitle>
+                    <AlertTitle>Agente Personalizado (BaseAgent Estendido)</AlertTitle>
                     <AlertDescription>
-                      Implemente lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados. Requer desenvolvimento de código no backend.
+                      Implemente lógicas operacionais únicas e fluxos de controle específicos com fluxos Genkit customizados (equivalente a estender a BaseAgent do ADK). Requer desenvolvimento de código no backend.
                     </AlertDescription>
                   </Alert>
                   <div className="space-y-2">
@@ -1229,8 +1223,9 @@ export default function AgentBuilderPage() {
                             if (!tool) return null;
 
                             let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
-                            if (tool.icon && typeof tool.icon === 'object' && 'type' in tool.icon) {
-                                const IconComponent = tool.icon.type as React.FC;
+                            const iconProp = tool.icon;
+                            if (iconProp && typeof iconProp === 'object' && 'type' in iconProp && typeof iconProp.type === 'function') {
+                                const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
                                 const foundIconName = Object.keys(iconComponents).find(
                                     name => iconComponents[name] === IconComponent
                                 ) as keyof typeof iconComponents | undefined;
@@ -1454,3 +1449,5 @@ export default function AgentBuilderPage() {
   );
 }
 
+
+    
