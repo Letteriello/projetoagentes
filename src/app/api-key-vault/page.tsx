@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { KeyRound, PlusCircle, Trash2, Edit3, Eye, EyeOff } from "lucide-react";
+import { KeyRound, PlusCircle, Trash2, Edit3, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast"; // Import useToast
+import { useToast } from "@/hooks/use-toast";
 
 interface ApiKeyEntry {
   id: string;
@@ -30,9 +42,9 @@ interface ApiKeyEntry {
 }
 
 const initialApiKeys: ApiKeyEntry[] = [
-  { id: "key_001", serviceName: "OpenAI GPT-4", apiKeyFragment: "sk- জুড়ে..._gH7d", apiKeyFull: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_gH7d", dateAdded: "2023-10-26", isKeyVisible: false },
-  { id: "key_002", serviceName: "Google Maps API", apiKeyFragment: "AIzaS..._zX9o", apiKeyFull: "AIzaSyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy_zX9o", dateAdded: "2023-11-15", isKeyVisible: false },
-  { id: "key_003", serviceName: "Shopify Admin API", apiKeyFragment: "shpat..._yU8n", apiKeyFull: "shpatzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_yU8n", dateAdded: "2024-01-05", isKeyVisible: false },
+  // { id: "key_001", serviceName: "OpenAI GPT-4", apiKeyFragment: "sk- জুড়ে..._gH7d", apiKeyFull: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_gH7d", dateAdded: "2023-10-26", isKeyVisible: false },
+  // { id: "key_002", serviceName: "Google Maps API", apiKeyFragment: "AIzaS..._zX9o", apiKeyFull: "AIzaSyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy_zX9o", dateAdded: "2023-11-15", isKeyVisible: false },
+  // { id: "key_003", serviceName: "Shopify Admin API", apiKeyFragment: "shpat..._yU8n", apiKeyFull: "shpatzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_yU8n", dateAdded: "2024-01-05", isKeyVisible: false },
 ];
 
 export default function ApiKeyVaultPage() {
@@ -41,7 +53,11 @@ export default function ApiKeyVaultPage() {
   const [selectedProvider, setSelectedProvider] = React.useState<string>("");
   const [customServiceName, setCustomServiceName] = React.useState<string>("");
   const [apiKeyInputValue, setApiKeyInputValue] = React.useState<string>("");
-  const { toast } = useToast(); // Initialize useToast
+  const { toast } = useToast();
+
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = React.useState(false);
+  const [deletingApiKey, setDeletingApiKey] = React.useState<ApiKeyEntry | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
 
   const toggleKeyVisibility = (keyId: string) => {
     setApiKeys(
@@ -65,10 +81,16 @@ export default function ApiKeyVaultPage() {
       return;
     }
 
-    if (!serviceName || serviceName === "other") {
+    if (!serviceName || serviceName === "other" && !customServiceName) { // Check if customServiceName is also empty when "other"
         toast({ title: "Erro", description: "Por favor, selecione um provedor ou forneça um nome de serviço personalizado.", variant: "destructive" });
         return;
     }
+    
+    if (serviceName === "other" && !customServiceName.trim()) {
+        toast({ title: "Erro", description: "Por favor, insira um nome de serviço personalizado válido.", variant: "destructive" });
+        return;
+    }
+
 
     const newKey: ApiKeyEntry = {
       id: `key_${Date.now()}`,
@@ -80,16 +102,27 @@ export default function ApiKeyVaultPage() {
     };
     setApiKeys([...apiKeys, newKey]);
     setIsAddKeyDialogOpen(false);
-    setSelectedProvider("");
-    setCustomServiceName("");
-    setApiKeyInputValue("");
+    resetAddKeyForm();
     toast({ title: "Sucesso!", description: `Chave API para "${serviceName}" adicionada.` });
   };
 
-  const handleDeleteApiKey = (keyId: string, keyName: string) => {
-    setApiKeys(apiKeys.filter((key) => key.id !== keyId));
-    toast({ title: "Chave Excluída", description: `A chave API "${keyName}" foi excluída.`, variant: "destructive" });
+  const handleTriggerDeleteDialog = (key: ApiKeyEntry) => {
+    setDeletingApiKey(key);
+    setIsConfirmDeleteDialogOpen(true);
+    setDeleteConfirmText(""); // Reset confirmation text
   };
+
+  const confirmDeleteApiKey = () => {
+    if (deletingApiKey && deleteConfirmText.toLowerCase() === "deletar") {
+      setApiKeys(apiKeys.filter((key) => key.id !== deletingApiKey.id));
+      toast({ title: "Chave Excluída", description: `A chave API "${deletingApiKey.serviceName}" foi excluída.`, variant: "default" }); // Changed to default variant for success
+      setIsConfirmDeleteDialogOpen(false);
+      setDeletingApiKey(null);
+    } else {
+      toast({ title: "Erro na Exclusão", description: "Texto de confirmação inválido.", variant: "destructive"});
+    }
+  };
+
 
   const resetAddKeyForm = () => {
     setSelectedProvider("");
@@ -229,7 +262,7 @@ export default function ApiKeyVaultPage() {
                         size="icon"
                         className="text-destructive hover:text-destructive"
                         aria-label="Excluir Chave API"
-                        onClick={() => handleDeleteApiKey(key.id, key.serviceName)} // Updated onClick
+                        onClick={() => handleTriggerDeleteDialog(key)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -246,6 +279,44 @@ export default function ApiKeyVaultPage() {
           </p>
         </CardFooter>
       </Card>
+
+      {deletingApiKey && (
+        <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center">
+                <AlertTriangle className="w-5 h-5 mr-2 text-destructive" />
+                Confirmar Exclusão
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Você tem certeza que deseja excluir a chave API para <strong>{deletingApiKey.serviceName}</strong>?
+                Esta ação não pode ser desfeita. Para confirmar, digite "<strong>deletar</strong>" no campo abaixo.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder='Digite "deletar" para confirmar'
+                className="border-destructive focus-visible:ring-destructive"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsConfirmDeleteDialogOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteApiKey}
+                disabled={deleteConfirmText.toLowerCase() !== "deletar"}
+                className={deleteConfirmText.toLowerCase() !== "deletar" ? "bg-destructive/50" : "bg-destructive hover:bg-destructive/90"}
+              >
+                Confirmar Exclusão
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
+
+    
