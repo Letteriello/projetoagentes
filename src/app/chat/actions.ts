@@ -2,18 +2,29 @@
 'use server';
 
 import { basicChatFlow, BasicChatInput, BasicChatOutput } from '@/ai/flows/chat-flow';
+import type { SavedAgentConfiguration } from '@/app/agent-builder/page'; // Import para o tipo
 import { z } from 'zod';
 
+// Definindo um tipo mais simples para os detalhes da ferramenta passados para a action
+const AgentToolDetailSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  iconName: z.string().optional(),
+  needsConfiguration: z.boolean().optional(),
+  genkitToolName: z.string().optional(),
+});
+
 const ChatMessageSchema = z.object({
-  userInput: z.string(), // Can be empty if fileDataUri is present
+  userInput: z.string(), 
   agentSystemPrompt: z.string().optional(),
   agentModel: z.string().optional(),
   agentTemperature: z.coerce.number().optional(),
   chatHistoryJson: z.string().optional(),
-  fileDataUri: z.string().optional(), // New field for image data URI
+  fileDataUri: z.string().optional(),
+  agentToolsDetailsJson: z.string().optional(), // Novo campo para detalhes das ferramentas
 }).refine(data => !!data.userInput?.trim() || !!data.fileDataUri, {
   message: "A mensagem ou um arquivo deve ser fornecido.",
-  path: ["userInput"], // Attach error to userInput for simplicity, or handle more specifically
+  path: ["userInput"], 
 });
 
 
@@ -24,6 +35,7 @@ interface ChatFormState {
     userInput?: string[];
     chatHistoryJson?: string[];
     fileDataUri?: string[];
+    agentToolsDetailsJson?: string[];
   } | null;
 }
 
@@ -38,6 +50,7 @@ export async function submitChatMessage(
     agentTemperature: formData.get('agentTemperature'),
     chatHistoryJson: formData.get('chatHistoryJson'),
     fileDataUri: formData.get('fileDataUri'),
+    agentToolsDetailsJson: formData.get('agentToolsDetailsJson'), // Processar novo campo
   });
 
   if (!validatedFields.success) {
@@ -48,7 +61,15 @@ export async function submitChatMessage(
     };
   }
 
-  const { userInput, agentSystemPrompt, agentModel, agentTemperature, chatHistoryJson, fileDataUri } = validatedFields.data;
+  const { 
+    userInput, 
+    agentSystemPrompt, 
+    agentModel, 
+    agentTemperature, 
+    chatHistoryJson, 
+    fileDataUri,
+    agentToolsDetailsJson 
+  } = validatedFields.data;
 
   let history: Array<{ role: 'user' | 'model'; content: string }> | undefined = undefined;
   if (chatHistoryJson) {
@@ -64,13 +85,28 @@ export async function submitChatMessage(
     }
   }
 
+  let agentToolsDetails: SavedAgentConfiguration['toolsDetails'] | undefined = undefined;
+  if (agentToolsDetailsJson) {
+    try {
+      agentToolsDetails = JSON.parse(agentToolsDetailsJson);
+    } catch (error) {
+      console.error("Erro ao parsear os detalhes das ferramentas do agente:", error);
+      return {
+        message: "Erro interno ao processar os detalhes das ferramentas do agente.",
+        agentResponse: null,
+        errors: { agentToolsDetailsJson: ["Formato inválido dos detalhes das ferramentas."] },
+      };
+    }
+  }
+
   const input: BasicChatInput = {
-    userMessage: userInput || "", // User input can be empty if a file is sent
+    userMessage: userInput || "", 
     systemPrompt: agentSystemPrompt,
     modelName: agentModel,
     temperature: agentTemperature,
     history: history,
-    fileDataUri: fileDataUri, // Pass the file data URI
+    fileDataUri: fileDataUri,
+    agentToolsDetails: agentToolsDetails, // Passar os detalhes das ferramentas
   };
 
   try {
@@ -93,3 +129,5 @@ export async function submitChatMessage(
     };
   }
 }
+
+    

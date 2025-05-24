@@ -14,17 +14,18 @@ import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builde
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator"; // Importado
+import { Label } from "@/components/ui/label"; // Importado
 
-interface ChatMessage {
+interface ChatMessageUI {
   id: string;
   text: string;
   sender: "user" | "agent" | "system";
-  role: "user" | "model";
   imageUrl?: string;
   fileName?: string;
 }
 
-interface HistoryMessage {
+interface ChatHistoryMessage {
   role: 'user' | 'model';
   content: string;
 }
@@ -43,8 +44,8 @@ const initialState = {
 };
 
 export function ChatUI() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [chatHistory, setChatHistory] = useState<HistoryMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessageUI[]>([]); // Para renderização da UI
+  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]); // Para enviar ao backend
   const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("none");
   const [activeChatTarget, setActiveChatTarget] = useState<string>(initialGems[0].name);
@@ -52,7 +53,7 @@ export function ChatUI() {
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false); // Control Popover state
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false); 
 
   const { savedAgents } = useAgents();
   const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
@@ -82,13 +83,12 @@ export function ChatUI() {
 
   useEffect(() => {
     if (formState.agentResponse && !isPending) {
-      const newAgentMessageUI: ChatMessage = {
+      const newAgentMessageUI: ChatMessageUI = {
         id: Date.now().toString(),
         text: formState.agentResponse!,
         sender: "agent",
-        role: "model",
       };
-      const newAgentMessageHistory: HistoryMessage = {
+      const newAgentMessageHistory: ChatHistoryMessage = {
         role: "model",
         content: formState.agentResponse!,
       };
@@ -147,18 +147,17 @@ export function ChatUI() {
         return;
     }
 
-    const userMessageContent = userInput || "";
+    const userMessageContent = userInput || ""; 
     const historyContentForUser = userMessageContent + (selectedFileName ? `\n[Arquivo anexado: ${selectedFileName}]` : "");
 
-    const newUserMessageUI: ChatMessage = {
+    const newUserMessageUI: ChatMessageUI = {
       id: (Date.now() - 1).toString(),
       text: userMessageContent,
       sender: "user",
-      role: "user",
       imageUrl: selectedFileDataUri || undefined,
       fileName: selectedFileName || undefined,
     };
-    const newUserMessageHistory: HistoryMessage = {
+    const newUserMessageHistory: ChatHistoryMessage = {
       role: "user",
       content: historyContentForUser,
     };
@@ -166,8 +165,8 @@ export function ChatUI() {
     setMessages((prevMessages) => [...prevMessages, newUserMessageUI]);
     
     const currentHistory = [...chatHistory, newUserMessageHistory];
-    formData.set("chatHistoryJson", JSON.stringify(currentHistory));
-    setChatHistory(currentHistory); 
+    formData.set("chatHistoryJson", JSON.stringify(currentHistory)); // Envia histórico para o backend
+    setChatHistory(currentHistory); // Atualiza histórico local para o próximo turno
 
     if (selectedFileDataUri) {
       formData.set("fileDataUri", selectedFileDataUri);
@@ -180,16 +179,21 @@ export function ChatUI() {
       formData.set("agentSystemPrompt", llmAgentConfig.systemPromptGenerated || "Você é um assistente prestativo.");
       if (llmAgentConfig.agentModel) formData.set("agentModel", llmAgentConfig.agentModel!);
       if (llmAgentConfig.agentTemperature !== undefined) formData.set("agentTemperature", llmAgentConfig.agentTemperature!.toString());
+      // Passar detalhes das ferramentas do agente
+      if (currentAgent.toolsDetails) {
+        formData.set("agentToolsDetailsJson", JSON.stringify(currentAgent.toolsDetails));
+      }
     } else {
       const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
       formData.set("agentSystemPrompt", currentGem.prompt);
+      // Para o assistente geral, não passamos agentToolsDetailsJson, então o fluxo usará um conjunto padrão ou nenhum.
     }
     formAction(formData);
   };
 
   const handleNewConversation = () => {
     setMessages([]);
-    setChatHistory([]);
+    setChatHistory([]); // Limpa o histórico para o backend também
     setSelectedFileDataUri(null);
     setSelectedFileName(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -221,8 +225,8 @@ export function ChatUI() {
             </SelectTrigger>
             <SelectContent className="bg-popover text-popover-foreground">
               <SelectItem value="none" className="text-xs hover:bg-accent/50">Assistente Geral (Usar Gem)</SelectItem>
-              {savedAgents.length > 0 && <div className="my-1 h-px bg-border/50" />}
-              {savedAgents.length > 0 && <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Meus Agentes</div>}
+              {savedAgents.length > 0 && <Separator className="my-1" />} 
+              {savedAgents.length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Meus Agentes</Label>}
               {savedAgents.map((agent) => (
                 <SelectItem key={agent.id} value={agent.id} className="text-xs hover:bg-accent/50">
                   <span className="truncate" title={agent.agentName}>{agent.agentName}</span>
@@ -443,3 +447,5 @@ export function ChatUI() {
     </div>
   );
 }
+
+    

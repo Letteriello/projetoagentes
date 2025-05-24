@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Fluxo de chat básico para interagir com um modelo de IA, com suporte a histórico, envio de imagens e ferramentas.
+ * @fileOverview Fluxo de chat básico para interagir com um modelo de IA, com suporte a histórico, envio de imagens e ferramentas dinâmicas.
  *
  * - basicChatFlow - Uma função que lida com uma única troca de chat, considerando o histórico, possível imagem e ferramentas.
  * - BasicChatInput - O tipo de entrada para basicChatFlow.
@@ -10,7 +10,25 @@
 
 import { ai } from '@/ai/genkit';
 import { performWebSearchTool } from '@/ai/tools/web-search-tool';
+// Importe outras ferramentas Genkit aqui conforme são criadas
+// Ex: import { calculatorTool } from '@/ai/tools/calculator-tool';
 import { z } from 'genkit';
+import type { ToolsArgument } from 'genkit/model';
+
+// Mapa de todas as ferramentas Genkit disponíveis na aplicação
+// A chave deve corresponder ao 'genkitToolName' definido em 'agent-builder/page.tsx'
+const allAvailableGenkitTools: Record<string, ToolsArgument[0]> = {
+  performWebSearch: performWebSearchTool,
+  // calculator: calculatorTool, // Exemplo
+};
+
+interface AgentToolDetail {
+  id: string;
+  label: string;
+  iconName?: string;
+  needsConfiguration?: boolean;
+  genkitToolName?: string;
+}
 
 // Esquema interno para a entrada do fluxo de chat (não exportado)
 const BasicChatInputSchema = z.object({
@@ -23,6 +41,13 @@ const BasicChatInputSchema = z.object({
     content: z.string(),
   })).optional().describe('O histórico da conversa até o momento.'),
   fileDataUri: z.string().optional().describe("Uma imagem como data URI. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
+  agentToolsDetails: z.array(z.object({ // Detalhes das ferramentas configuradas para o agente
+    id: z.string(),
+    label: z.string(),
+    iconName: z.string().optional(),
+    needsConfiguration: z.boolean().optional(),
+    genkitToolName: z.string().optional(),
+  })).optional().describe('Detalhes das ferramentas configuradas para o agente ativo.'),
 });
 export type BasicChatInput = z.infer<typeof BasicChatInputSchema>;
 
@@ -37,11 +62,11 @@ export async function basicChatFlow(input: BasicChatInput): Promise<BasicChatOut
   return internalChatFlow(input);
 }
 
-// Definição do prompt Genkit
+// Definição do prompt Genkit - Simplificado, pois as ferramentas são passadas dinamicamente
 const chatPrompt = ai.definePrompt(
   {
-    name: 'basicChatPromptWithHistoryImageAndTools',
-    tools: [performWebSearchTool],
+    name: 'basicChatPromptWithDynamicTools',
+    // Não definimos 'tools' aqui, pois serão passados dinamicamente para ai.generate()
   },
   async (input: BasicChatInput) => {
     // Esta função de prompt agora é mais um placeholder,
@@ -54,12 +79,12 @@ const chatPrompt = ai.definePrompt(
 // Definição do fluxo Genkit
 const internalChatFlow = ai.defineFlow(
   {
-    name: 'internalChatFlowWithHistoryImageAndTools',
+    name: 'internalChatFlowWithDynamicTools',
     inputSchema: BasicChatInputSchema,
     outputSchema: BasicChatOutputSchema,
   },
   async (input: BasicChatInput) => {
-    const modelToUse = input.modelName || ai.getModel();
+    const modelToUse = input.modelName || ai.getModel(); // Usa o modelo do agente ou o padrão do Genkit
     const temperatureToUse = input.temperature;
 
     // Tratamento para modelos que exigem configuração customizada no backend
@@ -78,19 +103,13 @@ const internalChatFlow = ai.defineFlow(
 
     let systemInstruction = input.systemPrompt || "Você é um assistente prestativo.";
     
-    if (!systemInstruction.toLowerCase().includes('performwebsearch') && 
-        (input.systemPrompt?.toLowerCase().includes('ferramentas disponíveis') || !input.systemPrompt ) // Add if tools are generally mentioned or no specific system prompt
-       ) {
-        systemInstruction += "\n\nVocê tem uma ferramenta chamada 'performWebSearch' que pode usar para pesquisar informações atuais ou tópicos que não conhece. Se precisar, use-a informando a consulta de busca.";
-    }
-    // Para modelos Gemini, o system prompt geralmente é a primeira mensagem do usuário ou uma mensagem com role 'system'
-    // dependendo da versão e como o modelo é invocado.
-    // Para consistência, vamos adicionar como a primeira mensagem do 'user'.
+    // A lógica para adicionar nomes de ferramentas ao systemInstruction já está no constructSystemPrompt do agent-builder.
+    // Portanto, o systemPrompt recebido aqui já deve conter essa informação.
+
     messages.push({ role: 'user', content: [{ text: systemInstruction }] }); 
 
     if (input.history && input.history.length > 0) {
       input.history.forEach(msg => {
-         // Evitar adicionar o prompt do sistema do histórico novamente se ele já foi o primeiro
         if (messages.length > 0 && messages[0].role === 'user' && typeof messages[0].content === 'object' && (messages[0].content as Array<any>)[0].text === msg.content) {
           // Não adiciona se for idêntico à instrução de sistema já inserida
         } else {
@@ -112,18 +131,32 @@ const internalChatFlow = ai.defineFlow(
     if (currentUserMessageParts.length > 0) {
       messages.push({ role: 'user', content: currentUserMessageParts });
     } else if (messages.length === 1 && messages[0].role === 'user') { 
-      // Apenas a instrução de sistema e nenhuma mensagem atual do usuário
-      // Adiciona uma mensagem vazia para garantir que o modelo tenha algo para responder,
-      // ou dependendo do modelo, pode ser melhor não enviar nada. Para Gemini, é bom ter um input.
       messages.push({ role: 'user', content: [{text: " "}] });
     }
     
+    // Selecionar dinamicamente as ferramentas Genkit com base na configuração do agente
+    const activeGenkitTools: ToolsArgument = [];
+    if (input.agentToolsDetails) {
+      input.agentToolsDetails.forEach(toolDetail => {
+        if (toolDetail.genkitToolName && allAvailableGenkitTools[toolDetail.genkitToolName]) {
+          activeGenkitTools.push(allAvailableGenkitTools[toolDetail.genkitToolName]);
+        }
+      });
+    }
+    // Se nenhuma ferramenta específica do agente for encontrada, podemos usar um conjunto padrão ou nenhuma.
+    // Por enquanto, se activeGenkitTools estiver vazio, nenhuma ferramenta será passada.
+    // Ou podemos adicionar uma ferramenta padrão se necessário, ex:
+    // if (activeGenkitTools.length === 0) {
+    //   activeGenkitTools.push(performWebSearchTool); // Exemplo: sempre ter busca web se nenhuma outra for definida
+    // }
+
+
     const llmResponse = await ai.generate({
         model: modelToUse,
         prompt: { messages }, 
-        tools: [performWebSearchTool], 
+        tools: activeGenkitTools.length > 0 ? activeGenkitTools : undefined, // Passa as ferramentas dinâmicas
         config: temperatureToUse !== undefined ? { temperature: temperatureToUse } : undefined,
-        output: {
+        output: { // Solicitar saída JSON para consistência
             format: 'json',
             schema: BasicChatOutputSchema,
         },
@@ -132,14 +165,18 @@ const internalChatFlow = ai.defineFlow(
     const output = llmResponse.output();
 
     if (!output || !output.agentResponse) {
-      console.error("Fluxo: Resposta do LLM inválida ou vazia", llmResponse.usage, llmResponse.candidates);
+      console.warn("Fluxo: Resposta do LLM inválida ou vazia (output.agentResponse ausente). Tentando llmResponse.text().", llmResponse.usage);
       const plainText = llmResponse.text;
       if (plainText) {
+        console.log("Fluxo: Usando llmResponse.text() como fallback:", plainText);
         return { agentResponse: plainText };
       }
+      console.error("Fluxo: Falha crítica, nenhuma resposta do LLM pôde ser extraída.");
       throw new Error("O modelo não retornou uma saída válida ou a resposta do agente estava vazia.");
     }
     
     return output;
   }
 );
+
+    
