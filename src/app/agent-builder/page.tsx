@@ -3,50 +3,37 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle } from "lucide-react";
-import Image from "next/image";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"; // Card-related imports
+import { Cpu, PlusCircle, Layers, Edit, MessageSquare, Trash2, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical } from "lucide-react";
+import Image from "next/image"; // Keep if used elsewhere, or remove
 import { useToast } from "@/hooks/use-toast";
-import { Slider } from "@/components/ui/slider";
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { useAgents } from '@/contexts/AgentsContext';
-import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge"; // Keep if used elsewhere, or remove
+
+// Import dos novos componentes
+import { AgentCard } from '@/components/agent-builder/agent-card';
+import { AgentBuilderDialog } from '@/components/agent-builder/agent-builder-dialog';
 
 
+// Estas definições de tipo e constantes serão mantidas aqui e passadas como props
+// para o AgentBuilderDialog e AgentCard.
 export interface AvailableTool {
   id: string;
   label: string;
-  icon: React.ReactNode;
+  icon: React.ReactNode; // ReactNode para o ícone
   description: string;
   needsConfiguration?: boolean;
   genkitToolName?: string;
 }
 
 export const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar informações na internet (via Genkit). Exige configuração da chave API Google e CSE ID.", needsConfiguration: true, genkitToolName: "performWebSearch" },
-  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite ao agente realizar cálculos matemáticos (via função Genkit)." },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite ao agente buscar informações em bases de conhecimento ou documentos (ex: RAG via Genkit, pode requerer configuração para especificar a fonte de dados).", needsConfiguration: true },
-  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite ao agente verificar ou criar eventos na agenda (requer fluxo Genkit e autenticação).", needsConfiguration: true },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite ao agente interagir com serviços web externos (ex: via OpenAPI, requer fluxo Genkit, URL do esquema e possivelmente chaves API).", needsConfiguration: true, genkitToolName: "invokeOpenAPI" },
-  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite ao agente consultar e interagir com bancos de dados SQL (requer fluxo Genkit e configuração de conexão detalhada).", needsConfiguration: true, genkitToolName: "queryDatabase" },
-  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite ao agente executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
+  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar na internet (via Genkit). Requer configuração.", needsConfiguration: true, genkitToolName: "performWebSearch" },
+  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite realizar cálculos matemáticos (via função Genkit)." },
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit).", needsConfiguration: true },
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth).", needsConfiguration: true },
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit).", needsConfiguration: true, genkitToolName: "invokeOpenAPI" },
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit).", needsConfiguration: true, genkitToolName: "queryDatabase" },
+  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit)." },
 ];
 
 export const agentToneOptions = [
@@ -62,9 +49,9 @@ export const agentToneOptions = [
 ];
 
 export const agentTypeOptions = [
-  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. Ideal para tarefas flexíveis e centradas na linguagem. (Ex: LlmAgent do ADK). A descrição do agente é usada por outros agentes LLM para decidir se devem delegar uma tarefa a ele." },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si, resultando em padrões de execução previsíveis. (Ex: SequentialAgent, ParallelAgent, LoopAgent do ADK)" },
-  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar _run_async_impl)." },
+  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. A description do agente é usada por outros agentes LLM para decidir se devem delegar tarefas a ele." },
+  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística, sem consultar um LLM para a orquestração em si." },
+  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl)." },
 ];
 
 export interface AgentConfigBase {
@@ -93,8 +80,6 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   loopExitToolName?: string;
   loopExitStateKey?: string;
   loopExitStateValue?: string;
-  // Campos de LLM podem ser opcionais se um workflow puder ter um LLM para alguma etapa,
-  // mas o controle principal do fluxo não é por LLM.
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -106,7 +91,6 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
 export interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
-   // Campos de LLM podem ser opcionais se o agente customizado usar um LLM internamente.
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -140,32 +124,22 @@ export interface ToolConfigData {
   calendarApiEndpoint?: string;
 }
 
-
 export interface SavedAgentConfiguration extends AgentConfig {
   id: string;
   templateId: string;
   systemPromptGenerated?: string;
-  toolsDetails: Array<{ id: string; label: string; iconName?: keyof typeof iconComponents | 'default'; needsConfiguration?: boolean; genkitToolName?: string; }>;
+  toolsDetails: Array<{ 
+    id: string; 
+    label: string; 
+    iconName?: keyof typeof iconComponents | 'default'; 
+    needsConfiguration?: boolean; 
+    genkitToolName?: string; 
+  }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
 }
 
-const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, GripVertical
-};
-
-const getToolIconComponent = (iconName?: keyof typeof iconComponents | 'default') => {
-  const Icon = iconName ? iconComponents[iconName] : iconComponents['Default'];
-  return Icon || Cpu;
-};
-
-
-const defaultLLMConfig: Omit<LLMAgentConfig, keyof AgentConfigBase | 'agentType'> = {
-  agentGoal: "",
-  agentTasks: "",
-  agentPersonality: agentToneOptions[0].label,
-  agentRestrictions: "",
-  agentModel: "googleai/gemini-2.0-flash",
-  agentTemperature: 0.7,
+export const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain: Cpu, FileJson, GripVertical, ConfigureIcon
 };
 
 export const agentTemplates: AgentTemplate[] = [
@@ -178,144 +152,45 @@ export const agentTemplates: AgentTemplate[] = [
       agentDescription: "Agente LLM configurado manualmente a partir do zero.",
       agentVersion: "1.0.0",
       agentTools: [],
-      ...defaultLLMConfig,
-    },
-  },
-  {
-    id: "support",
-    name: "Modelo: Agente de Suporte ao Cliente (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Agente de Suporte ao Cliente",
-      agentDescription: "Um agente prestativo para responder a perguntas comuns de clientes e ajudar com problemas.",
-      agentGoal: "Fornecer suporte rápido e eficiente aos clientes, esclarecendo dúvidas e direcionando para soluções.",
-      agentTasks: "1. Responder perguntas frequentes sobre produtos/serviços (especificações, preços, disponibilidade).\n2. Ajudar a solucionar problemas básicos de utilização.\n3. Direcionar para documentação relevante ou FAQs.\n4. Escalar problemas complexos para um atendente humano quando necessário e a ferramenta de escalonamento estiver disponível.",
-      agentPersonality: "Empático e Compreensivo",
-      agentRestrictions: "Nunca fornecer informações financeiras pessoais de clientes. Não prometer prazos de resolução exatos sem confirmação. Manter um tom profissional e paciente.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.5,
-      agentVersion: "1.0.0",
-      agentTools: ["knowledgeBase", "webSearch"],
-    },
-  },
-  {
-    id: "recommendation",
-    name: "Modelo: Agente de Recomendações (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Agente de Recomendações de Produtos",
-      agentDescription: "Um agente para ajudar usuários a descobrir e escolher produtos ou serviços com base em suas preferências.",
-      agentGoal: "Aumentar o engajamento e as vendas sugerindo itens relevantes com base nas necessidades e preferências do usuário.",
-      agentTasks: "1. Perguntar sobre as preferências, necessidades e orçamento do usuário.\n2. Sugerir produtos/serviços do catálogo com base nas respostas.\n3. Comparar até 3 produtos lado a lado, destacando prós e contras.\n4. Fornecer links diretos ou informações para as páginas dos produtos/serviços recomendados.",
-      agentPersonality: "Amigável e Prestativo",
-      agentRestrictions: "Apenas recomendar produtos/serviços do catálogo atual. Não inventar características ou preços. Ser transparente sobre limitações se não encontrar uma combinação perfeita.",
-      agentModel: "googleai/gemini-1.5-pro-latest",
+      agentGoal: "",
+      agentTasks: "",
+      agentPersonality: agentToneOptions[0].label,
+      agentRestrictions: "",
+      agentModel: "googleai/gemini-2.0-flash",
       agentTemperature: 0.7,
-      agentVersion: "1.0.0",
-      agentTools: ["knowledgeBase"],
     },
   },
   {
-    id: "writer",
-    name: "Modelo: Assistente de Escrita Criativa (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Assistente de Escrita Criativa",
-      agentDescription: "Um agente para ajudar a gerar ideias, esboços e rascunhos de conteúdo original e envolvente.",
-      agentGoal: "Auxiliar na criação de conteúdo escrito, como posts de blog, e-mails, descrições de produtos ou roteiros curtos.",
-      agentTasks: "1. Brainstorming de tópicos com base em palavras-chave ou temas fornecidos.\n2. Gerar parágrafos introdutórios, de desenvolvimento ou conclusivos.\n3. Sugerir diferentes títulos e subtítulos para um texto.\n4. Resumir textos longos em pontos principais ou em um formato específico (ex: bullet points).",
-      agentPersonality: "Criativo e Inspirador",
-      agentRestrictions: "Evitar plágio. Se usar informações externas (com a ferramenta de busca), sugerir a necessidade de citação. Focar na originalidade e na clareza da escrita.",
-      agentModel: "googleai/gemini-1.5-pro-latest",
-      agentTemperature: 0.8,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch"],
-    },
+    id: "support", name: "Modelo: Agente de Suporte ao Cliente (LLM)",
+    config: { agentType: "llm", agentName: "Agente de Suporte ao Cliente", agentDescription: "Agente prestativo para responder perguntas comuns e ajudar com problemas.", agentGoal: "Fornecer suporte rápido e eficiente, esclarecendo dúvidas.", agentTasks: "1. Responder FAQs.\n2. Solucionar problemas básicos.\n3. Direcionar para documentação.\n4. Escalonar para humanos se necessário.", agentPersonality: "Empático e Compreensivo", agentRestrictions: "Nunca fornecer informações financeiras pessoais. Manter tom profissional.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.5, agentVersion: "1.0.0", agentTools: ["knowledgeBase", "webSearch"] },
   },
   {
-    id: "grammar_checker",
-    name: "Modelo: Revisor de Gramática e Estilo (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Revisor de Gramática e Estilo",
-      agentDescription: "Um agente para revisar textos, corrigir erros gramaticais, melhorar o estilo e a clareza.",
-      agentGoal: "Ajudar o usuário a aprimorar seus textos, tornando-os gramaticalmente corretos, claros, concisos e estilisticamente adequados.",
-      agentTasks: "1. Identificar e corrigir erros de gramática e ortografia.\n2. Sugerir melhorias na estrutura das frases e na escolha de palavras.\n3. Verificar a pontuação.\n4. Oferecer feedback sobre o tom e estilo do texto, se solicitado.",
-      agentPersonality: "Analítico e Detalhista",
-      agentRestrictions: "Focar apenas na revisão do texto fornecido. Não adicionar novo conteúdo ou alterar o significado original. Explicar as correções se forem complexas.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.3,
-      agentVersion: "1.0.0",
-      agentTools: [],
-    },
+    id: "recommendation", name: "Modelo: Agente de Recomendações (LLM)",
+    config: { agentType: "llm", agentName: "Agente de Recomendações de Produtos", agentDescription: "Ajuda usuários a descobrir produtos/serviços.", agentGoal: "Aumentar engajamento sugerindo itens relevantes.", agentTasks: "1. Perguntar preferências.\n2. Sugerir produtos do catálogo.\n3. Comparar produtos.\n4. Fornecer links/informações.", agentPersonality: "Amigável e Prestativo", agentRestrictions: "Apenas recomendar produtos do catálogo. Não inventar características.", agentModel: "googleai/gemini-1.5-pro-latest", agentTemperature: 0.7, agentVersion: "1.0.0", agentTools: ["knowledgeBase"] },
   },
   {
-    id: "translator_pt_en",
-    name: "Modelo: Tradutor Simples (Português-Inglês) (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Tradutor Português-Inglês",
-      agentDescription: "Um agente para traduzir textos do português para o inglês e vice-versa.",
-      agentGoal: "Fornecer traduções precisas e naturais entre português e inglês.",
-      agentTasks: "1. Receber texto em português e traduzir para o inglês.\n2. Receber texto em inglês e traduzir para o português.\n3. Manter o contexto e o significado o mais fiel possível.",
-      agentPersonality: "Conciso e Objetivo",
-      agentRestrictions: "Limitar-se à tradução. Não interpretar ou adicionar informações. Indicar se uma expressão é idiomática e de difícil tradução literal.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.4,
-      agentVersion: "1.0.0",
-      agentTools: [],
-    },
+    id: "writer", name: "Modelo: Assistente de Escrita Criativa (LLM)",
+    config: { agentType: "llm", agentName: "Assistente de Escrita Criativa", agentDescription: "Ajuda a gerar ideias e rascunhos de conteúdo original.", agentGoal: "Auxiliar na criação de posts, e-mails, descrições.", agentTasks: "1. Brainstorming de tópicos.\n2. Gerar parágrafos.\n3. Sugerir títulos.\n4. Resumir textos.", agentPersonality: "Criativo e Inspirador", agentRestrictions: "Evitar plágio. Citar fontes externas.", agentModel: "googleai/gemini-1.5-pro-latest", agentTemperature: 0.8, agentVersion: "1.0.0", agentTools: ["webSearch"] },
   },
   {
-    id: "legal_analyst_basic",
-    name: "Modelo: Analista Jurídico Básico (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Analista Jurídico Básico",
-      agentDescription: "Agente para auxiliar na compreensão de conceitos legais e pesquisa de informações jurídicas básicas.",
-      agentGoal: "Ajudar a entender conceitos legais básicos, resumir termos jurídicos e encontrar informações sobre leis (com a ferramenta de busca).",
-      agentTasks: "1. Explicar termos legais em linguagem simples.\n2. Resumir cláusulas contratuais (se fornecidas pelo usuário).\n3. Buscar leis ou jurisprudências sobre um tópico (usando a ferramenta de busca).\n4. Não fornecer aconselhamento jurídico.",
-      agentPersonality: "Profissional e Direto",
-      agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL. Sempre recomendar a consulta a um advogado qualificado. Usar linguagem clara e evitar jargões excessivos. Limitar-se a informações e explicações gerais.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.3,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch", "knowledgeBase"],
-    },
+    id: "grammar_checker", name: "Modelo: Revisor de Gramática e Estilo (LLM)",
+    config: { agentType: "llm", agentName: "Revisor de Gramática e Estilo", agentDescription: "Revisa textos, corrige erros e melhora clareza.", agentGoal: "Aprimorar textos, tornando-os corretos e claros.", agentTasks: "1. Corrigir gramática/ortografia.\n2. Sugerir melhorias frasais.\n3. Verificar pontuação.\n4. Feedback sobre tom/estilo.", agentPersonality: "Analítico e Detalhista", agentRestrictions: "Focar na revisão. Não alterar significado. Explicar correções.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.3, agentVersion: "1.0.0", agentTools: [] },
   },
   {
-    id: "medical_triage_info",
-    name: "Modelo: Assistente de Triagem Médica Informativo (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Assistente de Triagem Médica (Informativo)",
-      agentDescription: "Agente para fornecer informações gerais sobre sintomas e direcionamento, SEM FORNECER DIAGNÓSTICO.",
-      agentGoal: "Fornecer informações gerais sobre sintomas comuns e possíveis condições, e direcionar para cuidados médicos apropriados, enfatizando que não substitui uma consulta médica.",
-      agentTasks: "1. Coletar informações sobre sintomas descritos pelo usuário.\n2. Oferecer informações gerais sobre possíveis causas relacionadas aos sintomas (com base em conhecimento geral e busca na web).\n3. Sugerir se é apropriado procurar um médico, atendimento de urgência ou autocuidado (com base na gravidade percebida dos sintomas descritos).\n4. Fornecer informações sobre tipos de especialistas médicos relevantes.",
-      agentPersonality: "Empático e Compreensivo",
-      agentRestrictions: "NÃO FORNECER DIAGNÓSTICOS. NÃO SUBSTITUIR A CONSULTA MÉDICA. Sempre enfatizar a importância de consultar um profissional de saúde para diagnósticos e tratamento. Não prescrever medicamentos ou tratamentos. As informações são apenas para fins educativos e informativos.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.5,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch", "knowledgeBase"],
-    },
+    id: "translator_pt_en", name: "Modelo: Tradutor Simples (Português-Inglês) (LLM)",
+    config: { agentType: "llm", agentName: "Tradutor Português-Inglês", agentDescription: "Traduz textos entre português e inglês.", agentGoal: "Fornecer traduções precisas e naturais.", agentTasks: "1. Traduzir PT-EN.\n2. Traduzir EN-PT.\n3. Manter contexto e significado.", agentPersonality: "Conciso e Objetivo", agentRestrictions: "Limitar-se à tradução. Não interpretar. Indicar expressões idiomáticas.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.4, agentVersion: "1.0.0", agentTools: [] },
   },
   {
-    id: "travel_planner_basic",
-    name: "Modelo: Planejador de Viagens Inicial (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Planejador de Viagens Inicial",
-      agentDescription: "Agente para ajudar a pesquisar destinos, voos, acomodações e sugerir itinerários básicos.",
-      agentGoal: "Ajudar usuários a pesquisar destinos, voos e acomodações, e fornecer sugestões de itinerários.",
-      agentTasks: "1. Perguntar sobre preferências de viagem (destino, orçamento, datas, tipo de viagem, interesses).\n2. Pesquisar destinos e atrações com base nos critérios (usando busca na web).\n3. Sugerir opções de voos e hotéis (simulado ou via ferramenta de busca), indicando que são exemplos.\n4. Esboçar um itinerário básico com atividades e pontos de interesse.",
-      agentPersonality: "Amigável e Prestativo",
-      agentRestrictions: "Informar que preços, disponibilidade e horários são exemplos e precisam ser verificados em sites de reserva reais. Não fazer reservas ou coletar informações de pagamento. Focar em sugestões e planejamento.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.7,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch", "customApiIntegration"],
-    },
+    id: "legal_analyst_basic", name: "Modelo: Analista Jurídico Básico (LLM)",
+    config: { agentType: "llm", agentName: "Analista Jurídico Básico", agentDescription: "Auxilia na compreensão de conceitos legais e pesquisa básica.", agentGoal: "Ajudar a entender conceitos legais, resumir termos, encontrar leis.", agentTasks: "1. Explicar termos legais.\n2. Resumir cláusulas (se fornecidas).\n3. Buscar leis/jurisprudência (com busca web).\n4. NÃO FORNECER ACONSELHAMENTO LEGAL.", agentPersonality: "Profissional e Direto", agentRestrictions: "NÃO FORNECER ACONSELHAMENTO LEGAL. Recomendar advogado. Usar linguagem clara.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.3, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
+  },
+  {
+    id: "medical_triage_info", name: "Modelo: Assistente de Triagem Médica Informativo (LLM)",
+    config: { agentType: "llm", agentName: "Assistente de Triagem Médica (Informativo)", agentDescription: "Fornece informações gerais sobre sintomas, SEM DIAGNÓSTICO.", agentGoal: "Informar sobre sintomas, direcionar para cuidados, NÃO SUBSTITUI CONSULTA.", agentTasks: "1. Coletar sintomas.\n2. Informar sobre possíveis causas (com busca web).\n3. Sugerir nível de cuidado.\n4. Informar sobre especialistas.", agentPersonality: "Empático e Compreensivo", agentRestrictions: "NÃO FAZER DIAGNÓSTICOS. NÃO SUBSTITUIR CONSULTA MÉDICA. Enfatizar consulta a profissional. Não prescrever.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.5, agentVersion: "1.0.0", agentTools: ["webSearch", "knowledgeBase"] },
+  },
+  {
+    id: "travel_planner_basic", name: "Modelo: Planejador de Viagens Inicial (LLM)",
+    config: { agentType: "llm", agentName: "Planejador de Viagens Inicial", agentDescription: "Ajuda a pesquisar destinos, voos, acomodações e sugerir itinerários.", agentGoal: "Ajudar usuários a pesquisar e planejar viagens.", agentTasks: "1. Perguntar preferências (destino, orçamento, datas, interesses).\n2. Pesquisar destinos/atrações (com busca web).\n3. Sugerir voos/hotéis (exemplos).\n4. Esboçar itinerário básico.", agentPersonality: "Amigável e Prestativo", agentRestrictions: "Informar que preços/disponibilidade são exemplos. Não fazer reservas. Focar em sugestões.", agentModel: "googleai/gemini-1.5-flash-latest", agentTemperature: 0.7, agentVersion: "1.0.0", agentTools: ["webSearch", "customApiIntegration"] },
   },
 ];
 
@@ -324,518 +199,48 @@ export default function AgentBuilderPage() {
   const { toast } = useToast();
   const { savedAgents, setSavedAgents } = useAgents();
 
-  const [selectedAgentTemplateId, setSelectedAgentTemplateId] = React.useState<string>(agentTemplates[0].id);
-  const [agentType, setAgentType] = React.useState<AgentConfig["agentType"]>(agentTemplates[0].config.agentType);
-
-  const [agentName, setAgentName] = React.useState(agentTemplates[0].config.agentName);
-  const [agentDescription, setAgentDescription] = React.useState(agentTemplates[0].config.agentDescription);
-  const [agentVersion, setAgentVersion] = React.useState(agentTemplates[0].config.agentVersion);
-  const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(agentTemplates[0].config.agentTools);
-
-  // LLM Specific State
-  const [agentGoal, setAgentGoal] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentGoal || "" );
-  const [agentTasks, setAgentTasks] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentTasks || "" );
-  const [agentPersonality, setAgentPersonality] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentPersonality || agentToneOptions[0].label );
-  const [agentRestrictions, setAgentRestrictions] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentRestrictions || "" );
-  const [agentModel, setAgentModel] = React.useState( (agentTemplates[0].config as LLMAgentConfig).agentModel || "googleai/gemini-2.0-flash" );
-  const [agentTemperature, setAgentTemperature] = React.useState( [(agentTemplates[0].config as LLMAgentConfig).agentTemperature || 0.7] );
-
-  // Workflow Specific State
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(
-    (agentTemplates[0].config.agentType === 'workflow' ? (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType : undefined)
-  );
-  const [workflowDescription, setWorkflowDescription] = React.useState(
-     (agentTemplates[0].config.agentType === 'workflow' ? (agentTemplates[0].config as WorkflowAgentConfig).workflowDescription : "")
-  );
-  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(
-    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopMaxIterations : undefined)
-  );
-  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<'none' | 'subagent_signal' | undefined>(
-    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopTerminationConditionType || 'none' : 'none')
-  );
-  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(
-    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopExitToolName : undefined)
-  );
-  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(
-     (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopExitStateKey : undefined)
-  );
-  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(
-    (agentTemplates[0].config.agentType === 'workflow' && (agentTemplates[0].config as WorkflowAgentConfig).detailedWorkflowType === 'loop' ? (agentTemplates[0].config as WorkflowAgentConfig).loopExitStateValue : undefined)
-  );
-
-
-  // Custom Specific State
-  const [customLogicDescription, setCustomLogicDescription] = React.useState(
-    (agentTemplates[0].config.agentType === 'custom' ? (agentTemplates[0].config as CustomAgentConfig).customLogicDescription : "")
-  );
-
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
-
-  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState("");
-  const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
-  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState("");
-  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState("");
-  const [modalDbType, setModalDbType] = React.useState("");
-  const [modalDbConnectionString, setModalDbConnectionString] = React.useState("");
-  const [modalDbUser, setModalDbUser] = React.useState("");
-  const [modalDbPassword, setModalDbPassword] = React.useState("");
-  const [modalDbName, setModalDbName] = React.useState("");
-  const [modalDbHost, setModalDbHost] = React.useState("");
-  const [modalDbPort, setModalDbPort] = React.useState("");
-  const [modalDbDescription, setModalDbDescription] = React.useState("");
-  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState("");
-  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState("");
-
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgentId, setEditingAgentId] = React.useState<string | null>(null);
+  const [currentEditingAgent, setCurrentEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
 
 
-  const resetLLMFields = (config: Partial<LLMAgentConfig>) => {
-    setAgentGoal(config.agentGoal || defaultLLMConfig.agentGoal);
-    setAgentTasks(config.agentTasks || defaultLLMConfig.agentTasks);
-    setAgentPersonality(config.agentPersonality || defaultLLMConfig.agentPersonality);
-    setAgentRestrictions(config.agentRestrictions || defaultLLMConfig.agentRestrictions);
-    setAgentModel(config.agentModel || defaultLLMConfig.agentModel);
-    setAgentTemperature([config.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : config.agentTemperature]);
-  };
-
-  const resetWorkflowFields = (config?: Partial<WorkflowAgentConfig>) => {
-    setWorkflowDescription(config?.workflowDescription || "");
-    setDetailedWorkflowType(config?.detailedWorkflowType || undefined);
-    setLoopMaxIterations(config?.loopMaxIterations || undefined);
-    setLoopTerminationConditionType(config?.loopTerminationConditionType || 'none');
-    setLoopExitToolName(config?.loopExitToolName || undefined);
-    setLoopExitStateKey(config?.loopExitStateKey || undefined);
-    setLoopExitStateValue(config?.loopExitStateValue || undefined);
-  }
-  const resetCustomLogicFields = (config?: Partial<CustomAgentConfig>) => {
-    setCustomLogicDescription(config?.customLogicDescription || "");
-  }
-
-  const handleTemplateChange = (templateId: string) => {
-    const template = agentTemplates.find(t => t.id === templateId);
-    if (template) {
-      setSelectedAgentTemplateId(templateId);
-      const config = template.config;
-      setAgentType(config.agentType);
-      setAgentName(config.agentName);
-      setAgentDescription(config.agentDescription);
-      setAgentVersion(config.agentVersion);
-      setCurrentAgentTools(config.agentTools);
-      setToolConfigurations({}); // Reset tool configs when template changes
-
-      if (config.agentType === 'llm') {
-        resetLLMFields(config);
-        resetWorkflowFields();
-        resetCustomLogicFields();
-      } else if (config.agentType === 'workflow') {
-        resetLLMFields(config as Partial<LLMAgentConfig>); 
-        resetWorkflowFields(config);
-        resetCustomLogicFields();
-      } else if (config.agentType === 'custom') {
-        resetLLMFields(config as Partial<LLMAgentConfig>); 
-        resetWorkflowFields();
-        resetCustomLogicFields(config);
-      }
-    }
-  };
-
-  const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
-    setAgentType(newAgentType);
-    if (newAgentType === 'llm') {
-        resetWorkflowFields();
-        resetCustomLogicFields();
-        const currentTemplate = agentTemplates.find(t => t.id === selectedAgentTemplateId);
-        if (currentTemplate && currentTemplate.config.agentType !== 'llm') {
-           resetLLMFields(defaultLLMConfig);
-        }
-    } else if (newAgentType === 'workflow') {
-        resetCustomLogicFields();
-        // Initialize workflow specific fields if not already set by a template
-        if (agentType !== 'workflow') { // Only reset if changing TO workflow
-            resetWorkflowFields({
-                detailedWorkflowType: undefined,
-                workflowDescription: "",
-                loopMaxIterations: undefined,
-                loopTerminationConditionType: 'none',
-            });
-        }
-    } else if (newAgentType === 'custom') {
-        resetWorkflowFields();
-    }
-  };
-
-  const constructSystemPrompt = () => {
-    const currentConfig = { agentGoal, agentTasks, agentPersonality, agentRestrictions, agentType, agentName, agentDescription }; 
-    if (currentConfig.agentType !== 'llm' && !currentConfig.agentGoal && !currentConfig.agentTasks && !currentConfig.agentPersonality) {
-        return undefined; 
-    }
-
-    let prompt = `Você é um agente de IA. Seu nome é "${currentConfig.agentName || 'Agente'}".\n`;
-    if (currentConfig.agentDescription) {
-      prompt += `Sua descrição geral é: "${currentConfig.agentDescription}".\n`;
-    }
-
-    if (currentConfig.agentType === 'llm') {
-        prompt += `Seu tipo principal é LLM (Modelo de Linguagem Grande), focado em linguagem e decisão.\n`;
-    } else if (currentConfig.agentType === 'workflow') {
-        prompt += `Seu tipo principal é Agente de Fluxo de Trabalho, focado em orquestrar tarefas de forma determinística (não usa LLM para o controle de fluxo em si).\n`;
-        if (detailedWorkflowType) {
-            prompt += `Subtipo de fluxo de trabalho: ${detailedWorkflowType}.\n`;
-        }
-        if (workflowDescription) {
-             prompt += `Descrição do fluxo: ${workflowDescription}.\n`;
-        }
-        if(detailedWorkflowType === 'loop' && loopMaxIterations) {
-            prompt += `O loop repetirá no máximo ${loopMaxIterations} vezes.\n`;
-        }
-        if(detailedWorkflowType === 'loop' && loopTerminationConditionType === 'subagent_signal') {
-            prompt += `O loop também pode terminar se um subagente sinalizar (ex: via ferramenta '${loopExitToolName || 'exit_loop'}' ou estado '${loopExitStateKey || 'status'}' atingir '${loopExitStateValue || 'FINALIZADO'}').\n`;
-        }
-    } else if (currentConfig.agentType === 'custom') {
-        prompt += `Seu tipo principal é Agente Personalizado, com lógica de backend customizada via Genkit (equivalente a estender BaseAgent, implementando _run_async_impl). Tipicamente orquestram outros agentes.\n`;
-        if (customLogicDescription) {
-            prompt += `Descrição da lógica customizada: ${customLogicDescription}.\n`;
-        }
-    }
-    prompt += `\nA seguir, as instruções de comportamento para qualquer capacidade de LLM que você possua (mesmo que seu tipo principal não seja LLM, você pode usar um LLM para tarefas específicas):\n\n`;
-
-    if (currentConfig.agentGoal) prompt += `OBJETIVO PRINCIPAL (se usando LLM):\n${currentConfig.agentGoal}\n\n`;
-    if (currentConfig.agentTasks) prompt += `TAREFAS PRINCIPAIS A SEREM REALIZADAS (se usando LLM):\n${currentConfig.agentTasks}\n\n`;
-    if (currentConfig.agentPersonality) prompt += `PERSONALIDADE/TOM DE COMUNICAÇÃO (se usando LLM):\n${currentConfig.agentPersonality}\n\n`;
-    if (currentConfig.agentRestrictions) {
-      prompt += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE (se usando LLM):\n${currentConfig.agentRestrictions}\n\n`;
-    }
-
-    const selectedToolObjects = currentAgentTools
-      .map(toolId => availableTools.find(t => t.id === toolId))
-      .filter(Boolean) as AvailableTool[];
-
-    if (selectedToolObjects.length > 0) {
-        prompt += `FERRAMENTAS DISPONÍVEIS PARA USO PELO LLM (Você deve decidir quando e como usá-las. Se uma ferramenta estiver marcada como 'requer configuração' e não estiver explicitamente configurada, informe ao usuário que não pode usá-la ou peça para configurá-la):\n`;
-        selectedToolObjects.forEach(tool => {
-            const currentToolConfig = toolConfigurations[tool.id];
-            const isConfigured = tool.needsConfiguration && currentToolConfig &&
-                ( (tool.id === 'webSearch' && currentToolConfig.googleApiKey && currentToolConfig.googleCseId) ||
-                  (tool.id === 'customApiIntegration' && currentToolConfig.openapiSpecUrl) ||
-                  (tool.id === 'databaseAccess' && (currentToolConfig.dbConnectionString || (currentToolConfig.dbHost && currentToolConfig.dbName))) ||
-                  (tool.id === 'knowledgeBase' && currentToolConfig.knowledgeBaseId) ||
-                  (tool.id === 'calendarAccess' && currentToolConfig.calendarApiEndpoint) ||
-                  (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(currentToolConfig).length > 0 ) 
-                );
-
-            const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, '');
-            prompt += `- Nome da Ferramenta para uso: '${toolNameForPrompt}'. Descrição: ${tool.description}${tool.needsConfiguration ? (isConfigured ? " (Status: Configurada e pronta para uso)" : " (Status: Requer configuração. Verifique antes de usar ou informe a necessidade de configuração)") : ""}\n`;
-        });
-        prompt += "\n";
-    } else {
-        prompt += `Nenhuma ferramenta externa está configurada para este agente para uso por um LLM.\n\n`;
-    }
-
-    prompt += "INSTRUÇÕES ADICIONAIS DE INTERAÇÃO (se usando LLM):\n";
-    prompt += "- Responda de forma concisa e direta ao ponto, a menos que o tom da personalidade solicite o contrário.\n";
-    prompt += "- Se você precisar usar uma ferramenta, anuncie claramente qual ferramenta (usando o 'Nome da Ferramenta para uso' fornecido acima) e por que você a usaria ANTES de simular sua execução ou pedir ao usuário para aguardar. Após a simulação (ou se a execução real for implementada), apresente os resultados obtidos pela ferramenta.\n";
-    prompt += "- Seja transparente sobre suas capacidades e limitações. Se não puder realizar uma tarefa, explique o motivo.\n";
-    prompt += "- Se uma ferramenta necessária não estiver configurada, informe ao usuário educadamente.\n";
-
-    return prompt.trim();
-  };
-
-  const handleCreateNewAgent = () => {
-    const customTemplate = agentTemplates.find(t => t.id === "custom_llm") || agentTemplates[0];
-    handleTemplateChange(customTemplate.id);
-    setToolConfigurations({});
+  const handleOpenCreateAgentModal = () => {
+    setCurrentEditingAgent(null); // Garante que estamos criando um novo
     setEditingAgentId(null);
-    resetWorkflowFields(); 
-    resetCustomLogicFields(); 
-  };
-
-  const openCreateAgentModal = () => {
-    handleCreateNewAgent();
     setIsBuilderModalOpen(true);
   };
 
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
+    setCurrentEditingAgent(agentToEdit);
     setEditingAgentId(agentToEdit.id);
-    setSelectedAgentTemplateId(agentToEdit.templateId || 'custom_llm'); 
-    setAgentType(agentToEdit.agentType);
-    setAgentName(agentToEdit.agentName);
-    setAgentDescription(agentToEdit.agentDescription);
-    setAgentVersion(agentToEdit.agentVersion);
-    setCurrentAgentTools(agentToEdit.agentTools);
-    setToolConfigurations(agentToEdit.toolConfigsApplied || {});
-
-    if (agentToEdit.agentType === 'llm') {
-      resetLLMFields(agentToEdit as LLMAgentConfig);
-      resetWorkflowFields(); 
-      resetCustomLogicFields(); 
-    } else if (agentToEdit.agentType === 'workflow') {
-      const workflowConfig = agentToEdit as WorkflowAgentConfig;
-      resetWorkflowFields(workflowConfig);
-      resetLLMFields({ 
-        agentGoal: workflowConfig.agentGoal || defaultLLMConfig.agentGoal,
-        agentTasks: workflowConfig.agentTasks || defaultLLMConfig.agentTasks,
-        agentPersonality: workflowConfig.agentPersonality || defaultLLMConfig.agentPersonality,
-        agentRestrictions: workflowConfig.agentRestrictions || defaultLLMConfig.agentRestrictions,
-        agentModel: workflowConfig.agentModel || defaultLLMConfig.agentModel,
-        agentTemperature: workflowConfig.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : workflowConfig.agentTemperature,
-      });
-      resetCustomLogicFields(); 
-    } else if (agentToEdit.agentType === 'custom') {
-      const customConfig = agentToEdit as CustomAgentConfig;
-      resetCustomLogicFields(customConfig);
-      resetLLMFields({ 
-        agentGoal: customConfig.agentGoal || defaultLLMConfig.agentGoal,
-        agentTasks: customConfig.agentTasks || defaultLLMConfig.agentTasks,
-        agentPersonality: customConfig.agentPersonality || defaultLLMConfig.agentPersonality,
-        agentRestrictions: customConfig.agentRestrictions || defaultLLMConfig.agentRestrictions,
-        agentModel: customConfig.agentModel || defaultLLMConfig.agentModel,
-        agentTemperature: customConfig.agentTemperature === undefined ? defaultLLMConfig.agentTemperature : customConfig.agentTemperature,
-      });
-      resetWorkflowFields(); 
-    }
     setIsBuilderModalOpen(true);
   };
 
-
-  const handleSaveConfiguration = () => {
-    if (!agentName) {
-      toast({ title: "Campo Obrigatório", description: "Nome do Agente é obrigatório.", variant: "destructive" });
-      return;
-    }
-
-    const systemPrompt = constructSystemPrompt();
-    const selectedToolsDetails = currentAgentTools
-        .map(toolId => {
-            const tool = availableTools.find(t => t.id === toolId);
-            if (!tool) return null;
-            
-            let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
-            const iconProp = tool.icon;
-            if (React.isValidElement(iconProp) && typeof iconProp.type === 'function') { 
-                 const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
-                 const foundIconName = Object.keys(iconComponents).find(
-                    name => iconComponents[name] === IconComponent
-                 ) as keyof typeof iconComponents | undefined;
-                 if (foundIconName) {
-                    iconNameKey = foundIconName;
-                 }
-            }
-
-            return { id: tool.id, label: tool.label, iconName: iconNameKey, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName };
-        })
-        .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
-
-
-    const appliedToolConfigs: Record<string, ToolConfigData> = {};
-    currentAgentTools.forEach(toolId => {
-      if (toolConfigurations[toolId]) {
-        appliedToolConfigs[toolId] = toolConfigurations[toolId];
-      }
-    });
-
-    let agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'templateId' | 'toolsDetails' | 'toolConfigsApplied' | 'systemPromptGenerated'> & {agentType: AgentConfig["agentType"]} = {
-        agentName,
-        agentDescription,
-        agentVersion,
-        agentTools: currentAgentTools,
-        agentType, 
-    };
-    
-
-    if (agentType === 'llm') {
-      agentConfigData = {
-        ...agentConfigData,
-        agentType: 'llm', 
-        agentGoal,
-        agentTasks,
-        agentPersonality,
-        agentRestrictions,
-        agentModel,
-        agentTemperature: agentTemperature[0],
-      };
-    } else if (agentType === 'workflow') {
-      agentConfigData = {
-        ...agentConfigData,
-        agentType: 'workflow', 
-        detailedWorkflowType,
-        workflowDescription,
-        loopMaxIterations: detailedWorkflowType === 'loop' ? loopMaxIterations : undefined,
-        loopTerminationConditionType: detailedWorkflowType === 'loop' ? loopTerminationConditionType : undefined,
-        loopExitToolName: detailedWorkflowType === 'loop' ? loopExitToolName : undefined,
-        loopExitStateKey: detailedWorkflowType === 'loop' ? loopExitStateKey : undefined,
-        loopExitStateValue: detailedWorkflowType === 'loop' ? loopExitStateValue : undefined,
-        agentGoal: agentGoal || undefined, 
-        agentTasks: agentTasks || undefined,
-        agentPersonality: agentPersonality || undefined,
-        agentRestrictions: agentRestrictions || undefined,
-        agentModel: agentModel || undefined,
-        agentTemperature: agentTemperature[0] ?? undefined,
-      };
-    } else { // custom
-      agentConfigData = {
-        ...agentConfigData,
-        agentType: 'custom', 
-        customLogicDescription,
-        agentGoal: agentGoal || undefined, 
-        agentTasks: agentTasks || undefined,
-        agentPersonality: agentPersonality || undefined,
-        agentRestrictions: agentRestrictions || undefined,
-        agentModel: agentModel || undefined,
-        agentTemperature: agentTemperature[0] ?? undefined,
-      };
-    }
-
+  const handleSaveAgent = (agentConfig: SavedAgentConfiguration) => {
     if (editingAgentId) {
-        setSavedAgents(prevAgents =>
-            prevAgents.map(agent =>
-                agent.id === editingAgentId ?
-                {
-                    ...(agentConfigData as AgentConfig), 
-                    id: editingAgentId, 
-                    templateId: selectedAgentTemplateId,
-                    systemPromptGenerated: systemPrompt,
-                    toolsDetails: selectedToolsDetails,
-                    toolConfigsApplied: appliedToolConfigs,
-                } : agent
-            )
-        );
-        toast({ title: "Agente Atualizado!", description: `O agente "${agentName}" foi atualizado.` });
+      setSavedAgents(prevAgents =>
+        prevAgents.map(agent =>
+          agent.id === editingAgentId ? agentConfig : agent
+        )
+      );
+      toast({ title: "Agente Atualizado!", description: `O agente "${agentConfig.agentName}" foi atualizado.` });
     } else {
-        const newAgentConfiguration: SavedAgentConfiguration = {
-            id: `agent-${Date.now()}`,
-            templateId: selectedAgentTemplateId,
-            ...(agentConfigData as AgentConfig), 
-            systemPromptGenerated: systemPrompt,
-            toolsDetails: selectedToolsDetails,
-            toolConfigsApplied: appliedToolConfigs,
-        };
-        setSavedAgents(prevAgents => [...prevAgents, newAgentConfiguration]);
-        toast({
-          title: "Configuração Salva!",
-          description: `O agente "${agentName}" (${agentTypeOptions.find(opt => opt.id === agentType)?.label.split('(')[0].trim()}) foi adicionado à sua lista.`,
-        });
+      setSavedAgents(prevAgents => [...prevAgents, agentConfig]);
+      toast({
+        title: "Configuração Salva!",
+        description: `O agente "${agentConfig.agentName}" foi adicionado à sua lista.`,
+      });
     }
-
     setEditingAgentId(null);
-    setIsBuilderModalOpen(false);
+    setCurrentEditingAgent(null);
+    //setIsBuilderModalOpen(false); // O Dialog no AgentBuilderDialog já faz isso via onOpenChange
   };
-
-  const handleToolSelectionChange = (toolId: string, checked: boolean) => {
-    setCurrentAgentTools(prevTools => {
-      if (checked) {
-        return [...prevTools, toolId];
-      } else {
-        const newToolConfigs = { ...toolConfigurations };
-        delete newToolConfigs[toolId];
-        setToolConfigurations(newToolConfigs);
-        return prevTools.filter(id => id !== toolId);
-      }
-    });
-  };
-
-  const resetModalInputs = () => {
-    setModalGoogleApiKey("");
-    setModalGoogleCseId("");
-    setModalOpenapiSpecUrl("");
-    setModalOpenapiApiKey("");
-    setModalDbType("");
-    setModalDbConnectionString("");
-    setModalDbUser("");
-    setModalDbPassword("");
-    setModalDbName("");
-    setModalDbHost("");
-    setModalDbPort("");
-    setModalDbDescription("");
-    setModalKnowledgeBaseId("");
-    setModalCalendarApiEndpoint("");
+  
+  const handleDeleteAgent = (agentIdToDelete: string) => {
+    // Adicionar modal de confirmação aqui seria ideal
+    setSavedAgents(prev => prev.filter(agent => agent.id !== agentIdToDelete));
+    toast({title: "Agente Excluído", description: "O agente foi removido da lista."});
   }
-
-  const openToolConfigModal = (tool: AvailableTool) => {
-    setConfiguringTool(tool);
-    resetModalInputs();
-
-    const currentConfig = toolConfigurations[tool.id] || {};
-    if (tool.id === "webSearch") {
-        setModalGoogleApiKey(currentConfig.googleApiKey || "");
-        setModalGoogleCseId(currentConfig.googleCseId || "");
-    } else if (tool.id === "customApiIntegration") {
-        setModalOpenapiSpecUrl(currentConfig.openapiSpecUrl || "");
-        setModalOpenapiApiKey(currentConfig.openapiApiKey || "");
-    } else if (tool.id === "databaseAccess") {
-        setModalDbType(currentConfig.dbType || "");
-        setModalDbConnectionString(currentConfig.dbConnectionString || "");
-        setModalDbUser(currentConfig.dbUser || "");
-        setModalDbPassword(currentConfig.dbPassword || "");
-        setModalDbName(currentConfig.dbName || "");
-        setModalDbHost(currentConfig.dbHost || "");
-        setModalDbPort(currentConfig.dbPort || "");
-        setModalDbDescription(currentConfig.dbDescription || "");
-    } else if (tool.id === "knowledgeBase") {
-        setModalKnowledgeBaseId(currentConfig.knowledgeBaseId || "");
-    } else if (tool.id === "calendarAccess") {
-        setModalCalendarApiEndpoint(currentConfig.calendarApiEndpoint || "");
-    }
-    setIsToolConfigModalOpen(true);
-  };
-
-  const handleSaveToolConfiguration = () => {
-    if (!configuringTool) return;
-
-    let newConfigData: Partial<ToolConfigData> = { ...toolConfigurations[configuringTool.id] };
-
-    if (configuringTool.id === "webSearch") {
-      if (!modalGoogleApiKey || !modalGoogleCseId) {
-        toast({ title: "Campos Obrigatórios", description: "Chave API e CSE ID são obrigatórios para Busca na Web.", variant: "destructive" });
-        return;
-      }
-      newConfigData = { googleApiKey: modalGoogleApiKey, googleCseId: modalGoogleCseId };
-    } else if (configuringTool.id === "customApiIntegration") {
-      if (!modalOpenapiSpecUrl) {
-        toast({ title: "Campo Obrigatório", description: "URL do Esquema OpenAPI é obrigatória.", variant: "destructive" });
-        return;
-      }
-      newConfigData = { openapiSpecUrl: modalOpenapiSpecUrl, openapiApiKey: modalOpenapiApiKey };
-    } else if (configuringTool.id === "databaseAccess") {
-        if (!modalDbType || (!modalDbConnectionString && (!modalDbHost || !modalDbName))) {
-             toast({ title: "Campos Obrigatórios", description: "Tipo de Banco e (String de Conexão ou Host/Nome do Banco) são obrigatórios.", variant: "destructive" });
-            return;
-        }
-        newConfigData = {
-            dbType: modalDbType,
-            dbConnectionString: modalDbConnectionString,
-            dbUser: modalDbUser,
-            dbPassword: modalDbPassword,
-            dbName: modalDbName,
-            dbHost: modalDbHost,
-            dbPort: modalDbPort,
-            dbDescription: modalDbDescription,
-        };
-    } else if (configuringTool.id === "knowledgeBase") {
-        if (!modalKnowledgeBaseId) {
-            toast({ title: "Campo Obrigatório", description: "ID da Base de Conhecimento é obrigatório.", variant: "destructive" });
-            return;
-        }
-        newConfigData = { knowledgeBaseId: modalKnowledgeBaseId };
-    } else if (configuringTool.id === "calendarAccess") {
-        if (!modalCalendarApiEndpoint) {
-            toast({ title: "Campo Obrigatório", description: "Endpoint da API de Calendário é obrigatório.", variant: "destructive" });
-            return;
-        }
-        newConfigData = { calendarApiEndpoint: modalCalendarApiEndpoint };
-    }
-
-
-    setToolConfigurations(prev => ({
-      ...prev,
-      [configuringTool.id]: newConfigData as ToolConfigData,
-    }));
-    setIsToolConfigModalOpen(false);
-    setConfiguringTool(null);
-    toast({ title: `Configuração salva para ${configuringTool.label}`});
-  };
 
 
   return (
@@ -845,7 +250,7 @@ export default function AgentBuilderPage() {
           <Cpu className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Meus Agentes</h1>
         </div>
-        <Button onClick={openCreateAgentModal}>
+        <Button onClick={handleOpenCreateAgentModal}>
           <PlusCircle className="mr-2 h-4 w-4" /> Criar Novo Agente
         </Button>
       </header>
@@ -857,137 +262,18 @@ export default function AgentBuilderPage() {
       {savedAgents.length > 0 ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {savedAgents.map((agent) => {
-              const agentTypeDetails = agentTypeOptions.find(opt => opt.id === agent.agentType);
-              const agentTypeLabel = agentTypeDetails?.label.split('(')[0].trim() || agent.agentType;
-
-              let AgentIconComponent: React.ReactNode;
-              
-              let specificIconType: keyof typeof iconComponents | undefined = undefined;
-
-              if (agent.templateId === 'legal_analyst_basic') specificIconType = 'Briefcase';
-              else if (agent.templateId === 'medical_triage_info') specificIconType = 'Stethoscope';
-              else if (agent.templateId === 'travel_planner_basic') specificIconType = 'Plane';
-              
-              if (specificIconType) {
-                 const SpecificIcon = iconComponents[specificIconType];
-                 AgentIconComponent = SpecificIcon ? <SpecificIcon size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" /> : <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
-              } else {
-                  const IconFromType = agentTypeDetails?.icon ?
-                    React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" }) :
-                    <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
-                  AgentIconComponent = IconFromType;
-              }
-
-
-              return (
-                <Card key={agent.id} className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start">
-                        {AgentIconComponent}
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start mb-1">
-                          <CardTitle className="text-lg font-semibold text-foreground">
-                            {agent.agentName || "Agente Sem Nome"}
-                          </CardTitle>
-                          <Badge variant="secondary" className="text-xs h-6">
-                              {agentTypeLabel}
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
-                          {agent.agentDescription || "Sem descrição."}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 flex-grow pt-0">
-                    {agent.agentType === 'llm' && (agent as LLMAgentConfig).agentGoal && (
-                        <div>
-                            <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Objetivo:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                                {(agent as LLMAgentConfig).agentGoal}
-                            </p>
-                        </div>
-                    )}
-                      {(agent.agentType === 'llm' || (agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).agentModel) || (agent.agentType === 'custom' && (agent as CustomAgentConfig).agentModel)) && (
-                        <div>
-                            <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Modelo de IA:</h4>
-                            <p className="text-xs text-muted-foreground">
-                                { (agent as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel }
-                            </p>
-                        </div>
-                    )}
-                    {agent.agentType === 'workflow' && (agent as WorkflowAgentConfig).workflowDescription && (
-                        <div>
-                            <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Descrição do Fluxo:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                                {(agent as WorkflowAgentConfig).workflowDescription}
-                                { (agent as WorkflowAgentConfig).detailedWorkflowType && <span className="block text-xs text-primary/70">Tipo: {(agent as WorkflowAgentConfig).detailedWorkflowType}</span>}
-                            </p>
-                        </div>
-                    )}
-                    {agent.agentType === 'custom' && (agent as CustomAgentConfig).customLogicDescription && (
-                        <div>
-                            <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Lógica Personalizada:</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                                {(agent as CustomAgentConfig).customLogicDescription}
-                            </p>
-                        </div>
-                    )}
-                      {agent.toolsDetails.length > 0 && (
-                        <div className="pt-2">
-                            <h4 className="text-sm font-semibold mb-1 text-foreground/80">Ferramentas:</h4>
-                            <div className="flex flex-wrap gap-1.5">
-                                {agent.toolsDetails.map(toolDetail => {
-                                    const fullTool = availableTools.find(t => t.id === toolDetail.id);
-                                    const IconComponent = getToolIconComponent(toolDetail.iconName);
-                                    const toolIcon = <IconComponent size={12} />;
-
-                                    const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] &&
-                                                        ( (fullTool.id === 'webSearch' && agent.toolConfigsApplied[fullTool.id]?.googleApiKey && agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
-                                                          (fullTool.id === 'customApiIntegration' && agent.toolConfigsApplied[fullTool.id]?.openapiSpecUrl) ||
-                                                          (fullTool.id === 'databaseAccess' && (agent.toolConfigsApplied[fullTool.id]?.dbConnectionString || (agent.toolConfigsApplied[fullTool.id]?.dbHost && agent.toolConfigsApplied[fullTool.id]?.dbName))) ||
-                                                          (fullTool.id === 'knowledgeBase' && agent.toolConfigsApplied[fullTool.id]?.knowledgeBaseId) ||
-                                                          (fullTool.id === 'calendarAccess' && agent.toolConfigsApplied[fullTool.id]?.calendarApiEndpoint) ||
-                                                           (fullTool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(fullTool.id) && Object.keys(agent.toolConfigsApplied[fullTool.id] || {}).length > 0)
-                                                        );
-                                    return (
-                                        <Badge
-                                            key={toolDetail.id}
-                                            variant={isConfigured && fullTool?.needsConfiguration ? "default" : "secondary"}
-                                            className="text-xs h-6 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default"
-                                            title={toolDetail.label + (fullTool?.needsConfiguration ? (isConfigured ? " (Configurada)" : " (Requer Configuração)") : "")}
-                                        >
-                                            {toolIcon}
-                                            <span className="truncate group-hover:whitespace-normal group-hover:max-w-none">{toolDetail.label}</span>
-                                            {fullTool?.needsConfiguration && (
-                                                <ConfigureIcon
-                                                    size={10}
-                                                    className={`ml-1 ${isConfigured ? 'text-green-400' : 'text-blue-400'}`}
-                                                    title={isConfigured ? "Configurada" : "Requer configuração"}
-                                                />
-                                            )}
-                                        </Badge>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="gap-2 mt-auto pt-4 border-t">
-                    <Button variant="outline" size="sm" onClick={() => handleEditAgent(agent)}>
-                      <Edit size={16} className="mr-1.5" /> Editar
-                    </Button>
-                      <Button variant="outline" size="sm" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat."})}>
-                      <MessageSquare size={16} className="mr-1.5" /> Testar
-                    </Button>
-                    <Button variant="destructive" size="sm" className="ml-auto" onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de exclusão de agente."})}>
-                      <Trash2 size={16} className="mr-1.5" /> Excluir
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })}
+            {savedAgents.map((agent) => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                onEdit={handleEditAgent}
+                onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
+                onDelete={handleDeleteAgent} // Adicionar confirmação aqui
+                availableTools={availableTools}
+                agentTypeOptions={agentTypeOptions}
+                iconComponents={iconComponents}
+              />
+            ))}
           </div>
         </div>
       ) : (
@@ -995,718 +281,34 @@ export default function AgentBuilderPage() {
           <Layers className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-medium text-foreground">Nenhum agente criado ainda</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Comece clicando no botão abaixo para configurar seu primeiro agente de IA.
+            Comece clicando no botão acima para configurar seu primeiro agente de IA.
           </p>
-          <Button onClick={openCreateAgentModal} className="mt-6">
+          <Button onClick={handleOpenCreateAgentModal} className="mt-6">
             <PlusCircle className="mr-2 h-4 w-4" /> Criar seu primeiro agente
           </Button>
         </div>
       )}
 
-      <Dialog open={isBuilderModalOpen} onOpenChange={(isOpen) => {
+      {/* O AgentBuilderDialog é renderizado aqui, controlado por isBuilderModalOpen */}
+      <AgentBuilderDialog
+        isOpen={isBuilderModalOpen}
+        onOpenChange={(isOpen) => {
           setIsBuilderModalOpen(isOpen);
-          if (!isOpen) setEditingAgentId(null);
-      }}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-4 border-b">
-            <DialogTitle className="text-2xl">
-                {editingAgentId ? `Editar Agente: ${agentName || 'Agente'}` : "Configurar Novo Agente"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingAgentId ? "Modifique as propriedades e configurações do seu agente." : "Defina as propriedades e configurações para seu novo agente. Comece com um modelo ou configure do zero."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-grow overflow-y-auto p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="agentTemplate" className="flex items-center gap-1.5"><Layers size={16}/>Modelo de Agente Inicial (Template)</Label>
-                <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange} disabled={!!editingAgentId}>
-                  <SelectTrigger id="agentTemplate">
-                    <SelectValue placeholder="Selecione um modelo para começar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentTemplates.map(template => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Modelos pré-configuram o tipo de agente e seus campos, incluindo instruções detalhadas. Não pode ser alterado durante a edição.</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="agentType" className="flex items-center gap-1.5"><Share2 size={16}/>Tipo de Agente</Label>
-                <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentConfig["agentType"])}>
-                  <SelectTrigger id="agentType">
-                    <SelectValue placeholder="Selecione o tipo de agente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentTypeOptions.map(option => (
-                      <SelectItem key={option.id} value={option.id}>
-                         <div className="flex items-center">
-                           {React.cloneElement(option.icon as React.ReactElement, { className: "mr-2 h-4 w-4 text-muted-foreground"})}
-                           {option.label}
-                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                 <p className="text-xs text-muted-foreground">
-                  {agentTypeOptions.find(opt => opt.id === agentType)?.description || "Define a arquitetura e o comportamento fundamental do agente."}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="agentName">Nome do Agente</Label>
-              <Input
-                id="agentName"
-                placeholder="ex: Agente de Suporte Avançado"
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agentDescription">Descrição Geral do Agente</Label>
-              <Textarea
-                id="agentDescription"
-                placeholder="Descreva a função principal e o objetivo geral deste agente, independente do tipo..."
-                value={agentDescription}
-                onChange={(e) => setAgentDescription(e.target.value)}
-              />
-            </div>
-
-            <Separator />
-
-            <div>
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções {agentType !== 'llm' && !(agentGoal || agentTasks || agentPersonality || agentRestrictions) && '(Opcional para este tipo)'}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {agentType === 'llm'
-                  ? "Forneça instruções claras para guiar o comportamento de decisão do agente. As respostas abaixo ajudarão a construir o \"Prompt do Sistema\" ideal."
-                  : "Se este agente utilizar um Modelo de Linguagem para alguma de suas funções ou para descrever seu comportamento geral, configure aqui."
-                }
-              </p>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
-                  <Input
-                    id="agentGoal"
-                    placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos."
-                    value={agentGoal}
-                    onChange={(e) => setAgentGoal(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
-                  <Textarea
-                    id="agentTasks"
-                    placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos."
-                    value={agentTasks}
-                    onChange={(e) => setAgentTasks(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
-                  <Select value={agentPersonality} onValueChange={setAgentPersonality}>
-                    <SelectTrigger id="agentPersonality">
-                      <SelectValue placeholder="Selecione um tom/personalidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agentToneOptions.map(option => (
-                        <SelectItem key={option.id} value={option.label}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma restrição ou informação importante para o agente?</Label>
-                  <Textarea
-                    id="agentRestrictions"
-                    placeholder="ex: Nunca fornecer informações de contato direto."
-                    value={agentRestrictions}
-                    onChange={(e) => setAgentRestrictions(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
-            <Separator />
-            <div>
-              <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {agentType !== 'llm' && !agentModel && '(Opcional para este tipo)'}</h3>
-               <p className="text-sm text-muted-foreground mb-4">
-                  Se este agente utilizar um Modelo de Linguagem Grande (LLM) para alguma de suas funções, configure-o aqui.
-                </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agentModel">Modelo de IA (via Genkit)</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Escolha o modelo Gemini para o agente. Outros (ex: OpenRouter) requerem fluxo Genkit dedicado e podem não funcionar no chat padrão sem ele.
-                  </p>
-                  <Select value={agentModel} onValueChange={setAgentModel}>
-                    <SelectTrigger id="agentModel">
-                      <SelectValue placeholder="Selecione um modelo (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="googleai/gemini-1.5-pro-latest">Gemini 1.5 Pro (Google)</SelectItem>
-                      <SelectItem value="googleai/gemini-1.5-flash-latest">Gemini 1.5 Flash (Google)</SelectItem>
-                      <SelectItem value="googleai/gemini-pro">Gemini 1.0 Pro (Google)</SelectItem>
-                      <SelectItem value="googleai/gemini-2.0-flash">Gemini 2.0 Flash (Google - Padrão Genkit)</SelectItem>
-                      <SelectItem value="openrouter/custom">OpenRouter (requer fluxo Genkit dedicado)</SelectItem>
-                      <SelectItem value="requestly/custom">Requestly Mock (requer fluxo Genkit dedicado)</SelectItem>
-                      <SelectItem value="custom-http/genkit">Outro Endpoint HTTP (requer fluxo Genkit dedicado)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentTemperature">Temperatura: {agentTemperature[0].toFixed(1)}</Label>
-                  <Slider
-                    id="agentTemperature"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={agentTemperature}
-                    onValueChange={setAgentTemperature}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Controla a criatividade da resposta. Baixo = focado, Alto = criativo.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {agentType === 'workflow' && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Workflow className="w-5 h-5 text-primary/80" /> Configuração do Fluxo de Trabalho</h3>
-                   <Alert className="mb-4">
-                    <Workflow className="h-4 w-4" />
-                    <AlertTitle>Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)</AlertTitle>
-                    <AlertDescription>
-                      Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si, resultando em padrões de execução previsíveis.
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-2 mb-4">
-                    <Label htmlFor="workflowDescription">Descrição Geral do Fluxo de Trabalho</Label>
-                    <Textarea
-                      id="workflowDescription"
-                      placeholder="Descreva o objetivo geral e o funcionamento esperado deste fluxo de trabalho..."
-                      value={workflowDescription}
-                      onChange={(e) => setWorkflowDescription(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2 mb-6">
-                    <Label htmlFor="detailedWorkflowType">Tipo de Fluxo Detalhado</Label>
-                    <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}>
-                      <SelectTrigger id="detailedWorkflowType">
-                        <SelectValue placeholder="Selecione o tipo de fluxo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sequential">Sequencial (Executar em ordem)</SelectItem>
-                        <SelectItem value="parallel">Paralelo (Executar simultaneamente)</SelectItem>
-                        <SelectItem value="loop">Loop (Repetir até condição)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {detailedWorkflowType === 'sequential' && (
-                    <Card className="bg-muted/30">
-                      <CardHeader>
-                        <CardTitle className="text-base">Configurar Etapas Sequenciais</CardTitle>
-                        <CardDescription className="text-xs">Defina a ordem dos subagentes. A saída de uma etapa pode ser usada pela próxima.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente sequencial."})}>
-                          <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Etapa
-                        </Button>
-                        <div className="p-3 border rounded-md bg-background/70 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/>
-                              <span className="text-sm">Ex: Agente de Análise de Sentimento (Tipo: LLM, ID: agent_sentiment)</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" 
-                                onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa: Aqui você definiria as instruções específicas para este subagente, incluindo como ele pode usar chaves de saída de etapas anteriores (ex: {resultado_etapa_anterior}) e qual chave de saída (output_key) ele próprio fornecerá."})}>
-                                <Settings size={14} />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover etapa."})}>
-                                <Trash2 size={14} />
-                              </Button>
-                            </div>
-                          </div>
-                           <div className="pl-6 space-y-1">
-                            <Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
-                            <Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: sentimento_analisado" />
-                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {detailedWorkflowType === 'parallel' && (
-                    <Card className="bg-muted/30">
-                      <CardHeader>
-                        <CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle>
-                        <CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription>
-                      </CardHeader>
-                       <CardContent className="space-y-3">
-                        <Alert variant="default" className="mt-3 mb-4 bg-background/50 border-border/70">
-                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                            <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
-                            <AlertDescription className="text-xs">
-                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. 
-                                Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. 
-                                Para coletar e processar os resultados, cada subagente paralelo deve usar uma "Chave de Saída" (`output_key`) para salvar seu resultado individual (ex: no estado da sessão). 
-                                Geralmente, um Agente Sequencial é usado como a próxima etapa no fluxo de trabalho geral para ler essas "Chaves de Saída" e então processar/mesclar os resultados usando um CustomAgent ou LlmAgent.
-                            </AlertDescription>
-                        </Alert>
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
-                          <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela
-                        </Button>
-                         <div className="p-3 border rounded-md bg-background/70 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" 
-                                onClick={() => toast({ title: "Em breve!", description: "Configurar Tarefa Paralela: Aqui você definiria as instruções para este subagente, incluindo a output_key que ele usará para armazenar seu resultado individual. Lembre-se que ele rodará em paralelo e, por padrão, de forma isolada de outras tarefas paralelas."})}>
-                                <Settings size={14} />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover tarefa."})}>
-                                <Trash2 size={14} />
-                              </Button>
-                            </div>
-                          </div>
-                           <div className="pl-0 space-y-1 mt-1.5"> 
-                            <Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label>
-                            <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: resultado_imagem_gerada" />
-                            <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela (ex: salvo no estado da sessão).</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {detailedWorkflowType === 'loop' && (
-                    <Card className="bg-muted/30">
-                      <CardHeader>
-                        <CardTitle className="text-base">Configurar Loop de Execução</CardTitle>
-                        <CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="loopMaxIterations">Número Máximo de Iterações (Opcional)</Label>
-                          <Input
-                            id="loopMaxIterations"
-                            type="number"
-                            min="1"
-                            placeholder="Ex: 5"
-                            value={loopMaxIterations || ""}
-                            onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)}
-                            className="h-9"
-                          />
-                           <p className="text-xs text-muted-foreground">Deixe em branco para loops baseados em outras condições (a serem definidas na lógica do agente).</p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-1.5">Condição de Término Adicional (Opcional):</Label>
-                            <RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)}>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="none" id="loop-cond-none" />
-                                    <Label htmlFor="loop-cond-none" className="font-normal">Nenhuma (apenas máximo de iterações)</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="subagent_signal" id="loop-cond-signal" />
-                                    <Label htmlFor="loop-cond-signal" className="font-normal">Sinalização por Subagente</Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
-                        {loopTerminationConditionType === 'subagent_signal' && (
-                            <Alert variant="default" className="mt-3 bg-background/50 border-border/70">
-                                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                                <AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle>
-                                <AlertDescription className="text-xs">
-                                    Um subagente dentro do loop pode sinalizar o término (ex: usando uma ferramenta como 'exit_loop' ou retornando um valor/estado particular).
-                                    Configure o subagente apropriado com essa lógica e, opcionalmente, especifique abaixo a ferramenta ou o valor de estado esperado para o término.
-                                </AlertDescription>
-                                <div className="mt-3 space-y-2 pl-1">
-                                    <div>
-                                        <Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label>
-                                        <Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/30" />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label>
-                                        <Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/30" />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label>
-                                        <Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/30" />
-                                    </div>
-                                </div>
-                            </Alert>
-                        )}
-                        <Separator className="my-3"/>
-                        <h4 className="text-sm font-medium pt-1">Subagente(s) na Sequência do Loop:</h4>
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente ao loop."})}>
-                          <PlusCircle size={16} className="mr-2" /> Adicionar Subagente ao Loop
-                        </Button>
-                        <div className="p-3 border rounded-md bg-background/70 space-y-2">
-                           <div className="flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/>
-                                <span className="text-sm">Ex: Agente de Coleta de Dados (Tipo: LLM, ID: agent_data_collector)</span>
-                             </div>
-                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" 
-                                onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa do Loop: Aqui você definiria as instruções para este subagente, como ele usa output_keys de etapas anteriores na mesma iteração, qual output_key ele produz, e se ele tem um papel em sinalizar o término do loop (ex: usando uma ferramenta como 'exit_loop' ou verificando uma condição)." })}>
-                                <Settings size={14} />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover subagente."})}>
-                                <Trash2 size={14} />
-                              </Button>
-                            </div>
-                          </div>
-                           <div className="pl-6 space-y-1">
-                            <Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
-                            <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50" placeholder="ex: dados_coletados_iteracao" />
-                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras da mesma iteração ou após o loop.</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              </>
-            )}
-
-            {agentType === 'custom' && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><FileJson className="w-5 h-5 text-primary/80" /> Configuração do Agente Personalizado</h3>
-                  <Alert className="mb-4">
-                    <FileJson className="h-4 w-4" />
-                    <AlertTitle>Agente Personalizado (Ex: BaseAgent Estendido do ADK)</AlertTitle>
-                    <AlertDescription>
-                      Implemente lógica operacional única e fluxos de controle específicos que vão além dos tipos de agente padrão, estendendo conceitualmente a BaseAgent. Agentes personalizados tipicamente orquestram outros agentes (como LlmAgent ou LoopAgent) e podem gerenciar o estado da sessão. Requer desenvolvimento de um fluxo Genkit customizado no backend (equivalente a implementar <code>_run_async_impl</code>).
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-2">
-                    <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
-                    <Textarea
-                      id="customLogicDescription"
-                      placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit personalizado implementará..."
-                      value={customLogicDescription}
-                      onChange={(e) => setCustomLogicDescription(e.target.value)}
-                      rows={6}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Separator />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="agentVersion">Versão do Agente</Label>
-                    <Input
-                    id="agentVersion"
-                    placeholder="ex: 1.0.0"
-                    value={agentVersion}
-                    onChange={(e) => setAgentVersion(e.target.value)}
-                    />
-                </div>
-            </div>
-
-            <div className="space-y-4">
-              <Label className="text-lg font-medium flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</Label>
-              <Card className="bg-muted/30">
-                <CardContent className="p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Capacite seu agente com funcionalidades para interagir com o mundo exterior. A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.
-                  </p>
-                  <div className="space-y-3 pt-2">
-                    {availableTools.map((tool) => (
-                      <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
-                        <Checkbox
-                          id={`tool-${tool.id}`}
-                          checked={currentAgentTools.includes(tool.id)}
-                          onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)}
-                          className="mt-1"
-                        />
-                        <div className="ml-3 flex-grow">
-                          <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                            {React.cloneElement(tool.icon as React.ReactElement, { size: 16, className: "mr-2"})}
-                            {tool.label}
-                            {tool.needsConfiguration && <ConfigureIcon size={14} className="ml-2 text-muted-foreground group-hover:text-primary transition-colors" title="Requer Configuração"/>}
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
-                        </div>
-                        {tool.needsConfiguration && currentAgentTools.includes(tool.id) && (
-                          <Button
-                              variant="outline"
-                              size="sm"
-                              className="ml-auto shrink-0"
-                              onClick={() => openToolConfigModal(tool)}
-                          >
-                            <ConfigureIcon size={14} className="mr-1.5" />
-                            {toolConfigurations[tool.id] &&
-                              ( (tool.id === 'webSearch' && toolConfigurations[tool.id]?.googleApiKey && toolConfigurations[tool.id]?.googleCseId) ||
-                                (tool.id === 'customApiIntegration' && toolConfigurations[tool.id]?.openapiSpecUrl) ||
-                                (tool.id === 'databaseAccess' && (toolConfigurations[tool.id]?.dbConnectionString || (toolConfigurations[tool.id]?.dbHost && toolConfigurations[tool.id]?.dbName))) ||
-                                (tool.id === 'knowledgeBase' && toolConfigurations[tool.id]?.knowledgeBaseId) ||
-                                (tool.id === 'calendarAccess' && toolConfigurations[tool.id]?.calendarApiEndpoint) ||
-                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfigurations[tool.id] || {}).length > 0 )
-                              ) ? "Reconfigurar" : "Configurar"}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {currentAgentTools.length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
-                      <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
-                      <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                        {currentAgentTools.map(toolId => {
-                            const tool = availableTools.find(t => t.id === toolId);
-                            if (!tool) return null;
-
-                            let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
-                            const iconProp = tool.icon;
-                             if (React.isValidElement(iconProp) && typeof iconProp.type === 'function') {
-                                const IconComponent = iconProp.type as React.FC<React.SVGProps<SVGSVGElement>>;
-                                const foundIconName = Object.keys(iconComponents).find(
-                                    name => iconComponents[name] === IconComponent
-                                ) as keyof typeof iconComponents | undefined;
-                                if (foundIconName) {
-                                    iconNameKey = foundIconName;
-                                }
-                            }
-                            const IconToRender = getToolIconComponent(iconNameKey);
-                            const toolIcon = <IconToRender size={14} className="mr-1.5 inline-block" />;
-
-                            const currentToolConfig = toolConfigurations[tool.id];
-                            const isConfigured = tool.needsConfiguration && currentToolConfig &&
-                                                ( (tool.id === 'webSearch' && currentToolConfig.googleApiKey && currentToolConfig.googleCseId) ||
-                                                  (tool.id === 'customApiIntegration' && currentToolConfig.openapiSpecUrl) ||
-                                                  (tool.id === 'databaseAccess' && (currentToolConfig.dbConnectionString || (currentToolConfig.dbHost && currentToolConfig.dbName))) ||
-                                                  (tool.id === 'knowledgeBase' && currentToolConfig.knowledgeBaseId) ||
-                                                  (tool.id === 'calendarAccess' && currentToolConfig.calendarApiEndpoint) ||
-                                                  (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(currentToolConfig).length > 0 )
-                                                );
-                            return (
-                              <li key={toolId} className="flex items-center">
-                                  {toolIcon}
-                                  {tool.label}
-                                  {tool.needsConfiguration && (
-                                      <ConfigureIcon
-                                          size={12}
-                                          className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`}
-                                          title={isConfigured ? "Configurada" : "Requer configuração"}
-                                      />
-                                  )}
-                              </li>
-                            );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <DialogFooter className="p-6 pt-4 border-t">
-            <Button variant="outline" onClick={() => { setIsBuilderModalOpen(false); setEditingAgentId(null); }}>Cancelar</Button>
-            <Button onClick={handleSaveConfiguration}>
-              <Save className="mr-2 h-4 w-4" /> {editingAgentId ? "Salvar Alterações" : "Salvar Configuração"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {isToolConfigModalOpen && configuringTool && (
-        <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => {
-          if (!open) setConfiguringTool(null);
-          setIsToolConfigModalOpen(open);
-        }}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Configurar: {configuringTool.label}</DialogTitle>
-              <DialogDescription>
-                Forneça os detalhes de configuração para a ferramenta {configuringTool.label}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-              {configuringTool.id === "webSearch" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label>
-                    <Input
-                      id="modalGoogleApiKey"
-                      value={modalGoogleApiKey}
-                      onChange={(e) => setModalGoogleApiKey(e.target.value)}
-                      placeholder="Cole sua chave API aqui (ex: AIza...)"
-                      type="password"
-                    />
-                    <p className="text-xs text-muted-foreground">Necessária para autenticar suas solicitações à API de busca.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca (CSE ID)</Label>
-                    <Input
-                      id="modalGoogleCseId"
-                      value={modalGoogleCseId}
-                      onChange={(e) => setModalGoogleCseId(e.target.value)}
-                      placeholder="Cole seu CSE ID aqui (ex: 0123...)"
-                    />
-                    <p className="text-xs text-muted-foreground">Identifica qual mecanismo de busca personalizado você deseja usar.</p>
-                  </div>
-                </>
-              )}
-              {configuringTool.id === "customApiIntegration" && (
-                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalOpenapiSpecUrl">URL do Esquema OpenAPI (JSON ou YAML)</Label>
-                    <Input
-                      id="modalOpenapiSpecUrl"
-                      value={modalOpenapiSpecUrl}
-                      onChange={(e) => setModalOpenapiSpecUrl(e.target.value)}
-                      placeholder="ex: https://petstore.swagger.io/v2/swagger.json"
-                    />
-                    <p className="text-xs text-muted-foreground">O link direto para o arquivo de especificação da API.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalOpenapiApiKey">Chave de API da API Externa (Opcional)</Label>
-                    <Input
-                      id="modalOpenapiApiKey"
-                      value={modalOpenapiApiKey}
-                      onChange={(e) => setModalOpenapiApiKey(e.target.value)}
-                      placeholder="Se a API requer uma chave de autenticação"
-                      type="password"
-                    />
-                     <p className="text-xs text-muted-foreground">Usada pelo agente para interagir com a API externa.</p>
-                  </div>
-                </>
-              )}
-              {configuringTool.id === "databaseAccess" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalDbType">Tipo de Banco de Dados</Label>
-                    <Select value={modalDbType} onValueChange={setModalDbType}>
-                        <SelectTrigger id="modalDbType">
-                            <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="postgresql">PostgreSQL</SelectItem>
-                            <SelectItem value="mysql">MySQL</SelectItem>
-                            <SelectItem value="sqlserver">SQL Server</SelectItem>
-                            <SelectItem value="sqlite">SQLite</SelectItem>
-                            <SelectItem value="other">Outro (especificar string de conexão)</SelectItem>
-                        </SelectContent>
-                    </Select>
-                  </div>
-                  {modalDbType !== 'other' && modalDbType !== 'sqlite' && (
-                    <>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="modalDbHost">Host</Label>
-                                <Input id="modalDbHost" value={modalDbHost} onChange={(e) => setModalDbHost(e.target.value)} placeholder="ex: localhost ou endereço do servidor" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="modalDbPort">Porta</Label>
-                                <Input id="modalDbPort" type="number" value={modalDbPort} onChange={(e) => setModalDbPort(e.target.value)} placeholder="ex: 5432" />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="modalDbName">Nome do Banco de Dados</Label>
-                            <Input id="modalDbName" value={modalDbName} onChange={(e) => setModalDbName(e.target.value)} placeholder="ex: meu_banco_de_dados" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="modalDbUser">Usuário</Label>
-                                <Input id="modalDbUser" value={modalDbUser} onChange={(e) => setModalDbUser(e.target.value)} placeholder="ex: admin_usuario" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="modalDbPassword">Senha</Label>
-                                <Input id="modalDbPassword" type="password" value={modalDbPassword} onChange={(e) => setModalDbPassword(e.target.value)} />
-                            </div>
-                        </div>
-                    </>
-                  )}
-                  {(modalDbType === 'other' || modalDbType === 'sqlite') && (
-                    <div className="space-y-2">
-                        <Label htmlFor="modalDbConnectionString">String de Conexão (ou Caminho para SQLite)</Label>
-                        <Input
-                        id="modalDbConnectionString"
-                        value={modalDbConnectionString}
-                        onChange={(e) => setModalDbConnectionString(e.target.value)}
-                        placeholder={modalDbType === 'sqlite' ? "ex: /caminho/para/meu_banco.db" : "ex: postgresql://user:pass@host:port/db"}
-                        />
-                         <p className="text-xs text-muted-foreground">
-                            {modalDbType === 'sqlite' ? 'Caminho absoluto ou relativo para o arquivo do banco de dados SQLite.' : 'Formato completo da string de conexão.'}
-                        </p>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="modalDbDescription">Descrição do Banco/Tabelas (Opcional)</Label>
-                    <Textarea
-                        id="modalDbDescription"
-                        value={modalDbDescription}
-                        onChange={(e) => setModalDbDescription(e.target.value)}
-                        placeholder="Ex: Contém tabelas de clientes e pedidos. Tabela 'clientes' tem colunas: id, nome, email."
-                        rows={3}
-                    />
-                    <p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto dos dados disponíveis.</p>
-                  </div>
-                </>
-              )}
-               {configuringTool.id === "knowledgeBase" && (
-                <div className="space-y-2">
-                    <Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label>
-                    <Input
-                      id="modalKnowledgeBaseId"
-                      value={modalKnowledgeBaseId}
-                      onChange={(e) => setModalKnowledgeBaseId(e.target.value)}
-                      placeholder="ex: documentos_produto_xyz ou faq_servico_abc"
-                    />
-                    <p className="text-xs text-muted-foreground">Identificador único para a base de conhecimento que o agente deve consultar (ex: Vertex AI Search Datastore ID, nome de coleção Pinecone, etc.).</p>
-                </div>
-              )}
-              {configuringTool.id === "calendarAccess" && (
-                <div className="space-y-2">
-                    <Label htmlFor="modalCalendarApiEndpoint">Endpoint da API de Calendário ou ID do Fluxo Genkit</Label>
-                    <Input
-                      id="modalCalendarApiEndpoint"
-                      value={modalCalendarApiEndpoint}
-                      onChange={(e) => setModalCalendarApiEndpoint(e.target.value)}
-                      placeholder="ex: https://api.example.com/calendar ou nome_do_fluxo_genkit_calendario"
-                    />
-                    <p className="text-xs text-muted-foreground">URL do endpoint da API ou o identificador do fluxo Genkit responsável pelo acesso à agenda. Pode requerer autenticação OAuth configurada separadamente no backend.</p>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline" onClick={() => { setIsToolConfigModalOpen(false); setConfiguringTool(null);}}>Cancelar</Button>
-              </DialogClose>
-              <Button onClick={handleSaveToolConfiguration}>Salvar Configuração</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+          if (!isOpen) {
+            setEditingAgentId(null);
+            setCurrentEditingAgent(null);
+          }
+        }}
+        editingAgent={currentEditingAgent}
+        onSave={handleSaveAgent}
+        agentTemplates={agentTemplates}
+        availableTools={availableTools}
+        agentTypeOptions={agentTypeOptions}
+        agentToneOptions={agentToneOptions}
+        iconComponents={iconComponents}
+      />
     </div>
   );
 }
 
     
-
-    
-
-  
