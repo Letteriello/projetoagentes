@@ -17,7 +17,6 @@ import {
   SidebarInset,
   useSidebar,
 } from '@/components/ui/sidebar';
-// AppLogo não é mais usado aqui
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -29,9 +28,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/', icon: LayoutGrid, label: 'Início' },
-  { href: '/agent-builder', icon: Cpu, label: 'Construtor de Agentes' },
-  { href: '/chat', icon: MessageSquare, label: 'Chat com Agentes' },
-  { href: '/api-key-vault', icon: KeyRound, label: 'Cofre de Chaves API' },
+  { href: '/agent-builder', icon: Cpu, label: 'Agentes' }, // Alterado
+  { href: '/chat', icon: MessageSquare, label: 'Chat' }, // Alterado
+  { href: '/api-key-vault', icon: KeyRound, label: 'Chaves API' }, // Alterado
 ];
 
 function MainLayout({ children }: { children: ReactNode }) {
@@ -60,9 +59,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider defaultOpen>
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-        <SidebarHeader className="p-4 flex items-center justify-center h-16"> {/* Ajustado para centralizar melhor o texto */}
+        <SidebarHeader className="p-4 flex items-center justify-center h-16">
           <Link href="/" className="hover:text-sidebar-primary/90 transition-colors">
-            {/* Ícone AppLogo removido */}
             <span className="aida-logo-text">Aida</span>
           </Link>
         </SidebarHeader>
