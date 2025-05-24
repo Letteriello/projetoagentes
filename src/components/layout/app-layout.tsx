@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, PanelLeftClose, PanelRightOpen, Home } from 'lucide-react';
+import { Cpu, MessageSquare, KeyRound, Settings, UserCircle, ChevronsLeft, ChevronsRight, Home } from 'lucide-react';
 import {
   Sidebar,
   SidebarHeader,
@@ -15,7 +15,6 @@ import {
   SidebarMenuButton,
   SidebarInset,
   useSidebar,
-  // SidebarProvider // Removido pois está no RootLayout
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -39,7 +38,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/agent-builder', icon: Cpu, label: 'Agentes' },
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
-  // { href: '/api-key-vault', icon: KeyRound, label: 'Chaves API' }, // Movido para o Dropdown
 ];
 
 // Componente interno para o toggle da sidebar, usando o contexto
@@ -76,7 +74,6 @@ function MainLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarInset>
-      {/* Header móvel simplificado */}
       {mounted && isMobile && (
         <header
           className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
@@ -86,7 +83,6 @@ function MainLayout({ children }: { children: ReactNode }) {
           </Button>
         </header>
       )}
-      {/* Conteúdo principal da página */}
       {children}
     </SidebarInset>
   );
@@ -98,8 +94,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const { state: sidebarState, isMobile, collapsible, mounted } = useSidebar();
 
-  // Determina se a sidebar está no modo "apenas ícone"
-  // Esta lógica precisa ser robusta e considerar que `collapsible` pode não ser 'icon'
   const isSidebarIconOnly = mounted && !isMobile && collapsible === 'icon' && sidebarState === 'collapsed';
 
   return (
@@ -107,7 +101,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground" collapsible="icon">
         <SidebarHeader className={cn(
           "flex items-center relative",
-          isSidebarIconOnly ? "h-14 justify-center py-2" : "h-16 justify-center p-4" // Removido px-2 para iconOnly
+          isSidebarIconOnly ? "h-14 justify-center py-2" : "h-16 justify-center p-4" 
         )}>
           <SidebarToggle />
           {!isSidebarIconOnly && (
@@ -124,15 +118,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
-                    className={cn(
-                      isSidebarIconOnly ? "justify-center" : "justify-start"
+                    className={cn( // A centralização do botão em modo ícone é feita pelo SidebarMenuButton
+                      // isSidebarIconOnly ? "justify-center" : "justify-start"
                     )}
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
                     <a>
                       <item.icon className={cn(
-                        "flex-shrink-0",
-                        isSidebarIconOnly ? "size-6" : "size-5 mr-2" 
+                        "flex-shrink-0 size-5", // Ícone sempre size-5 (20px)
+                        isSidebarIconOnly ? "" : "mr-2" 
                       )} />
                       {!isSidebarIconOnly && <span className="truncate">{item.label}</span>}
                     </a>
@@ -149,14 +143,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   className={cn(
-                     isSidebarIconOnly ? "justify-center" : "justify-start w-full"
+                    // isSidebarIconOnly ? "justify-center" : "justify-start w-full"
                   )}
                   tooltip={{ children: "Minha Conta", side: "right", className: "bg-popover text-popover-foreground" }}
                   aria-label="Opções da conta"
                 >
                   <UserCircle className={cn(
-                     "flex-shrink-0",
-                     isSidebarIconOnly ? "size-6" : "size-5 mr-2" 
+                     "flex-shrink-0 size-5",  // Ícone sempre size-5 (20px)
+                     isSidebarIconOnly ? "" : "mr-2" 
                   )} />
                   {!isSidebarIconOnly && <span className="truncate">Minha Conta</span>}
                 </SidebarMenuButton>
@@ -189,3 +183,4 @@ export function AppLayout({ children }: { children: ReactNode }) {
     </>
   );
 }
+
