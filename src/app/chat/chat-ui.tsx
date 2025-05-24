@@ -7,20 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator"; // Added import
-import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Send, User, Bot, SparklesIcon, Settings2, HardDrive, Cpu, RefreshCcw } from "lucide-react"; // Added RefreshCcw
 import { useState, useRef, useEffect, useActionState } from "react";
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
-import { useAgents } from "@/contexts/AgentsContext"; // Importado
-import type { SavedAgentConfiguration } from "@/app/agent-builder/page"; // Importado
+import { useAgents } from "@/contexts/AgentsContext";
+import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builder/page";
 
-interface Message {
+interface ChatMessage {
   id: string;
   text: string;
   sender: "user" | "agent" | "system";
-  gem?: string; // Nome da personalidade/gem selecionada
-  agentName?: string; // Nome do agente selecionado
+  role: "user" | "model"; // For Genkit history
 }
 
 const initialGems = [
@@ -36,34 +35,29 @@ const initialState = {
   errors: null,
 };
 
-function SubmitButton() {
-  // useActionState needs to be called within the component that uses the form.
-  // To get isPending here, it should be passed as a prop or this button
-  // needs to be more tightly coupled with the form's action state.
-  // For now, let's assume isPending is passed as a prop or context if needed.
-  // const [,,isPending] = useActionState(async () => {}, undefined);
-  // This line above will cause an error if uncommented, as useActionState is already used in ChatUI
-  // and hooks cannot be called conditionally or nested in this way.
-  // We will rely on the isPending from the parent ChatUI component.
-  return (
-    <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" aria-disabled={false /* Replace with actual isPending if passed */} >
-      {false /* Replace with actual isPending if passed */ ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
-      <span className="sr-only">Enviar</span>
-    </Button>
-  );
-}
-
 export function ChatUI() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'model', content: string }>>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]); // UI messages, includes sender for styling
   const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>("none"); // 'none' para Assistente Geral/Gem Padrão
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("none");
+  const [activeChatTarget, setActiveChatTarget] = useState<string>(initialGems[0].name);
 
-  const { savedAgents } = useAgents(); // Consumindo o contexto
+  const { savedAgents } = useAgents();
   const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectedAgentId !== 'none') {
+      const agent = savedAgents.find(a => a.id === selectedAgentId);
+      setActiveChatTarget(agent ? `Agente: ${agent.agentName}` : "Agente não encontrado");
+    } else {
+      const gem = initialGems.find(g => g.id === selectedGemId);
+      setActiveChatTarget(gem ? `Gem: ${gem.name}` : "Gem não encontrado");
+    }
+  }, [selectedAgentId, selectedGemId, savedAgents]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -73,72 +67,82 @@ export function ChatUI() {
 
   useEffect(() => {
     if (formState.agentResponse && !isPending) {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { id: Date.now().toString(), text: formState.agentResponse!, sender: "agent" },
-      ]);
+      const newAgentMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: formState.agentResponse!,
+        sender: "agent",
+        role: "model",
+      };
+      setMessages((prevMessages) => [...prevMessages, newAgentMessage]);
+      setChatHistory((prevHistory) => [...prevHistory, { role: "model", content: formState.agentResponse! }]);
       formRef.current?.reset();
       inputRef.current?.focus();
-      // Reset formState fields after processing
       // @ts-ignore
       formState.agentResponse = null;
       // @ts-ignore
       formState.message = "";
     }
     if (formState.message && formState.errors && !isPending) {
-       toast({
+      toast({
         title: "Erro no Chat",
         description: formState.message,
         variant: "destructive",
       });
-       // @ts-ignore
-       formState.message = "";
+      // @ts-ignore
+      formState.message = "";
     }
   }, [formState, isPending]);
-
 
   const handleFormSubmit = (formData: FormData) => {
     const userInput = formData.get("userInput") as string;
     if (!userInput?.trim()) return;
 
-    const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
+    const newUserMessage: ChatMessage = {
+      id: (Date.now() - 1).toString(),
+      text: userInput,
+      sender: "user",
+      role: "user",
+    };
+    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+    const currentChatHistory = [...chatHistory, { role: "user" as const, content: userInput }];
+    setChatHistory(currentChatHistory);
+
+    formData.set("chatHistoryJson", JSON.stringify(currentChatHistory));
+
     const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
 
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      {
-        id: (Date.now() -1).toString(),
-        text: userInput,
-        sender: "user",
-        gem: currentAgent ? undefined : currentGem.name, // Gem só é relevante se nenhum agente específico for usado
-        agentName: currentAgent ? currentAgent.agentName : undefined
-      },
-    ]);
-
-    // Passar configurações do agente ou do gem para a action
     if (currentAgent && selectedAgentId !== 'none') {
-      formData.set("agentSystemPrompt", currentAgent.systemPromptGenerated || "Você é um assistente prestativo.");
-      if (currentAgent.agentModel) formData.set("agentModel", currentAgent.agentModel);
-      if (currentAgent.agentTemperature !== undefined) formData.set("agentTemperature", currentAgent.agentTemperature.toString());
-      // As ferramentas já estão descritas no systemPromptGenerated
+      formData.set("agentSystemPrompt", (currentAgent as LLMAgentConfig).systemPromptGenerated || "Você é um assistente prestativo.");
+      if ((currentAgent as LLMAgentConfig).agentModel) formData.set("agentModel", (currentAgent as LLMAgentConfig).agentModel!);
+      if ((currentAgent as LLMAgentConfig).agentTemperature !== undefined) formData.set("agentTemperature", (currentAgent as LLMAgentConfig).agentTemperature!.toString());
     } else {
+      const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
       formData.set("agentSystemPrompt", currentGem.prompt);
-      // Para o assistente geral, podemos usar o modelo e temperatura padrão do Genkit (não precisa passar)
     }
 
     formAction(formData);
   };
 
+  const handleNewConversation = () => {
+    setMessages([]);
+    setChatHistory([]);
+    if (inputRef.current) inputRef.current.value = "";
+    toast({ title: "Nova Conversa Iniciada", description: "O histórico do chat foi limpo." });
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden p-4 md:p-6 gap-4 bg-background">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div className="space-y-1 md:col-span-1">
           <Label htmlFor="gem-selector" className="text-xs font-medium text-muted-foreground px-1">
             <SparklesIcon size={14} className="inline-block mr-1.5 text-primary/70" />
             Personalidade Base (Gem)
           </Label>
-          <Select value={selectedGemId} onValueChange={setSelectedGemId} disabled={selectedAgentId !== 'none'}>
+          <Select 
+            value={selectedGemId} 
+            onValueChange={(value) => { setSelectedGemId(value); if(selectedAgentId === 'none') { const gem = initialGems.find(g => g.id === value); setActiveChatTarget(gem ? `Gem: ${gem.name}`:'');} }} 
+            disabled={selectedAgentId !== 'none'}
+          >
             <SelectTrigger id="gem-selector" className="bg-card border-border focus:ring-primary/50 disabled:opacity-70">
               <SelectValue placeholder="Selecione uma personalidade" />
             </SelectTrigger>
@@ -150,14 +154,16 @@ export function ChatUI() {
               ))}
             </SelectContent>
           </Select>
-           <p className="text-xs text-muted-foreground px-1">Usado se nenhum Agente específico for selecionado.</p>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-1">
           <Label htmlFor="agent-selector" className="text-xs font-medium text-muted-foreground px-1">
             <Cpu size={14} className="inline-block mr-1.5 text-primary/70" />
             Agente Específico
           </Label>
-          <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+          <Select 
+            value={selectedAgentId} 
+            onValueChange={(value) => { setSelectedAgentId(value); const agent = savedAgents.find(a => a.id === value); if(agent) { setActiveChatTarget(`Agente: ${agent.agentName}`); } else if (value === 'none') { const gem = initialGems.find(g => g.id === selectedGemId); setActiveChatTarget(gem ? `Gem: ${gem.name}`:''); } }}
+          >
             <SelectTrigger id="agent-selector" className="bg-card border-border focus:ring-primary/50">
               <SelectValue placeholder="Selecione um agente" />
             </SelectTrigger>
@@ -172,9 +178,19 @@ export function ChatUI() {
               ))}
             </SelectContent>
           </Select>
-           <p className="text-xs text-muted-foreground px-1">Substitui a personalidade Gem pela configuração do agente.</p>
+        </div>
+        <div className="md:col-span-1 flex justify-end items-center md:mt-5">
+            <Button variant="outline" size="sm" onClick={handleNewConversation}>
+                <RefreshCcw size={14} className="mr-2"/> Nova Conversa
+            </Button>
         </div>
       </div>
+        
+      {activeChatTarget && (
+        <div className="text-center text-sm text-muted-foreground py-2 border-b border-border">
+          Conversando com: <span className="font-semibold text-foreground">{activeChatTarget}</span>
+        </div>
+      )}
 
       <Card className="flex-1 flex flex-col overflow-hidden shadow-sm border-border bg-card">
         <CardContent className="flex-1 p-0 overflow-hidden">
@@ -189,7 +205,7 @@ export function ChatUI() {
                 >
                   {msg.sender === "agent" && (
                     <div className="p-2 rounded-full bg-primary/10 text-primary flex-shrink-0">
-                        <Bot className="h-5 w-5" />
+                      <Bot className="h-5 w-5" />
                     </div>
                   )}
                   <div
@@ -200,33 +216,28 @@ export function ChatUI() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                    {msg.sender === "user" && (msg.agentName || msg.gem) && (
-                       <p className="text-xs opacity-60 mt-1.5 pt-1.5 border-t border-primary-foreground/20">
-                        Enviado para: {msg.agentName ? `Agente: ${msg.agentName}` : `Gem: ${msg.gem}`}
-                       </p>
-                    )}
                   </div>
                   {msg.sender === "user" && (
-                     <div className="p-2 rounded-full bg-muted text-muted-foreground flex-shrink-0">
-                        <User className="h-5 w-5" />
+                    <div className="p-2 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                      <User className="h-5 w-5" />
                     </div>
                   )}
                 </div>
               ))}
-               {isPending && (
+              {isPending && (
                 <div className="flex items-start gap-3 justify-start">
-                   <div className="p-2 rounded-full bg-primary/10 text-primary flex-shrink-0">
-                        <Bot className="h-5 w-5 animate-pulse" />
-                    </div>
+                  <div className="p-2 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                    <Bot className="h-5 w-5 animate-pulse" />
+                  </div>
                   <div className="p-3 rounded-xl bg-muted max-w-[70%] shadow-sm rounded-bl-none">
                     <p className="text-sm text-muted-foreground">Pensando...</p>
                   </div>
                 </div>
               )}
               {formState.errors?.userInput && !isPending && (
-                 <div className="flex justify-end">
-                    <p className="text-sm text-destructive mt-1">{formState.errors.userInput.join(", ")}</p>
-                 </div>
+                <div className="flex justify-end">
+                  <p className="text-sm text-destructive mt-1">{formState.errors.userInput.join(", ")}</p>
+                </div>
               )}
             </div>
           </ScrollArea>
@@ -241,12 +252,15 @@ export function ChatUI() {
           className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
           autoComplete="off"
           required
+          disabled={isPending}
         />
         <Button type="submit" size="icon" variant="ghost" className="rounded-full hover:bg-primary/10 text-primary disabled:opacity-50" disabled={isPending} aria-disabled={isPending}>
-            {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
-            <span className="sr-only">Enviar</span>
+          {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+          <span className="sr-only">Enviar</span>
         </Button>
       </form>
     </div>
   );
 }
+
+    

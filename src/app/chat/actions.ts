@@ -8,7 +8,8 @@ const ChatMessageSchema = z.object({
   userInput: z.string().min(1, { message: "A mensagem não pode estar vazia." }),
   agentSystemPrompt: z.string().optional(),
   agentModel: z.string().optional(),
-  agentTemperature: z.coerce.number().optional(), // Coerce string from FormData to number
+  agentTemperature: z.coerce.number().optional(),
+  chatHistoryJson: z.string().optional(), // Histórico como JSON string
 });
 
 interface ChatFormState {
@@ -16,6 +17,7 @@ interface ChatFormState {
   agentResponse?: string | null;
   errors?: {
     userInput?: string[];
+    chatHistoryJson?: string[]; // Added for potential future validation
   } | null;
 }
 
@@ -28,6 +30,7 @@ export async function submitChatMessage(
     agentSystemPrompt: formData.get('agentSystemPrompt'),
     agentModel: formData.get('agentModel'),
     agentTemperature: formData.get('agentTemperature'),
+    chatHistoryJson: formData.get('chatHistoryJson'),
   });
 
   if (!validatedFields.success) {
@@ -38,13 +41,28 @@ export async function submitChatMessage(
     };
   }
 
-  const { userInput, agentSystemPrompt, agentModel, agentTemperature } = validatedFields.data;
+  const { userInput, agentSystemPrompt, agentModel, agentTemperature, chatHistoryJson } = validatedFields.data;
+
+  let history: Array<{ role: 'user' | 'model'; content: string }> | undefined = undefined;
+  if (chatHistoryJson) {
+    try {
+      history = JSON.parse(chatHistoryJson);
+    } catch (error) {
+      console.error("Erro ao parsear o histórico do chat:", error);
+      return {
+        message: "Erro interno ao processar o histórico do chat.",
+        agentResponse: null,
+        errors: { chatHistoryJson: ["Formato inválido do histórico do chat."] },
+      };
+    }
+  }
 
   const input: BasicChatInput = {
     userMessage: userInput,
-    systemPrompt: agentSystemPrompt, // Será o systemPrompt do agente ou do Gem
-    modelName: agentModel, // Modelo específico do agente
-    temperature: agentTemperature, // Temperatura específica do agente
+    systemPrompt: agentSystemPrompt,
+    modelName: agentModel,
+    temperature: agentTemperature,
+    history: history,
   };
 
   try {
@@ -58,7 +76,7 @@ export async function submitChatMessage(
     console.error("Erro ao chamar o fluxo de chat:", error);
     let errorMessage = "Ocorreu um erro ao processar sua mensagem. Tente novamente.";
     if (error instanceof Error) {
-        errorMessage = error.message;
+      errorMessage = error.message;
     }
     return {
       message: errorMessage,
@@ -67,3 +85,5 @@ export async function submitChatMessage(
     };
   }
 }
+
+    
