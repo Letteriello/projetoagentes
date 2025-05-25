@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
@@ -31,7 +31,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -317,12 +317,18 @@ export function AgentBuilderDialog({
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
             let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
+            // Ensure tool.icon is valid and is a React component type before trying to find its name
             if (React.isValidElement(tool.icon) && typeof tool.icon.type === 'function') {
-                 const IconComponent = tool.icon.type as React.FC<React.SVGProps<SVGSVGElement>>;
-                 const foundIconName = Object.keys(iconComponents).find(
-                    name => iconComponents[name] === IconComponent
-                 ) as keyof typeof iconComponents | undefined;
-                 if (foundIconName) iconNameKey = foundIconName;
+                // Check if tool.icon.type is among the values of iconComponents
+                const foundIconName = Object.keys(iconComponents).find(
+                    name => iconComponents[name] === tool.icon.type
+                ) as keyof typeof iconComponents | undefined;
+                if (foundIconName) {
+                    iconNameKey = foundIconName;
+                }
+            } else if (typeof tool.icon === 'string' && iconComponents[tool.icon as keyof typeof iconComponents]) {
+                // Fallback if icon is passed as a string name (though current setup uses ReactNode)
+                iconNameKey = tool.icon as keyof typeof iconComponents;
             }
             return { id: tool.id, label: tool.label, iconName: iconNameKey, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName };
         })
@@ -433,6 +439,7 @@ export function AgentBuilderDialog({
         setModalDbType(currentConfig.dbType || "");
         setModalDbConnectionString(currentConfig.dbConnectionString || "");
         setModalDbUser(currentConfig.dbUser || "");
+        setModalDbPassword(currentConfig.dbPassword || ""); // Added this line
         setModalDbName(currentConfig.dbName || "");
         setModalDbHost(currentConfig.dbHost || "");
         setModalDbPort(currentConfig.dbPort || "");
@@ -464,7 +471,7 @@ export function AgentBuilderDialog({
         }
         newConfigData = {
             dbType: modalDbType, dbConnectionString: modalDbConnectionString,
-            dbUser: modalDbUser, dbPassword: modalDbPassword, dbName: modalDbName,
+            dbUser: modalDbUser, dbPassword: modalDbPassword, dbName: modalDbName, // Ensure modalDbPassword is included
             dbHost: modalDbHost, dbPort: modalDbPort, dbDescription: modalDbDescription,
         };
     } else if (configuringTool.id === "knowledgeBase") {
@@ -479,11 +486,19 @@ export function AgentBuilderDialog({
     toast({ title: `Configuração salva para ${configuringTool.label}`});
   };
   
-  const selectedAgentTypeDescription = agentTypeOptions.find(opt => opt.id === agentType)?.description || "Configure seu agente.";
+  const selectedAgentTypeOption = agentTypeOptions.find(opt => opt.id === agentType);
+  const selectedAgentTypeDescription = selectedAgentTypeOption?.description || "Configure seu agente.";
+  const selectedAgentTypeLabel = selectedAgentTypeOption?.label.split(' (')[0].trim() || "Agente";
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) setConfiguringTool(null); 
+        if (!open && configuringTool) { // If main dialog closes while tool config is open
+            setIsToolConfigModalOpen(false); // Close tool config modal as well
+            setConfiguringTool(null);
+        } else if (!open) {
+            setConfiguringTool(null); // Reset if only main dialog is closing
+        }
         onOpenChange(open);
     }}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
@@ -492,114 +507,112 @@ export function AgentBuilderDialog({
             {editingAgent ? `Editar Agente: ${agentName || 'Agente'}` : "Novo Agente"}
           </DialogTitle>
           <DialogDescription>
-            {editingAgent ? "Modifique as propriedades e configurações do seu agente." : "Defina as propriedades e configurações para seu novo agente."}
+            {editingAgent ? "Modifique as propriedades e configurações do seu agente." : "Defina as propriedades e configurações para seu novo agente. Comece com um modelo ou configure do zero."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-grow overflow-y-auto p-6">
-            <Tabs defaultValue="config" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6 h-auto">
-                    <TabsTrigger value="config" className="py-2">Configuração Principal</TabsTrigger>
-                    <TabsTrigger value="tools" className="py-2">Ferramentas</TabsTrigger>
-                    {/* A aba Definição de Fluxo será condicional ou sempre presente e seu conteúdo condicional */}
+        <div className="flex-grow overflow-y-auto p-6 space-y-6">
+            <Tabs defaultValue="configPrincipal" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+                    <TabsTrigger value="configPrincipal" className="py-2">Configuração Principal</TabsTrigger>
+                    <TabsTrigger value="ferramentas" className="py-2">Ferramentas</TabsTrigger>
+                    <TabsTrigger value="definicaoFluxo" className="py-2" disabled={agentType !== 'workflow'}>Definição do Fluxo</TabsTrigger>
                 </TabsList>
                 
-                {/* Aba de Configuração Principal */}
-                <TabsContent value="config" className="space-y-6">
+                <TabsContent value="configPrincipal" className="space-y-6">
                     <TooltipProvider>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="agentTemplate" className="flex items-center">
-                                <Layers size={16} className="mr-1.5"/>Modelo de Agente Inicial
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mb-6">
+                            <Label htmlFor="agentTemplate" className="text-left flex items-center">
+                            <Layers size={16} className="mr-1.5"/>Modelo de Agente
                                 <Tooltip>
                                     <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
                                     <TooltipContent className="max-w-xs"><p>Modelos pré-configuram o tipo de agente e seus campos, incluindo instruções detalhadas. {!editingAgent ? "Mudar o template reseta os campos para os do novo modelo." : "Não pode ser alterado durante a edição."}</p></TooltipContent>
                                 </Tooltip>
-                                </Label>
-                                <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange} disabled={!!editingAgent}>
-                                <SelectTrigger id="agentTemplate"><SelectValue placeholder="Selecione um modelo para começar" /></SelectTrigger>
-                                <SelectContent>
-                                    {agentTemplates.map(template => (<SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>))}
-                                </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="agentType" className="flex items-center">
-                                <Share2 size={16} className="mr-1.5"/>Tipo de Agente
+                            </Label>
+                            <Select value={selectedAgentTemplateId} onValueChange={handleTemplateChange} disabled={!!editingAgent}>
+                            <SelectTrigger id="agentTemplate"><SelectValue placeholder="Selecione um modelo para começar" /></SelectTrigger>
+                            <SelectContent>
+                                {agentTemplates.map(template => (<SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>))}
+                            </SelectContent>
+                            </Select>
+                        </div>
+
+                        <Separator className="my-6"/>
+
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
+                            <Label htmlFor="agentType" className="text-left flex items-center">
+                            <Share2 size={16} className="mr-1.5"/>Tipo de Agente
                                 <Tooltip>
                                     <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
                                     <TooltipContent className="max-w-xs"><p>{selectedAgentTypeDescription}</p></TooltipContent>
                                 </Tooltip>
-                                </Label>
-                                <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentConfig["agentType"])}>
-                                <SelectTrigger id="agentType"><SelectValue placeholder="Selecione o tipo de agente" /></SelectTrigger>
-                                <SelectContent>
-                                    {agentTypeOptions.map(option => (
-                                    <SelectItem key={option.id} value={option.id}>
-                                        <div className="flex items-center">
-                                        {option.icon ? React.cloneElement(option.icon as React.ReactElement, { className: "mr-2 h-4 w-4 text-muted-foreground"}) : <Cpu size={16} className="mr-2 h-4 w-4 text-muted-foreground"/>}
-                                        {option.label}
-                                        </div>
-                                    </SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                            </div>
+                            </Label>
+                            <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentConfig["agentType"])}>
+                            <SelectTrigger id="agentType"><SelectValue placeholder="Selecione o tipo de agente" /></SelectTrigger>
+                            <SelectContent>
+                                {agentTypeOptions.map(option => (
+                                <SelectItem key={option.id} value={option.id}>
+                                    <div className="flex items-center">
+                                    {option.icon ? React.cloneElement(option.icon as React.ReactElement, { className: "mr-2 h-4 w-4 text-muted-foreground"}) : <Cpu size={16} className="mr-2 h-4 w-4 text-muted-foreground"/>}
+                                    {option.label}
+                                    </div>
+                                </SelectItem>
+                                ))}
+                            </SelectContent>
+                            </Select>
                         </div>
-
-                        { (agentType === 'llm' && 
-                            <Alert className="bg-card border-border/60">
-                                <Brain className="h-4 w-4" />
-                                <AlertTitle>{agentTypeOptions.find(opt => opt.id === 'llm')?.label.split(' (')[0].trim() || "Agente LLM"}</AlertTitle>
-                                <AlertDescription>{agentTypeOptions.find(opt => opt.id === 'llm')?.description}</AlertDescription>
+                        
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 mt-3">
+                            <div></div> {/* Empty cell for alignment */}
+                            <Alert variant="default" className="bg-card border-border/60 mt-1">
+                                {selectedAgentTypeOption?.icon ? React.cloneElement(selectedAgentTypeOption.icon as React.ReactElement, { className: "h-4 w-4 text-primary/80" }) : <Cpu className="h-4 w-4 text-primary/80" />}
+                                <AlertTitle>{selectedAgentTypeLabel}</AlertTitle>
+                                <AlertDescription>{selectedAgentTypeDescription}</AlertDescription>
                             </Alert>
-                        )}
-
-
-                        <div className="space-y-2">
-                            <Label htmlFor="agentName">Nome do Agente</Label>
-                            <Input id="agentName" placeholder="ex: Agente de Suporte Avançado" value={agentName} onChange={(e) => setAgentName(e.target.value)} />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="agentDescription" className="flex items-center">Descrição Geral do Agente
+
+
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mt-6">
+                            <Label htmlFor="agentName" className="text-left">Nome do Agente</Label>
+                            <Input id="agentName" placeholder="ex: Suporte Nível 1" value={agentName} onChange={(e) => setAgentName(e.target.value)} />
+
+                            <Label htmlFor="agentDescription" className="text-left flex items-start pt-2.5">
+                                Descrição Geral
                                 <Tooltip>
                                     <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
                                     <TooltipContent className="max-w-xs"><p>Esta descrição será incluída no prompt do sistema do agente e pode ser usada por outros agentes LLM para decidir se devem delegar uma tarefa a ele.</p></TooltipContent>
                                 </Tooltip>
                             </Label>
-                            <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo geral deste agente..." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} />
+                            <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo geral deste agente..." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} rows={3}/>
                         </div>
                         
                         {agentType === 'workflow' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="workflowDescription">Descrição Geral do Fluxo de Trabalho</Label>
+                            <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-3">
+                                <Label htmlFor="workflowDescription" className="text-left pt-2.5">Descrição Geral do Fluxo</Label>
                                 <Textarea id="workflowDescription" placeholder="Descreva o objetivo geral e o funcionamento esperado deste fluxo..." value={workflowDescription} onChange={(e) => setWorkflowDescription(e.target.value)} rows={3}/>
                             </div>
                         )}
                         {agentType === 'custom' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="customLogicDescription">Descrição da Lógica Personalizada (Genkit Flow)</Label>
+                             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-3">
+                                <Label htmlFor="customLogicDescription" className="text-left pt-2.5">Descrição da Lógica Personalizada</Label>
                                 <Textarea id="customLogicDescription" placeholder="Descreva a funcionalidade principal e a lógica que seu fluxo Genkit customizado implementará..." value={customLogicDescription} onChange={(e) => setCustomLogicDescription(e.target.value)} rows={6}/>
                             </div>
                         )}
 
-                        <Separator />
+                        <Separator className="my-6"/>
                         <div>
-                            <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções {agentType !== 'llm' && !(agentGoal || agentTasks || agentPersonality || agentRestrictions || agentModel) && '(Opcional para este tipo)'}</h3>
-                            { (agentType !== 'llm' && !(agentGoal || agentTasks || agentPersonality || agentRestrictions || agentModel)) && 
-                                <p className="text-sm text-muted-foreground mb-4">Se este agente utilizar um Modelo de Linguagem para alguma de suas funções ou para descrever seu comportamento geral, configure aqui.</p>
-                            }
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="agentGoal" className="flex items-center gap-1.5"><Target size={16}/>Qual é o objetivo principal deste agente?</Label>
-                                    <Input id="agentGoal" placeholder="ex: Ajudar usuários a encontrarem informações sobre nossos produtos." value={agentGoal} onChange={(e) => setAgentGoal(e.target.value)} />
+                            <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Settings className="w-5 h-5 text-primary/80" /> Comportamento e Instruções {agentType !== 'llm' && !(agentGoal || agentTasks || agentPersonality || agentRestrictions) && '(Opcional para este tipo)'}</h3>
+                             <div className="space-y-3">
+                                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
+                                    <Label htmlFor="agentGoal" className="text-left flex items-center gap-1.5"><Target size={16}/>Objetivo</Label>
+                                    <Input id="agentGoal" placeholder="ex: Ajudar usuários a encontrarem informações sobre produtos." value={agentGoal} onChange={(e) => setAgentGoal(e.target.value)} />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="agentTasks" className="flex items-center gap-1.5"><ListChecks size={16}/>Quais são as principais tarefas que este agente deve realizar?</Label>
+                                <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
+                                    <Label htmlFor="agentTasks" className="text-left flex items-center gap-1.5 pt-2.5"><ListChecks size={16}/>Tarefas</Label>
                                     <Textarea id="agentTasks" placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos." value={agentTasks} onChange={(e) => setAgentTasks(e.target.value)} rows={3} />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="agentPersonality" className="flex items-center gap-1.5"><Smile size={16}/>Qual deve ser a personalidade/tom do agente?</Label>
+                                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
+                                    <Label htmlFor="agentPersonality" className="text-left flex items-center gap-1.5"><Smile size={16}/>Personalidade/Tom</Label>
                                     <Select value={agentPersonality} onValueChange={setAgentPersonality}>
                                     <SelectTrigger id="agentPersonality"><SelectValue placeholder="Selecione um tom/personalidade" /></SelectTrigger>
                                     <SelectContent>
@@ -607,22 +620,22 @@ export function AgentBuilderDialog({
                                     </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="agentRestrictions" className="flex items-center gap-1.5"><Ban size={16}/>Há alguma restrição ou informação importante para o agente?</Label>
+                                <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
+                                    <Label htmlFor="agentRestrictions" className="text-left flex items-center gap-1.5 pt-2.5"><Ban size={16}/>Restrições</Label>
                                     <Textarea id="agentRestrictions" placeholder="ex: Nunca fornecer informações de contato direto." value={agentRestrictions} onChange={(e) => setAgentRestrictions(e.target.value)} rows={3}/>
                                 </div>
                             </div>
                         </div>
 
-                        <Separator />
+                        <Separator className="my-6"/>
                         <div>
-                            <h3 className="text-lg font-medium mb-3 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {agentType !== 'llm' && !agentModel && '(Opcional para este tipo)'}</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="agentModel" className="flex items-center">Modelo de IA (via Genkit)
+                            <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {agentType !== 'llm' && !agentModel && '(Opcional para este tipo)'}</h3>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
+                                    <Label htmlFor="agentModel" className="text-left flex items-center">Modelo de IA
                                         <Tooltip>
                                             <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                            <TooltipContent className="max-w-xs"><p>Modelos Google são integrados. Outros (OpenRouter, Requestly, etc.) requerem um fluxo Genkit dedicado no backend e podem não funcionar no chat padrão sem essa customização. A configuração aqui serve para documentar a intenção e guiar o prompt do sistema.</p></TooltipContent>
+                                            <TooltipContent className="max-w-xs"><p>Modelos Google são integrados via Genkit. Outros (OpenRouter, etc.) requerem fluxo Genkit dedicado e podem não funcionar no chat padrão sem essa customização.</p></TooltipContent>
                                         </Tooltip>
                                     </Label>
                                     <Select value={agentModel} onValueChange={setAgentModel}>
@@ -638,8 +651,8 @@ export function AgentBuilderDialog({
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="agentTemperature" className="flex items-center">Temperatura: {agentTemperature[0].toFixed(1)}
+                                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
+                                    <Label htmlFor="agentTemperature" className="text-left flex items-center">Temperatura: {agentTemperature[0].toFixed(1)}
                                         <Tooltip>
                                             <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
                                             <TooltipContent className="max-w-xs"><p>Controla a criatividade. Baixo = focado, Alto = criativo.</p></TooltipContent>
@@ -649,17 +662,16 @@ export function AgentBuilderDialog({
                                 </div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="agentVersion">Versão do Agente</Label>
-                                <Input id="agentVersion" placeholder="ex: 1.0.0" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} />
-                            </div>
+                        
+                        <Separator className="my-6"/>
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
+                            <Label htmlFor="agentVersion" className="text-left">Versão do Agente</Label>
+                            <Input id="agentVersion" placeholder="ex: 1.0.0" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} />
                         </div>
                     </TooltipProvider>
                 </TabsContent>
 
-                {/* Aba de Ferramentas */}
-                <TabsContent value="tools" className="space-y-6">
+                <TabsContent value="ferramentas" className="space-y-6">
                      <TooltipProvider>
                         <div>
                             <h3 className="text-lg font-medium mb-1 flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</h3>
@@ -683,7 +695,7 @@ export function AgentBuilderDialog({
                                             <Checkbox id={`tool-${tool.id}`} checked={isToolSelected} onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)} className="mt-1 mr-3 shrink-0"/>
                                             <div className="flex-grow">
                                                 <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 18, className: "mr-2 text-primary/90"})}
+                                                    {React.isValidElement(tool.icon) ? React.cloneElement(tool.icon, { size: 18, className: "mr-2 text-primary/90"}) : <Cpu size={18} className="mr-2 text-primary/90"/>}
                                                     {tool.label}
                                                     {tool.needsConfiguration && <ConfigureIcon size={14} className={cn("ml-2 text-muted-foreground group-hover:text-primary transition-colors", isConfigured && "text-green-500")} title={isConfigured ? "Configurada" : "Requer Configuração"}/>}
                                                 </Label>
@@ -717,9 +729,9 @@ export function AgentBuilderDialog({
                                                                 );
                                             return (
                                                 <Badge key={toolId} variant={isToolConfigured && tool.needsConfiguration ? "default" : "secondary"} className={cn(isToolConfigured && tool.needsConfiguration && "bg-green-600/20 border-green-500/50 text-green-700 hover:bg-green-600/30", "whitespace-nowrap")}>
-                                                    {React.cloneElement(tool.icon as React.ReactElement, { size: 12, className: "mr-1.5 inline-block"})}
+                                                    {React.isValidElement(tool.icon) ? React.cloneElement(tool.icon, { size: 12, className: "mr-1.5 inline-block"}) : <Cpu size={12} className="mr-1.5 inline-block"/>}
                                                     {tool.label}
-                                                    {tool.needsConfiguration && (<ConfigureIcon size={12} className={`ml-1.5 ${isToolConfigured ? 'text-green-500' : 'text-blue-500'}`} title={isToolConfigured ? "Configurada" : "Requer configuração"}/> )}
+                                                    {tool.needsConfiguration && (<ConfigureIcon size={12} className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`} title={isConfigured ? "Configurada" : "Requer configuração"}/> )}
                                                 </Badge>
                                             );
                                         })}
@@ -732,17 +744,16 @@ export function AgentBuilderDialog({
                      </TooltipProvider>
                 </TabsContent>
 
-                 {/* Aba de Definição de Fluxo (Condicional) */}
                 {agentType === 'workflow' && (
-                    <TabsContent value="workflow" className="space-y-6">
+                    <TabsContent value="definicaoFluxo" className="space-y-6">
                         <TooltipProvider>
-                             <Alert className="mb-4 bg-card border-border/60">
-                                <Workflow className="h-4 w-4" />
+                             <Alert variant="default" className="mb-4 bg-card border-border/60">
+                                <Workflow className="h-4 w-4 text-primary/80" />
                                 <AlertTitle>{agentTypeOptions.find(opt => opt.id === 'workflow')?.label.split(' (')[0].trim() || "Agente de Fluxo de Trabalho"}</AlertTitle>
                                 <AlertDescription>{agentTypeOptions.find(opt => opt.id === 'workflow')?.description || "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística. Eles não consultam um LLM para a orquestração em si."}</AlertDescription>
                             </Alert>
-                            <div className="space-y-2 mb-4">
-                                <Label htmlFor="detailedWorkflowType">Tipo de Fluxo Detalhado</Label>
+                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mb-4">
+                                <Label htmlFor="detailedWorkflowType" className="text-left">Tipo de Fluxo Detalhado</Label>
                                 <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}>
                                 <SelectTrigger id="detailedWorkflowType"><SelectValue placeholder="Selecione o tipo de fluxo" /></SelectTrigger>
                                 <SelectContent>
@@ -766,7 +777,11 @@ export function AgentBuilderDialog({
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover etapa."})}><Trash2 size={14} /></Button>
                                             </div>
                                         </div>
-                                        <div className="pl-6 space-y-1"><Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label><Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: sentimento_analisado" /><p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p></div>
+                                        <div className="pl-6 space-y-1">
+                                            <Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
+                                            <Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: sentimento_analisado" />
+                                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p>
+                                        </div>
                                     </div>
                                 </CardContent>
                                 </Card>
@@ -779,9 +794,11 @@ export function AgentBuilderDialog({
                                             <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                             <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
                                             <AlertDescription className="text-xs">
-                                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. Para coletar e processar esses resultados, geralmente é necessário:
+                                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. 
+                                                Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. 
+                                                Para coletar e processar esses resultados, geralmente é necessário:
                                                 <br />1. Que cada subagente paralelo use uma 'Chave de Saída' (`output_key`) única para salvar seu resultado individual (ex: no estado da sessão).
-                                                <br />2. Adicionar um Agente Sequencial como a próxima etapa no fluxo de trabalho. Este Agente Sequencial pode então conter um `CustomAgent` ou `LlmAgent` para realizar a lógica de combinação, análise ou tomada de decisão com base nos múltiplos resultados paralelos.
+                                                <br />2. Adicionar um Agente Sequencial subsequente que, por sua vez, pode conter um `CustomAgent` ou `LlmAgent` para realizar a lógica de combinação, análise ou tomada de decisão com base nos múltiplos resultados paralelos.
                                             </AlertDescription>
                                         </Alert>
                                         <Button variant="outline" size="sm" className="w-full" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
@@ -812,31 +829,43 @@ export function AgentBuilderDialog({
                                 <Card className="bg-muted/30 border-border/50">
                                     <CardHeader><CardTitle className="text-base">Configurar Loop de Execução</CardTitle><CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription></CardHeader>
                                     <CardContent className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="loopMaxIterations">Número Máximo de Iterações (Opcional)</Label>
+                                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
+                                            <Label htmlFor="loopMaxIterations" className="text-left">Nº Máximo de Iterações (Opc.)</Label>
                                             <Input id="loopMaxIterations" type="number" min="1" placeholder="Ex: 5" value={loopMaxIterations || ""} onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)} className="h-9" />
-                                            <p className="text-xs text-muted-foreground">Deixe em branco para loops baseados apenas em outras condições.</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label className="flex items-center gap-1.5">Condição de Término Adicional (Opcional):</Label>
-                                            <RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)}>
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="loop-cond-none" /><Label htmlFor="loop-cond-none" className="font-normal">Nenhuma (apenas máximo de iterações)</Label></div>
+                                        
+                                        <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
+                                            <Label className="text-left pt-1 flex items-center gap-1.5">Condição de Término Adicional
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs"><p>Define como o loop pode terminar além do número máximo de iterações. "Sinalização por Subagente" permite que uma etapa interna ao loop cause a sua interrupção.</p></TooltipContent>
+                                                </Tooltip>
+                                            </Label>
+                                            <RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)} className="pt-1">
+                                                <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="loop-cond-none" /><Label htmlFor="loop-cond-none" className="font-normal">Nenhuma</Label></div>
                                                 <div className="flex items-center space-x-2"><RadioGroupItem value="subagent_signal" id="loop-cond-signal" /><Label htmlFor="loop-cond-signal" className="font-normal">Sinalização por Subagente</Label></div>
                                             </RadioGroup>
                                         </div>
+
                                         {loopTerminationConditionType === 'subagent_signal' && (
                                             <Alert variant="default" className="mt-3 bg-card border-border/70">
                                                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
                                                 <AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle>
-                                                <AlertDescription className="text-xs">
-                                                    Um subagente dentro do loop pode sinalizar o término (ex: usando uma ferramenta específica como 'exit_loop' ou retornando um valor/estado particular).
-                                                    Configure o subagente apropriado com essa lógica e, opcionalmente, indique abaixo qual ferramenta ou valor de estado é esperado para o término.
+                                                <AlertDescription className="text-xs space-y-2">
+                                                    <p>Um subagente dentro do loop pode sinalizar o término (ex: usando uma ferramenta como 'exit_loop' ou retornando um valor/estado particular). Configure o subagente apropriado com essa lógica.</p>
+                                                    <div className="space-y-1">
+                                                        <Label htmlFor="loopExitTool" className="text-xs">Ferramenta de Saída (Exemplo):</Label>
+                                                        <Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label htmlFor="loopExitStateKey" className="text-xs">Chave de Estado para Saída (Exemplo):</Label>
+                                                        <Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label htmlFor="loopExitStateValue" className="text-xs">Valor de Estado para Sair (Exemplo):</Label>
+                                                        <Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" />
+                                                    </div>
                                                 </AlertDescription>
-                                                <div className="mt-3 space-y-2 pl-1">
-                                                    <div><Label htmlFor="loopExitTool" className="text-xs text-muted-foreground">Ferramenta de Saída do Loop (Exemplo):</Label><Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" /></div>
-                                                    <div><Label htmlFor="loopExitStateKey" className="text-xs text-muted-foreground">Chave de Estado para Saída (Exemplo):</Label><Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" /></div>
-                                                    <div><Label htmlFor="loopExitStateValue" className="text-xs text-muted-foreground">Valor de Estado para Sair (Exemplo):</Label><Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" /></div>
-                                                </div>
                                             </Alert>
                                         )}
                                         <Separator className="my-3"/>
@@ -878,7 +907,6 @@ export function AgentBuilderDialog({
           </Button>
         </DialogFooter>
 
-        {/* Modal de Configuração de Ferramenta Específica */}
         {isToolConfigModalOpen && configuringTool && (
             <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => {
                 if (!open) setConfiguringTool(null);
@@ -890,7 +918,7 @@ export function AgentBuilderDialog({
                 <DialogDescription>{configuringTool.description} Forneça os detalhes de configuração abaixo.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-                {configuringTool.id === "webSearch" && ( /* ... campos para Busca Web ... */ <>
+                {configuringTool.id === "webSearch" && ( <>
                         <div className="space-y-2">
                             <Label htmlFor="modalGoogleApiKey">Chave de API do Google Custom Search</Label>
                             <Input id="modalGoogleApiKey" value={modalGoogleApiKey} onChange={(e) => setModalGoogleApiKey(e.target.value)} placeholder="Cole sua chave API aqui" type="password"/>
@@ -902,7 +930,7 @@ export function AgentBuilderDialog({
                             <p className="text-xs text-muted-foreground">Identifica seu mecanismo de busca personalizado.</p>
                         </div>
                     </>)}
-                {configuringTool.id === "customApiIntegration" && ( /* ... campos para API OpenAPI ... */ <>
+                {configuringTool.id === "customApiIntegration" && ( <>
                     <div className="space-y-2">
                         <Label htmlFor="modalOpenapiSpecUrl">URL do Esquema OpenAPI (JSON ou YAML)</Label>
                         <Input id="modalOpenapiSpecUrl" value={modalOpenapiSpecUrl} onChange={(e) => setModalOpenapiSpecUrl(e.target.value)} placeholder="ex: https://petstore.swagger.io/v2/swagger.json"/>
@@ -914,7 +942,7 @@ export function AgentBuilderDialog({
                         <p className="text-xs text-muted-foreground">Usada para interagir com a API externa.</p>
                     </div>
                 </>)}
-                {configuringTool.id === "databaseAccess" && ( /* ... campos para Acesso a BD ... */ <>
+                {configuringTool.id === "databaseAccess" && ( <>
                     <div className="space-y-2">
                         <Label htmlFor="modalDbType">Tipo de Banco de Dados</Label>
                         <Select value={modalDbType} onValueChange={setModalDbType}>
@@ -952,12 +980,12 @@ export function AgentBuilderDialog({
                         <p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto dos dados.</p>
                     </div>
                 </>)}
-                {configuringTool.id === "knowledgeBase" && ( /* ... campos para Base de Conhecimento ... */ <div className="space-y-2">
+                {configuringTool.id === "knowledgeBase" && ( <div className="space-y-2">
                         <Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label>
                         <Input id="modalKnowledgeBaseId" value={modalKnowledgeBaseId} onChange={(e) => setModalKnowledgeBaseId(e.target.value)} placeholder="ex: documentos_produto_xyz"/>
                         <p className="text-xs text-muted-foreground">Identificador para a base de conhecimento (RAG).</p>
                     </div>)}
-                {configuringTool.id === "calendarAccess" && ( /* ... campos para Acesso à Agenda ... */ <div className="space-y-2">
+                {configuringTool.id === "calendarAccess" && ( <div className="space-y-2">
                         <Label htmlFor="modalCalendarApiEndpoint">Endpoint da API ou ID do Fluxo Genkit</Label>
                         <Input id="modalCalendarApiEndpoint" value={modalCalendarApiEndpoint} onChange={(e) => setModalCalendarApiEndpoint(e.target.value)} placeholder="ex: https://api.example.com/calendar"/>
                         <p className="text-xs text-muted-foreground">URL ou identificador do fluxo Genkit para agenda.</p>
@@ -975,3 +1003,4 @@ export function AgentBuilderDialog({
   );
 }
 
+    
