@@ -310,22 +310,63 @@ export default function AgentBuilderPage() {
     setIsBuilderModalOpen(true);
   };
 
-  const handleSaveAgent = (agentConfig: SavedAgentConfiguration) => {
-    if (editingAgent) {
-      setSavedAgents(prevAgents =>
-        prevAgents.map(agent =>
-          agent.id === editingAgent.id ? agentConfig : agent
-        )
-      );
-      toast({ title: "Agente Atualizado!", description: `O agente "${agentConfig.agentName}" foi atualizado.` });
-    } else {
-      setSavedAgents(prevAgents => [...prevAgents, agentConfig]);
-      toast({
-        title: "Agente Criado!",
-        description: `O agente "${agentConfig.agentName}" foi adicionado à sua lista.`,
+  const handleSaveAgent = async (agentConfig: SavedAgentConfiguration) => {
+    console.log('Attempting to save agent configuration:', agentConfig);
+    const isEditing = !!editingAgent; // Check if we are editing before API call
+
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(agentConfig),
       });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error('Failed to parse error response from server:', parseError);
+          throw new Error(`Server error: ${response.status}. Could not parse error details.`);
+        }
+        console.error('Server returned an error:', errorData);
+        // Use errorData.details if available from our backend error structure
+        throw new Error(errorData.details || errorData.error || errorData.message || `Server error: ${response.status}`);
+      }
+
+      const responseData = await response.json(); // Contains agentId, agentName from backend
+      console.log('Agent saved to backend successfully:', responseData);
+
+      // Update local state only after successful API call
+      if (isEditing) {
+        setSavedAgents(prevAgents =>
+          prevAgents.map(agent =>
+            agent.id === editingAgent!.id ? agentConfig : agent // editingAgent is guaranteed by isEditing
+          )
+        );
+        toast({ title: "Agente Atualizado!", description: `Agente "${agentConfig.agentName}" (ID: ${responseData.agentId}) foi atualizado no servidor.` });
+      } else {
+        setSavedAgents(prevAgents => [...prevAgents, agentConfig]);
+        toast({
+          title: "Agente Criado!",
+          description: `Agente "${agentConfig.agentName}" (ID: ${responseData.agentId}) foi criado e definido no servidor.`,
+        });
+      }
+      setEditingAgent(null); // Clear editing state
+      // setIsBuilderModalOpen(false); // Close modal on success - already handled by onOpenChange
+
+    } catch (error: any) {
+      console.error('Failed to save agent to backend:', error);
+      toast({
+        title: "Erro ao Salvar Agente",
+        description: `Não foi possível salvar o agente no servidor. ${error.message || ''}`,
+        variant: "destructive",
+      });
+      // Return here to prevent optimistic UI update or closing modal if save failed
+      return;
     }
-    setEditingAgent(null);
   };
   
   const handleDeleteAgent = (agentIdToDelete: string) => {
