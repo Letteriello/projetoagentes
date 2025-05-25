@@ -20,10 +20,10 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
+        default: "h-12 px-4 py-3", // Alterado de h-10 py-2 para h-12 py-3
         sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        lg: "h-11 rounded-md px-8", // Nota: O tamanho 'lg' atual é h-11 (44px). Mantendo-o assim por enquanto.
+        icon: "h-10 w-10", // Os botões de ícone geralmente têm tamanhos específicos. h-12 w-12 seria 48px.
       },
     },
     defaultVariants: {
