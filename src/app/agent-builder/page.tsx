@@ -11,7 +11,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { Cpu, PlusCircle, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, Plus } from "lucide-react"; // Added Plus
+import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ export interface AvailableTool {
   description: string;
   needsConfiguration?: boolean;
   genkitToolName?: string;
+  configFields?: Array<{ id: string; label: string; type: 'text' | 'password' | 'select'; options?: string[]; placeholder?: string; description?: string }>;
 }
 
 export const availableTools: AvailableTool[] = [
@@ -94,6 +95,8 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   agentRestrictions?: string;
   agentModel?: string;
   agentTemperature?: number;
+  // Adicionar workflowSteps aqui futuramente, ex:
+  // workflowSteps?: Array<{ agentId: string; order?: number; inputMappings?: any; outputKey?: string }>;
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
@@ -147,7 +150,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
 }
 
 export const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain: Cpu, FileJson, GripVertical, ConfigureIcon
+  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain: Cpu, FileJson, GripVertical, ConfigureIcon, ClipboardCopy
 };
 
 export const agentTemplates: AgentTemplate[] = [
@@ -392,7 +395,7 @@ export default function AgentBuilderPage() {
             Comece clicando no botão acima para configurar seu primeiro agente de IA.
           </p>
           <Button onClick={handleOpenCreateAgentModal} className={cn("mt-6", isMounted && "button-live-glow")}>
-            <Plus className="mr-2 h-4 w-4" /> Criar seu primeiro agente
+            <Plus className="mr-2 h-4 w-4" /> Criar Novo Agente
           </Button>
         </div>
       )}
@@ -416,3 +419,4 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
