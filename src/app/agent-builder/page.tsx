@@ -11,7 +11,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy } from "lucide-react";
+import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon, Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon } from "lucide-react"; // Added more icons
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
@@ -89,25 +89,24 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   loopExitToolName?: string;
   loopExitStateKey?: string;
   loopExitStateValue?: string;
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-  // Adicionar workflowSteps aqui futuramente, ex:
+  agentGoal?: string; // Opcional para workflows, para descrição geral
+  agentTasks?: string; // Opcional
+  agentPersonality?: string; // Opcional
+  agentRestrictions?: string; // Opcional
+  agentModel?: string; // Opcional
+  agentTemperature?: number; // Opcional
   // workflowSteps?: Array<{ agentId: string; order?: number; inputMappings?: any; outputKey?: string }>;
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
   agentType: "custom";
   customLogicDescription: string;
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
+  agentGoal?: string; // Opcional
+  agentTasks?: string; // Opcional
+  agentPersonality?: string; // Opcional
+  agentRestrictions?: string; // Opcional
+  agentModel?: string; // Opcional
+  agentTemperature?: number; // Opcional
 }
 
 export type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig;
@@ -142,7 +141,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
   toolsDetails: Array<{
     id: string;
     label: string;
-    iconName?: keyof typeof iconComponents | 'default';
+    iconName?: keyof typeof iconComponents | 'default'; // Para garantir que apenas nomes válidos sejam usados
     needsConfiguration?: boolean;
     genkitToolName?: string;
   }>;
@@ -150,7 +149,10 @@ export interface SavedAgentConfiguration extends AgentConfig {
 }
 
 export const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain: Cpu, FileJson, GripVertical, ConfigureIcon, ClipboardCopy
+  Search, Calculator, FileText, CalendarDays, Network, Database, Code2,
+  Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain: Cpu, FileJson,
+  GripVertical, ConfigureIcon, ClipboardCopy, AlertCircle, DeleteIcon, EditIcon, ChatIcon,
+  CopyIcon, EyeIcon, EyeOffIcon, SaveIcon, Plus, Layers, Info
 };
 
 export const agentTemplates: AgentTemplate[] = [
@@ -268,7 +270,7 @@ export const agentTemplates: AgentTemplate[] = [
     },
   },
   {
-    id: "medical_triage_info", name: "Modelo: Assistente de Triagem Médica Informativo (LLM)",
+    id: "medical_triage_info", name: "Modelo: Assistente de Triagem Médica (Informativo) (LLM)",
     config: {
       agentType: "llm",
       agentName: "Assistente de Triagem Médica (Informativo)",
@@ -314,7 +316,8 @@ export default function AgentBuilderPage() {
   }, []);
 
   const handleOpenCreateAgentModal = () => {
-    setEditingAgent(null);
+    setEditingAgent(null); // Garante que estamos criando um novo agente
+    // A lógica para resetar os campos do formulário agora está dentro de AgentBuilderDialog
     setIsBuilderModalOpen(true);
   };
 
@@ -338,7 +341,7 @@ export default function AgentBuilderPage() {
         description: `O agente "${agentConfig.agentName}" foi adicionado à sua lista.`,
       });
     }
-    setEditingAgent(null);
+    setEditingAgent(null); // Limpa o agente em edição após salvar
   };
 
   const handleDeleteAgent = (agentIdToDelete: string) => {
@@ -351,7 +354,7 @@ export default function AgentBuilderPage() {
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Cpu className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Meus Agentes</h1>
+          <h1 className="text-3xl font-bold">Agentes</h1>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -405,7 +408,7 @@ export default function AgentBuilderPage() {
         onOpenChange={(isOpen) => {
           setIsBuilderModalOpen(isOpen);
           if (!isOpen) {
-            setEditingAgent(null);
+            setEditingAgent(null); // Garante que o estado de edição seja limpo ao fechar
           }
         }}
         editingAgent={editingAgent}
@@ -419,4 +422,3 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
