@@ -298,6 +298,11 @@ export default function AgentBuilderPage() {
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgent, setEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
 
   const handleOpenCreateAgentModal = () => {
@@ -353,7 +358,7 @@ export default function AgentBuilderPage() {
             </Tooltip>
           </TooltipProvider>
         </div>
-        <Button onClick={handleOpenCreateAgentModal} className="button-live-glow">
+        <Button onClick={handleOpenCreateAgentModal} className={cn(isMounted && "button-live-glow")}>
           Novo Agente
         </Button>
       </header>
@@ -381,7 +386,7 @@ export default function AgentBuilderPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Comece clicando no botão acima para configurar seu primeiro agente de IA.
           </p>
-          <Button onClick={handleOpenCreateAgentModal} className="mt-6 button-live-glow">
+          <Button onClick={handleOpenCreateAgentModal} className={cn("mt-6", isMounted && "button-live-glow")}>
             <PlusCircle className="mr-2 h-4 w-4" /> Criar seu primeiro agente
           </Button>
         </div>
@@ -406,5 +411,3 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
-
-    
