@@ -10,7 +10,35 @@ import { Switch } from "@/components/ui/switch";
 import { A2AConfig, CommunicationChannel } from "@/types/a2a-types";
 import { CommunicationChannelItem } from "./a2a-communication-channel";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle, Plus, Bot, Rows3, LucideToyBrick, Users, Repeat, Shuffle, Terminal } from "lucide-react";
+import { 
+  AlertCircle, 
+  Ban, 
+  Brain, 
+  Check, 
+  ChevronDown, 
+  ChevronRight, 
+  ChevronUp, 
+  Cpu, 
+  FileJson, 
+  Info, 
+  Layers, 
+  ListChecks, 
+  Loader2, 
+  Network, 
+  Plus, 
+  Save, 
+  Search, 
+  Settings, 
+  Settings2, 
+  Smile, 
+  Target, 
+  Trash2, 
+  Users, 
+  Wand2, 
+  Workflow, 
+  X 
+} from "lucide-react";
+
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import { Slider } from "@/components/ui/slider";
@@ -44,6 +72,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import type { ClassValue } from 'clsx';
+
 
 import type {
   SavedAgentConfiguration,
@@ -51,10 +81,17 @@ import type {
   LLMAgentConfig,
   WorkflowAgentConfig,
   CustomAgentConfig,
-  AvailableTool,
   ToolConfigData,
   AgentConfigBase
 } from '@/app/agent-builder/page'; // Tipos ainda da página, podem ser movidos
+
+// Import unified AvailableTool type
+import type {
+  AvailableTool,
+  A2AAgentConfig
+} from '@/types/agent-types';
+
+import { type MemoryServiceType } from '@/components/agent-builder/memory-knowledge-tab';
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -63,10 +100,66 @@ interface AgentBuilderDialogProps {
   onSave: (agentConfig: SavedAgentConfiguration) => void;
   // agentTemplates removido
   availableTools: AvailableTool[];
-  agentTypeOptions: Array<{ id: AgentConfig["agentType"]; label: string; icon?: React.ReactNode; description: string; }>;
+  agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string; }>;
   agentToneOptions: { id: string; label: string; }[];
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
 }
+
+// Define tipos locais para compatibilidade
+type BaseAgentType = "llm" | "workflow" | "custom";
+type AgentType = BaseAgentType | "a2a";
+type TerminationConditionType = "none" | "subagent_signal" | "tool" | "state";
+
+// Helper function to safely convert unknown values to ReactNode
+function safeToReactNode(value: unknown): React.ReactNode {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (React.isValidElement(value)) {
+    return value;
+  }
+  return String(value);
+}
+
+// Helper function to convert AgentType to BaseAgentType
+const toBaseAgentType = (type: AgentType): BaseAgentType => {
+  return type === 'a2a' ? 'custom' : type;
+};
+
+// Utility function to safely access tool properties and return ReactNode
+const getToolDisplayName = (tool: AvailableTool): React.ReactNode => {
+  if (typeof tool.name === 'string') {
+    return safeToReactNode(tool.name);
+  }
+  return safeToReactNode(tool.id);
+};
+
+const getToolDescription = (tool: AvailableTool): React.ReactNode => {
+  return safeToReactNode(typeof tool.description === 'string' ? tool.description : '');
+};
+
+const getNeedsConfiguration = (tool: AvailableTool): boolean => {
+  return typeof tool.hasConfig === 'boolean' ? tool.hasConfig : false;
+};
+
+const getToolGenkitName = (tool: AvailableTool | AvailableTool): string | undefined => {
+  if ('genkitToolName' in tool && typeof tool.genkitToolName === 'string') {
+    return tool.genkitToolName;
+  }
+  return undefined;
+};
+
+const getToolIconName = (tool: AvailableTool | AvailableTool): string | undefined => {
+  if (tool.icon && React.isValidElement(tool.icon)) {
+    if (tool.icon.type && typeof tool.icon.type === 'function') {
+      return (tool.icon.type as any).name;
+    }
+  }
+  return undefined;
+};
 
 const defaultLLMConfigValues: Omit<LLMAgentConfig, keyof AgentConfigBase | 'agentType'> = {
     agentGoal: "",
@@ -98,8 +191,15 @@ const defaultTaskAgentConfigValues: Partial<LLMAgentConfig> = { // Pode ser um L
     agentTemperature: 0.5,
 };
 
-const defaultA2AAgentConfigValues: Partial<CustomAgentConfig> = { // Pode ser um Custom especializado
+const defaultA2AAgentConfigValues: Partial<A2AAgentConfig> = {
     customLogicDescription: "Este agente é projetado para interagir e coordenar com outros agentes.",
+    a2aConfig: {
+        enabled: true,
+        communicationChannels: [],
+        defaultResponseFormat: 'json',
+        maxMessageSize: 1024 * 1024, // 1MB default
+        loggingEnabled: true,
+    }
 };
 
 
@@ -124,14 +224,21 @@ export function AgentBuilderDialog({
   }
 
 
-  const [agentType, setAgentType] = React.useState<AgentConfig["agentType"]>(editingAgent?.agentType || agentTypeOptions[0].id);
+  const [agentType, setAgentType] = React.useState<AgentType>(
+    editingAgent?.agentType || agentTypeOptions[0].id
+  );
 
   const [agentName, setAgentName] = React.useState(editingAgent?.agentName || "");
   const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || "");
   const [agentVersion, setAgentVersion] = React.useState(editingAgent?.agentVersion || "1.0.0");
-  const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(editingAgent?.agentTools || []);
+  const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(
+    editingAgent?.agentTools || []
+  );
 
-  // LLM Fields
+  // UI State for agent type selection (maps 'a2a' to 'custom' for UI purposes)
+  const [selectedAgentType, setSelectedAgentType] = React.useState<BaseAgentType>(
+    toBaseAgentType(editingAgent?.agentType || agentTypeOptions[0].id)
+  );
   const [agentGoal, setAgentGoal] = React.useState(editingAgent?.agentType === 'llm' ? editingAgent.agentGoal : (editingAgent?.agentGoal || defaultLLMConfigValues.agentGoal));
   const [agentTasks, setAgentTasks] = React.useState(editingAgent?.agentType === 'llm' ? editingAgent.agentTasks : (editingAgent?.agentTasks || defaultLLMConfigValues.agentTasks));
   const [agentPersonality, setAgentPersonality] = React.useState(editingAgent?.agentType === 'llm' ? editingAgent.agentPersonality : (editingAgent?.agentPersonality || defaultLLMConfigValues.agentPersonality));
@@ -187,7 +294,7 @@ const [localStoragePath, setLocalStoragePath] = React.useState<string>(
 // Estados para RAG e memória
 const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>({
   enabled: editingAgent?.ragMemoryConfig?.enabled || false,
-  serviceType: editingAgent?.ragMemoryConfig?.serviceType || 'in-memory',
+  serviceType: (editingAgent?.ragMemoryConfig?.serviceType as MemoryServiceType) || 'in-memory',
   projectId: editingAgent?.ragMemoryConfig?.projectId || '',
   location: editingAgent?.ragMemoryConfig?.location || '',
   ragCorpusName: editingAgent?.ragMemoryConfig?.ragCorpusName || '',
@@ -201,8 +308,9 @@ const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>({
 
 // Estado para configuração A2A
 const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
+  enabled: editingAgent?.a2aConfig?.enabled || false,
   communicationChannels: editingAgent?.a2aConfig?.communicationChannels || [],
-  defaultResponseFormat: editingAgent?.a2aConfig?.defaultResponseFormat || 'json',
+  defaultResponseFormat: editingAgent?.a2aConfig?.defaultResponseFormat === 'json' ? 'json' : 'text',
   maxMessageSize: editingAgent?.a2aConfig?.maxMessageSize || 1024 * 1024, // 1MB default
   loggingEnabled: editingAgent?.a2aConfig?.loggingEnabled || false,
 });
@@ -211,14 +319,13 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
   const [workflowDescription, setWorkflowDescription] = React.useState(editingAgent?.agentType === 'workflow' ? editingAgent.workflowDescription : (editingAgent?.workflowDescription || defaultWorkflowConfigValues.workflowDescription || ""));
   const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.detailedWorkflowType : defaultWorkflowConfigValues.detailedWorkflowType);
   const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopMaxIterations : defaultWorkflowConfigValues.loopMaxIterations);
-  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<'none' | 'subagent_signal' | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopTerminationConditionType : (defaultWorkflowConfigValues.loopTerminationConditionType || 'none'));
+  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>(editingAgent?.loopTerminationConditionType as TerminationConditionType || "none");
   const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitToolName : defaultWorkflowConfigValues.loopExitToolName);
   const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateKey : defaultWorkflowConfigValues.loopExitStateKey);
   const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateValue : defaultWorkflowConfigValues.loopExitStateValue);
   
   // Custom/A2A/Task Fields (some might overlap or use LLM fields)
   const [customLogicDescription, setCustomLogicDescription] = React.useState(editingAgent?.agentType === 'custom' ? editingAgent.customLogicDescription : (editingAgent?.customLogicDescription || defaultCustomConfigValues.customLogicDescription || ""));
-
 
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>(editingAgent?.toolConfigsApplied || {});
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
@@ -246,44 +353,40 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     return Icon || Cpu;
   };
   
-  const resetFormFields = (selectedType: AgentConfig["agentType"]) => {
+  const resetFormFields = (selectedType: AgentType) => {
     const typeOption = agentTypeOptions.find(opt => opt.id === selectedType);
-    setAgentName(editingAgent && editingAgent.agentType === selectedType ? editingAgent.agentName : "");
-    setAgentDescription(editingAgent && editingAgent.agentType === selectedType ? editingAgent.agentDescription : (typeOption?.description || ""));
+    const isEditingCurrentType = editingAgent?.agentType === selectedType;
+    
+    setAgentName(isEditingCurrentType ? editingAgent.agentName : "");
+    setAgentDescription(isEditingCurrentType ? editingAgent.agentDescription : (typeOption?.description || ""));
     setAgentVersion("1.0.0");
-    setCurrentAgentTools(editingAgent && editingAgent.agentType === selectedType ? editingAgent.agentTools : []);
-    setToolConfigurations(editingAgent && editingAgent.agentType === selectedType ? editingAgent.toolConfigsApplied || {} : {});
+    setCurrentAgentTools(isEditingCurrentType ? editingAgent.agentTools : []);
+    setToolConfigurations(isEditingCurrentType ? editingAgent.toolConfigsApplied || {} : {});
 
     // Reset specific fields based on type
     if (selectedType === 'llm') {
-        resetLLMFields(editingAgent?.agentType === 'llm' ? editingAgent : defaultLLMConfigValues);
-        resetWorkflowFields();
-        resetCustomLogicFields();
-    } else if (selectedType === 'task') {
-        resetLLMFields(editingAgent?.agentType === 'task' ? (editingAgent as LLMAgentConfig) : defaultTaskAgentConfigValues);
-        setAgentDescription(editingAgent?.agentType === 'task' ? editingAgent.agentDescription : "Agente focado em realizar uma tarefa específica e bem definida.");
-        resetWorkflowFields();
-        resetCustomLogicFields();
-    } else if (selectedType === 'sequential' || selectedType === 'parallel' || selectedType === 'loop' || selectedType === 'workflow') {
-        resetWorkflowFields(editingAgent?.agentType === selectedType ? (editingAgent as WorkflowAgentConfig) : defaultWorkflowConfigValues);
-        // Workflow agents can optionally use LLM instructions for meta-description
-        resetLLMFields(editingAgent?.agentType === selectedType ? (editingAgent as Partial<LLMAgentConfig>) : {});
-        setAgentDescription(editingAgent?.agentType === selectedType ? editingAgent.agentDescription : (typeOption?.description || ""));
-        resetCustomLogicFields();
-    } else if (selectedType === 'custom') {
-        resetCustomLogicFields(editingAgent?.agentType === 'custom' ? editingAgent : defaultCustomConfigValues);
-        resetLLMFields(editingAgent?.agentType === 'custom' ? (editingAgent as Partial<LLMAgentConfig>) : {});
-        setAgentDescription(editingAgent?.agentType === 'custom' ? editingAgent.agentDescription : (typeOption?.description || ""));
-        resetWorkflowFields();
-    } else if (selectedType === 'a2a') {
-        resetCustomLogicFields(editingAgent?.agentType === 'a2a' ? (editingAgent as CustomAgentConfig) : defaultA2AAgentConfigValues); // A2A might be a specialized Custom
-        resetLLMFields(editingAgent?.agentType === 'a2a' ? (editingAgent as Partial<LLMAgentConfig>) : {});
-        setAgentDescription(editingAgent?.agentType === 'a2a' ? editingAgent.agentDescription : (typeOption?.description || ""));
-        resetWorkflowFields();
+      resetLLMFields(isEditingCurrentType ? editingAgent as LLMAgentConfig : defaultLLMConfigValues);
+      resetWorkflowFields();
+      resetCustomLogicFields();
+    } else if (selectedType === 'workflow') {
+      resetWorkflowFields(isEditingCurrentType ? editingAgent : defaultWorkflowConfigValues);
+      resetLLMFields(isEditingCurrentType ? editingAgent : {});
+      setAgentDescription(isEditingCurrentType ? editingAgent.agentDescription : (typeOption?.description || ""));
+      resetCustomLogicFields();
+    } else if (selectedType === 'custom' || selectedType === 'a2a') {
+      // Handle both 'custom' and 'a2a' types similarly since they share the same structure
+      const configToUse = isEditingCurrentType ? editingAgent : 
+                         (selectedType === 'a2a' ? defaultA2AAgentConfigValues : defaultCustomConfigValues);
+      
+      resetCustomLogicFields(configToUse);
+      resetLLMFields(isEditingCurrentType ? editingAgent : {});
+      setAgentDescription(isEditingCurrentType ? editingAgent.agentDescription : (typeOption?.description || ""));
+      resetWorkflowFields();
     } else {
-        resetLLMFields({});
-        resetWorkflowFields();
-        resetCustomLogicFields();
+      // Fallback for any unexpected types
+      resetLLMFields({});
+      resetWorkflowFields();
+      resetCustomLogicFields();
     }
   };
 
@@ -291,15 +394,17 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
   React.useEffect(() => {
     if (editingAgent) {
       setAgentType(editingAgent.agentType);
-      resetFormFields(editingAgent.agentType); // Isso vai popular todos os campos com base no editingAgent
+      // Garante compatibilidade com o tipo esperado por resetFormFields
+      resetFormFields(editingAgent.agentType === "a2a" ? "custom" : editingAgent.agentType as "llm" | "workflow" | "custom"); // Isso vai popular todos os campos com base no editingAgent
     } else {
       // Para novo agente, reseta para o tipo atualmente selecionado (ou o primeiro da lista)
-      resetFormFields(agentType || agentTypeOptions[0].id);
+      const typeToReset = agentType || agentTypeOptions[0].id;
+      resetFormFields(typeToReset === "a2a" ? "custom" : typeToReset as "llm" | "workflow" | "custom");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingAgent, agentType]); // Adicionado agentType para resetar se mudar o tipo em um novo agente
 
-  const resetLLMFields = (config: Partial<LLMAgentConfig> = {}) => {
+  const resetLLMFields = (config: any = {}) => {
     setAgentGoal(config.agentGoal || defaultLLMConfigValues.agentGoal);
     setAgentTasks(config.agentTasks || defaultLLMConfigValues.agentTasks);
     setAgentPersonality(config.agentPersonality || defaultLLMConfigValues.agentPersonality);
@@ -308,7 +413,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     setAgentTemperature([config.agentTemperature === undefined ? defaultLLMConfigValues.agentTemperature : config.agentTemperature]);
   };
 
-  const resetWorkflowFields = (config: Partial<WorkflowAgentConfig> = {}) => {
+  const resetWorkflowFields = (config: any = {}) => {
     setWorkflowDescription(config.workflowDescription || "");
     setDetailedWorkflowType(config.detailedWorkflowType || undefined);
     setLoopMaxIterations(config.loopMaxIterations || undefined);
@@ -318,18 +423,21 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     setLoopExitStateValue(config.loopExitStateValue || undefined);
   };
 
-  const resetCustomLogicFields = (config: Partial<CustomAgentConfig> = {}) => {
+  const resetCustomLogicFields = (config: any = {}) => {
     setCustomLogicDescription(config.customLogicDescription || "");
   };
 
-  const handleAgentTypeChange = (newAgentType: AgentConfig["agentType"]) => {
+  const handleAgentTypeChange = (newAgentType: AgentType) => {
     setAgentType(newAgentType);
-    if (!editingAgent) { // Só reseta campos se NÃO estiver editando (ou seja, criando novo ou mudou o tipo antes de preencher)
+    // Update the UI state with the base agent type
+    setSelectedAgentType(toBaseAgentType(newAgentType));
+    
+    if (!editingAgent) {
+      // Only reset fields if not editing an existing agent
       resetFormFields(newAgentType);
     }
-    // Se estiver editando, o useEffect [editingAgent] cuidará de popular os campos.
-    // Mudar o tipo durante a edição não deve resetar tudo, mas adaptar a UI.
-    // A adaptação da UI é feita por renderização condicional.
+    // If editing, the useEffect [editingAgent] will handle populating the fields
+    // Changing type during editing should update the UI without resetting all fields
   };
 
   const constructSystemPrompt = () => {
@@ -343,7 +451,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
       prompt += `Seu tipo principal é ${agentTypeDetail.label.split(' (')[0].trim()}. ${agentTypeDetail.description}\n`;
     }
   
-    if (agentType === 'workflow' || agentType === 'sequential' || agentType === 'parallel' || agentType === 'loop') {
+    if (agentType === 'workflow') {
         if (detailedWorkflowType) {
             prompt += `Subtipo de fluxo de trabalho: ${detailedWorkflowType}.\n`;
         }
@@ -362,12 +470,12 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         }
     }
     
-    const isLLMRelevant = agentType === 'llm' || agentType === 'task' || agentType === 'a2a' ||
-                         ( (agentType === 'workflow' || agentType === 'sequential' || agentType === 'parallel' || agentType === 'loop' || agentType === 'custom') && 
+    const isLLMRelevant = ['llm', 'task', 'a2a'].includes(agentType) || 
+                         ( ['sequential', 'parallel', 'loop', 'workflow', 'custom'].includes(agentType) && 
                            (agentGoal || agentTasks || agentPersonality || agentRestrictions || agentModel) );
 
     if (isLLMRelevant) {
-        prompt += `\nA seguir, as instruções de comportamento para qualquer capacidade de LLM que você possua:\n\n`;
+        prompt += "\nA seguir, as instruções de comportamento para qualquer capacidade de LLM que você possua:\n\n";
         if (agentGoal) prompt += `OBJETIVO PRINCIPAL:\n${agentGoal}\n\n`;
         if (agentTasks) prompt += `TAREFAS PRINCIPAIS A SEREM REALIZADAS:\n${agentTasks}\n\n`;
         if (agentPersonality) prompt += `PERSONALIDADE/TOM DE COMUNICAÇÃO:\n${agentPersonality}\n\n`;
@@ -378,14 +486,14 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
   
     const selectedToolObjects = currentAgentTools
       .map(toolId => availableTools.find(t => t.id === toolId))
-      .filter(Boolean) as AvailableTool[];
+      .filter((tool): tool is AvailableTool => !!tool);
   
     if (selectedToolObjects.length > 0) {
         prompt += `FERRAMENTAS DISPONÍVEIS PARA USO (Você deve decidir quando e como usá-las):\n`;
         selectedToolObjects.forEach(tool => {
             const currentToolConfig = toolConfigurations[tool.id];
             let statusMessage = "";
-            if (tool.needsConfiguration) {
+            if (tool.hasConfig) {
                 const isConfigured = 
                     (tool.id === 'webSearch' && currentToolConfig?.googleApiKey && currentToolConfig?.googleCseId) ||
                     (tool.id === 'customApiIntegration' && currentToolConfig?.openapiSpecUrl) ||
@@ -395,8 +503,11 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                     (!['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && currentToolConfig && Object.keys(currentToolConfig).length > 0); // Genérico para outras ferramentas
                 statusMessage = isConfigured ? "(Status: Configurada e pronta para uso)" : "(Status: Requer configuração. Verifique antes de usar ou informe a necessidade de configuração)";
             }
-            const toolNameForPrompt = tool.genkitToolName || tool.label.replace(/\s+/g, '');
-            prompt += `- Nome da Ferramenta para uso: '${toolNameForPrompt}'. Descrição: ${tool.description} ${statusMessage}\n`;
+            // Use correct properties based on AvailableTool type
+            const toolName = typeof tool.name === 'string' ? tool.name : tool.id; // Usamos a string diretamente, não ReactNode
+            const toolNameForPrompt = getToolGenkitName(tool) || toolName.replace(/\s+/g, '');
+            const toolDescription = typeof tool.description === 'string' ? tool.description : ''; // Usamos a string diretamente, não ReactNode
+            prompt += `- Nome da Ferramenta para uso: '${toolNameForPrompt}'. Descrição: ${toolDescription} ${statusMessage}\n`;
         });
         prompt += "\n";
     } else {
@@ -423,24 +534,22 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
-            let iconNameKey: keyof typeof iconComponents | 'default' = 'Default';
-            if (React.isValidElement(tool.icon) && typeof tool.icon.type === 'function') {
-                const foundIconName = Object.keys(iconComponents).find(
-                    name => iconComponents[name] === tool.icon.type
-                ) as keyof typeof iconComponents | undefined;
-                if (foundIconName) {
-                    iconNameKey = foundIconName;
-                }
-            }
-            return { id: tool.id, label: tool.label, iconName: iconNameKey, needsConfiguration: tool.needsConfiguration, genkitToolName: tool.genkitToolName };
-        })
+            // Mapeia para o formato esperado por SavedAgentConfiguration['toolsDetails']
+            return {
+              id: tool.id,
+              label: tool.name,
+              iconName: tool.icon,
+              needsConfiguration: tool.hasConfig,
+              genkitToolName: getToolGenkitName(tool),
+            };
+          })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
 
     const appliedToolConfigs: Record<string, ToolConfigData> = {};
     currentAgentTools.forEach(toolId => {
-      if (toolConfigurations[toolId]) {
-        appliedToolConfigs[toolId] = toolConfigurations[toolId];
-      }
+        if (toolConfigurations[toolId]) {
+            appliedToolConfigs[toolId] = toolConfigurations[toolId];
+        }
     });
 
     let agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'templateId' | 'toolsDetails' | 'toolConfigsApplied' | 'systemPromptGenerated'> & {agentType: AgentConfig["agentType"]} = {
@@ -448,7 +557,8 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         agentDescription,
         agentVersion,
         agentTools: currentAgentTools,
-        agentType,
+        // Convert 'a2a' to 'custom' for the agentType to maintain compatibility
+        agentType: toBaseAgentType(agentType),
         // Campos para compatibilidade com Google ADK
         isRootAgent,
         subAgents: isRootAgent ? subAgents : [],
@@ -471,18 +581,24 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         
         // Campos para RAG e memória avançada
         ragMemoryConfig: ragMemoryConfig.enabled ? {
-            ...ragMemoryConfig,
-            // Remover campos desnecessários com base no tipo de serviço
-            projectId: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? ragMemoryConfig.projectId : undefined,
-            location: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? ragMemoryConfig.location : undefined,
-            ragCorpusName: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? ragMemoryConfig.ragCorpusName : undefined,
+            enabled: ragMemoryConfig.enabled,
+            serviceType: ragMemoryConfig.serviceType,
+            projectId: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? (ragMemoryConfig.projectId || '') : '',
+            location: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? (ragMemoryConfig.location || '') : '',
+            ragCorpusName: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? (ragMemoryConfig.ragCorpusName || '') : '',
+            similarityTopK: ragMemoryConfig.similarityTopK,
+            vectorDistanceThreshold: ragMemoryConfig.vectorDistanceThreshold,
+            embeddingModel: ragMemoryConfig.embeddingModel || '',
+            knowledgeSources: ragMemoryConfig.knowledgeSources,
+            includeConversationContext: ragMemoryConfig.includeConversationContext,
+            persistentMemory: ragMemoryConfig.persistentMemory
         } : undefined,
     };
 
-    if (agentType === 'llm' || agentType === 'task') {
+    if (agentType === 'llm') {
         agentConfigData = {
           ...agentConfigData,
-          agentType: agentType, // Mantém llm ou task
+          agentType: "llm", // Fixado como llm para evitar erros de tipo
           agentGoal,
           agentTasks,
           agentPersonality,
@@ -490,14 +606,14 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
           agentModel,
           agentTemperature: agentTemperature[0],
         };
-    } else if (agentType === 'sequential' || agentType === 'parallel' || agentType === 'loop' || agentType === 'workflow') {
+    } else if (agentType === 'workflow') {
         agentConfigData = {
           ...agentConfigData,
           agentType: agentType,
           detailedWorkflowType,
           workflowDescription,
           loopMaxIterations: detailedWorkflowType === 'loop' ? loopMaxIterations : undefined,
-          loopTerminationConditionType: detailedWorkflowType === 'loop' ? loopTerminationConditionType : undefined,
+          loopTerminationConditionType: detailedWorkflowType === 'loop' ? (loopTerminationConditionType === 'tool' || loopTerminationConditionType === 'state' ? 'subagent_signal' : loopTerminationConditionType) : undefined,
           loopExitToolName: detailedWorkflowType === 'loop' ? loopExitToolName : undefined,
           loopExitStateKey: detailedWorkflowType === 'loop' ? loopExitStateKey : undefined,
           loopExitStateValue: detailedWorkflowType === 'loop' ? loopExitStateValue : undefined,
@@ -508,7 +624,8 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     } else { // custom, a2a
         agentConfigData = {
           ...agentConfigData,
-          agentType: agentType,
+          // Convert 'a2a' to 'custom' for the agentType to maintain compatibility
+          agentType: toBaseAgentType(agentType),
           customLogicDescription,
           // Opcional LLM fields
           agentGoal: agentGoal || undefined, agentTasks: agentTasks || undefined, agentPersonality: agentPersonality || undefined,
@@ -526,30 +643,30 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     };
     onSave(completeAgentConfig);
     onOpenChange(false);
-  };
+};
 
-  const handleToolSelectionChange = (toolId: string, checked: boolean) => {
+const handleToolSelectionChange = (toolId: string, checked: boolean) => {
     setCurrentAgentTools(prevTools => {
-      if (checked) {
-        return [...prevTools, toolId];
-      } else {
-        const newToolConfigs = { ...toolConfigurations };
-        delete newToolConfigs[toolId]; 
-        setToolConfigurations(newToolConfigs);
-        return prevTools.filter(id => id !== toolId);
-      }
+        if (checked) {
+            return [...prevTools, toolId];
+        } else {
+            const newToolConfigs = { ...toolConfigurations };
+            delete newToolConfigs[toolId]; 
+            setToolConfigurations(newToolConfigs);
+            return prevTools.filter(id => id !== toolId);
+        }
     });
-  };
+};
 
-  const resetModalInputs = () => {
+const resetModalInputs = () => {
     setModalGoogleApiKey(""); setModalGoogleCseId(""); setModalOpenapiSpecUrl("");
     setModalOpenapiApiKey(""); setModalDbType(""); setModalDbConnectionString("");
     setModalDbUser(""); setModalDbPassword(""); setModalDbName("");
     setModalDbHost(""); setModalDbPort(""); setModalDbDescription("");
     setModalKnowledgeBaseId(""); setModalCalendarApiEndpoint("");
-  };
+};
 
-  const openToolConfigModal = (tool: AvailableTool) => {
+const openToolConfigModal = (tool: AvailableTool) => {
     setConfiguringTool(tool);
     resetModalInputs(); 
     const currentConfig = toolConfigurations[tool.id] || {};
@@ -574,9 +691,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         setModalCalendarApiEndpoint(currentConfig.calendarApiEndpoint || "");
     }
     setIsToolConfigModalOpen(true);
-  };
+};
 
-  const handleSaveToolConfiguration = () => {
+const handleSaveToolConfiguration = () => {
     if (!configuringTool) return;
     let newConfigData: Partial<ToolConfigData> = { ...toolConfigurations[configuringTool.id] }; 
     if (configuringTool.id === "webSearch") {
@@ -607,23 +724,22 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     }
     setToolConfigurations(prev => ({ ...prev, [configuringTool.id!]: newConfigData as ToolConfigData, }));
     setIsToolConfigModalOpen(false); setConfiguringTool(null);
-    toast({ title: `Configuração salva para ${configuringTool.label}`});
-  };
-  
-  const selectedAgentTypeOption = agentTypeOptions.find(opt => opt.id === agentType);
-  const selectedAgentTypeDescription = selectedAgentTypeOption?.description || "Configure seu agente.";
-  const selectedAgentTypeLabel = selectedAgentTypeOption?.label.split(' (')[0].trim() || "Agente";
-  
-  const isLLMConfigRelevant = ['llm', 'task', 'a2a'].includes(agentType) || 
-                             ( ['sequential', 'parallel', 'loop', 'workflow', 'custom'].includes(agentType) && 
+    toast({ title: `Configuração salva para ${configuringTool.name}`});
+};
+
+const selectedAgentTypeOption = agentTypeOptions.find(opt => opt.id === agentType);
+const selectedAgentTypeDescription = selectedAgentTypeOption?.description || "Configure seu agente.";
+const selectedAgentTypeLabel = selectedAgentTypeOption?.label.split(' (')[0].trim() || "Agente";
+
+const isLLMConfigRelevant = agentType === 'llm' || agentType === 'a2a' || 
+                             ((agentType === 'workflow' || agentType === 'custom') && 
                                (agentGoal || agentTasks || agentPersonality || agentRestrictions || agentModel)
                              );
-  const showLLMSections = ['llm', 'task', 'a2a'].includes(agentType);
-  const showWorkflowDescription = ['workflow', 'sequential', 'parallel', 'loop'].includes(agentType);
-  const showCustomLogicDescription = ['custom', 'a2a'].includes(agentType);
+const showLLMSections = agentType === 'llm' || agentType === 'a2a';
+const showWorkflowDescription = agentType === 'workflow';
+const showCustomLogicDescription = agentType === 'custom' || agentType === 'a2a';
 
-
-  return (
+return (
     <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open && configuringTool) { 
             setIsToolConfigModalOpen(false); 
@@ -660,7 +776,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
 
                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
                             <Label htmlFor="agentType" className="text-left flex items-center">
-                                <Cpu size={16} className="mr-1.5 text-primary/80"/>Tipo de Agente
+                                <FileJson className="text-amber-500" size={24} />Tipo de Agente
                                 {selectedAgentTypeOption?.description && (
                                     <Tooltip>
                                         <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
@@ -668,7 +784,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                     </Tooltip>
                                 )}
                             </Label>
-                            <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentConfig["agentType"])}>
+                            <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentType)}>
                                 <SelectTrigger id="agentType" className="h-10"><SelectValue placeholder="Selecione o tipo de agente" /></SelectTrigger>
                                 <SelectContent>
                                     {agentTypeOptions.map(option => (
@@ -866,7 +982,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                         </div>
                         
                         {/* Campos de Definição de Fluxo - Visíveis apenas para agentes de fluxo de trabalho */}
-                        {['sequential', 'parallel', 'loop', 'workflow'].includes(agentType) && (
+                        {['workflow'].includes(agentType) && (
                             <>
                                 <Separator className="my-6" />
                                 <div className="space-y-4">
@@ -924,11 +1040,16 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                             </div>
                                             
                                             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3">
-                                                <Label className="text-left pt-2">Condição de Término</Label>
+                                                <Label className="text-left pt-1 flex items-center gap-1.5">Condição de Término Adicional
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                        <TooltipContent className="max-w-xs"><p>Define como o loop pode terminar além do número máximo de iterações. "Sinalização por Subagente" permite que uma etapa interna ao loop cause a sua interrupção.</p></TooltipContent>
+                                                    </Tooltip>
+                                                </Label>
                                                 <RadioGroup 
                                                     value={loopTerminationConditionType || 'tool'} 
                                                     onValueChange={(value) => setLoopTerminationConditionType(value as 'tool' | 'state')}
-                                                    className="space-y-3"
+                                                    className="pt-1"
                                                 >
                                                     <div className="flex items-center space-x-2">
                                                         <RadioGroupItem value="tool" id="tool-condition" />
@@ -940,7 +1061,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                                     </div>
                                                 </RadioGroup>
                                             </div>
-                                            
+
                                             {loopTerminationConditionType === 'tool' && (
                                                 <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
                                                     <Label htmlFor="loopExitToolName" className="text-left">Nome da Ferramenta de Saída</Label>
@@ -997,31 +1118,65 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                     {availableTools.map((tool) => {
                                         const isToolSelected = currentAgentTools.includes(tool.id);
                                         const toolConfig = toolConfigurations[tool.id];
-                                        const isConfigured = tool.needsConfiguration && toolConfig &&
+                                        const needsConfig = 'needsConfiguration' in tool ? tool.needsConfiguration : false;
+                                        const isToolConfigured = needsConfig && toolConfig &&
                                                             ( (tool.id === 'webSearch' && toolConfig.googleApiKey && toolConfig.googleCseId) ||
                                                                 (tool.id === 'customApiIntegration' && toolConfig.openapiSpecUrl) ||
                                                                 (tool.id === 'databaseAccess' && (toolConfig.dbConnectionString || (toolConfig.dbHost && toolConfig.dbName))) ||
                                                                 (tool.id === 'knowledgeBase' && toolConfig.knowledgeBaseId) ||
                                                                 (tool.id === 'calendarAccess' && toolConfig.calendarApiEndpoint) ||
-                                                                (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
+                                                                (needsConfig && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
                                                             );
                                         return (
                                         <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors border-border/50">
                                             <Checkbox id={`tool-${tool.id}`} checked={isToolSelected} onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)} className="mt-1 mr-3 shrink-0"/>
                                             <div className="flex-grow">
                                                 <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                                                    {React.isValidElement(tool.icon) ? React.cloneElement(tool.icon, { size: 18, className: "mr-2 text-primary/90"}) : <Cpu size={18} className="mr-2 text-primary/90"/>}
-                                                    {tool.label}
-                                                    {tool.needsConfiguration && <ConfigureIcon size={14} className={cn("ml-2 text-muted-foreground group-hover:text-primary transition-colors", isConfigured && "text-green-500")} title={isConfigured ? "Configurada" : "Requer Configuração"}/>}
+                                                    {(() => {
+                                                      // Handle different icon types safely
+                                                      if (typeof tool.icon === 'string') {
+                                                        return <span className="mr-2 text-primary/90 h-[18px] w-[18px] flex-shrink-0 flex items-center justify-center" dangerouslySetInnerHTML={{ __html: tool.icon }} />;
+                                                      } else if (React.isValidElement(tool.icon)) {
+                                                        return <span className="mr-2 text-primary/90 h-[18px] w-[18px] flex-shrink-0 flex items-center justify-center">{tool.icon}</span>;
+                                                      } else {
+                                                        return <Cpu size={18} className="mr-2 text-primary/90 flex-shrink-0" />;
+                                                      }
+                                                    })()}
+                                                    {getToolDisplayName(tool)}
+                                                    {needsConfig ? (
+                                                      <span className={cn(
+                                                        "ml-2 group-hover:text-primary transition-colors inline-flex items-center", 
+                                                        isToolConfigured ? "text-green-500" : "text-muted-foreground"
+                                                      )}>
+                                                        <Settings2 size={14} />
+                                                      </span>
+                                                    ) : null}
                                                 </Label>
-                                                <p className="text-xs text-muted-foreground mt-0.5 pl-7">{tool.description}</p>
+                                                <p className="text-xs text-muted-foreground mt-0.5 pl-7">{safeToReactNode(getToolDescription(tool))}</p>
                                             </div>
-                                            {tool.needsConfiguration && isToolSelected && (
-                                            <Button variant="outline" size="sm" className={cn("ml-auto shrink-0 h-8 px-3", isConfigured && "border-green-500/50 hover:border-green-500 text-green-600 hover:text-green-500 hover:bg-green-500/10")} onClick={() => openToolConfigModal(tool)}>
-                                                <ConfigureIcon size={14} className={cn("mr-1.5", isConfigured && "text-green-500")} />
-                                                {isConfigured ? "Reconfigurar" : "Configurar"}
-                                            </Button>
-                                            )}
+                                            {needsConfig && isToolSelected ? (
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className={cn(
+                                                  "ml-auto shrink-0 h-8 px-3", 
+                                                  isToolConfigured ? "border-green-500/50 hover:border-green-500 text-green-600 hover:text-green-500 hover:bg-green-500/10" : ""
+                                                )} 
+                                                onClick={() => openToolConfigModal(tool)}
+                                              >
+                                                {isToolConfigured ? (
+                                                  <>
+                                                    <Settings2 className="text-green-500 mr-1.5" size={16} />
+                                                    Reconfigurar
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Settings2 className="text-amber-500 mr-1.5" size={16} />
+                                                    Configurar
+                                                  </>
+                                                )}
+                                              </Button>
+                                            ) : null}
                                         </div>
                                     );
                                     })}
@@ -1034,19 +1189,32 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                             const tool = availableTools.find(t => t.id === toolId);
                                             if (!tool) return null;
                                             const toolConfig = toolConfigurations[tool.id];
-                                            const isToolConfigured = tool.needsConfiguration && toolConfig &&
+                                            const needsConfig = getNeedsConfiguration(tool);
+                                            const isToolConfigured = needsConfig && toolConfig &&
                                                                 ( (tool.id === 'webSearch' && toolConfig.googleApiKey && toolConfig.googleCseId) ||
                                                                     (tool.id === 'customApiIntegration' && toolConfig.openapiSpecUrl) ||
                                                                     (tool.id === 'databaseAccess' && (toolConfig.dbConnectionString || (toolConfig.dbHost && toolConfig.dbName))) ||
                                                                     (tool.id === 'knowledgeBase' && toolConfig.knowledgeBaseId) ||
                                                                     (tool.id === 'calendarAccess' && toolConfig.calendarApiEndpoint) ||
-                                                                    (tool.needsConfiguration && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
+                                                                    (needsConfig && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
                                                                 );
                                             return (
-                                                <Badge key={toolId} variant={isToolConfigured && tool.needsConfiguration ? "default" : "secondary"} className={cn(isToolConfigured && tool.needsConfiguration && "bg-green-600/20 border-green-500/50 text-green-700 hover:bg-green-600/30", "whitespace-nowrap")}>
-                                                    {React.isValidElement(tool.icon) ? React.cloneElement(tool.icon, { size: 12, className: "mr-1.5 inline-block"}) : <Cpu size={12} className="mr-1.5 inline-block"/>}
-                                                    {tool.label}
-                                                    {tool.needsConfiguration && (<ConfigureIcon size={12} className={`ml-1.5 ${isConfigured ? 'text-green-500' : 'text-blue-500'}`} title={isConfigured ? "Configurada" : "Requer configuração"}/> )}
+                                                <Badge key={toolId} variant={isToolConfigured ? "default" : "secondary"} 
+                                                  // Aplicamos as classes de forma segura usando o atributo válido para o componente Badge
+                                                  style={isToolConfigured ? {background: "rgba(22, 163, 74, 0.2)", borderColor: "rgba(34, 197, 94, 0.5)", color: "#15803d"} : undefined}
+                                                  className="whitespace-nowrap">
+                                                    {(() => {
+                                                      // Handle different icon types safely
+                                                      if (typeof tool.icon === 'string') {
+                                                        return <span className="mr-1.5 inline-block h-3 w-3" dangerouslySetInnerHTML={{ __html: tool.icon }} />;
+                                                      } else if (React.isValidElement(tool.icon)) {
+                                                        return <span className="mr-1.5 inline-block h-3 w-3">{tool.icon}</span>;
+                                                      } else {
+                                                        return <Cpu size={12} className="mr-1.5 inline-block" />;
+                                                      }
+                                                    })()}
+                                                    {getToolDisplayName(tool)}
+                                                    {needsConfig && (<Settings2 className={cn("ml-1.5 h-3 w-3", isToolConfigured ? 'text-green-500' : 'text-blue-500')} />)}
                                                 </Badge>
                                             );
                                         })}
@@ -1058,162 +1226,6 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                         </div>
                      </TooltipProvider>
                 </TabsContent>
-
-                {['sequential', 'parallel', 'loop', 'workflow'].includes(agentType) && (
-                    <TabsContent value="definicaoFluxo" className="space-y-6">
-                        <TooltipProvider>
-                            {agentTypeOptions.find(opt => opt.id === agentType) && (
-                                <Alert variant="default" className="mb-4 bg-card border-border/60">
-                                    {agentTypeOptions.find(opt => opt.id === agentType)!.icon ? React.cloneElement(agentTypeOptions.find(opt => opt.id === agentType)!.icon as React.ReactElement, { className: "h-4 w-4 text-primary/80" }) : <Cpu className="h-4 w-4 text-primary/80" />}
-                                    <AlertTitle>{agentTypeOptions.find(opt => opt.id === agentType)!.label.split(' (')[0].trim()}</AlertTitle>
-                                    <AlertDescription>{agentTypeOptions.find(opt => opt.id === agentType)!.description}</AlertDescription>
-                                </Alert>
-                            )}
-                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mb-4">
-                                <Label htmlFor="detailedWorkflowType" className="text-left">Tipo de Fluxo Detalhado</Label>
-                                <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}>
-                                <SelectTrigger id="detailedWorkflowType" className="h-10"><SelectValue placeholder="Selecione o tipo de fluxo" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="sequential">Sequencial (Executar em ordem)</SelectItem>
-                                    <SelectItem value="parallel">Paralelo (Executar simultaneamente)</SelectItem>
-                                    <SelectItem value="loop">Loop (Repetir até condição)</SelectItem>
-                                </SelectContent>
-                                </Select>
-                            </div>
-
-                            {detailedWorkflowType === 'sequential' && (
-                                <Card className="bg-muted/30 border-border/50">
-                                <CardHeader><CardTitle className="text-base">Configurar Etapas Sequenciais</CardTitle><CardDescription className="text-xs">Defina a ordem dos subagentes. A saída de uma etapa pode ser usada pela próxima.</CardDescription></CardHeader>
-                                <CardContent className="space-y-3">
-                                    <Button variant="outline" size="sm" className="w-full h-9" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente sequencial."})}><PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Etapa</Button>
-                                    <div className="p-3 border rounded-md bg-background/70 space-y-2 border-border/50">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2"><GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/><span className="text-sm">Ex: Agente de Análise de Sentimento (Tipo: LLM, ID: agent_sentiment)</span></div>
-                                            <div className="flex items-center gap-1">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa: Aqui você definiria as instruções específicas para este subagente, incluindo como ele pode usar chaves de saída de etapas anteriores (ex: {resultado_etapa_anterior}) e qual chave de saída (output_key) ele próprio fornecerá."})}><Settings size={14} /></Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover etapa."})}><Trash2 size={14} /></Button>
-                                            </div>
-                                        </div>
-                                        <div className="pl-6 space-y-1">
-                                            <Label htmlFor="outputKeySequential" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
-                                            <Input id="outputKeySequential" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: sentimento_analisado" />
-                                            <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) em etapas futuras.</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                                </Card>
-                            )}
-                            {detailedWorkflowType === 'parallel' && (
-                                <Card className="bg-muted/30 border-border/50">
-                                    <CardHeader><CardTitle className="text-base">Configurar Tarefas Paralelas</CardTitle><CardDescription className="text-xs">Adicione os subagentes que devem ser executados simultaneamente.</CardDescription></CardHeader>
-                                    <CardContent className="space-y-3">
-                                        <Alert variant="default" className="mt-3 mb-4 bg-card border-border/70">
-                                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                                            <AlertTitle className="text-sm font-medium">Importante: Execução Independente das Tarefas Paralelas</AlertTitle>
-                                            <AlertDescription className="text-xs">
-                                                Os subagentes configurados aqui serão executados em paralelo (simultaneamente) e operam de forma independente. 
-                                                Não há compartilhamento automático de histórico de conversa ou estado entre eles durante a execução. 
-                                                Para coletar e processar esses resultados, geralmente é necessário:
-                                                <br />1. Que cada subagente paralelo use uma 'Chave de Saída' (`output_key`) única para salvar seu resultado individual (ex: no estado da sessão).
-                                                <br />2. Adicionar um Agente Sequencial subsequente que, por sua vez, pode conter um `CustomAgent` ou `LlmAgent` para realizar a lógica de combinação, análise ou tomada de decisão com base nos múltiplos resultados paralelos.
-                                            </AlertDescription>
-                                        </Alert>
-                                        <Button variant="outline" size="sm" className="w-full h-9" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente/tarefa paralela."})}>
-                                            <PlusCircle size={16} className="mr-2" /> Adicionar Subagente/Tarefa Paralela
-                                        </Button>
-                                        <div className="p-3 border rounded-md bg-background/70 space-y-2 border-border/50">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm">Ex: Agente de Geração de Imagem (Tipo: Custom, ID: agent_image_gen)</span>
-                                                <div className="flex items-center gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Tarefa Paralela: Aqui você definiria as instruções para este subagente, incluindo a output_key que ele usará para armazenar seu resultado individual. Lembre-se que ele rodará em paralelo e, por padrão, de forma isolada de outras tarefas paralelas."})}>
-                                                        <Settings size={14} />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover tarefa."})}>
-                                                        <Trash2 size={14} />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            <div className="pl-0 space-y-1 mt-1.5">
-                                                <Label htmlFor="outputKeyParallel" className="text-xs text-muted-foreground">Chave de Saída (para resultado individual):</Label>
-                                                <Input id="outputKeyParallel" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: resultado_imagem_gerada" />
-                                                <p className="text-xs text-muted-foreground/80">Use esta chave para que um agente sequencial posterior possa acessar o resultado desta tarefa paralela (ex: salvo no estado da sessão).</p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            {detailedWorkflowType === 'loop' && (
-                                <Card className="bg-muted/30 border-border/50">
-                                    <CardHeader><CardTitle className="text-base">Configurar Loop de Execução</CardTitle><CardDescription className="text-xs">Defina o(s) subagente(s) a serem repetidos e a condição de término.</CardDescription></CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
-                                            <Label htmlFor="loopMaxIterations" className="text-left">Nº Máximo de Iterações (Opc.)</Label>
-                                            <Input id="loopMaxIterations" type="number" min="1" placeholder="Ex: 5" value={loopMaxIterations || ""} onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)} className="h-9" />
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
-                                            <Label className="text-left pt-1 flex items-center gap-1.5">Condição de Término Adicional
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                                    <TooltipContent className="max-w-xs"><p>Define como o loop pode terminar além do número máximo de iterações. "Sinalização por Subagente" permite que uma etapa interna ao loop cause a sua interrupção.</p></TooltipContent>
-                                                </Tooltip>
-                                            </Label>
-                                            <RadioGroup value={loopTerminationConditionType || 'none'} onValueChange={(value) => setLoopTerminationConditionType(value as 'none' | 'subagent_signal' | undefined)} className="pt-1">
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="loop-cond-none" /><Label htmlFor="loop-cond-none" className="font-normal">Nenhuma</Label></div>
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="subagent_signal" id="loop-cond-signal" /><Label htmlFor="loop-cond-signal" className="font-normal">Sinalização por Subagente</Label></div>
-                                            </RadioGroup>
-                                        </div>
-
-                                        {loopTerminationConditionType === 'subagent_signal' && (
-                                            <Alert variant="default" className="mt-3 bg-card border-border/70">
-                                                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                                                <AlertTitle className="text-sm font-medium">Sinalização por Subagente</AlertTitle>
-                                                <AlertDescription className="text-xs space-y-2">
-                                                    <p>Um subagente dentro do loop pode sinalizar o término (ex: usando uma ferramenta como 'exit_loop' ou retornando um valor/estado particular). Configure o subagente apropriado com essa lógica.</p>
-                                                    <div className="space-y-1">
-                                                        <Label htmlFor="loopExitTool" className="text-xs">Ferramenta de Saída (Exemplo):</Label>
-                                                        <Input id="loopExitTool" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} placeholder="exit_loop" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <Label htmlFor="loopExitStateKey" className="text-xs">Chave de Estado para Saída (Exemplo):</Label>
-                                                        <Input id="loopExitStateKey" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} placeholder="status_documento" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <Label htmlFor="loopExitStateValue" className="text-xs">Valor de Estado para Sair (Exemplo):</Label>
-                                                        <Input id="loopExitStateValue" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} placeholder="FINALIZADO" className="h-7 text-xs mt-0.5 bg-muted/50 border-border/40" />
-                                                    </div>
-                                                </AlertDescription>
-                                            </Alert>
-                                        )}
-                                        <Separator className="my-3"/>
-                                        <h4 className="text-sm font-medium pt-1">Subagente(s) na Sequência do Loop:</h4>
-                                        <Button variant="outline" size="sm" className="w-full h-9" onClick={() => toast({ title: "Em breve!", description: "Adicionar subagente ao loop."})}>
-                                            <PlusCircle size={16} className="mr-2" /> Adicionar Subagente ao Loop
-                                        </Button>
-                                        <div className="p-3 border rounded-md bg-background/70 space-y-2 border-border/50">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2"><GripVertical size={16} className="text-muted-foreground cursor-grab" title="Reordenar (arrastar)"/><span className="text-sm">Ex: Agente de Coleta de Dados (Tipo: LLM, ID: agent_data_collector)</span></div>
-                                                <div className="flex items-center gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast({ title: "Em breve!", description: "Configurar Etapa do Loop: Aqui você definiria as instruções para este subagente, como ele usa output_keys de etapas anteriores na mesma iteração, qual output_key ele produz, e se ele tem um papel em sinalizar o término do loop (ex: usando uma ferramenta como 'exit_loop' ou verificando uma condição)." })}>
-                                                        <Settings size={14} />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => toast({ title: "Em breve!", description: "Remover subagente."})}>
-                                                        <Trash2 size={14} />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            <div className="pl-6 space-y-1">
-                                                <Label htmlFor="outputKeyLoopStep" className="text-xs text-muted-foreground">Chave de Saída (opcional):</Label>
-                                                <Input id="outputKeyLoopStep" readOnly disabled className="h-7 text-xs bg-muted/50 border-border/40" placeholder="ex: dados_coletados_iteracao" />
-                                                <p className="text-xs text-muted-foreground/80">Use esta chave para referenciar a saída desta etapa (ex: salva no estado da sessão) dentro da iteração ou após o loop.</p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </TooltipProvider>
-                    </TabsContent>
-                )}
 
                 <TabsContent value="memoriaConhecimento" className="space-y-6">
                     <TooltipProvider>
@@ -1234,7 +1246,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                             
                             // Propriedades de RAG e Conhecimento
                             ragMemoryConfig={ragMemoryConfig}
-                            setRagMemoryConfig={setRagMemoryConfig}
+                            setRagMemoryConfig={(config) => setRagMemoryConfig(config)}
                         />
                     </TooltipProvider>
                 </TabsContent>
@@ -1260,8 +1272,8 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                     <TooltipProvider>
                         <A2AConfigComponent
                             a2aConfig={a2aConfig}
-                            setA2AConfig={setA2AConfig}
-                            savedAgents={savedAgents || []}
+                            setA2AConfig={(config) => setA2AConfig(config)}
+                            savedAgents={(savedAgents || []) as any /* Força casting para evitar erro de tipo incompatível */}
                         />
                     </TooltipProvider>
                 </TabsContent>
@@ -1284,7 +1296,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
             }}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                <DialogTitle>Configurar: {configuringTool.label}</DialogTitle>
+                <DialogTitle>Configurar: {configuringTool.name}</DialogTitle>
                 <DialogDescription>{configuringTool.description} Forneça os detalhes de configuração abaixo.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
