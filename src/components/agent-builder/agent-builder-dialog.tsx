@@ -6,15 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { A2AConfig, CommunicationChannel } from "@/types/a2a-types";
+import { CommunicationChannelItem } from "./a2a-communication-channel";
 import { Textarea } from "@/components/ui/textarea";
-import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle, Plus, Bot, Rows3, LucideToyBrick, Users, Repeat, Shuffle } from "lucide-react";
+import { Cpu, PlusCircle, Save, Info, Workflow, Settings, Brain, Target, ListChecks, Smile, Ban, Search, Calculator, FileText, CalendarDays, Network, Layers, Trash2, Edit, MessageSquare, Share2, FileJson, Database, Code2, BookText, Languages, Settings2 as ConfigureIcon, ClipboardCopy, Briefcase, Stethoscope, Plane, GripVertical, AlertCircle, Plus, Bot, Rows3, LucideToyBrick, Users, Repeat, Shuffle, Terminal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAgents } from "@/contexts/AgentsContext";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SubAgentSelector } from "@/components/agent-builder/sub-agent-selector";
+import { MultiAgentTab } from "@/components/agent-builder/multi-agent-tab";
+import { ArtifactManagementTab, ArtifactDefinition } from "@/components/agent-builder/artifact-management-tab";
+import { MemoryKnowledgeTab, RagMemoryConfig, KnowledgeSource } from "@/components/agent-builder/memory-knowledge-tab";
+import { A2AConfig as A2AConfigComponent } from "@/components/agent-builder/a2a-config";
+import type { A2AConfig as A2AConfigType } from "@/types/a2a-types";
+import { convertToGoogleADKConfig } from "@/lib/google-adk-utils";
 import {
   Dialog,
   DialogContent,
@@ -103,6 +114,7 @@ export function AgentBuilderDialog({
   iconComponents,
 }: AgentBuilderDialogProps) {
   const { toast } = useToast();
+  const { savedAgents } = useAgents(); // Acessa a lista de agentes salvos para o seletor de sub-agentes
 
   if (agentToneOptions.length > 0 && !defaultLLMConfigValues.agentPersonality) {
     defaultLLMConfigValues.agentPersonality = agentToneOptions[0].label;
@@ -127,7 +139,75 @@ export function AgentBuilderDialog({
   const [agentModel, setAgentModel] = React.useState(editingAgent?.agentModel || defaultLLMConfigValues.agentModel);
   const [agentTemperature, setAgentTemperature] = React.useState([(editingAgent?.agentTemperature === undefined ? defaultLLMConfigValues.agentTemperature : editingAgent.agentTemperature)]);
 
-  // Workflow Fields
+  // Multi-agent fields (Google ADK)
+const [isRootAgent, setIsRootAgent] = React.useState(editingAgent?.isRootAgent || false);
+const [subAgents, setSubAgents] = React.useState<string[]>(editingAgent?.subAgents || []);
+const [globalInstruction, setGlobalInstruction] = React.useState(editingAgent?.globalInstruction || "");
+
+// Estados para gerenciamento de estado e memória
+const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(
+    editingAgent?.enableStatePersistence || false
+);
+const [statePersistenceType, setStatePersistenceType] = React.useState<'session' | 'memory' | 'database'>(
+    editingAgent?.statePersistenceType || 'memory'
+);
+const [initialStateValues, setInitialStateValues] = React.useState<Array<{
+    key: string;
+    value: string;
+    scope: 'global' | 'agent' | 'temporary';
+    description: string;
+}>>(editingAgent?.initialStateValues || []);
+const [enableStateSharing, setEnableStateSharing] = React.useState<boolean>(
+    editingAgent?.enableStateSharing || false
+);
+const [stateSharingStrategy, setStateSharingStrategy] = React.useState<'all' | 'explicit' | 'none'>(
+    editingAgent?.stateSharingStrategy || 'explicit'
+);
+const [enableRAG, setEnableRAG] = React.useState<boolean>(
+    editingAgent?.enableRAG || false
+);
+
+// Estados para gerenciamento de artefatos
+const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(
+    editingAgent?.enableArtifacts || false
+);
+const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>(
+    editingAgent?.artifactStorageType || 'memory'
+);
+const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>(
+    editingAgent?.artifacts || []
+);
+const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(
+    editingAgent?.cloudStorageBucket || ''
+);
+const [localStoragePath, setLocalStoragePath] = React.useState<string>(
+    editingAgent?.localStoragePath || ''
+);
+
+// Estados para RAG e memória
+const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>({
+  enabled: editingAgent?.ragMemoryConfig?.enabled || false,
+  serviceType: editingAgent?.ragMemoryConfig?.serviceType || 'in-memory',
+  projectId: editingAgent?.ragMemoryConfig?.projectId || '',
+  location: editingAgent?.ragMemoryConfig?.location || '',
+  ragCorpusName: editingAgent?.ragMemoryConfig?.ragCorpusName || '',
+  similarityTopK: editingAgent?.ragMemoryConfig?.similarityTopK || 5,
+  vectorDistanceThreshold: editingAgent?.ragMemoryConfig?.vectorDistanceThreshold || 0.7,
+  embeddingModel: editingAgent?.ragMemoryConfig?.embeddingModel || '',
+  knowledgeSources: editingAgent?.ragMemoryConfig?.knowledgeSources || [],
+  includeConversationContext: editingAgent?.ragMemoryConfig?.includeConversationContext || true,
+  persistentMemory: editingAgent?.ragMemoryConfig?.persistentMemory || false,
+});
+
+// Estado para configuração A2A
+const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
+  communicationChannels: editingAgent?.a2aConfig?.communicationChannels || [],
+  defaultResponseFormat: editingAgent?.a2aConfig?.defaultResponseFormat || 'json',
+  maxMessageSize: editingAgent?.a2aConfig?.maxMessageSize || 1024 * 1024, // 1MB default
+  loggingEnabled: editingAgent?.a2aConfig?.loggingEnabled || false,
+});
+
+// Workflow Fields
   const [workflowDescription, setWorkflowDescription] = React.useState(editingAgent?.agentType === 'workflow' ? editingAgent.workflowDescription : (editingAgent?.workflowDescription || defaultWorkflowConfigValues.workflowDescription || ""));
   const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.detailedWorkflowType : defaultWorkflowConfigValues.detailedWorkflowType);
   const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopMaxIterations : defaultWorkflowConfigValues.loopMaxIterations);
@@ -369,6 +449,34 @@ export function AgentBuilderDialog({
         agentVersion,
         agentTools: currentAgentTools,
         agentType,
+        // Campos para compatibilidade com Google ADK
+        isRootAgent,
+        subAgents: isRootAgent ? subAgents : [],
+        globalInstruction: isRootAgent ? globalInstruction : "",
+        
+        // Campos para gerenciamento de estado e memória
+        enableStatePersistence,
+        statePersistenceType,
+        initialStateValues,
+        enableStateSharing,
+        stateSharingStrategy,
+        enableRAG,
+        
+        // Campos para gerenciamento de artefatos
+        enableArtifacts,
+        artifactStorageType,
+        artifacts,
+        cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
+        localStoragePath: artifactStorageType === 'filesystem' ? localStoragePath : undefined,
+        
+        // Campos para RAG e memória avançada
+        ragMemoryConfig: ragMemoryConfig.enabled ? {
+            ...ragMemoryConfig,
+            // Remover campos desnecessários com base no tipo de serviço
+            projectId: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? ragMemoryConfig.projectId : undefined,
+            location: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? ragMemoryConfig.location : undefined,
+            ragCorpusName: ragMemoryConfig.serviceType === 'vertex-ai-rag' ? ragMemoryConfig.ragCorpusName : undefined,
+        } : undefined,
     };
 
     if (agentType === 'llm' || agentType === 'task') {
@@ -537,10 +645,12 @@ export function AgentBuilderDialog({
 
         <div className="flex-grow overflow-y-auto p-6 space-y-6">
             <Tabs defaultValue="configPrincipal" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+                <TabsList className="grid w-full grid-cols-5 mb-6 h-auto">
                     <TabsTrigger value="configPrincipal" className="py-2">Configuração Principal</TabsTrigger>
                     <TabsTrigger value="ferramentas" className="py-2">Ferramentas</TabsTrigger>
-                    <TabsTrigger value="definicaoFluxo" className="py-2" disabled={!['sequential', 'parallel', 'loop', 'workflow'].includes(agentType)}>Definição do Fluxo</TabsTrigger>
+                    <TabsTrigger value="memoriaConhecimento" className="py-2">Memória e Conhecimento</TabsTrigger>
+                    <TabsTrigger value="artefatos" className="py-2">Artefatos</TabsTrigger>
+                    <TabsTrigger value="a2a" className="py-2">Comunicação A2A</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="configPrincipal" className="space-y-6">
@@ -654,7 +764,7 @@ export function AgentBuilderDialog({
                                 <div>
                                     <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
                                         <Brain className="w-5 h-5 text-primary/80" /> Configurações do Modelo {!showLLMSections && !agentModel && '(Opcional para este tipo)'}
-                                        {!showLLMSections && agentModel && '(Opcional, usado se preenchido)'}
+                                        {!showLLMSections && agentModel && '(Opcional para este tipo)'}
                                     </h3>
                                     <div className="space-y-3">
                                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
@@ -696,6 +806,183 @@ export function AgentBuilderDialog({
                             <Label htmlFor="agentVersion" className="text-left">Versão do Agente</Label>
                             <Input id="agentVersion" placeholder="ex: 1.0.0" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} className="h-10"/>
                         </div>
+                        
+                        {/* Configuração de Multi-Agente - Visível para todos os tipos de agentes */}
+                        <Separator className="my-6" />
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <Users className="h-5 w-5 text-primary/80" />
+                                <h3 className="text-lg font-medium">Configuração Multi-Agente</h3>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id="isRootAgent"
+                                    checked={isRootAgent}
+                                    onCheckedChange={setIsRootAgent}
+                                />
+                                <Label htmlFor="isRootAgent" className="flex items-center gap-1">
+                                    Este é um Agente Raiz (controla outros agentes)
+                                </Label>
+                            </div>
+                            
+                            {isRootAgent && (
+                                <>
+                                    <Alert variant="default" className="bg-muted/30 border-border/50">
+                                        <AlertCircle className="h-4 w-4 text-primary/80" />
+                                        <AlertTitle className="text-sm">Agente Raiz ADK</AlertTitle>
+                                        <AlertDescription className="text-xs">
+                                            Como Agente Raiz, este agente pode coordenar múltiplos sub-agentes, seguindo a arquitetura do Google Agent Development Kit.
+                                        </AlertDescription>
+                                    </Alert>
+                                    
+                                    <div className="space-y-4 mt-2">
+                                        <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
+                                            <Label htmlFor="globalInstruction" className="text-left pt-2">Instrução Global</Label>
+                                            <Textarea
+                                                id="globalInstruction"
+                                                placeholder="Instrução que será aplicada a todos os sub-agentes..."
+                                                value={globalInstruction}
+                                                onChange={(e) => setGlobalInstruction(e.target.value)}
+                                                className="min-h-20 resize-y"
+                                            />
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-medium">Sub-Agentes</Label>
+                                            <Card className="border-border/50">
+                                                <CardContent className="p-4">
+                                                    <SubAgentSelector
+                                                        selectedAgents={subAgents}
+                                                        onChange={setSubAgents}
+                                                        availableAgents={savedAgents || []}
+                                                    />
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Campos de Definição de Fluxo - Visíveis apenas para agentes de fluxo de trabalho */}
+                        {['sequential', 'parallel', 'loop', 'workflow'].includes(agentType) && (
+                            <>
+                                <Separator className="my-6" />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <Workflow className="h-5 w-5 text-primary/80" />
+                                        <h3 className="text-lg font-medium">Definição do Fluxo de Trabalho</h3>
+                                    </div>
+                                    
+                                    {agentTypeOptions.find(opt => opt.id === agentType) && (
+                                        <Alert variant="default" className="mb-4 bg-card border-border/60">
+                                            {agentTypeOptions.find(opt => opt.id === agentType)!.icon ? 
+                                                React.cloneElement(agentTypeOptions.find(opt => opt.id === agentType)!.icon as React.ReactElement, 
+                                                { className: "h-4 w-4 text-primary/80" }) : 
+                                                <Cpu className="h-4 w-4 text-primary/80" />}
+                                            <AlertTitle>{agentTypeOptions.find(opt => opt.id === agentType)!.label.split(' (')[0].trim()}</AlertTitle>
+                                            <AlertDescription>{agentTypeOptions.find(opt => opt.id === agentType)!.description}</AlertDescription>
+                                        </Alert>
+                                    )}
+                                    
+                                    <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mb-4">
+                                        <Label htmlFor="detailedWorkflowType" className="text-left">Tipo de Fluxo Detalhado</Label>
+                                        <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}>
+                                            <SelectTrigger id="detailedWorkflowType" className="h-10"><SelectValue placeholder="Selecione o tipo de fluxo" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="sequential">Sequencial (Executar em ordem)</SelectItem>
+                                                <SelectItem value="parallel">Paralelo (Executar simultaneamente)</SelectItem>
+                                                <SelectItem value="loop">Loop (Repetir até condição)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3">
+                                        <Label htmlFor="workflowDescription" className="text-left pt-2">Descrição do Fluxo</Label>
+                                        <Textarea 
+                                            id="workflowDescription" 
+                                            placeholder="Descreva como as ferramentas serão executadas neste fluxo..." 
+                                            value={workflowDescription} 
+                                            onChange={(e) => setWorkflowDescription(e.target.value)}
+                                            className="min-h-24 resize-y"
+                                        />
+                                    </div>
+                                    
+                                    {detailedWorkflowType === 'loop' && (
+                                        <>
+                                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mt-6">
+                                                <Label htmlFor="loopMaxIterations" className="text-left">Máximo de Iterações</Label>
+                                                <Input 
+                                                    id="loopMaxIterations" 
+                                                    type="number" 
+                                                    placeholder="ex: 10" 
+                                                    value={loopMaxIterations?.toString() || ""} 
+                                                    onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)}
+                                                    className="h-10"
+                                                />
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3">
+                                                <Label className="text-left pt-2">Condição de Término</Label>
+                                                <RadioGroup 
+                                                    value={loopTerminationConditionType || 'tool'} 
+                                                    onValueChange={(value) => setLoopTerminationConditionType(value as 'tool' | 'state')}
+                                                    className="space-y-3"
+                                                >
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="tool" id="tool-condition" />
+                                                        <Label htmlFor="tool-condition" className="font-normal">Baseado em Ferramenta</Label>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="state" id="state-condition" />
+                                                        <Label htmlFor="state-condition" className="font-normal">Baseado em Estado</Label>
+                                                    </div>
+                                                </RadioGroup>
+                                            </div>
+                                            
+                                            {loopTerminationConditionType === 'tool' && (
+                                                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
+                                                    <Label htmlFor="loopExitToolName" className="text-left">Nome da Ferramenta de Saída</Label>
+                                                    <Input 
+                                                        id="loopExitToolName" 
+                                                        placeholder="ex: exitLoop" 
+                                                        value={loopExitToolName || ""} 
+                                                        onChange={(e) => setLoopExitToolName(e.target.value)}
+                                                        className="h-10"
+                                                    />
+                                                </div>
+                                            )}
+                                            
+                                            {loopTerminationConditionType === 'state' && (
+                                                <>
+                                                    <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
+                                                        <Label htmlFor="loopExitStateKey" className="text-left">Chave do Estado</Label>
+                                                        <Input 
+                                                            id="loopExitStateKey" 
+                                                            placeholder="ex: loopComplete" 
+                                                            value={loopExitStateKey || ""} 
+                                                            onChange={(e) => setLoopExitStateKey(e.target.value)}
+                                                            className="h-10"
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
+                                                        <Label htmlFor="loopExitStateValue" className="text-left">Valor do Estado para Saída</Label>
+                                                        <Input 
+                                                            id="loopExitStateValue" 
+                                                            placeholder="ex: true" 
+                                                            value={loopExitStateValue || ""} 
+                                                            onChange={(e) => setLoopExitStateValue(e.target.value)}
+                                                            className="h-10"
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </TooltipProvider>
                 </TabsContent>
 
@@ -927,6 +1214,59 @@ export function AgentBuilderDialog({
                         </TooltipProvider>
                     </TabsContent>
                 )}
+
+                <TabsContent value="memoriaConhecimento" className="space-y-6">
+                    <TooltipProvider>
+                        <MemoryKnowledgeTab
+                            // Propriedades de Estado e Memória
+                            enableStatePersistence={enableStatePersistence}
+                            setEnableStatePersistence={setEnableStatePersistence}
+                            statePersistenceType={statePersistenceType}
+                            setStatePersistenceType={setStatePersistenceType}
+                            initialStateValues={initialStateValues}
+                            setInitialStateValues={setInitialStateValues}
+                            enableStateSharing={enableStateSharing}
+                            setEnableStateSharing={setEnableStateSharing}
+                            stateSharingStrategy={stateSharingStrategy}
+                            setStateSharingStrategy={setStateSharingStrategy}
+                            enableRAG={enableRAG}
+                            setEnableRAG={setEnableRAG}
+                            
+                            // Propriedades de RAG e Conhecimento
+                            ragMemoryConfig={ragMemoryConfig}
+                            setRagMemoryConfig={setRagMemoryConfig}
+                        />
+                    </TooltipProvider>
+                </TabsContent>
+
+                <TabsContent value="artefatos" className="space-y-6">
+                    <TooltipProvider>
+                        <ArtifactManagementTab
+                            enableArtifacts={enableArtifacts}
+                            setEnableArtifacts={setEnableArtifacts}
+                            artifactStorageType={artifactStorageType}
+                            setArtifactStorageType={setArtifactStorageType}
+                            artifacts={artifacts}
+                            setArtifacts={setArtifacts}
+                            cloudStorageBucket={cloudStorageBucket}
+                            setCloudStorageBucket={setCloudStorageBucket}
+                            localStoragePath={localStoragePath}
+                            setLocalStoragePath={setLocalStoragePath}
+                        />
+                    </TooltipProvider>
+                </TabsContent>
+                
+                <TabsContent value="a2a" className="space-y-6">
+                    <TooltipProvider>
+                        <A2AConfigComponent
+                            a2aConfig={a2aConfig}
+                            setA2AConfig={setA2AConfig}
+                            savedAgents={savedAgents || []}
+                        />
+                    </TooltipProvider>
+                </TabsContent>
+
+
             </Tabs>
         </div>
 

@@ -68,6 +68,9 @@ export interface AgentConfigBase {
   agentDescription: string;
   agentVersion: string;
   agentTools: string[];
+  isRootAgent?: boolean; // Indica se este é um agente raiz em um sistema multi-agente
+  subAgents?: string[]; // Lista de IDs de agentes que podem ser delegados
+  globalInstruction?: string; // Instrução global que se aplica a todos os agentes na árvore
 }
 
 export interface LLMAgentConfig extends AgentConfigBase {
@@ -134,25 +137,115 @@ export interface ToolConfigData {
   calendarApiEndpoint?: string;
 }
 
-export interface SavedAgentConfiguration extends AgentConfig {
+export interface SavedAgentConfiguration extends AgentConfigBase {
   id: string;
   templateId: string;
   systemPromptGenerated?: string;
   toolsDetails: Array<{
     id: string;
     label: string;
-    iconName?: keyof typeof iconComponents | 'default'; // Para garantir que apenas nomes válidos sejam usados
+    iconName?: keyof typeof iconComponents | 'default';
     needsConfiguration?: boolean;
     genkitToolName?: string;
   }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
+  
+  // Common agent properties
+  agentType: "llm" | "workflow" | "custom" | "a2a";
+  agentGoal?: string;
+  agentTasks?: string;
+  agentPersonality?: string;
+  agentRestrictions?: string;
+  agentModel?: string;
+  agentTemperature?: number;
+  
+  // Workflow specific
+  workflowDescription?: string;
+  detailedWorkflowType?: "sequential" | "parallel" | "loop";
+  loopMaxIterations?: number;
+  loopTerminationConditionType?: "none" | "subagent_signal";
+  loopExitToolName?: string;
+  loopExitStateKey?: string;
+  loopExitStateValue?: string;
+  
+  // Custom/A2A specific
+  customLogicDescription?: string;
+  
+  // State and Memory
+  enableStatePersistence?: boolean;
+  statePersistenceType?: 'session' | 'memory' | 'database';
+  initialStateValues?: Array<{
+    key: string;
+    value: string;
+    scope: 'global' | 'agent' | 'temporary';
+    description: string;
+  }>;
+  enableStateSharing?: boolean;
+  stateSharingStrategy?: 'all' | 'explicit' | 'none';
+  enableRAG?: boolean;
+  
+  // Artifacts
+  enableArtifacts?: boolean;
+  artifactStorageType?: 'memory' | 'filesystem' | 'cloud';
+  artifacts?: any[];
+  cloudStorageBucket?: string;
+  localStoragePath?: string;
+  
+  // RAG and Memory
+  ragMemoryConfig?: {
+    enabled: boolean;
+    serviceType: string;
+    projectId: string;
+    location: string;
+    ragCorpusName: string;
+    similarityTopK: number;
+    vectorDistanceThreshold: number;
+    embeddingModel: string;
+    knowledgeSources: any[];
+    includeConversationContext: boolean;
+    persistentMemory: boolean;
+  };
+  
+  // A2A specific
+  a2aConfig?: {
+    enabled: boolean;
+    communicationChannels: any[];
+    defaultResponseFormat: string;
+    maxMessageSize: number;
+    loggingEnabled: boolean;
+  };
 }
 
 export const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Search, Calculator, FileText, CalendarDays, Network, Database, Code2,
-  Default: Cpu, Briefcase, Stethoscope, Plane, Workflow, Brain: Cpu, FileJson,
-  GripVertical, ConfigureIcon, ClipboardCopy, AlertCircle, DeleteIcon, EditIcon, ChatIcon,
-  CopyIcon, EyeIcon, EyeOffIcon, SaveIcon, Plus, Layers, Info
+  Search,
+  Calculator,
+  FileText,
+  CalendarDays,
+  Network,
+  Database,
+  Code2,
+  Cpu,
+  Briefcase,
+  Stethoscope,
+  Plane,
+  Workflow,
+  Brain: Cpu,
+  FileJson,
+  GripVertical,
+  ConfigureIcon,
+  ClipboardCopy,
+  AlertCircle,
+  DeleteIcon,
+  EditIcon,
+  ChatIcon,
+  CopyIcon,
+  EyeIcon,
+  EyeOffIcon,
+  SaveIcon,
+  Plus,
+  Layers,
+  Info,
+  Default: Cpu
 };
 
 export const agentTemplates: AgentTemplate[] = [
