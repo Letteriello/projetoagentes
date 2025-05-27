@@ -52,6 +52,7 @@ import { MultiAgentTab } from "@/components/agent-builder/multi-agent-tab";
 import { ArtifactManagementTab, ArtifactDefinition } from "@/components/agent-builder/artifact-management-tab";
 import { MemoryKnowledgeTab, RagMemoryConfig, KnowledgeSource } from "@/components/agent-builder/memory-knowledge-tab";
 import { A2AConfig as A2AConfigComponent } from "@/components/agent-builder/a2a-config";
+import { ToolsTab } from "@/components/agent-builder/tools-tab";
 import type { A2AConfig as A2AConfigType } from "@/types/a2a-types";
 import { convertToGoogleADKConfig } from "@/lib/google-adk-utils";
 import {
@@ -1108,123 +1109,26 @@ return (
                 </TabsContent>
 
                 <TabsContent value="ferramentas" className="space-y-6">
-                     <TooltipProvider>
+                    <TooltipProvider>
                         <div>
-                            <h3 className="text-lg font-medium mb-1 flex items-center gap-2"><Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente (Capacidades via Genkit)</h3>
-                            <p className="text-sm text-muted-foreground mb-4">Capacite seu agente com funcionalidades para interagir com o mundo exterior. A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.</p>
-                            <Card className="bg-muted/30 border-border/50">
-                                <CardContent className="p-4 space-y-3">
-                                <div className="space-y-3 pt-2">
-                                    {availableTools.map((tool) => {
-                                        const isToolSelected = currentAgentTools.includes(tool.id);
-                                        const toolConfig = toolConfigurations[tool.id];
-                                        const needsConfig = 'needsConfiguration' in tool ? tool.needsConfiguration : false;
-                                        const isToolConfigured = needsConfig && toolConfig &&
-                                                            ( (tool.id === 'webSearch' && toolConfig.googleApiKey && toolConfig.googleCseId) ||
-                                                                (tool.id === 'customApiIntegration' && toolConfig.openapiSpecUrl) ||
-                                                                (tool.id === 'databaseAccess' && (toolConfig.dbConnectionString || (toolConfig.dbHost && toolConfig.dbName))) ||
-                                                                (tool.id === 'knowledgeBase' && toolConfig.knowledgeBaseId) ||
-                                                                (tool.id === 'calendarAccess' && toolConfig.calendarApiEndpoint) ||
-                                                                (needsConfig && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
-                                                            );
-                                        return (
-                                        <div key={tool.id} className="flex items-start p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors border-border/50">
-                                            <Checkbox id={`tool-${tool.id}`} checked={isToolSelected} onCheckedChange={(checked) => handleToolSelectionChange(tool.id, !!checked)} className="mt-1 mr-3 shrink-0"/>
-                                            <div className="flex-grow">
-                                                <Label htmlFor={`tool-${tool.id}`} className="font-medium flex items-center cursor-pointer group">
-                                                    {(() => {
-                                                      // Handle different icon types safely
-                                                      if (typeof tool.icon === 'string') {
-                                                        return <span className="mr-2 text-primary/90 h-[18px] w-[18px] flex-shrink-0 flex items-center justify-center" dangerouslySetInnerHTML={{ __html: tool.icon }} />;
-                                                      } else if (React.isValidElement(tool.icon)) {
-                                                        return <span className="mr-2 text-primary/90 h-[18px] w-[18px] flex-shrink-0 flex items-center justify-center">{tool.icon}</span>;
-                                                      } else {
-                                                        return <Cpu size={18} className="mr-2 text-primary/90 flex-shrink-0" />;
-                                                      }
-                                                    })()}
-                                                    {getToolDisplayName(tool)}
-                                                    {needsConfig ? (
-                                                      <span className={cn(
-                                                        "ml-2 group-hover:text-primary transition-colors inline-flex items-center", 
-                                                        isToolConfigured ? "text-green-500" : "text-muted-foreground"
-                                                      )}>
-                                                        <Settings2 size={14} />
-                                                      </span>
-                                                    ) : null}
-                                                </Label>
-                                                <p className="text-xs text-muted-foreground mt-0.5 pl-7">{safeToReactNode(getToolDescription(tool))}</p>
-                                            </div>
-                                            {needsConfig && isToolSelected ? (
-                                              <Button 
-                                                variant="outline" 
-                                                size="sm" 
-                                                className={cn(
-                                                  "ml-auto shrink-0 h-8 px-3", 
-                                                  isToolConfigured ? "border-green-500/50 hover:border-green-500 text-green-600 hover:text-green-500 hover:bg-green-500/10" : ""
-                                                )} 
-                                                onClick={() => openToolConfigModal(tool)}
-                                              >
-                                                {isToolConfigured ? (
-                                                  <>
-                                                    <Settings2 className="text-green-500 mr-1.5" size={16} />
-                                                    Reconfigurar
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <Settings2 className="text-amber-500 mr-1.5" size={16} />
-                                                    Configurar
-                                                  </>
-                                                )}
-                                              </Button>
-                                            ) : null}
-                                        </div>
-                                    );
-                                    })}
-                                </div>
-                                {currentAgentTools.length > 0 && (
-                                    <div className="mt-4 pt-3 border-t border-border/50">
-                                    <h4 className="text-sm font-medium mb-2">Ferramentas Selecionadas:</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {currentAgentTools.map(toolId => {
-                                            const tool = availableTools.find(t => t.id === toolId);
-                                            if (!tool) return null;
-                                            const toolConfig = toolConfigurations[tool.id];
-                                            const needsConfig = getNeedsConfiguration(tool);
-                                            const isToolConfigured = needsConfig && toolConfig &&
-                                                                ( (tool.id === 'webSearch' && toolConfig.googleApiKey && toolConfig.googleCseId) ||
-                                                                    (tool.id === 'customApiIntegration' && toolConfig.openapiSpecUrl) ||
-                                                                    (tool.id === 'databaseAccess' && (toolConfig.dbConnectionString || (toolConfig.dbHost && toolConfig.dbName))) ||
-                                                                    (tool.id === 'knowledgeBase' && toolConfig.knowledgeBaseId) ||
-                                                                    (tool.id === 'calendarAccess' && toolConfig.calendarApiEndpoint) ||
-                                                                    (needsConfig && !['webSearch', 'customApiIntegration', 'databaseAccess', 'knowledgeBase', 'calendarAccess'].includes(tool.id) && Object.keys(toolConfig || {}).length > 0)
-                                                                );
-                                            return (
-                                                <Badge key={toolId} variant={isToolConfigured ? "default" : "secondary"} 
-                                                  // Aplicamos as classes de forma segura usando o atributo válido para o componente Badge
-                                                  style={isToolConfigured ? {background: "rgba(22, 163, 74, 0.2)", borderColor: "rgba(34, 197, 94, 0.5)", color: "#15803d"} : undefined}
-                                                  className="whitespace-nowrap">
-                                                    {(() => {
-                                                      // Handle different icon types safely
-                                                      if (typeof tool.icon === 'string') {
-                                                        return <span className="mr-1.5 inline-block h-3 w-3" dangerouslySetInnerHTML={{ __html: tool.icon }} />;
-                                                      } else if (React.isValidElement(tool.icon)) {
-                                                        return <span className="mr-1.5 inline-block h-3 w-3">{tool.icon}</span>;
-                                                      } else {
-                                                        return <Cpu size={12} className="mr-1.5 inline-block" />;
-                                                      }
-                                                    })()}
-                                                    {getToolDisplayName(tool)}
-                                                    {needsConfig && (<Settings2 className={cn("ml-1.5 h-3 w-3", isToolConfigured ? 'text-green-500' : 'text-blue-500')} />)}
-                                                </Badge>
-                                            );
-                                        })}
-                                    </div>
-                                    </div>
-                                )}
-                                </CardContent>
-                            </Card>
+                            <h3 className="text-lg font-medium mb-1 flex items-center gap-2">
+                                <Network className="w-5 h-5 text-primary/80" /> 
+                                Ferramentas do Agente (Capacidades via Genkit)
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Capacite seu agente com funcionalidades para interagir com o mundo exterior. 
+                                A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.
+                            </p>
+                            
+                            <ToolsTab
+                                availableTools={availableTools}
+                                selectedToolIds={currentAgentTools}
+                                onToolSelectionChange={handleToolSelectionChange}
+                                onConfigureTool={openToolConfigModal}
+                                toolConfigsApplied={toolConfigurations}
+                            />
                         </div>
-                     </TooltipProvider>
+                    </TooltipProvider>
                 </TabsContent>
 
                 <TabsContent value="memoriaConhecimento" className="space-y-6">
