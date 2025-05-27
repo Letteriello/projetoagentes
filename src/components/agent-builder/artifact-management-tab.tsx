@@ -602,8 +602,7 @@ https://exemplo.com/**/*.docx
         {enableArtifacts && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Eye size={16} className="text-primary/80" />
+              <CardTitle className="text-base">
                 Visualização de Artefatos
               </CardTitle>
               <CardDescription>

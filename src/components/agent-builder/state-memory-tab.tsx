@@ -101,8 +101,8 @@ export function StateMemoryTab({
 
   return (
     <div>
-      <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-        <Database className="w-5 h-5 text-primary/80" /> Gerenciamento de Estado e Memória
+      <h3 className="text-lg font-medium mb-3">
+        Gerenciamento de Estado e Memória
       </h3>
       
       <Alert variant="default" className="mb-4 bg-card border-border/70">
@@ -306,18 +306,8 @@ export function StateMemoryTab({
                 checked={enableStateSharing} 
                 onCheckedChange={setEnableStateSharing}
               />
-              <Label htmlFor="enable-sharing" className="flex items-center gap-1">
+              <Label htmlFor="enable-sharing">
                 Habilitar compartilhamento de estado entre agentes
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                      <Info size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Quando habilitado, permite que sub-agentes em um sistema multi-agente acessem e modifiquem o estado compartilhado.</p>
-                  </TooltipContent>
-                </Tooltip>
               </Label>
             </div>
             
@@ -345,8 +335,7 @@ export function StateMemoryTab({
         {/* Seção de RAG (Expandir no futuro) */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Brain size={16} className="text-primary/80" />
+            <CardTitle className="text-base">
               Retrieval-Augmented Generation (RAG)
             </CardTitle>
             <CardDescription>
@@ -360,18 +349,8 @@ export function StateMemoryTab({
                 checked={enableRAG} 
                 onCheckedChange={setEnableRAG}
               />
-              <Label htmlFor="enable-rag" className="flex items-center gap-1">
+              <Label htmlFor="enable-rag">
                 Habilitar suporte a RAG
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                      <Info size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Habilitar suporte para Retrieval-Augmented Generation (RAG), permitindo que o agente acesse e utilize conhecimento externo.</p>
-                  </TooltipContent>
-                </Tooltip>
               </Label>
             </div>
             

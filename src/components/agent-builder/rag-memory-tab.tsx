@@ -163,8 +163,8 @@ export function RagMemoryTab({
 
   return (
     <div>
-      <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-        <BrainCircuit className="w-5 h-5 text-primary/80" /> Retrieval-Augmented Generation (RAG) e Memória
+      <h3 className="text-lg font-medium mb-3">
+        Configuração de RAG (Retrieval-Augmented Generation) e Memória
       </h3>
       
       <Alert variant="default" className="mb-4 bg-card border-border/70">
@@ -575,7 +575,6 @@ export function RagMemoryTab({
                     onClick={() => setShowNewSourceForm(true)}
                     className="w-full"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
                     Adicionar Nova Fonte de Conhecimento
                   </Button>
                 )}
