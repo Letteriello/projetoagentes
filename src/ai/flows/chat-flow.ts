@@ -12,6 +12,9 @@ import { ai } from '@/ai/genkit';
 import { performWebSearchTool } from '@/ai/tools/web-search-tool';
 // Importe outras ferramentas Genkit aqui conforme são criadas
 // Ex: import { calculatorTool } from '@/ai/tools/calculator-tool';
+import { openAI } from 'genkitx-openai';
+import { ollama } from 'genkitx-ollama';
+import process from 'node:process';
 import { z } from 'genkit';
 import type { ToolsArgument } from 'genkit/model';
 
@@ -87,16 +90,57 @@ const internalChatFlow = ai.defineFlow(
     const modelToUse = input.modelName || ai.getModel(); // Usa o modelo do agente ou o padrão do Genkit
     const temperatureToUse = input.temperature;
 
-    // Tratamento para modelos que exigem configuração customizada no backend
-    if (['openrouter/custom', 'requestly/custom', 'custom-http/genkit'].includes(modelToUse)) {
-      let providerName = "um provedor personalizado";
-      if (modelToUse === 'openrouter/custom') providerName = "OpenRouter";
-      if (modelToUse === 'requestly/custom') providerName = "Requestly";
-      if (modelToUse === 'custom-http/genkit') providerName = "um endpoint HTTP customizado";
-      
-      return { 
-        agentResponse: `Este agente está configurado para usar ${providerName}. A integração completa para este tipo de configuração (que requer um fluxo Genkit customizado no backend) ainda não está implementada no sistema de chat padrão. Para usar este agente com todas as suas capacidades, um fluxo Genkit específico precisa ser desenvolvido e invocado.` 
-      };
+    let dynamicModel; // To hold the dynamically configured model instance
+
+    if (modelToUse.startsWith('openrouter/')) {
+        const modelId = modelToUse.split('openrouter/')[1];
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) {
+            return { agentResponse: "Erro: OPENROUTER_API_KEY não está configurada no servidor." };
+        }
+        dynamicModel = openAI({ 
+            apiKey: apiKey, 
+            model: modelId, 
+            baseUrl: "https://openrouter.ai/api/v1" 
+        });
+        console.log(`Usando OpenRouter: ${modelId}`);
+    } else if (modelToUse.startsWith('groq/')) {
+        const modelId = modelToUse.split('groq/')[1];
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) {
+            return { agentResponse: "Erro: GROQ_API_KEY não está configurada no servidor." };
+        }
+        dynamicModel = openAI({ 
+            apiKey: apiKey, 
+            model: modelId, 
+            baseUrl: "https://api.groq.com/openai/v1"
+        });
+        console.log(`Usando Groq: ${modelId}`);
+    } else if (modelToUse.startsWith('ollama/')) {
+        const modelId = modelToUse.split('ollama/')[1];
+        const ollamaHost = process.env.OLLAMA_API_HOST;
+        if (!ollamaHost) {
+            return { agentResponse: "Erro: OLLAMA_API_HOST não está configurado no servidor." };
+        }
+        dynamicModel = ollama({ 
+            host: ollamaHost, 
+            model: modelId 
+        });
+        console.log(`Usando Ollama: ${modelId} em ${ollamaHost}`);
+    } else if (modelToUse.startsWith('requestly/custom')) {
+        return { 
+            agentResponse: "Este agente está configurado para usar Requestly (Mock). Resposta mock: 'Olá do Requestly!'" 
+        };
+    } else if (modelToUse.startsWith('custom-http/genkit')) {
+        return { 
+            agentResponse: "Este agente está configurado para usar um endpoint HTTP customizado. A integração completa para este tipo de configuração ainda não está implementada no sistema de chat padrão." 
+        };
+    } else if (modelToUse.startsWith('googleai/')) {
+        dynamicModel = modelToUse; 
+        console.log(`Usando Google AI: ${modelToUse}`);
+    } else {
+        dynamicModel = ai.getModel(); 
+        console.log(`Usando modelo padrão Genkit ou modelo não reconhecido: ${modelToUse}`);
     }
 
     const messages: Array<{ role: string, content: any | Array<{text?: string, media?: {url: string, contentType?: string}}> }> = [];
@@ -152,7 +196,7 @@ const internalChatFlow = ai.defineFlow(
 
 
     const llmResponse = await ai.generate({
-        model: modelToUse,
+        model: dynamicModel,
         prompt: { messages }, 
         tools: activeGenkitTools.length > 0 ? activeGenkitTools : undefined, // Passa as ferramentas dinâmicas
         config: temperatureToUse !== undefined ? { temperature: temperatureToUse } : undefined,
