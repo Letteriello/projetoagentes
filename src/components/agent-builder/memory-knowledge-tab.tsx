@@ -264,8 +264,8 @@ export function MemoryKnowledgeTab({
   
   return (
     <div>
-      <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-        <BrainCircuit className="w-5 h-5 text-primary/80" /> Memória e Conhecimento
+      <h3 className="text-lg font-medium mb-3">
+        Memória e Conhecimento
       </h3>
       
       <Alert variant="default" className="mb-4 bg-card border-border/70">
@@ -280,16 +280,13 @@ export function MemoryKnowledgeTab({
       {/* Implementação inicial simplificada - vamos expandir incrementalmente */}
       <Tabs value={activeMemoryTab} onValueChange={setActiveMemoryTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 h-auto">
-          <TabsTrigger value="estado" className="py-2">
-            <Database className="h-4 w-4 mr-2" />
+          <TabsTrigger value="estado" className="py-2 px-4">
             Estado e Persistência
           </TabsTrigger>
-          <TabsTrigger value="rag" className="py-2">
-            <Book className="h-4 w-4 mr-2" />
+          <TabsTrigger value="rag" className="py-2 px-4">
             RAG e Conhecimento
           </TabsTrigger>
-          <TabsTrigger value="compartilhamento" className="py-2">
-            <ListFilter className="h-4 w-4 mr-2" />
+          <TabsTrigger value="compartilhamento" className="py-2 px-4">
             Compartilhamento
           </TabsTrigger>
         </TabsList>

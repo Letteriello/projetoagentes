@@ -308,8 +308,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
       {!detailViewToolId ? (
         <Tabs defaultValue="regular-tools" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="regular-tools" className="flex items-center gap-2">
-              <Wand2 size={16} />
+            <TabsTrigger value="regular-tools" className="py-2 px-4">
               <span>Ferramentas Padrão</span>
               {selectedToolIds.filter(id => 
                 regularTools.some(tool => tool.id === id)
@@ -321,8 +320,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="mcp-tools" className="flex items-center gap-2">
-              <Cpu size={16} />
+            <TabsTrigger value="mcp-tools" className="py-2 px-4">
               <span>MCP Tools</span>
               {selectedToolIds.filter(id => 
                 mcpTools.some(tool => tool.id === id)

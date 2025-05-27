@@ -30,8 +30,8 @@ interface MultiAgentTabProps {
 }: MultiAgentTabProps) {
   return (
     <div>
-      <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
-        <Users className="w-5 h-5 text-primary/80" /> Configuração de Sistema Multi-Agente (Google ADK)
+      <h3 className="text-lg font-medium mb-3">
+        Configuração de Sistema Multi-Agente (Google ADK)
       </h3>
       
       <Alert variant="default" className="mb-4 bg-card border-border/70">
@@ -55,18 +55,8 @@ interface MultiAgentTabProps {
         </div>        {isRootAgent && (
           <>
             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-4">
-              <Label htmlFor="subAgents" className="text-left flex items-center pt-2">
+              <Label htmlFor="subAgents" className="text-left pt-2">
                 Sub-Agentes
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                      <Info size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Lista de agentes que este agente raiz pode delegar tarefas. Adicionar sub-agentes permite a delegação automática (Auto Flow).</p>
-                  </TooltipContent>
-                </Tooltip>
               </Label>
               <SubAgentSelector 
                 selectedAgents={subAgents} 
@@ -76,18 +66,8 @@ interface MultiAgentTabProps {
             </div>
 
             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-4">
-              <Label htmlFor="globalInstruction" className="text-left flex items-center pt-2">
+              <Label htmlFor="globalInstruction" className="text-left pt-2">
                 Instrução Global
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                      <Info size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Instruções que se aplicam a todos os agentes na árvore de agentes completa. Esta instrução somente tem efeito no agente raiz.</p>
-                  </TooltipContent>
-                </Tooltip>
               </Label>
               <Textarea 
                 id="globalInstruction" 

@@ -59,13 +59,11 @@ export function A2AConfig({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Network className="h-5 w-5 text-primary/80" />
-        <h3 className="text-lg font-medium">Configuração de Comunicação Agent-to-Agent (A2A)</h3>
-      </div>
+      <h3 className="text-lg font-medium mb-3">
+        Configuração de Comunicação Agent-to-Agent (A2A)
+      </h3>
 
       <Alert variant="default" className="bg-muted/30 border-border/50">
-        <AlertCircle className="h-4 w-4 text-primary/80" />
         <AlertTitle className="text-sm">Protocolo A2A do Google ADK</AlertTitle>
         <AlertDescription className="text-xs">
           Configure como este agente se comunica com outros agentes, definindo canais, formatos de mensagem e políticas de comunicação.
@@ -76,7 +74,7 @@ export function A2AConfig({
         <div className="flex justify-between items-center">
           <Label className="text-sm font-medium">Canais de Comunicação</Label>
           <Button variant="outline" size="sm" onClick={handleAddCommunicationChannel}>
-            <Plus className="h-4 w-4 mr-1" /> Adicionar Canal
+            Adicionar Canal
           </Button>
         </div>
         
