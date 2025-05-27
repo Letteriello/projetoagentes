@@ -162,7 +162,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
                 ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20" 
                 : "bg-primary/10"
             )}>
-              {detailViewTool.icon}
+              {detailViewTool.icon && <detailViewTool.icon width={32} height={32} className="text-primary" />}
             </div>
             <div>
               <h2 className="text-xl font-semibold flex items-center gap-2">

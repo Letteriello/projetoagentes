@@ -1,14 +1,26 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
-import { 
-  Search, 
-  Calculator, 
-  FileText, 
-  CalendarDays, 
-  Network, 
-  Database, 
-  Code2 
-} from "lucide-react";
+import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe } from "lucide-react";
+
+function getIconComponent(name?: string): LucideIcon {
+  const iconMap: Record<string, LucideIcon> = {
+    search: Search,
+    calculator: Calculator,
+    filetext: FileText,
+    calendardays: CalendarDays,
+    network: Network,
+    database: Database,
+    code2: Code2,
+    terminal: Terminal,
+    cpu: Cpu,
+    brain: Brain,
+    globe: Globe,
+    // Adicione outros ícones conforme necessário
+  };
+  if (!name) return HelpCircle;
+  return iconMap[name.toLowerCase()] || HelpCircle;
+}
+
 import * as React from "react";
 
 /**
@@ -18,7 +30,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "webSearch", 
     name: "Busca na Web (Google)", 
-    icon: <Search size={16} className="mr-2"/>, 
+    icon: Search, 
     description: "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.", 
     hasConfig: true, 
     configType: "webSearch", 
@@ -46,7 +58,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "calculator", 
     name: "Calculadora", 
-    icon: <Calculator size={16} className="mr-2"/>, 
+    icon: Calculator, 
     description: "Permite realizar cálculos matemáticos (via função Genkit).", 
     hasConfig: false,
     genkitToolName: "calculator" 
@@ -54,7 +66,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "knowledgeBase", 
     name: "Consulta à Base de Conhecimento (RAG)", 
-    icon: <FileText size={16} className="mr-2"/>, 
+    icon: FileText, 
     description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.", 
     hasConfig: true, 
     configType: "knowledgeBase",
@@ -73,7 +85,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "calendarAccess", 
     name: "Acesso à Agenda/Calendário", 
-    icon: <CalendarDays size={16} className="mr-2"/>, 
+    icon: CalendarDays, 
     description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.", 
     hasConfig: true, 
     configType: "calendarAccess",
@@ -93,7 +105,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "customApiIntegration", 
     name: "Integração com API Externa (OpenAPI)", 
-    icon: <Network size={16} className="mr-2"/>, 
+    icon: Network, 
     description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.", 
     hasConfig: true, 
     configType: "openApi",
@@ -121,7 +133,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "databaseAccess", 
     name: "Acesso a Banco de Dados (SQL)", 
-    icon: <Database size={16} className="mr-2"/>, 
+    icon: Database, 
     description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.", 
     hasConfig: true, 
     configType: "database",
@@ -194,7 +206,7 @@ export const standardTools: AvailableTool[] = [
   { 
     id: "codeExecutor", 
     name: "Execução de Código (Python Sandbox)", 
-    icon: <Code2 size={16} className="mr-2"/>, 
+    icon: Code2, 
     description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.", 
     hasConfig: true, 
     configType: "codeExecutor",
@@ -213,9 +225,17 @@ export const standardTools: AvailableTool[] = [
 ];
 
 /**
+ * Função para converter os mcpTools (com iconName) para o formato AvailableTool (com icon)
+ */
+const mcpToolsWithIcons: AvailableTool[] = mcpTools.map(tool => ({
+  ...tool,
+  icon: getIconComponent((tool as any).iconName as string)
+}));
+
+/**
  * Todas as ferramentas disponíveis (padrão + MCP)
  */
 export const allTools: AvailableTool[] = [
   ...standardTools,
-  ...mcpTools
+  ...mcpToolsWithIcons
 ];

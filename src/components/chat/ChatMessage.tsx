@@ -88,34 +88,34 @@ export function ChatMessage({ isUser, content, timestamp, isLoading, isError }: 
         ) : isUser ? (
           <p className="text-white whitespace-pre-wrap">{content}</p>
         ) : (
-          <ReactMarkdown
-            className="prose prose-sm prose-invert max-w-none"
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeSanitize]}
-            components={{
-              code({ node, inline, className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || '');
-                const codeContent = String(children).replace(/\n$/, '');
+          <div className="prose prose-sm prose-invert max-w-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeSanitize]}
+              components={{
+                code({ inline, className, children }: any) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  const codeContent = String(children).replace(/\n$/, '');
 
-                if (inline) {
-                  // Inline code: e.g., `variableName`
-                  return <code className="bg-gray-600 px-1 py-0.5 rounded text-sm font-mono">{children}</code>;
+                  if (inline) {
+                    return (
+                      <code className="bg-gray-600 px-1 py-0.5 rounded text-sm font-mono">
+                        {children}
+                      </code>
+                    );
+                  }
+
+                  if (match) {
+                    return <CodeBlock language={match[1]} value={codeContent} />;
+                  }
+
+                  return <CodeBlock language={undefined} value={codeContent} />;
                 }
-
-                if (match) {
-                  // Fenced code block: e.g., ```javascript ... ```
-                  return <CodeBlock language={match[1]} value={codeContent} />;
-                }
-
-                // Fallback for code elements not matching (e.g., if remark-gfm is not perfectly handling all cases)
-                // or for code blocks without a language specified.
-                // Render as a preformatted block without syntax highlighting but with CodeBlock styling.
-                return <CodeBlock language={undefined} value={codeContent} />;
-              }
-            }}
-          >
-            {content}
-          </ReactMarkdown>
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
         )}
         <p className="text-xs mt-1 opacity-70">
           {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

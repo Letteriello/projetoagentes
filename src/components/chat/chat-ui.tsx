@@ -461,7 +461,8 @@ This is an XSS attempt:
         </p>
         <p className="mt-2 text-xs text-gray-400">This action cannot be undone.</p>
       </Modal>
-    </div>
+      </div> {/* fecha flex flex-col flex-1 */}
+    </div>   {/* fecha flex h-screen ... */}
     </>
   );
 }

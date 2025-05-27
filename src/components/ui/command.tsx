@@ -77,7 +77,7 @@ const CommandInput = React.forwardRef<
   </div>
 ))
 
-CommandInput.displayName = CommandPrimitive.Input.displayName
+CommandInput.displayName = "CommandInput"
 
 const CommandList = React.forwardRef<
   HTMLDivElement,
@@ -133,21 +133,31 @@ const CommandSeparator = React.forwardRef<
 ))
 CommandSeparator.displayName = "CommandSeparator"
 
-const CommandItem = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    {...props}
-  />
-))
+interface CommandItemProps extends React.HTMLAttributes<HTMLDivElement> {
+  value: string;
+  onSelect: () => void;
+  children: React.ReactNode;
+}
 
-CommandItem.displayName = CommandPrimitive.Item.displayName
+const CommandItem = React.forwardRef<HTMLDivElement, CommandItemProps>(
+  ({ value, onSelect, className, children, ...props }, ref) => (
+    <div
+      ref={ref}
+      role="option"
+      tabIndex={0}
+      data-value={value}
+      onClick={onSelect}
+      className={cn(
+        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+);
+CommandItem.displayName = "CommandItem";
 
 const CommandShortcut = ({
   className,

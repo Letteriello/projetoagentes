@@ -4,13 +4,15 @@ import * as React from "react";
 
 /**
  * Exemplos de ferramentas MCP para demonstração
+ * Nota: Os ícones precisam ser criados dinamicamente em componentes React
+ * Aqui estamos apenas definindo os nomes dos ícones que serão usados
  */
-export const mcpTools: AvailableTool[] = [
+export const mcpTools: Omit<AvailableTool, 'icon'>[] & { iconName?: string }[] = [
   {
     id: "desktop-commander",
     name: "Desktop Commander",
     description: "Executa comandos e gerencia arquivos no sistema do usuário de forma segura",
-    icon: <Terminal size={16} className="mr-2" />,
+    iconName: "Terminal",
     isMCPTool: true,
     mcpServerId: "local-mcp",
     mcpServerName: "Servidor Local MCP",
@@ -44,7 +46,7 @@ export const mcpTools: AvailableTool[] = [
     id: "memory-search",
     name: "Memory Search",
     description: "Realiza buscas semânticas em bases de conhecimento usando vetorização e embeddings",
-    icon: <Search size={16} className="mr-2" />,
+    iconName: "Search",
     isMCPTool: true,
     mcpServerId: "local-mcp",
     mcpServerName: "Servidor Local MCP",
@@ -70,7 +72,7 @@ export const mcpTools: AvailableTool[] = [
     id: "sequential-thinking",
     name: "Sequential Thinking",
     description: "Decomposição de problemas em passos sequenciais para resolução eficiente",
-    icon: <Brain size={16} className="mr-2" />,
+    iconName: "Brain",
     isMCPTool: true,
     mcpServerId: "local-mcp",
     mcpServerName: "Servidor Local MCP",
@@ -95,7 +97,7 @@ export const mcpTools: AvailableTool[] = [
     id: "puppeteer-browser",
     name: "Puppeteer Browser",
     description: "Automatiza navegadores web para capturar conteúdo ou interagir com sites",
-    icon: <Globe size={16} className="mr-2" />,
+    iconName: "Globe",
     isMCPTool: true,
     mcpServerId: "local-mcp",
     mcpServerName: "Servidor Local MCP",
@@ -136,3 +138,22 @@ export const mcpTools: AvailableTool[] = [
     ]
   }
 ];
+
+/**
+ * Função auxiliar para converter o nome do ícone em um componente React
+ * Deve ser usada no componente React que vai renderizar as ferramentas
+ */
+export function getIconComponent(iconName: string): React.ReactNode {
+  switch (iconName) {
+    case 'Terminal':
+      return React.createElement(Terminal, { size: 16, className: "mr-2" });
+    case 'Search':
+      return React.createElement(Search, { size: 16, className: "mr-2" });
+    case 'Brain':
+      return React.createElement(Brain, { size: 16, className: "mr-2" });
+    case 'Globe':
+      return React.createElement(Globe, { size: 16, className: "mr-2" });
+    default:
+      return React.createElement(Cpu, { size: 16, className: "mr-2" });
+  }
+}

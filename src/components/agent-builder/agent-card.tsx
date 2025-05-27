@@ -55,11 +55,11 @@ export function AgentCard({ agent, onEdit, onTest, onDelete, availableTools, age
   
   if (specificIconType) {
       const SpecificIcon = iconComponents[specificIconType];
-      AgentIconComponent = SpecificIcon ? <SpecificIcon size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" /> : <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+      AgentIconComponent = SpecificIcon ? <SpecificIcon width={20} height={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" /> : <Cpu width={20} height={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
   } else if (agentTypeDetails?.icon) {
-    AgentIconComponent = React.cloneElement(agentTypeDetails.icon as React.ReactElement, { size: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" });
+    AgentIconComponent = React.cloneElement(agentTypeDetails.icon as React.ReactElement, { width: 20, height: 20, className: "text-primary mr-4 self-start mt-1 w-10 h-10" });
   } else {
-    AgentIconComponent = <Cpu size={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
+    AgentIconComponent = <Cpu width={20} height={20} className="text-primary mr-4 self-start mt-1 w-10 h-10" />;
   }
 
   return (
@@ -123,7 +123,7 @@ export function AgentCard({ agent, onEdit, onTest, onDelete, availableTools, age
                     {agent.toolsDetails.map(toolDetail => {
                         const fullTool = availableTools.find(t => t.id === toolDetail.id);
                         const IconComponent = getToolIconComponent(toolDetail.iconName);
-                        const toolIcon = <IconComponent size={12} />;
+                        const toolIcon = <IconComponent width={12} height={12} />;
 
                         const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] &&
                                             ( (fullTool.id === 'webSearch' && agent.toolConfigsApplied[fullTool.id]?.googleApiKey && agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
@@ -144,10 +144,12 @@ export function AgentCard({ agent, onEdit, onTest, onDelete, availableTools, age
                                 <span className="truncate group-hover:whitespace-normal group-hover:max-w-none">{toolDetail.label}</span>
                                 {fullTool?.needsConfiguration && (
                                     <ConfigureIcon
-                                        size={10}
+                                        width={10}
+                                        height={10}
                                         className={`ml-1 ${isConfigured ? 'text-green-400' : 'text-blue-400'}`}
-                                        title={isConfigured ? "Configurada" : "Requer configuração"}
-                                    />
+                                    >
+                                        <title>{isConfigured ? "Configurada" : "Requer configuração"}</title>
+                                    </ConfigureIcon>
                                 )}
                             </Badge>
                         );

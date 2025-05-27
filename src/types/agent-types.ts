@@ -6,15 +6,9 @@ export interface ToolConfigData {
   [key: string]: any;
 }
 
-export interface AvailableTool {
-  id: string;
-  name: string;
-  description: string;
-  icon?: string;
-  hasConfig?: boolean;
-  configType?: string;
-  requiresAuth?: boolean;
-}
+// Unifica com o tipo de tool-types.ts para evitar conflitos de tipagem em toda a aplicação
+import type { AvailableTool as UIAvailableTool } from './tool-types';
+export type AvailableTool = UIAvailableTool;
 
 export interface AgentConfig {
   agentType: 'llm' | 'task' | 'workflow' | 'sequential' | 'parallel' | 'loop' | 'custom' | 'a2a';

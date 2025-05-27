@@ -208,7 +208,7 @@ export function convertToGoogleADKConfig(
     // Adiciona valores iniciais de estado se existirem
     if (agent.initialStateValues && agent.initialStateValues.length > 0) {
       baseConfig.state_settings.initial_values = agent.initialStateValues.reduce(
-        (values, stateItem) => {
+        (values: Record<string, Record<string, any>>, stateItem: { scope: string; key: string; value: any }) => {
           // Os valores iniciais são convertidos para um objeto aninhado por escopo
           // para seguir o formato do Google ADK
           if (!values[stateItem.scope]) values[stateItem.scope] = {};
@@ -240,8 +240,8 @@ export function convertToGoogleADKConfig(
     // Adiciona fontes de conhecimento
     if (agent.ragMemoryConfig.knowledgeSources && agent.ragMemoryConfig.knowledgeSources.length > 0) {
       baseConfig.memory_service.knowledge_sources = agent.ragMemoryConfig.knowledgeSources
-        .filter(source => source.enabled)
-        .map(source => ({
+        .filter((source: { enabled: boolean }) => source.enabled)
+        .map((source: { id: string; name: string; type: string; location: string; description?: string; enabled: boolean; format?: string; credentials?: any; updateFrequency?: any }) => ({
           id: source.id,
           name: source.name,
           type: source.type,
@@ -260,7 +260,7 @@ export function convertToGoogleADKConfig(
     baseConfig.artifact_settings = {
       enabled: true,
       storage_type: agent.artifactStorageType || 'memory',
-      artifacts: agent.artifacts.map(artifact => ({
+      artifacts: agent.artifacts.map((artifact: { id: string; name: string; type: string; mimeType: string; description?: string; accessRoles?: string[]; versionControl?: boolean; sizeLimit?: number; uriPattern?: string }) => ({
         id: artifact.id,
         name: artifact.name,
         type: artifact.type,

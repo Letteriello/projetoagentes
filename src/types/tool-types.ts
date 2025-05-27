@@ -47,29 +47,32 @@ export interface ToolExample {
 /**
  * Interface expandida de uma ferramenta disponível
  */
+import { LucideIcon } from "lucide-react";
+
 export interface AvailableTool {
   id: string;
   name: string;
   description: string;
-  icon?: ReactNode;
+  icon?: LucideIcon;
   hasConfig?: boolean;
   configType?: string;
   requiresAuth?: boolean;
-  
+
   // Campos específicos para MCP Tools
   isMCPTool?: boolean;
   mcpServerId?: string;
   mcpServerName?: string;
   mcpToolName?: string;
   parameters?: ToolParameter[];
-  
+
   // Campos para configuração da UI
   configFields?: ToolConfigField[];
-  
+
   // Campos para documentação
   documentation?: string;
   examples?: ToolExample[];
-  
+
   // Campo de compatibilidade com implementação existente
   genkitToolName?: string;
 }
+
