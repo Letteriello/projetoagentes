@@ -1,5 +1,9 @@
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
+import { CodeBlock } from './CodeBlock'; // Import the new CodeBlock component
 
 interface ChatMessageProps {
   isUser: boolean;
@@ -81,8 +85,37 @@ export function ChatMessage({ isUser, content, timestamp, isLoading, isError }: 
           <div className="flex items-center h-5"> {/* Ensure loader is vertically centered like text */}
             <div className="dot-flashing"></div>
           </div>
-        ) : (
+        ) : isUser ? (
           <p className="text-white whitespace-pre-wrap">{content}</p>
+        ) : (
+          <ReactMarkdown
+            className="prose prose-sm prose-invert max-w-none"
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeSanitize]}
+            components={{
+              code({ node, inline, className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || '');
+                const codeContent = String(children).replace(/\n$/, '');
+
+                if (inline) {
+                  // Inline code: e.g., `variableName`
+                  return <code className="bg-gray-600 px-1 py-0.5 rounded text-sm font-mono">{children}</code>;
+                }
+
+                if (match) {
+                  // Fenced code block: e.g., ```javascript ... ```
+                  return <CodeBlock language={match[1]} value={codeContent} />;
+                }
+
+                // Fallback for code elements not matching (e.g., if remark-gfm is not perfectly handling all cases)
+                // or for code blocks without a language specified.
+                // Render as a preformatted block without syntax highlighting but with CodeBlock styling.
+                return <CodeBlock language={undefined} value={codeContent} />;
+              }
+            }}
+          >
+            {content}
+          </ReactMarkdown>
         )}
         <p className="text-xs mt-1 opacity-70">
           {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
