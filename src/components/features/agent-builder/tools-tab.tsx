@@ -39,6 +39,19 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
   onConfigureTool,
   toolConfigsApplied = {},
 }) => {
+  // CONCEPTUAL TODO for API Key Vault integration:
+  // When a tool `needsConfiguration` (e.g., requires an API key):
+  // 1. The `onConfigureTool` function or a similar mechanism would be triggered.
+  // 2. Instead of prompting the user for the raw API key directly in this UI,
+  //    the configuration dialog for the tool should allow the user to select
+  //    from a list of "registered" services/API keys fetched from the `/api/apikeys` endpoint (API Key Vault).
+  // 3. The `ToolConfigData` (or equivalent state managed by the agent builder)
+  //    would then store a reference to the selected key, such as its `id` or `serviceName`
+  //    (e.g., `{ "apiKeyId": "key_123_openai" }` or `{ "apiKeyServiceName": "OpenAI" }`).
+  // 4. This reference, not the actual key, would be saved as part of the agent's configuration.
+  // 5. The `toolConfigsApplied` prop might then reflect this, e.g. by showing "OpenAI Key Configured"
+  //    instead of the key itself or a fragment.
+
   // Estado para ferramentas filtradas e pesquisadas
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<ToolFilters>({
@@ -305,6 +318,14 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
   
   return (
     <div className="space-y-6">
+      <h3 className="text-lg font-medium mb-1 flex items-center gap-2">
+        <Wand2 className="w-5 h-5 text-primary/80" />
+        Ferramentas do Agente
+        <Tooltip>
+            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-0 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+            <TooltipContent className="max-w-xs"><p>Ferramentas são capacidades (implementadas como fluxos Genkit) que permitem ao agente interagir com sistemas externos, APIs, bancos de dados ou executar ações específicas (ex: busca na web, acesso a calendário).</p></TooltipContent>
+        </Tooltip>
+      </h3>
       {!detailViewToolId ? (
         <Tabs defaultValue="regular-tools" className="w-full">
           <TabsList className="grid w-full grid-cols-2">

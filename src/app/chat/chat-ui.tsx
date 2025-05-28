@@ -464,7 +464,7 @@ export function ChatUI() {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [optimisticMessages]);
 
   const handleNewConversation = useCallback(() => {
     setMessages([]);

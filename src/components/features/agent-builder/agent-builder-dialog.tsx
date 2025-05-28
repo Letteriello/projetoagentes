@@ -784,12 +784,18 @@ return (
                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
                             <Label htmlFor="agentType" className="text-left flex items-center">
                                 <FileJson className="text-amber-500" size={24} />Tipo de Agente
-                                {selectedAgentTypeOption?.description && (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                        <TooltipContent className="max-w-xs"><p>{selectedAgentTypeOption.description}</p></TooltipContent>
-                                    </Tooltip>
-                                )}
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                    <TooltipContent className="max-w-md">
+                                        <p>Define a arquitetura e o comportamento fundamental do agente:</p>
+                                        <ul className="list-disc pl-4 mt-1 text-xs">
+                                            <li><strong>Agente LLM:</strong> Focado em interações de linguagem natural, usando um Large Language Model para gerar respostas, realizar tarefas e usar ferramentas.</li>
+                                            <li><strong>Agente de Fluxo de Trabalho (Workflow):</strong> Orquestra uma série de tarefas ou outros agentes (sub-agentes) em uma sequência definida (sequencial, paralelo, loop).</li>
+                                            <li><strong>Agente Customizado:</strong> Implementa lógica proprietária através de um fluxo Genkit customizado, oferecendo máxima flexibilidade.</li>
+                                            <li><strong>Agente A2A (Agent-to-Agent):</strong> Especializado em comunicação e colaboração com outros agentes, geralmente usando um fluxo customizado para interações A2A. (ADK)</li>
+                                        </ul>
+                                    </TooltipContent>
+                                </Tooltip>
                             </Label>
                             <Select value={agentType} onValueChange={(value) => handleAgentTypeChange(value as AgentType)}>
                                 <SelectTrigger id="agentType" className="h-10"><SelectValue placeholder="Selecione o tipo de agente" /></SelectTrigger>
@@ -820,6 +826,10 @@ return (
                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
                             <Label htmlFor="agentFramework" className="text-left flex items-center">
                                 <Settings2 className="mr-2 h-5 w-5 text-primary/80" />Framework do Agente
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                    <TooltipContent className="max-w-xs"><p>Otimiza a configuração para um framework específico como Google Genkit, Langchain, etc. A lógica principal ainda é via Genkit.</p></TooltipContent>
+                                </Tooltip>
                             </Label>
                             <Select
                                 defaultValue={editingAgent?.agentFramework || "custom"} 
@@ -865,7 +875,7 @@ return (
                                 Descrição Geral
                                 <Tooltip>
                                     <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                    <TooltipContent className="max-w-xs"><p>Esta descrição geral do agente será incluída no prompt do sistema e pode ser usada por outros agentes LLM para decidir se devem delegar uma tarefa a ele.</p></TooltipContent>
+                                    <TooltipContent className="max-w-xs"><p>Esta descrição é incluída no prompt do sistema e pode ser usada por outros agentes para delegação.</p></TooltipContent>
                                 </Tooltip>
                             </Label>
                             <Textarea id="agentDescription" placeholder="Descreva a função principal e o objetivo geral deste agente..." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} rows={3}/>
@@ -899,15 +909,33 @@ return (
                                     </h3>
                                      <div className="space-y-3">
                                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
-                                            <Label htmlFor="agentGoal" className="text-left flex items-center gap-1.5"><Target size={16}/>Objetivo</Label>
+                                            <Label htmlFor="agentGoal" className="text-left flex items-center gap-1.5">
+                                                <Target size={16}/>Objetivo
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs"><p>Define o objetivo primário para agentes LLM.</p></TooltipContent>
+                                                </Tooltip>
+                                            </Label>
                                             <Input id="agentGoal" placeholder="ex: Ajudar usuários a encontrarem informações sobre produtos." value={agentGoal} onChange={(e) => setAgentGoal(e.target.value)} className="h-10"/>
                                         </div>
                                         <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
-                                            <Label htmlFor="agentTasks" className="text-left flex items-center gap-1.5 pt-2.5"><ListChecks size={16}/>Tarefas</Label>
+                                            <Label htmlFor="agentTasks" className="text-left flex items-center gap-1.5 pt-2.5">
+                                                <ListChecks size={16}/>Tarefas
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs"><p>Tarefas específicas que o agente LLM deve realizar.</p></TooltipContent>
+                                                </Tooltip>
+                                            </Label>
                                             <Textarea id="agentTasks" placeholder="ex: 1. Responder perguntas sobre especificações. 2. Comparar produtos." value={agentTasks} onChange={(e) => setAgentTasks(e.target.value)} rows={3} />
                                         </div>
                                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
-                                            <Label htmlFor="agentPersonality" className="text-left flex items-center gap-1.5"><Smile size={16}/>Personalidade/Tom</Label>
+                                            <Label htmlFor="agentPersonality" className="text-left flex items-center gap-1.5">
+                                                <Smile size={16}/>Personalidade/Tom
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs"><p>Influencia o tom e estilo das respostas do agente LLM.</p></TooltipContent>
+                                                </Tooltip>
+                                            </Label>
                                             <Select value={agentPersonality} onValueChange={setAgentPersonality}>
                                             <SelectTrigger id="agentPersonality" className="h-10"><SelectValue placeholder="Selecione um tom/personalidade" /></SelectTrigger>
                                             <SelectContent>
@@ -916,7 +944,13 @@ return (
                                             </Select>
                                         </div>
                                         <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
-                                            <Label htmlFor="agentRestrictions" className="text-left flex items-center gap-1.5 pt-2.5"><Ban size={16}/>Restrições</Label>
+                                            <Label htmlFor="agentRestrictions" className="text-left flex items-center gap-1.5 pt-2.5">
+                                                <Ban size={16}/>Restrições
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs"><p>Diretrizes cruciais que o agente LLM deve seguir.</p></TooltipContent>
+                                                </Tooltip>
+                                            </Label>
                                             <Textarea id="agentRestrictions" placeholder="ex: Nunca fornecer informações de contato direto." value={agentRestrictions} onChange={(e) => setAgentRestrictions(e.target.value)} rows={3}/>
                                         </div>
                                     </div>
@@ -933,7 +967,13 @@ return (
                                             <Label htmlFor="agentModel" className="text-left flex items-center">Modelo de IA
                                                 <Tooltip>
                                                     <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                                    <TooltipContent className="max-w-xs"><p>Modelos Google são integrados via Genkit. Outros (OpenRouter, etc.) requerem fluxo Genkit dedicado e podem não funcionar no chat padrão sem essa customização.</p></TooltipContent>
+                                                    <TooltipContent className="max-w-md">
+                                                        <p>Modelos de IA subjacentes. "Custom/Other" pode requerer configurações de fluxo Genkit específicas.</p>
+                                                        <ul className="list-disc pl-4 mt-1 text-xs">
+                                                            <li><strong>Modelos Google (Gemini):</strong> Integrados nativamente via Genkit.</li>
+                                                            <li><strong>OpenRouter/Requestly/Outro Endpoint HTTP:</strong> Permitem usar modelos de outros provedores, mas exigem um fluxo Genkit customizado.</li>
+                                                        </ul>
+                                                    </TooltipContent>
                                                 </Tooltip>
                                             </Label>
                                             <Select value={agentModel} onValueChange={setAgentModel}>
@@ -953,7 +993,7 @@ return (
                                             <Label htmlFor="agentTemperature" className="text-left flex items-center">Temperatura: {agentTemperature[0].toFixed(1)}
                                                 <Tooltip>
                                                     <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                                    <TooltipContent className="max-w-xs"><p>Controla a criatividade. Baixo = focado, Alto = criativo.</p></TooltipContent>
+                                                    <TooltipContent className="max-w-xs"><p>Controla a criatividade/determinismo da resposta. Baixo = focado, Alto = criativo.</p></TooltipContent>
                                                 </Tooltip>
                                             </Label>
                                             <Slider id="agentTemperature" min={0} max={1} step={0.1} value={agentTemperature} onValueChange={setAgentTemperature} />
@@ -965,13 +1005,23 @@ return (
                         
                         <Separator className="my-6"/>
                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
-                            <Label htmlFor="agentVersion" className="text-left">Versão do Agente</Label>
+                            <Label htmlFor="agentVersion" className="text-left flex items-center">
+                                Versão do Agente
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                    <TooltipContent className="max-w-xs"><p>Para versionamento de configurações do agente.</p></TooltipContent>
+                                </Tooltip>
+                            </Label>
                             <Input id="agentVersion" placeholder="ex: 1.0.0" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} className="h-10"/>
                         </div>
                         
                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
                             <Label htmlFor="agentFramework" className="text-left flex items-center">
                                 <Settings2 className="text-amber-500" size={24} />Framework do Agente
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                    <TooltipContent className="max-w-xs"><p>Otimiza a configuração para um framework específico como Google Genkit, Langchain, etc. A lógica principal ainda é via Genkit.</p></TooltipContent>
+                                </Tooltip>
                             </Label>
                             <Select
                                 defaultValue={editingAgent?.agentFramework || "custom"}
@@ -1019,6 +1069,10 @@ return (
                                 />
                                 <Label htmlFor="isRootAgent" className="flex items-center gap-1">
                                     Este é um Agente Raiz (controla outros agentes)
+                                    <Tooltip>
+                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                        <TooltipContent className="max-w-xs"><p>Designa o agente como um controlador principal em uma configuração ADK multi-agente.</p></TooltipContent>
+                                    </Tooltip>
                                 </Label>
                             </div>
                             
@@ -1034,7 +1088,13 @@ return (
                                     
                                     <div className="space-y-4 mt-2">
                                         <div className="grid grid-cols-[200px_1fr] items-start gap-x-4">
-                                            <Label htmlFor="globalInstruction" className="text-left pt-2">Instrução Global</Label>
+                                            <Label htmlFor="globalInstruction" className="text-left pt-2 flex items-center">
+                                                Instrução Global
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs"><p>Instrução aplicada a todos os sub-agentes em um sistema ADK multi-agente.</p></TooltipContent>
+                                                </Tooltip>
+                                            </Label>
                                             <Textarea
                                                 id="globalInstruction"
                                                 placeholder="Instrução que será aplicada a todos os sub-agentes..."
@@ -1083,7 +1143,20 @@ return (
                                     )}
                                     
                                     <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mb-4">
-                                        <Label htmlFor="detailedWorkflowType" className="text-left">Tipo de Fluxo Detalhado</Label>
+                                        <Label htmlFor="detailedWorkflowType" className="text-left flex items-center">
+                                            Tipo de Fluxo Detalhado
+                                            <Tooltip>
+                                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                <TooltipContent className="max-w-xs">
+                                                    <p>Define a lógica de execução:</p>
+                                                    <ul className="list-disc pl-4 mt-1 text-xs">
+                                                        <li><strong>Sequencial:</strong> Tarefas em ordem.</li>
+                                                        <li><strong>Paralelo:</strong> Tarefas simultaneamente.</li>
+                                                        <li><strong>Loop:</strong> Tarefas repetidas até condição.</li>
+                                                    </ul>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </Label>
                                         <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}>
                                             <SelectTrigger id="detailedWorkflowType" className="h-10"><SelectValue placeholder="Selecione o tipo de fluxo" /></SelectTrigger>
                                             <SelectContent>
@@ -1108,7 +1181,13 @@ return (
                                     {detailedWorkflowType === 'loop' && (
                                         <>
                                             <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mt-6">
-                                                <Label htmlFor="loopMaxIterations" className="text-left">Máximo de Iterações</Label>
+                                                <Label htmlFor="loopMaxIterations" className="text-left flex items-center">
+                                                    Máximo de Iterações
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                        <TooltipContent className="max-w-xs"><p>Número máximo de execuções do loop.</p></TooltipContent>
+                                                    </Tooltip>
+                                                </Label>
                                                 <Input 
                                                     id="loopMaxIterations" 
                                                     type="number" 
@@ -1123,7 +1202,7 @@ return (
                                                 <Label className="text-left pt-1 flex items-center gap-1.5">Condição de Término Adicional
                                                     <Tooltip>
                                                         <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                                        <TooltipContent className="max-w-xs"><p>Define como o loop pode terminar além do número máximo de iterações. "Sinalização por Subagente" permite que uma etapa interna ao loop cause a sua interrupção.</p></TooltipContent>
+                                                        <TooltipContent className="max-w-xs"><p>Controla como o loop termina (além das iterações máximas).</p></TooltipContent>
                                                     </Tooltip>
                                                 </Label>
                                                 <RadioGroup 
@@ -1144,7 +1223,13 @@ return (
 
                                             {loopTerminationConditionType === 'tool' && (
                                                 <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                                    <Label htmlFor="loopExitToolName" className="text-left">Nome da Ferramenta de Saída</Label>
+                                                    <Label htmlFor="loopExitToolName" className="text-left flex items-center">
+                                                        Nome da Ferramenta de Saída
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                            <TooltipContent className="max-w-xs"><p>Nome da ferramenta Genkit cujo resultado para o loop.</p></TooltipContent>
+                                                        </Tooltip>
+                                                    </Label>
                                                     <Input 
                                                         id="loopExitToolName" 
                                                         placeholder="ex: exitLoop" 
@@ -1158,7 +1243,13 @@ return (
                                             {loopTerminationConditionType === 'state' && (
                                                 <>
                                                     <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                                        <Label htmlFor="loopExitStateKey" className="text-left">Chave do Estado</Label>
+                                                        <Label htmlFor="loopExitStateKey" className="text-left flex items-center">
+                                                            Chave do Estado
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                                <TooltipContent className="max-w-xs"><p>Nome da variável de estado que determina o fim do loop.</p></TooltipContent>
+                                                            </Tooltip>
+                                                        </Label>
                                                         <Input 
                                                             id="loopExitStateKey" 
                                                             placeholder="ex: loopComplete" 
@@ -1168,7 +1259,13 @@ return (
                                                         />
                                                     </div>
                                                     <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                                        <Label htmlFor="loopExitStateValue" className="text-left">Valor do Estado para Saída</Label>
+                                                        <Label htmlFor="loopExitStateValue" className="text-left flex items-center">
+                                                            Valor do Estado para Saída
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                                <TooltipContent className="max-w-xs"><p>Valor da chave de estado que termina o loop.</p></TooltipContent>
+                                                            </Tooltip>
+                                                        </Label>
                                                         <Input 
                                                             id="loopExitStateValue" 
                                                             placeholder="ex: true" 
@@ -1184,6 +1281,26 @@ return (
                                 </div>
                             </>
                         )}
+                         {showCustomLogicDescription && (
+                             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-3">
+                                <Label htmlFor="customLogicDescription" className="text-left pt-2.5 flex items-center">
+                                    {agentType === 'a2a' ? "Descrição da Interação A2A" : "Descrição da Lógica Personalizada"}
+                                    <Tooltip>
+                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                        <TooltipContent className="max-w-xs">
+                                            {agentType === 'a2a' 
+                                            ? <p>Descreve padrões de interação A2A e protocolos.</p>
+                                            : <p>Descreve a funcionalidade do fluxo Genkit customizado.</p>}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </Label>
+                                <Textarea id="customLogicDescription" placeholder={
+                                    agentType === 'a2a' 
+                                    ? "Descreva como este agente deve interagir com outros agentes, quais informações ele troca, etc..."
+                                    : "Descreva a funcionalidade principal e a lógica que seu fluxo Genkit customizado implementará..."
+                                    } value={customLogicDescription} onChange={(e) => setCustomLogicDescription(e.target.value)} rows={agentType === 'a2a' ? 4 : 6}/>
+                            </div>
+                        )}
                     </TooltipProvider>
                 </TabsContent>
 
@@ -1192,7 +1309,11 @@ return (
                         <div>
                             <h3 className="text-lg font-medium mb-1 flex items-center gap-2">
                                 <Network className="w-5 h-5 text-primary/80" /> 
-                                Ferramentas do Agente (Capacidades via Genkit)
+                                Ferramentas do Agente
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                    <TooltipContent className="max-w-xs"><p>Capacidades (via Genkit) para interagir com sistemas externos ou executar ações.</p></TooltipContent>
+                                </Tooltip>
                             </h3>
                             <p className="text-sm text-muted-foreground mb-4">
                                 Capacite seu agente com funcionalidades para interagir com o mundo exterior. 
