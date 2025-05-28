@@ -9,10 +9,15 @@ import { ChatMessageUI } from '@/types/chat'; // Import shared type
 
 interface ChatMessageDisplayProps {
   message: ChatMessageUI;
-  // Add any other props needed for display, e.g., currentUser for styling self-messages
+  isStreaming?: boolean; // isStreaming is optional, directly from ChatMessageUI
 }
 
-export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps) {
+// Simple CSS for blinking cursor (can be moved to a global CSS file)
+const BlinkingCursor = () => (
+  <span className="inline-block w-0.5 h-4 bg-current animate-blink" />
+);
+
+export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps) { // Removed isStreaming from direct props as it's on message
   const isUser = message.sender === 'user';
   const isAgent = message.sender === 'agent';
 
@@ -63,6 +68,10 @@ export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps)
                   </code>
                 );
               },
+              // Custom component to render paragraph to allow appending cursor
+              p: ({children}) => {
+                return <p>{children}{isAgent && message.isStreaming && <BlinkingCursor />}</p>; // Use message.isStreaming
+              }
             }}
           >
             {message.text}

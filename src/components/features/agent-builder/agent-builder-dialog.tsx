@@ -46,12 +46,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SubAgentSelector } from "@/components/agent-builder/sub-agent-selector";
-import { MultiAgentTab } from "@/components/agent-builder/multi-agent-tab";
-import { ArtifactManagementTab, ArtifactDefinition } from "@/components/agent-builder/artifact-management-tab";
-import { MemoryKnowledgeTab, RagMemoryConfig, KnowledgeSource } from "@/components/agent-builder/memory-knowledge-tab";
-import { A2AConfig as A2AConfigComponent } from "@/components/agent-builder/a2a-config";
-import { ToolsTab } from "@/components/agent-builder/tools-tab";
+import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
+import { MultiAgentTab } from "@/components/features/agent-builder/multi-agent-tab";
+import { ArtifactManagementTab, ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
+import { MemoryKnowledgeTab, RagMemoryConfig, KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab";
+import { A2AConfig as A2AConfigComponent } from "@/components/features/agent-builder/a2a-config";
+import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
 import type { A2AConfig as A2AConfigType } from "@/types/a2a-types";
 import { convertToGoogleADKConfig } from "@/lib/google-adk-utils";
 import {
@@ -90,7 +90,7 @@ import type {
   A2AAgentConfig
 } from '@/types/agent-types';
 
-import { type MemoryServiceType } from '@/components/agent-builder/memory-knowledge-tab';
+import { type MemoryServiceType } from '@/components/features/agent-builder/memory-knowledge-tab';
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -214,6 +214,7 @@ export function AgentBuilderDialog({
 }: AgentBuilderDialogProps) {
   const { toast } = useToast();
   const { savedAgents } = useAgents(); // Acessa a lista de agentes salvos para o seletor de sub-agentes
+  const [isLoading, setIsLoading] = React.useState(false); // Track loading state for async operations
 
   if (agentToneOptions.length > 0 && !defaultLLMConfigValues.agentPersonality) {
     defaultLLMConfigValues.agentPersonality = agentToneOptions[0].label;
@@ -533,13 +534,13 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
-            // Mapeia para o formato esperado por SavedAgentConfiguration['toolsDetails']
             return {
               id: tool.id,
-              label: tool.name,
+              label: tool.name, // Ensure 'label' is mapped from 'tool.name'
               iconName: tool.icon,
               needsConfiguration: tool.hasConfig,
               genkitToolName: getToolGenkitName(tool),
+              // Adicione outros campos conforme necessário para SavedAgentConfiguration['toolsDetails']
             };
           })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
@@ -738,6 +739,13 @@ const showLLMSections = agentType === 'llm' || agentType === 'a2a';
 const showWorkflowDescription = agentType === 'workflow';
 const showCustomLogicDescription = agentType === 'custom' || agentType === 'a2a';
 
+const agentFrameworkOptions = [
+  { id: "custom", label: "Customizado / Padrão", description: "Configuração padrão ou customizada sem um framework específico.", icon: <Settings2 className="h-4 w-4" /> },
+  { id: "genkit", label: "Google Genkit", description: "Agente construído com o Google Genkit.", icon: <Brain className="h-4 w-4 text-blue-500" /> },
+  { id: "langchain", label: "Langchain", description: "Agente construído com Langchain.", icon: <Layers className="h-4 w-4 text-green-500" /> },
+  { id: "crewai", label: "Crew AI", description: "Agente construído com Crew AI para colaboração.", icon: <Users className="h-4 w-4 text-purple-500" /> },
+];
+
 return (
     <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open && configuringTool) { 
@@ -809,8 +817,47 @@ return (
                             </div>
                         )}
 
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
+                            <Label htmlFor="agentFramework" className="text-left flex items-center">
+                                <Settings2 className="mr-2 h-5 w-5 text-primary/80" />Framework do Agente
+                            </Label>
+                            <Select
+                                defaultValue={editingAgent?.agentFramework || "custom"} 
+                                onValueChange={(value) => handleFieldChange('agentFramework', value)}
+                                disabled={isLoading} 
+                            >
+                                <SelectTrigger id="agentFramework" className="h-10">
+                                    <SelectValue placeholder="Selecione o framework" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {agentFrameworkOptions.map(framework => (
+                                        <SelectItem key={framework.id} value={framework.id}>
+                                            <div className="flex items-center gap-2">
+                                                {framework.icon}
+                                                <span>{framework.label}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <div /> {/* Empty div for grid alignment of paragraph and alert if they span full width */} 
+                            <div className="col-span-2 space-y-1">
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Selecione o framework base para o agente (opcional). Isso pode habilitar configurações específicas.
+                                </p>
+                                {editingAgent?.agentFramework && agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework) && (
+                                    <Alert variant="default" className="mt-2 text-xs">
+                                        {React.cloneElement(agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework)!.icon as React.ReactElement, { className: "h-4 w-4" })}
+                                        <AlertTitle className="font-semibold">{agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework)!.label}</AlertTitle>
+                                        <AlertDescription>
+                                            {agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework)!.description}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </div>
+                        </div>
 
-                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mt-6">
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
                             <Label htmlFor="agentName" className="text-left">Nome do Agente</Label>
                             <Input id="agentName" placeholder="ex: Suporte Nível 1" value={agentName} onChange={(e) => setAgentName(e.target.value)} className="h-10"/>
 
@@ -885,7 +932,7 @@ return (
                                         <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
                                             <Label htmlFor="agentModel" className="text-left flex items-center">Modelo de IA
                                                 <Tooltip>
-                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
                                                     <TooltipContent className="max-w-xs"><p>Modelos Google são integrados via Genkit. Outros (OpenRouter, etc.) requerem fluxo Genkit dedicado e podem não funcionar no chat padrão sem essa customização.</p></TooltipContent>
                                                 </Tooltip>
                                             </Label>
@@ -922,11 +969,45 @@ return (
                             <Input id="agentVersion" placeholder="ex: 1.0.0" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} className="h-10"/>
                         </div>
                         
+                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
+                            <Label htmlFor="agentFramework" className="text-left flex items-center">
+                                <Settings2 className="text-amber-500" size={24} />Framework do Agente
+                            </Label>
+                            <Select
+                                defaultValue={editingAgent?.agentFramework || "custom"}
+                                onValueChange={(value) => handleFieldChange('agentFramework', value)}
+                            >
+                                <SelectTrigger id="agentFramework" className="h-10"><SelectValue placeholder="Selecione o framework" /></SelectTrigger>
+                                <SelectContent>
+                                    {agentFrameworkOptions.map(framework => (
+                                        <SelectItem key={framework.id} value={framework.id}>
+                                            <div className="flex items-center gap-2">
+                                                {framework.icon}
+                                                <span>{framework.label}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Selecione o framework base para o agente (opcional). Isso pode habilitar configurações específicas.
+                            </p>
+                            {editingAgent?.agentFramework && agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework) && (
+                                <Alert variant="default" className="mt-2 text-xs">
+                                    {React.cloneElement(agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework)!.icon as React.ReactElement, { className: "h-4 w-4" })}
+                                    <AlertTitle className="font-semibold">{agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework)!.label}</AlertTitle>
+                                    <AlertDescription>
+                                        {agentFrameworkOptions.find(f => f.id === editingAgent.agentFramework)!.description}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+
                         {/* Configuração de Multi-Agente - Visível para todos os tipos de agentes */}
                         <Separator className="my-6" />
                         <div className="space-y-4">
                             <div className="flex items-center gap-2">
-                                <Users className="h-5 w-5 text-primary/80" />
+                                <Users className="h-5 text-primary/80" />
                                 <h3 className="text-lg font-medium">Configuração Multi-Agente</h3>
                             </div>
                             

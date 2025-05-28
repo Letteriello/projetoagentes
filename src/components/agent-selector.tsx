@@ -20,9 +20,18 @@ interface AgentData {
 interface AgentSelectorProps {
   onAgentSelected: (agentId: string) => void;
   selectedAgentId?: string;
+  savedAgents: any[]; // Adjust the type as needed
+  showLabel?: boolean;
+  triggerClassName?: string;
 }
 
-export function AgentSelector({ onAgentSelected, selectedAgentId }: AgentSelectorProps) {
+export function AgentSelector({ 
+  onAgentSelected, 
+  selectedAgentId, 
+  savedAgents, 
+  showLabel = false, 
+  triggerClassName = '' 
+}: AgentSelectorProps) {
   const [agents, setAgents] = useState<AgentData[]>([]);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [apiKey, setApiKey] = useState('');

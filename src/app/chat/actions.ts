@@ -1,4 +1,3 @@
-
 'use server';
 
 import { basicChatFlow, BasicChatInput, BasicChatOutput } from '@/ai/flows/chat-flow';
@@ -28,7 +27,7 @@ const ChatMessageSchema = z.object({
 });
 
 
-interface ChatFormState {
+export interface ChatFormState {
   message: string;
   agentResponse?: string | null;
   errors?: {

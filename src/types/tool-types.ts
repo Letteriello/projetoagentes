@@ -54,12 +54,17 @@ export interface AvailableTool {
   name: string;
   description: string;
   icon?: LucideIcon;
-  hasConfig?: boolean;
-  configType?: string;
+  hasConfig?: boolean; 
+  configType?: string; 
   requiresAuth?: boolean;
 
+  // New fields for better categorization and framework alignment
+  type: 'regular' | 'mcp' | 'genkit_native' | 'langchain_native' | 'crewai_native' | 'custom';
+  frameworks?: ('genkit' | 'langchain' | 'crewai')[]; 
+  category?: string; 
+
   // Campos específicos para MCP Tools
-  isMCPTool?: boolean;
+  isMCPTool?: boolean; 
   mcpServerId?: string;
   mcpServerName?: string;
   mcpToolName?: string;
@@ -75,4 +80,3 @@ export interface AvailableTool {
   // Campo de compatibilidade com implementação existente
   genkitToolName?: string;
 }
-

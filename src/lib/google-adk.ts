@@ -4,7 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 
 // Tipos para integração com Google ADK
-interface ADKAgentConfig {
+export interface ADKAgentConfig {
   agentId?: string;
   displayName: string;
   description?: string;
@@ -13,7 +13,7 @@ interface ADKAgentConfig {
   capabilities?: string[];
 }
 
-interface ADKTool {
+export interface ADKTool {
   name: string;
   description?: string;
   inputSchema?: any;
@@ -21,7 +21,7 @@ interface ADKTool {
   implementation?: (params: any) => Promise<any>;
 }
 
-interface ADKChatMessage {
+export interface ADKChatMessage {
   role: 'user' | 'model' | 'system' | 'tool';
   content: string | ADKContentPart[];
   toolCallId?: string;
@@ -29,7 +29,7 @@ interface ADKChatMessage {
   toolResults?: any;
 }
 
-interface ADKContentPart {
+export interface ADKContentPart {
   type: 'text' | 'image' | 'file';
   text?: string;
   imageUrl?: string;
@@ -37,7 +37,7 @@ interface ADKContentPart {
   mimeType?: string;
 }
 
-interface ADKChatCompletionOptions {
+export interface ADKChatCompletionOptions {
   model?: string;
   messages: ADKChatMessage[];
   temperature?: number;
@@ -46,7 +46,7 @@ interface ADKChatCompletionOptions {
   tools?: ADKTool[];
 }
 
-interface ADKChatCompletionResponse {
+export interface ADKChatCompletionResponse {
   id: string;
   model: string;
   choices: {
@@ -220,6 +220,50 @@ export class GoogleADK {
     // Resposta genérica
     return 'Entendi sua mensagem. Como posso ajudar com mais informações sobre esse assunto?';
   }
+
+  /**
+   * Lista os agentes ADK disponíveis (mock).
+   * @returns Promise<ADKAgentConfig[]>
+   */
+  public async listAgents(): Promise<ADKAgentConfig[]> {
+    console.log("[GoogleADK Mock] listAgents called");
+    // Simula a obtenção de agentes do localStorage ou de uma lista mockada
+    if (typeof window !== 'undefined') {
+      try {
+        const savedAgentsString = localStorage.getItem('ADK_AGENTS');
+        if (savedAgentsString) {
+          const savedAgents = JSON.parse(savedAgentsString);
+          // Transforma o objeto de agentes em um array
+          return Object.values(savedAgents) as ADKAgentConfig[];
+        }
+      } catch (error) {
+        console.error("[GoogleADK Mock] Error parsing ADK_AGENTS from localStorage:", error);
+        return []; // Retorna vazio em caso de erro
+      }
+    }
+    // Retorna uma lista mockada se não estiver no browser ou não houver nada no localStorage
+    return [
+      {
+        agentId: 'agent-1-mock', 
+        displayName: 'Agente de Viagens Mock',
+        description: 'Ajuda a planejar suas viagens.',
+        model: 'gemini-1.5-pro',
+        tools: [{ name: 'search_flights' }, { name: 'book_hotel' }],
+      },
+      {
+        agentId: 'agent-2-mock',
+        displayName: 'Assistente de Código Mock',
+        description: 'Ajuda com programação e desenvolvimento.',
+        model: 'gemini-1.5-pro-code',
+        tools: [{ name: 'code_interpreter' }],
+      }
+    ];
+  }
+
+  /**
+   * Cria um novo agente ADK (mock).
+   */
+  // ... rest of the code remains the same ...
 }
 
 // Exporta uma instância padrão para uso em toda a aplicação

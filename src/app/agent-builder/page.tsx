@@ -16,8 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
 
-import { AgentCard } from '@/components/agent-builder/agent-card';
-import { AgentBuilderDialog } from '@/components/agent-builder/agent-builder-dialog';
+import { AgentCard } from '@/components/features/agent-builder/agent-card';
+import { AgentBuilderDialog } from '@/components/features/agent-builder/agent-builder-dialog';
 import {
   Tooltip,
   TooltipContent,

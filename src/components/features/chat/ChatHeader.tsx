@@ -24,14 +24,15 @@ interface ChatHeaderProps {
   selectedADKAgentId: string | null;
   setSelectedADKAgentId: (id: string | null) => void;
   adkAgents: ADKAgent[];
-  selectedAgentId: string;
-  setSelectedAgentId: (id: string) => void;
+  selectedAgentId: string | null;
+  setSelectedAgentId: (id: string | null) => void;
   savedAgents: SavedAgentConfiguration[];
-  selectedGemId: string;
-  setSelectedGemId: (id: string) => void;
+  selectedGemId: string | null;
+  setSelectedGemId: (id: string | null) => void;
   initialGems: Gem[]; 
   handleNewConversation: () => void;
   isSidebarOpen?: boolean; 
+  isADKInitializing?: boolean;
 }
 
 export default function ChatHeader({
@@ -50,7 +51,12 @@ export default function ChatHeader({
   initialGems,
   handleNewConversation,
   isSidebarOpen,
+  isADKInitializing,
 }: ChatHeaderProps) {
+  const handleGemSelect = (id: string) => {
+    setSelectedGemId(id);
+  };
+
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background">
       <div className="flex items-center gap-2">
@@ -71,50 +77,35 @@ export default function ChatHeader({
                 <SelectValue placeholder="Selecione Agente ADK" />
               </SelectTrigger>
               <SelectContent>
-                {!selectedADKAgentId && <SelectItem value="">Selecione um Agente ADK</SelectItem>}
-                {adkAgents.map(agent => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.displayName}
+                {isADKInitializing ? (
+                  <SelectItem value="loading" disabled>
+                    Carregando agentes ADK...
                   </SelectItem>
-                ))}
+                ) : adkAgents.length === 0 ? (
+                  <SelectItem value="no-adk-agents" disabled>
+                    Nenhum agente ADK configurado
+                  </SelectItem>
+                ) : (
+                  <>
+                    {!selectedADKAgentId && <SelectItem value="">Selecione um Agente ADK</SelectItem>}
+                    {adkAgents.map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.displayName}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
                 <SelectItem value="">Desativar Agente ADK</SelectItem> 
               </SelectContent>
             </Select>
           </div>
         ) : (
           <AgentSelector
-            selectedAgentId={selectedAgentId}
-            onAgentSelect={(agentId) => {
-              setSelectedAgentId(agentId);
-              if (agentId === 'google-adk') {
-                setUsingADKAgent(true);
-              } else {
-                setUsingADKAgent(false);
-                setSelectedADKAgentId(null);
-              }
-            }}
-            savedAgents={savedAgents}
-            showLabel={false}
-            triggerClassName="w-auto min-w-[150px] max-w-[200px] truncate"
+            agents={initialGems.map(gem => ({ id: gem.id, name: gem.name, description: gem.prompt }))}
+            selectedAgentId={selectedGemId ?? undefined}
+            onSelectAgent={(id) => handleGemSelect(id ?? '')}
+            agentType="Gems"
           />
-        )}
-
-        {!usingADKAgent && selectedAgentId === 'none' && (
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <Select value={selectedGemId} onValueChange={setSelectedGemId}>
-              <SelectTrigger className="w-auto min-w-[150px] max-w-[200px] truncate">
-                <SelectValue placeholder="Selecione um Gem" />
-              </SelectTrigger>
-              <SelectContent>
-                {initialGems.map((gem) => (
-                  <SelectItem key={gem.id} value={gem.id}>
-                    {gem.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         )}
 
         <Button variant="outline" size="icon" onClick={handleNewConversation} title="Nova Conversa">

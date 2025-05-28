@@ -39,12 +39,12 @@ export default function MessageInputArea({
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   useEffect(() => {
-    if (selectedFileDataUri) {
+    if (selectedFile) {
       setIsPopoverOpen(true);
     } else {
       setIsPopoverOpen(false);
     }
-  }, [selectedFileDataUri]);
+  }, [selectedFile]);
 
   const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !isPending) {
@@ -77,7 +77,7 @@ export default function MessageInputArea({
             )}
           </Button>
         </PopoverTrigger>
-        {selectedFile && selectedFileDataUri && (
+        {selectedFile && (
           <PopoverContent side="top" align="start" className="w-auto p-0 border-none shadow-none bg-transparent mb-1">
             <AttachmentPopoverContent
               fileName={selectedFileName}

@@ -26,7 +26,7 @@ export default function MessageList({ messages, isPending }: MessageListProps) {
           }}
           className="w-full" // Ensure motion.div takes full width for proper alignment
         >
-          <ChatMessageDisplay message={msg} />
+          <ChatMessageDisplay message={msg} isStreaming={msg.isStreaming} />
         </motion.div>
       ))}
 

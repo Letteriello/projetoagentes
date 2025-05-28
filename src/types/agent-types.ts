@@ -1,6 +1,6 @@
 import { A2AConfig } from "./a2a-types";
-import { ArtifactDefinition } from "@/components/agent-builder/artifact-management-tab";
-import { KnowledgeSource, RagMemoryConfig } from "@/components/agent-builder/memory-knowledge-tab";
+import { ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
+import { KnowledgeSource, RagMemoryConfig } from "@/components/features/agent-builder/memory-knowledge-tab";
 
 export interface ToolConfigData {
   [key: string]: any;
@@ -9,6 +9,8 @@ export interface ToolConfigData {
 // Unifica com o tipo de tool-types.ts para evitar conflitos de tipagem em toda a aplicação
 import type { AvailableTool as UIAvailableTool } from './tool-types';
 export type AvailableTool = UIAvailableTool;
+
+export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
 
 export interface AgentConfig {
   agentType: 'llm' | 'task' | 'workflow' | 'sequential' | 'parallel' | 'loop' | 'custom' | 'a2a';
