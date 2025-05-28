@@ -273,30 +273,37 @@ export function ArtifactManagementTab({
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2 mb-4">
-              <Switch 
-                id="enable-artifacts" 
-                checked={enableArtifacts} 
-                onCheckedChange={setEnableArtifacts}
+                <Switch
+                    id="enableArtifacts"
+                    checked={enableArtifacts}
+                    onCheckedChange={setEnableArtifacts}
               />
-              <Label htmlFor="enable-artifacts" className="flex items-center gap-1">
-                Habilitar gerenciamento de artefatos
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                      <Info size={14} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Quando habilitado, o agente pode criar, modificar e acessar artefatos como documentos, imagens e outros tipos de conteúdo.</p>
-                  </TooltipContent>
-                </Tooltip>
+                <Label htmlFor="enableArtifacts" className="flex items-center">
+                    Habilitar Gerenciamento de Artefatos
+                    <Tooltip>
+                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                        <TooltipContent className="max-w-xs"><p>Permite que o agente crie, leia, atualize e exclua artefatos (arquivos, dados estruturados, etc.) durante sua execução. Essencial para tarefas que envolvem manipulação de dados ou geração de resultados complexos.</p></TooltipContent>
+                    </Tooltip>
               </Label>
             </div>
             
             {enableArtifacts && (
               <div className="space-y-4">
                 <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                  <Label htmlFor="artifact-storage-type" className="text-left">Tipo de Armazenamento</Label>
+                    <Label htmlFor="artifact-storage-type" className="text-left flex items-center">
+                        Tipo de Armazenamento
+                        <Tooltip>
+                            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                                <p>Define onde os artefatos gerados ou utilizados pelo agente serão armazenados (ADK Storage Options):</p>
+                                <ul className="list-disc pl-4 mt-1 text-xs">
+                                    <li><strong>Memória:</strong> Armazenamento temporário na memória do agente, perdido ao reiniciar.</li>
+                                    <li><strong>Sistema de Arquivos:</strong> Salva os artefatos no sistema de arquivos local do servidor onde o agente está rodando.</li>
+                                    <li><strong>Nuvem (Cloud):</strong> Utiliza um serviço de armazenamento em nuvem (ex: Google Cloud Storage) para persistência robusta e escalável.</li>
+                                </ul>
+                            </TooltipContent>
+                        </Tooltip>
+                    </Label>
                   <Select 
                     value={artifactStorageType} 
                     onValueChange={(value: 'memory' | 'filesystem' | 'cloud') => setArtifactStorageType(value)}
@@ -314,7 +321,13 @@ export function ArtifactManagementTab({
 
                 {artifactStorageType === 'filesystem' && setLocalStoragePath && (
                   <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                    <Label htmlFor="local-storage-path" className="text-left">Caminho Local</Label>
+                    <Label htmlFor="local-storage-path" className="text-left flex items-center">
+                        Caminho Local
+                        <Tooltip>
+                            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                            <TooltipContent className="max-w-xs"><p>Se o tipo de armazenamento for "Sistema de Arquivos", especifique o caminho absoluto no servidor onde os artefatos devem ser salvos.</p></TooltipContent>
+                        </Tooltip>
+                    </Label>
                     <Input 
                       id="local-storage-path" 
                       value={localStoragePath || ''} 
@@ -327,7 +340,13 @@ export function ArtifactManagementTab({
 
                 {artifactStorageType === 'cloud' && setCloudStorageBucket && (
                   <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                    <Label htmlFor="cloud-storage-bucket" className="text-left">Bucket de Armazenamento</Label>
+                    <Label htmlFor="cloud-storage-bucket" className="text-left flex items-center">
+                        Bucket de Armazenamento
+                        <Tooltip>
+                            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                            <TooltipContent className="max-w-xs"><p>Se o tipo de armazenamento for "Nuvem", especifique o nome do bucket no seu provedor de nuvem (ex: um bucket no Google Cloud Storage) onde os artefatos serão armazenados.</p></TooltipContent>
+                        </Tooltip>
+                    </Label>
                     <Input 
                       id="cloud-storage-bucket" 
                       value={cloudStorageBucket || ''} 
@@ -360,12 +379,60 @@ export function ArtifactManagementTab({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40px]">Tipo</TableHead>
-                        <TableHead className="w-[150px]">Nome</TableHead>
+                        <TableHead className="w-[40px]">Tipo
+                            <Tooltip>
+                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                    <p>O tipo geral do artefato (ADK Artifact Types):</p>
+                                    <ul className="list-disc pl-4 mt-1 text-xs">
+                                        <li><strong>Documento:</strong> Arquivos textuais, planilhas, PDFs, etc.</li>
+                                        <li><strong>Imagem:</strong> Arquivos de imagem (PNG, JPG, etc.).</li>
+                                        <li><strong>Vídeo/Áudio:</strong> Arquivos multimídia.</li>
+                                        <li><strong>JSON:</strong> Dados estruturados em formato JSON.</li>
+                                        <li><strong>Binário:</strong> Qualquer outro tipo de arquivo.</li>
+                                        <li><strong>Referência:</strong> Um ponteiro para um artefato maior ou um recurso externo.</li>
+                                    </ul>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TableHead>
+                        <TableHead className="w-[150px]">Nome
+                             <Tooltip>
+                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                <TooltipContent><p>O nome identificador para este tipo de artefato que o agente manipulará. Ex: `relatorio_mensal`, `imagem_processada`.</p></TooltipContent>
+                            </Tooltip>
+                        </TableHead>
                         <TableHead>Descrição</TableHead>
-                        <TableHead className="w-[120px]">MIME Type</TableHead>
-                        <TableHead className="w-[120px]">Acesso</TableHead>
-                        <TableHead className="w-[90px]">Persistente</TableHead>
+                        <TableHead className="w-[120px]">MIME Type
+                            <Tooltip>
+                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                <TooltipContent><p>O tipo de conteúdo padrão do artefato, conforme o padrão MIME. Ex: `application/pdf`, `image/png`, `text/csv`.</p></TooltipContent>
+                            </Tooltip>
+                        </TableHead>
+                        <TableHead className="w-[120px]">Acesso
+                             <Tooltip>
+                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                    <p>Define quem pode ler ou escrever neste tipo de artefato (ADK Roles):</p>
+                                    <ul className="list-disc pl-4 mt-1 text-xs">
+                                        <li><strong>Usuário:</strong> O usuário final interagindo com o agente.</li>
+                                        <li><strong>Agente:</strong> O próprio agente.</li>
+                                        <li><strong>Sub-Agente:</strong> Outros agentes que são subordinados a este.</li>
+                                    </ul>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TableHead>
+                        <TableHead className="w-[90px]">Persistente
+                            <Tooltip>
+                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                <TooltipContent><p>Indica se os artefatos deste tipo devem ser salvos de forma persistente (além da sessão atual de execução do agente).</p></TooltipContent>
+                            </Tooltip>
+                        </TableHead>
+                        <TableHead className="w-[90px]">Versões
+                            <Tooltip>
+                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                <TooltipContent><p>Indica se múltiplas versões do artefato devem ser mantidas, permitindo rastrear o histórico de alterações.</p></TooltipContent>
+                            </Tooltip>
+                        </TableHead>
                         <TableHead className="w-[80px] text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>

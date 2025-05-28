@@ -1,9 +1,8 @@
-
 "use client";
 
-import type { SavedAgentConfiguration } from '@/app/agent-builder/page';
+import type { SavedAgentConfiguration } from '@/app/agent-builder/page'; // Adjust path if necessary
 import * as React from 'react';
-import { firestore } from '@/lib/firestoreClient'; // Import Firestore client
+import { firestore } from '@/lib/firestoreClient';
 import {
   collection,
   getDocs,
@@ -17,14 +16,14 @@ import {
   orderBy,
   Timestamp
 } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast'; 
+import { useToast } from '@/hooks/use-toast'; // Assuming a toast hook is available
 
 // Placeholder for userId - replace with actual user management later
 const PLACEHOLDER_USER_ID = "defaultUser";
 
 interface AgentsContextType {
   savedAgents: SavedAgentConfiguration[];
-  setSavedAgents: React.Dispatch<React.SetStateAction<SavedAgentConfiguration[]>>; // Kept for direct manipulation if ever needed, though Firestore ops are preferred
+  // setSavedAgents: React.Dispatch<React.SetStateAction<SavedAgentConfiguration[]>>; // Removed as state is managed internally by Firestore ops
   addAgent: (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<SavedAgentConfiguration | null>;
   updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;
@@ -33,7 +32,7 @@ interface AgentsContextType {
 
 const AgentsContext = React.createContext<AgentsContextType | undefined>(undefined);
 
-export function AgentsProvider({ children }: { children: React.ReactNode }) {
+export function FirestoreAgentsProvider({ children }: { children: React.ReactNode }) {
   const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = React.useState<boolean>(true);
   const { toast } = useToast();
@@ -48,25 +47,35 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
         
         const querySnapshot = await getDocs(q);
         const agents: SavedAgentConfiguration[] = [];
-        querySnapshot.forEach((docSnap) => { // Renamed doc to docSnap to avoid conflict with firebase/firestore doc function
+        querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          // Ensure all fields are correctly mapped, especially Timestamps to Dates
-          // This mapping needs to be comprehensive and match the SavedAgentConfiguration structure.
+          // Comprehensive mapping based on SavedAgentConfiguration structure
           const agentData: SavedAgentConfiguration = {
             id: docSnap.id,
             userId: data.userId,
             agentName: data.agentName,
             agentDescription: data.agentDescription,
             agentVersion: data.agentVersion,
-            // Assuming agentConfiguration holds the specific type details (LLM, Workflow, etc.)
-            // and common fields are at the top level of the Firestore document.
-            agentType: data.agentType, 
-            agentGoal: data.agentGoal,
-            agentTasks: data.agentTasks,
-            agentPersonality: data.agentPersonality,
-            agentRestrictions: data.agentRestrictions,
-            agentModel: data.agentModel,
-            agentTemperature: data.agentTemperature,
+            agentType: data.agentType,
+            // LLM-specific fields (ensure they exist or provide defaults)
+            agentGoal: data.agentGoal || "",
+            agentTasks: data.agentTasks || "",
+            agentPersonality: data.agentPersonality || "",
+            agentRestrictions: data.agentRestrictions || "",
+            agentModel: data.agentModel || "googleai/gemini-1.5-flash-latest", // Default model
+            agentTemperature: data.agentTemperature === undefined ? 0.7 : data.agentTemperature, // Default temperature
+            // Workflow-specific fields
+            workflowDescription: data.workflowDescription,
+            detailedWorkflowType: data.detailedWorkflowType,
+            loopMaxIterations: data.loopMaxIterations,
+            loopTerminationConditionType: data.loopTerminationConditionType,
+            loopExitToolName: data.loopExitToolName,
+            loopExitStateKey: data.loopExitStateKey,
+            loopExitStateValue: data.loopExitStateValue,
+            // Custom/A2A-specific fields
+            customLogicDescription: data.customLogicDescription,
+            a2aConfig: data.a2aConfig, // This is an object itself
+            // Common fields
             agentTools: data.agentTools || [],
             toolConfigsApplied: data.toolConfigsApplied || {},
             systemPromptGenerated: data.systemPromptGenerated || "",
@@ -85,18 +94,8 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
             artifacts: data.artifacts || [],
             cloudStorageBucket: data.cloudStorageBucket,
             localStoragePath: data.localStoragePath,
-            a2aConfig: data.a2aConfig,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
-            // Ensure all other specific fields for different agent types are mapped here
-            // For example, for LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentConfig
-            // This might require a more dynamic mapping or ensuring Firestore structure matches these types.
-            // The current SavedAgentConfiguration is a union type, so direct spreading might not be safe
-            // without ensuring the Firestore data strictly matches one of the union members.
-            // For simplicity, we assume top-level fields cover most common properties.
-            // Detailed specific properties might be nested under an 'agentConfiguration' field or similar
-            // if they are not flat in Firestore. If they are flat, they need to be explicitly listed.
-            ...(data.agentConfiguration || {}), // Spread if specific config is nested
           };
           agents.push(agentData);
         });
@@ -120,7 +119,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     setIsLoadingAgents(true);
     try {
       const fullAgentData = {
-        ...agentConfigData, // Spread all properties from the form
+        ...agentConfigData, // Spread all properties from the form/input
         userId: PLACEHOLDER_USER_ID,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -128,14 +127,14 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
       const docRef = await addDoc(collection(firestore, 'agents'), fullAgentData);
       
       const newAgentForState: SavedAgentConfiguration = {
-        ...agentConfigData, // Use the input data which should conform to one of the union types
+        ...(agentConfigData as SavedAgentConfiguration), // Cast to ensure all type properties are met
         id: docRef.id,
         userId: PLACEHOLDER_USER_ID,
         createdAt: new Date(), 
         updatedAt: new Date(), 
       };
 
-      setSavedAgents(prev => [newAgentForState, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+      setSavedAgents(prev => [newAgentForState, ...prev].sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
       toast({ title: "Agente Adicionado", description: `"${newAgentForState.agentName}" foi salvo com sucesso.` });
       return newAgentForState;
     } catch (error) {
@@ -155,18 +154,17 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     setIsLoadingAgents(true);
     const agentRef = doc(firestore, 'agents', agentId);
     try {
-      // Construct the update payload carefully, excluding fields that shouldn't be directly updated (like id, userId, createdAt)
-      const { id, userId, createdAt, updatedAt, ...updatePayload } = agentConfigUpdate;
+      const { id, userId, createdAt, updatedAt, ...updatePayload } = agentConfigUpdate; // Exclude immutable fields
       
       await updateDoc(agentRef, {
-        ...updatePayload, // This will spread all fields from agentConfigUpdate
+        ...updatePayload, 
         updatedAt: serverTimestamp(),
       });
       
       setSavedAgents(prev =>
         prev.map(agent =>
           agent.id === agentId ? { ...agent, ...updatePayload, updatedAt: new Date() } : agent
-        ).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        ).sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       );
       toast({ title: "Agente Atualizado", description: "As alterações foram salvas." });
     } catch (error) {
@@ -201,7 +199,8 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   };
   
   return (
-    <AgentsContext.Provider value={{ savedAgents, setSavedAgents, addAgent, updateAgent, deleteAgent, isLoadingAgents }}>
+    // Removed setSavedAgents from provider value as it's managed internally
+    <AgentsContext.Provider value={{ savedAgents, addAgent, updateAgent, deleteAgent, isLoadingAgents }}>
       {children}
     </AgentsContext.Provider>
   );
@@ -210,7 +209,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
 export function useAgents() {
   const context = React.useContext(AgentsContext);
   if (context === undefined) {
-    throw new Error('useAgents must be used within an AgentsProvider');
+    throw new Error('useAgents must be used within an FirestoreAgentsProvider');
   }
   return context;
 }

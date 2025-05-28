@@ -36,100 +36,121 @@ import { cn } from "@/lib/utils"; // Import cn
 interface ApiKeyEntry {
   id: string;
   serviceName: string;
-  apiKeyFragment: string;
-  apiKeyFull?: string;
   dateAdded: string;
-  isKeyVisible: boolean;
+  // Removed apiKeyFragment, apiKeyFull, isKeyVisible
+  // Added status (optional, for now just serviceName and id are primary)
+  status?: string; 
 }
 
-const initialApiKeys: ApiKeyEntry[] = [
-  // { id: "key_001", serviceName: "OpenAI GPT-4", apiKeyFragment: "sk- জুড়ে..._gH7d", apiKeyFull: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_gH7d", dateAdded: "2023-10-26", isKeyVisible: false },
-  // { id: "key_002", serviceName: "Google Maps API", apiKeyFragment: "AIzaS..._zX9o", apiKeyFull: "AIzaSyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy_zX9o", dateAdded: "2023-11-15", isKeyVisible: false },
-  // { id: "key_003", serviceName: "Shopify Admin API", apiKeyFragment: "shpat..._yU8n", apiKeyFull: "shpatzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz_yU8n", dateAdded: "2024-01-05", isKeyVisible: false },
-];
+const initialApiKeys: ApiKeyEntry[] = []; // Start with an empty array
 
 export default function ApiKeyVaultPage() {
   const [apiKeys, setApiKeys] = React.useState<ApiKeyEntry[]>(initialApiKeys);
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
   const [selectedProvider, setSelectedProvider] = React.useState<string>("");
   const [customServiceName, setCustomServiceName] = React.useState<string>("");
-  const [apiKeyInputValue, setApiKeyInputValue] = React.useState<string>("");
+  // Removed apiKeyInputValue state
   const { toast } = useToast();
 
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = React.useState(false);
   const [deletingApiKey, setDeletingApiKey] = React.useState<ApiKeyEntry | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
 
-  const toggleKeyVisibility = (keyId: string) => {
-    setApiKeys(
-      apiKeys.map((key) =>
-        key.id === keyId ? { ...key, isKeyVisible: !key.isKeyVisible } : key
-      )
-    );
-  };
+  // Removed toggleKeyVisibility function
 
-  const handleAddApiKey = () => {
-    if (!apiKeyInputValue) {
-      toast({ title: "Erro", description: "Por favor, insira uma chave API.", variant: "destructive" });
-      return;
-    }
-
+  const handleAddApiKey = async () => {
     let serviceName = selectedProvider;
     if (selectedProvider === "other" && customServiceName) {
-      serviceName = customServiceName;
-    } else if (selectedProvider === "other" && !customServiceName) {
+      serviceName = customServiceName.trim();
+    } else if (selectedProvider === "other" && !customServiceName.trim()) {
       toast({ title: "Erro", description: "Por favor, insira um nome de serviço personalizado.", variant: "destructive" });
       return;
     }
 
-    if (!serviceName || serviceName === "other" && !customServiceName) { // Check if customServiceName is also empty when "other"
+    if (!serviceName || (selectedProvider === "other" && !serviceName)) {
         toast({ title: "Erro", description: "Por favor, selecione um provedor ou forneça um nome de serviço personalizado.", variant: "destructive" });
         return;
     }
-    
-    if (serviceName === "other" && !customServiceName.trim()) {
-        toast({ title: "Erro", description: "Por favor, insira um nome de serviço personalizado válido.", variant: "destructive" });
-        return;
+
+    try {
+      const response = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceName }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to register service: ${response.statusText}`);
+      }
+
+      const newKey = await response.json(); // Expecting { id, serviceName, dateAdded }
+      setApiKeys([...apiKeys, newKey]);
+      setIsAddKeyDialogOpen(false);
+      resetAddKeyForm();
+      toast({ title: "Sucesso!", description: `Serviço "${serviceName}" registrado para gerenciamento de chave API.` });
+    } catch (error: any) {
+      console.error("Error adding API key reference:", error);
+      toast({ title: "Erro ao Registrar", description: error.message || "Não foi possível registrar o serviço.", variant: "destructive" });
     }
-
-
-    const newKey: ApiKeyEntry = {
-      id: `key_${Date.now()}`,
-      serviceName: serviceName,
-      apiKeyFragment: `${apiKeyInputValue.substring(0, 5)}...${apiKeyInputValue.substring(apiKeyInputValue.length - 4)}`,
-      apiKeyFull: apiKeyInputValue,
-      dateAdded: new Date().toISOString().split("T")[0],
-      isKeyVisible: false,
-    };
-    setApiKeys([...apiKeys, newKey]);
-    setIsAddKeyDialogOpen(false);
-    resetAddKeyForm();
-    toast({ title: "Sucesso!", description: `Chave API para "${serviceName}" adicionada.` });
   };
 
   const handleTriggerDeleteDialog = (key: ApiKeyEntry) => {
     setDeletingApiKey(key);
     setIsConfirmDeleteDialogOpen(true);
-    setDeleteConfirmText(""); // Reset confirmation text
+    setDeleteConfirmText(""); 
   };
 
-  const confirmDeleteApiKey = () => {
+  const confirmDeleteApiKey = async () => {
     if (deletingApiKey && deleteConfirmText.toLowerCase() === "deletar") {
-      setApiKeys(apiKeys.filter((key) => key.id !== deletingApiKey.id));
-      toast({ title: "Chave Excluída", description: `A chave API "${deletingApiKey.serviceName}" foi excluída.`, variant: "default" }); // Changed to default variant for success
-      setIsConfirmDeleteDialogOpen(false);
-      setDeletingApiKey(null);
+      try {
+        const response = await fetch(`/api/apikeys/${deletingApiKey.id}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to delete service: ${response.statusText}`);
+        }
+
+        setApiKeys(apiKeys.filter((key) => key.id !== deletingApiKey.id));
+        toast({ title: "Serviço Excluído", description: `O registro para "${deletingApiKey.serviceName}" foi excluído.`, variant: "default" });
+        setIsConfirmDeleteDialogOpen(false);
+        setDeletingApiKey(null);
+      } catch (error: any) {
+        console.error("Error deleting API key reference:", error);
+        toast({ title: "Erro na Exclusão", description: error.message || "Não foi possível excluir o serviço.", variant: "destructive"});
+      }
     } else {
       toast({ title: "Erro na Exclusão", description: "Texto de confirmação inválido.", variant: "destructive"});
     }
   };
 
-
   const resetAddKeyForm = () => {
     setSelectedProvider("");
     setCustomServiceName("");
-    setApiKeyInputValue("");
+    // Removed setApiKeyInputValue("");
   };
+  
+  // Optional: Fetch keys on component mount
+  React.useEffect(() => {
+    const fetchKeys = async () => {
+      try {
+        const response = await fetch('/api/apikeys');
+        if (!response.ok) {
+          throw new Error('Failed to fetch API key configurations');
+        }
+        const data = await response.json();
+        setApiKeys(data);
+      } catch (error) {
+        console.error("Failed to fetch API keys:", error);
+        // toast({ title: "Erro", description: "Não foi possível carregar as configurações de chave API.", variant: "destructive" });
+        // Allowing the page to load with empty keys for now if API is not ready
+      }
+    };
+    fetchKeys();
+  }, []);
+
 
   return (
     <div className="space-y-6 p-4">
@@ -187,17 +208,7 @@ export default function ApiKeyVaultPage() {
                 </div>
               )}
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="apiKey" className="text-right">
-                  Chave API
-                </Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="Cole sua chave API aqui"
-                  className="col-span-3"
-                  value={apiKeyInputValue}
-                  onChange={(e) => setApiKeyInputValue(e.target.value)}
-                />
+                {/* Removed API Key Input Field */}
               </div>
             </div>
             <DialogFooter>
@@ -205,7 +216,7 @@ export default function ApiKeyVaultPage() {
                 setIsAddKeyDialogOpen(false);
                 resetAddKeyForm();
               }}>Cancelar</Button>
-              <Button type="submit" onClick={handleAddApiKey} className="button-live-glow">Salvar Chave</Button>
+              <Button type="submit" onClick={handleAddApiKey} className="button-live-glow">Registrar Serviço</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -226,43 +237,34 @@ export default function ApiKeyVaultPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome do Serviço</TableHead>
-                <TableHead>Chave API</TableHead>
-                <TableHead>Data de Adição</TableHead>
+                <TableHead>Data de Registro</TableHead>
+                {/* Removed Key Column */}
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {apiKeys.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    Nenhuma chave API adicionada ainda.
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                    Nenhum serviço de API registrado ainda.
                   </TableCell>
                 </TableRow>
               ) : (
                 apiKeys.map((key) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-medium">{key.serviceName}</TableCell>
-                    <TableCell className="font-mono">
-                      {key.isKeyVisible ? key.apiKeyFull : key.apiKeyFragment}
-                    </TableCell>
                     <TableCell>{key.dateAdded}</TableCell>
+                    {/* Removed Key Cell */}
                     <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" aria-label="Editar Chave API" onClick={() => toast({title: "Em breve", description: "Funcionalidade de edição de chave API."})}>
+                      <Button variant="ghost" size="icon" aria-label="Editar Serviço API" onClick={() => toast({title: "Em breve", description: "Funcionalidade de edição de serviço API."})}>
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleKeyVisibility(key.id)}
-                        aria-label="Alternar Visibilidade da Chave API"
-                      >
-                        {key.isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                      {/* Removed Toggle Visibility Button */}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="text-destructive hover:text-destructive"
-                        aria-label="Excluir Chave API"
+                        aria-label="Excluir Registro de Serviço API"
                         onClick={() => handleTriggerDeleteDialog(key)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -276,7 +278,7 @@ export default function ApiKeyVaultPage() {
         </CardContent>
          <CardFooter>
           <p className="text-xs text-muted-foreground">
-            Observação: O gerenciamento de chaves API é uma função de segurança crítica. Garanta que controles de acesso adequados e logs de auditoria estejam implementados para sistemas de produção. Esta é uma simulação visual.
+            Observação: As chaves API reais devem ser configuradas de forma segura no backend (ex: variáveis de ambiente). Este cofre gerencia quais serviços estão registrados para uso.
           </p>
         </CardFooter>
       </Card>
@@ -290,8 +292,8 @@ export default function ApiKeyVaultPage() {
                 Confirmar Exclusão
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Você tem certeza que deseja excluir a chave API para <strong>{deletingApiKey.serviceName}</strong>?
-                Esta ação não pode ser desfeita. Para confirmar, digite "<strong>deletar</strong>" no campo abaixo.
+                Você tem certeza que deseja excluir o registro do serviço API para <strong>{deletingApiKey.serviceName}</strong>?
+                Esta ação não pode ser desfeita e apenas remove a referência do sistema. A chave real deve ser gerenciada no backend. Para confirmar, digite "<strong>deletar</strong>" no campo abaixo.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4">
