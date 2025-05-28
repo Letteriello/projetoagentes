@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -75,7 +74,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
 
-
+// Import unified AvailableTool type
 import type {
   SavedAgentConfiguration,
   AgentConfig,
@@ -86,7 +85,6 @@ import type {
   AgentConfigBase
 } from '@/app/agent-builder/page'; // Tipos ainda da página, podem ser movidos
 
-// Import unified AvailableTool type
 import type {
   AvailableTool,
   A2AAgentConfig

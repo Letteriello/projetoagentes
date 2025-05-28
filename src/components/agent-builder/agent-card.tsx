@@ -146,7 +146,7 @@ export function AgentCard({ agent, onEdit, onTest, onDelete, availableTools, age
                                     <ConfigureIcon
                                         width={10}
                                         height={10}
-                                        className={`ml-1 ${isConfigured ? 'text-green-400' : 'text-blue-400'}`}
+                                        className={`ml-1 ${isConfigured ? 'text-emerald-500' : 'text-sky-500'}`}
                                     >
                                         <title>{isConfigured ? "Configurada" : "Requer configuração"}</title>
                                     </ConfigureIcon>

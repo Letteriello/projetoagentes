@@ -16,6 +16,15 @@ export interface Conversation {
   // summary?: string; // Optional: for a brief overview
 }
 
+export interface ChatMessageUI {
+  id: string;
+  text: string;
+  sender: "user" | "agent" | "system";
+  imageUrl?: string;
+  fileName?: string;
+  fileDataUri?: string;
+}
+
 // You might also want a type for the overall chat state if you use a reducer or context
 export interface ChatState {
   conversations: Conversation[];
