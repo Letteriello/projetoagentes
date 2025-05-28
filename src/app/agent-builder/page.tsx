@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from "react";
+import * as React from "react"; import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +11,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon, Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon } from "lucide-react"; // Added more icons
+import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon, Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon, LucideIcon } from "lucide-react"; // Updated icons
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
@@ -28,21 +28,23 @@ import {
 export interface AvailableTool {
   id: string;
   label: string;
-  icon: React.ReactNode;
+  name: string;
+  type: 'genkit_native';
+  icon: LucideIcon | undefined;
   description: string;
   needsConfiguration?: boolean;
   genkitToolName?: string;
-  configFields?: Array<{ id: string; label: string; type: 'text' | 'password' | 'select'; options?: string[]; placeholder?: string; description?: string }>;
+  configFields?: Array<{ id: string; label: string; type: 'text' | 'password' | 'select'; options?: Array<{ label: string; value: string; }>; placeholder?: string; description?: string }>;
 }
 
 export const availableTools: AvailableTool[] = [
-  { id: "webSearch", label: "Busca na Web (Google)", icon: <Search size={16} className="mr-2"/>, description: "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.", needsConfiguration: true, genkitToolName: "performWebSearch" },
-  { id: "calculator", label: "Calculadora", icon: <Calculator size={16} className="mr-2"/>, description: "Permite realizar cálculos matemáticos (via função Genkit).", genkitToolName: "calculator" },
-  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", icon: <FileText size={16} className="mr-2"/>, description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.", needsConfiguration: true, genkitToolName: "queryKnowledgeBase" },
-  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", icon: <CalendarDays size={16} className="mr-2"/>, description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.", needsConfiguration: true, genkitToolName: "accessCalendar" },
-  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", icon: <Network size={16} className="mr-2"/>, description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.", needsConfiguration: true, genkitToolName: "invokeOpenAPI" },
-  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", icon: <Database size={16} className="mr-2"/>, description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.", needsConfiguration: true, genkitToolName: "queryDatabase" },
-  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", icon: <Code2 size={16} className="mr-2"/>, description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.", needsConfiguration: true, genkitToolName: "executeCode" },
+  { id: "webSearch", label: "Busca na Web (Google)", name: "webSearch", type: "genkit_native", icon: Search, description: "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.", needsConfiguration: true, genkitToolName: "performWebSearch" },
+  { id: "calculator", label: "Calculadora", name: "calculator", type: "genkit_native", icon: Calculator, description: "Permite realizar cálculos matemáticos (via função Genkit).", genkitToolName: "calculator" }, // Fixed escaped quote
+  { id: "knowledgeBase", label: "Consulta à Base de Conhecimento (RAG)", name: "knowledgeBase", type: "genkit_native", icon: FileText, description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.", needsConfiguration: true, genkitToolName: "queryKnowledgeBase" }, // Fixed escaped quote
+  { id: "calendarAccess", label: "Acesso à Agenda/Calendário", name: "calendarAccess", type: "genkit_native", icon: CalendarDays, description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.", needsConfiguration: true, genkitToolName: "accessCalendar" }, // Fixed escaped quote
+  { id: "customApiIntegration", label: "Integração com API Externa (OpenAPI)", name: "customApiIntegration", type: "genkit_native", icon: Network, description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.", needsConfiguration: true, genkitToolName: "invokeOpenAPI" }, // Fixed escaped quote
+  { id: "databaseAccess", label: "Acesso a Banco de Dados (SQL)", name: "databaseAccess", type: "genkit_native", icon: Database, description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.", needsConfiguration: true, genkitToolName: "queryDatabase" }, // Fixed escaped quote
+  { id: "codeExecutor", label: "Execução de Código (Python Sandbox)", name: "codeExecutor", type: "genkit_native", icon: Code2, description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.", needsConfiguration: true, genkitToolName: "executeCode" }, // Fixed escaped quote
 ];
 
 export const agentToneOptions = [
@@ -58,9 +60,9 @@ export const agentToneOptions = [
 ];
 
 export const agentTypeOptions = [
-  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. A description do agente é usada por outros agentes LLM para decidir se devem delegar tarefas a ele." },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística, sem consultar um LLM para a orquestração em si." },
-  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl)." },
+  { id: "llm" as const, label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: Brain as ReactNode, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planear, gerar respostas e usar ferramentas. A descrição do agente é usada por outros agentes LLM para decidir se devem delegar tarefas a ele." },
+  { id: "workflow" as const, label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: Workflow as ReactNode, description: "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística, sem consultar um LLM para a orquestração em si." },
+  { id: "custom" as const, label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: FileJson as ReactNode, description: "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl)." },
 ];
 
 export interface AgentConfigBase {
@@ -421,8 +423,8 @@ export default function AgentBuilderPage() {
 
   const handleSaveAgent = (agentConfig: SavedAgentConfiguration) => {
     if (editingAgent) {
-      setSavedAgents(prevAgents =>
-        prevAgents.map(agent =>
+ setSavedAgents((prevAgents: SavedAgentConfiguration[]) =>
+        prevAgents.map((agent: SavedAgentConfiguration) =>
           agent.id === editingAgent.id ? agentConfig : agent
         )
       );
@@ -438,7 +440,7 @@ export default function AgentBuilderPage() {
   };
 
   const handleDeleteAgent = (agentIdToDelete: string) => {
-    setSavedAgents(prev => prev.filter(agent => agent.id !== agentIdToDelete));
+ setSavedAgents((prev: SavedAgentConfiguration[]) => prev.filter((agent: SavedAgentConfiguration) => agent.id !== agentIdToDelete));
     toast({title: "Agente Excluído", description: "O agente foi removido da lista."});
   }
 
