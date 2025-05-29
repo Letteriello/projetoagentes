@@ -7,6 +7,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { AgentsProvider } from '@/contexts/AgentsContext';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import dynamic from 'next/dynamic';
+
+// Import ErrorBoundary with no SSR to avoid hydration issues
+const ErrorBoundary = dynamic(
+  () => import('@/components/error-boundary').then(mod => mod.ErrorBoundary),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -23,16 +30,18 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
-        <ThemeProvider>
-          <AgentsProvider>
-            <SidebarProvider defaultOpen>
-              <AppLayout>
-                {children}
-              </AppLayout>
-            </SidebarProvider>
-          </AgentsProvider>
-          <Toaster />
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AgentsProvider>
+              <SidebarProvider defaultOpen>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+              </SidebarProvider>
+            </AgentsProvider>
+            <Toaster />
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

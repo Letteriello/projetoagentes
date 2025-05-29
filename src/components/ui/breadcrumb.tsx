@@ -51,10 +51,8 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                   {item.label}
                 </span>
               ) : item.href ? (
-                <Link href={item.href} legacyBehavior>
-                  <a className={cn("text-muted-foreground hover:text-foreground hover:underline", linkClassName)}>
-                    {item.label}
-                  </a>
+                <Link href={item.href} className={cn("text-muted-foreground hover:text-foreground hover:underline", linkClassName)}>
+                  {item.label}
                 </Link>
               ) : (
                 <span className={cn("text-muted-foreground", linkClassName)}>

@@ -141,7 +141,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.label}>
-                <Link href={item.href} legacyBehavior passHref>
+                <Link href={item.href} passHref>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
@@ -150,13 +150,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     )}
                     tooltip={{ children: item.label, side: "right", className: "bg-popover text-popover-foreground" }}
                   >
-                    <a>
+                    <div>
                       <item.icon className={cn(
                         "flex-shrink-0 size-5", 
                         isSidebarIconOnly ? "" : "mr-2" 
                       )} />
                       {!isSidebarIconOnly && <span className="truncate">{item.label}</span>}
-                    </a>
+                    </div>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -185,13 +185,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <DropdownMenuContent side="right" align="start" className="w-56 bg-popover text-popover-foreground">
                 <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <Link href="/profile" passHref legacyBehavior>
+                <Link href="/profile" passHref>
                   <DropdownMenuItem>
                     <UserCircle className="mr-2 h-4 w-4" />
                     <span>Perfil</span>
                   </DropdownMenuItem>
                 </Link>
-                <Link href="/api-key-vault" passHref legacyBehavior>
+                <Link href="/api-key-vault" passHref>
                   <DropdownMenuItem>
                     <KeyRound className="mr-2 h-4 w-4" />
                     <span>Chaves API</span>
