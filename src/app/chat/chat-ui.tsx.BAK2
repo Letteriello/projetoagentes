@@ -1,0 +1,690 @@
+
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X, UploadCloud, FileUp, Code2, Image as ImageIcon, Mic, Menu, Plus, Sparkles } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useState, useRef, useEffect, useActionState, ChangeEvent } from "react";
+import { submitChatMessage } from "./actions";
+import { toast } from "@/hooks/use-toast";
+import { useAgents } from "@/contexts/AgentsContext";
+import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builder/page";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator"; 
+import { Label } from "@/components/ui/label"; 
+import { AgentSelector } from "@/components/agent-selector";
+import { googleADK, sendMessageToAgent } from "@/lib/google-adk";
+
+interface ChatMessageUI {
+  id: string;
+  text: string;
+  sender: "user" | "agent" | "system";
+  imageUrl?: string;
+  fileName?: string;
+}
+
+interface ChatHistoryMessage {
+  role: 'user' | 'model';
+  content: any; // Pode ser string ou array de partes (texto/mídia)
+}
+
+const initialGems = [
+  { id: "general", name: "Assistente Geral", prompt: "Você é um assistente prestativo e conciso." },
+  { id: "creative", name: "Escritor Criativo", prompt: "Você é um escritor criativo, ajude a gerar ideias e textos com um tom inspirador." },
+  { id: "code", name: "Programador Expert", prompt: "Você é um programador expert, forneça explicações claras e exemplos de código eficientes." },
+  { id: "researcher", name: "Pesquisador Analítico", prompt: "Você é um pesquisador analítico, foque em dados e informações factuais." },
+];
+
+const initialState = {
+  message: "",
+  agentResponse: null,
+  errors: null,
+};
+
+// Componente de botão de recurso estilo Gemini aprimorado
+const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex flex-col items-center gap-1.5 p-2 feature-button-hover rounded-lg transition-all duration-200 cursor-pointer group"
+  >
+    <div className="p-2.5 feature-button-bg rounded-full shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-200">
+      {icon}
+    </div>
+    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors duration-200">{label}</span>
+  </button>
+);
+
+export function ChatUI() {
+  const [messages, setMessages] = useState<ChatMessageUI[]>([]); // Para renderização da UI
+  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]); // Para enviar ao backend
+  const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("none");
+  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string>("");
+  const [activeChatTarget, setActiveChatTarget] = useState<string>(initialGems[0].name);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [usingADKAgent, setUsingADKAgent] = useState(false);
+
+  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false); 
+
+  const { savedAgents } = useAgents();
+  const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
+
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let targetName = "Chat";
+    if (usingADKAgent && selectedADKAgentId) {
+      // Busca o nome do agente ADK
+      if (typeof window !== 'undefined') {
+        try {
+          const savedADKAgents = JSON.parse(localStorage.getItem('ADK_AGENTS') || '{}');
+          const adkAgent = savedADKAgents[selectedADKAgentId];
+          targetName = adkAgent ? `${adkAgent.displayName} (ADK)` : "Agente ADK";
+        } catch (error) {
+          console.error('Erro ao buscar agente ADK:', error);
+          targetName = "Agente ADK";
+        }
+      }
+    } else if (selectedAgentId !== 'none') {
+      const agent = savedAgents.find(a => a.id === selectedAgentId);
+      targetName = agent ? `${agent.agentName}` : "Agente não encontrado";
+    } else {
+      const gem = initialGems.find(g => g.id === selectedGemId);
+      targetName = gem ? `${gem.name} (Gem)` : "Gem não encontrado";
+    }
+    setActiveChatTarget(targetName);
+  }, [selectedAgentId, selectedGemId, savedAgents, selectedADKAgentId, usingADKAgent]);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (formState.agentResponse && !isPending) {
+      const newAgentMessageUI: ChatMessageUI = {
+        id: Date.now().toString(),
+        text: formState.agentResponse!,
+        sender: "agent",
+      };
+      const newAgentMessageHistory: ChatHistoryMessage = {
+        role: "model",
+        content: [{ text: formState.agentResponse! }],
+      };
+      setMessages((prevMessages) => [...prevMessages, newAgentMessageUI]);
+      setChatHistory((prevHistory) => [...prevHistory, newAgentMessageHistory]);
+      
+      formRef.current?.reset(); 
+      if (inputRef.current) inputRef.current.value = ""; 
+      setSelectedFileDataUri(null);
+      setSelectedFileName(null);
+      if (fileInputRef.current) fileInputRef.current.value = ""; 
+      // @ts-ignore
+      formState.agentResponse = null;
+      // @ts-ignore
+      formState.message = "";
+    }
+    if (formState.message && formState.errors && !isPending) {
+      toast({
+        title: "Erro no Chat",
+        description: formState.message,
+        variant: "destructive",
+      });
+      // @ts-ignore
+      formState.message = "";
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formState, isPending]);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast({ title: "Tipo de arquivo inválido", description: "Por favor, selecione um arquivo de imagem.", variant: "destructive" });
+        if(fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedFileDataUri(reader.result as string);
+        setSelectedFileName(file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFileDataUri(null);
+    setSelectedFileName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFormSubmit = async (formData: FormData) => {
+    const userMessage = formData.get("userInput") as string;
+    if (!userMessage?.trim() && !selectedFileDataUri) return;
+    
+    // Reset file selection
+    const fileDataUri = selectedFileDataUri;
+    const fileName = selectedFileName;
+    setSelectedFileDataUri(null);
+    setSelectedFileName(null);
+    
+    // Generate a unique ID for the message
+    const messageId = Math.random().toString(36).substring(2, 9);
+    
+    // Add user message to UI
+    const newUserMessage: ChatMessageUI = {
+      id: messageId,
+      text: userMessage || "",
+      sender: "user",
+      ...(fileDataUri && { imageUrl: fileDataUri }),
+      ...(fileName && { fileName })
+    };
+    
+    setMessages(prev => [...prev, newUserMessage]);
+    
+    // Reset input
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+    
+    // Build content parts for the API
+    type ChatContentPart = { type: "text"; text: string } | { type: "image"; imageUrl: string };
+const contentParts: ChatContentPart[] = [];
+    if (userMessage) {
+      contentParts.push({ type: "text", text: userMessage });
+    }
+    
+    if (fileDataUri) {
+      contentParts.push({ 
+        type: "image", 
+        imageUrl: fileDataUri 
+      });
+    }
+    
+    // Add to chat history (for sending to backend)
+    setChatHistory(prev => [...prev, { 
+      role: "user", 
+      content: contentParts.length === 1 && contentParts[0].type === "text" 
+        ? contentParts[0].text! 
+        : contentParts
+    }]);
+    
+    try {
+      // Temporary placeholder message while waiting for response
+      const agentMessageId = Math.random().toString(36).substring(2, 9);
+      const placeholderMessage: ChatMessageUI = {
+        id: agentMessageId,
+        text: "",
+        sender: "agent"
+      };
+      
+      setMessages(prev => [...prev, placeholderMessage]);
+      
+      let responseText = "";
+      
+      // Usar agente ADK se estiver selecionado
+      if (usingADKAgent && selectedADKAgentId) {
+        try {
+          // Converte o histórico de mensagens para o formato ADK
+          const adkHistory = chatHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }));
+          
+          // Envia a mensagem para o agente ADK
+          const adkResponse = await sendMessageToAgent(
+            selectedADKAgentId,
+            userMessage || "",
+            adkHistory
+          );
+          
+          // Extrai o texto da resposta
+          if (typeof adkResponse.content === "string") {
+            responseText = adkResponse.content;
+          } else if (Array.isArray(adkResponse.content)) {
+            responseText = adkResponse.content
+              .filter(part => part.type === "text")
+              .map(part => part.text)
+              .join(" ");
+          }
+        } catch (error) {
+          console.error("Erro ao usar agente ADK:", error);
+          responseText = "Ocorreu um erro ao processar sua mensagem com o agente ADK. Verifique se a API key está configurada corretamente.";
+        }
+      } else {
+        // Usar o fluxo tradicional (agentes locais ou gems)
+        // Simulação de resposta para demonstração
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        responseText = `Resposta simulada para: ${userMessage || "imagem enviada"}`;
+      }
+      
+      // Atualiza a mensagem na UI
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === agentMessageId 
+            ? { ...msg, text: responseText } 
+            : msg
+        )
+      );
+      
+      // Adiciona à história do chat
+      setChatHistory(prev => [...prev, { 
+        role: "model", 
+        content: responseText
+      }]);
+      
+    } catch (error) {
+      console.error("Error sending message:", error);
+      // Adiciona mensagem de erro à UI
+      setMessages(prev => [...prev, {
+        id: Math.random().toString(36).substring(2, 9),
+        text: "Ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.",
+        sender: "system"
+      }]);
+    }
+  };
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    setChatHistory([]); 
+    setSelectedFileDataUri(null);
+    setSelectedFileName(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (inputRef.current) inputRef.current.value = "";
+    toast({ title: "Nova Conversa Iniciada", description: "O histórico do chat e anexos foram limpos." });
+  };
+
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background text-foreground">
+      <header className="flex items-center justify-between p-4 border-b border-border/50 sticky top-0 bg-background/95 backdrop-blur-sm z-10 shadow-sm">
+  <div className="flex items-center gap-3 min-w-0">
+    <Bot className="h-7 w-7 text-primary flex-shrink-0 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full p-1.5 shadow" />
+    <span className="text-xl font-bold text-foreground tracking-tight">Assistente Geral <span className="font-normal text-base text-blue-400 ml-1">(Gem)</span></span>
+  </div>
+  <div className="flex items-center gap-2">
+    <ThemeToggle />
+    <button className="p-2 rounded-full hover:bg-muted transition-colors" aria-label="Configurações">
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 9 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09c.2.63.76 1.09 1.51 1.09H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+    </button>
+  </div>
+</header>
+<div className="flex items-center gap-1.5 md:gap-2 mt-2">
+  <Select
+    value={selectedAgentId}
+    onValueChange={(value) => { setSelectedAgentId(value); handleNewConversation(); }}
+  >
+            <SelectTrigger
+              id="agent-selector"
+              className="w-auto md:w-[150px] lg:w-[180px] h-8 text-xs bg-card hover:bg-muted/70 border-border/70 focus:ring-primary/50 text-foreground"
+              aria-label="Selecionar Agente"
+            >
+              <Cpu size={14} className="mr-1.5 text-primary/80 hidden sm:inline-block" />
+              <SelectValue placeholder="Agente Específico" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover text-popover-foreground">
+              <SelectItem value="none" className="text-xs hover:bg-accent/50">Assistente Geral (Usar Gem)</SelectItem>
+              {savedAgents.length > 0 && <Separator className="my-1" />} 
+              {savedAgents.length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Meus Agentes</Label>}
+              {savedAgents.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id} className="text-xs hover:bg-accent/50">
+                  <span className="truncate" title={agent.agentName}>{agent.agentName}</span>
+                  <span className="text-muted-foreground/70 ml-1 hidden md:inline">({agent.agentType})</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedGemId}
+            onValueChange={(value) => { setSelectedGemId(value); handleNewConversation(); }}
+            disabled={selectedAgentId !== 'none'}
+          >
+            <SelectTrigger
+              id="gem-selector"
+              className={cn(
+                "w-auto md:w-[140px] lg:w-[160px] h-8 text-xs bg-card hover:bg-muted/70 border-border/70 focus:ring-primary/50 text-foreground",
+                selectedAgentId !== 'none' && "opacity-50 cursor-not-allowed"
+              )}
+              aria-label="Selecionar Personalidade (Gem)"
+            >
+              <SparklesIcon size={14} className="mr-1.5 text-primary/80 hidden sm:inline-block"/>
+              <SelectValue placeholder="Personalidade Base" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover text-popover-foreground">
+              {initialGems.map((gem) => (
+                <SelectItem key={gem.id} value={gem.id} className="text-xs hover:bg-accent/50">
+                  {gem.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon" onClick={handleNewConversation} className="h-8 w-8 text-primary/90 hover:text-primary hover:bg-muted/70 border-border/70" aria-label="Nova Conversa">
+              <RefreshCcw size={16}/>
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        {/* Messages Area */}
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 h-full">
+          <div className="space-y-4 min-h-full flex flex-col">
+            {messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full flex-1 text-center">
+                {/* Saudação com gradiente estilo Gemini */}
+                <h2 className="text-3xl font-light mb-6">
+                  <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">Olá</span>
+                  {typeof window !== 'undefined' && localStorage.getItem('userName') ? (
+                    <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">, {localStorage.getItem('userName')}</span>
+                  ) : ''}
+                </h2>
+                <p className="text-lg text-muted-foreground mb-8">Como posso ajudar você hoje?</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md w-full px-2">
+                  {/* Card de Criar Agente */}
+                  <div 
+                    className="group p-3 rounded-lg bg-[hsl(var(--suggestion-card-bg))] border border-[hsl(var(--suggestion-card-border))] hover:bg-[hsl(var(--suggestion-card-hover))] hover:shadow-lg cursor-pointer transition-all duration-200 flex flex-col items-center gap-2 w-full min-w-0"
+                    onClick={() => window.location.href = '/agent-builder'}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+                        <Cpu className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1 group-hover:text-primary transition-colors">Criar um agente</h3>
+                        <p className="text-sm text-muted-foreground">Monte um agente com ferramentas específicas</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-1">
+                      <span>Iniciar</span>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8.78145 7.99999L5.48145 4.69999L6.42411 3.75732L10.6668 7.99999L6.42411 12.2427L5.48145 11.3L8.78145 7.99999Z" fill="currentColor"/>
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  {/* Card de Fazer Pergunta */}
+                  <div 
+                    className="group p-3 rounded-lg bg-[hsl(var(--suggestion-card-bg))] border border-[hsl(var(--suggestion-card-border))] hover:bg-[hsl(var(--suggestion-card-hover))] hover:shadow-lg cursor-pointer transition-all duration-200 flex flex-col items-center gap-2 w-full min-w-0"
+                    onClick={() => {
+                      if (inputRef.current) {
+                        inputRef.current.focus();
+                        inputRef.current.value = 'O que é um agente? ';
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-full bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform duration-300">
+                        <MessageSquare className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1 group-hover:text-blue-500 transition-colors">Fazer uma pergunta</h3>
+                        <p className="text-sm text-muted-foreground">Tire dúvidas sobre o sistema</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-blue-500/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-1">
+                      <span>Perguntar</span>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8.78145 7.99999L5.48145 4.69999L6.42411 3.75732L10.6668 7.99999L6.42411 12.2427L5.48145 11.3L8.78145 7.99999Z" fill="currentColor"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Bloco duplicado removido para evitar erro de parsing e poluição visual. */}
+            {messages.map((msg, idx) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, x: msg.sender === "user" ? 20 : -20, y: 10 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                exit={{ opacity: 0, x: msg.sender === "user" ? 20 : -20, y: 10 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 260, 
+                  damping: 20, 
+                  delay: idx * 0.05 
+                }}
+                className={`flex items-end gap-2.5 w-full ${
+                  msg.sender === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                {msg.sender === "agent" && (
+                  <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
+                    <img src="/logo-assistente.svg" alt="Assistente" className="h-6 w-6 object-contain" />
+                  </div>
+                )}
+                {msg.sender === "user" && (
+                  <div className="flex-shrink-0 p-1.5 rounded-full bg-muted border border-border/50 self-start">
+                    <img src="/avatar-usuario.svg" alt="Usuário" className="h-6 w-6 object-contain" />
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    "p-3 rounded-2xl max-w-[80%] md:max-w-[65%] shadow-lg text-sm border border-transparent transition-all duration-200",
+                    msg.sender === "user"
+                      ? "bg-[hsl(var(--chat-bubble-user))] text-primary-foreground ml-auto rounded-br-md border-primary/30"
+                      : "bg-[hsl(var(--chat-bubble-agent))] text-foreground mr-auto rounded-bl-md border-border/40"
+                  )}
+                >
+                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                  {msg.imageUrl && (
+                    <div className="mt-2">
+                      <Image src={msg.imageUrl} alt={msg.fileName || "Imagem enviada"} width={300} height={200} className="rounded-md max-w-full h-auto object-contain" />
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+            {/* Skeleton animado para loading de resposta longa */}
+            {isPending && (
+              <div className="flex items-end gap-2.5 w-full justify-start animate-pulse">
+                <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
+                  <img src="/logo-assistente.svg" alt="Assistente" className="h-6 w-6 object-contain" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="h-4 w-40 sm:w-52 rounded-xl bg-muted/60" />
+                  <div className="h-4 w-28 sm:w-36 rounded-xl bg-muted/40" />
+                  <div className="h-4 w-20 rounded-xl bg-muted/30" />
+                </div>
+              </div>
+            )}
+      <p className="whitespace-pre-wrap">{msg.text}</p>
+      {msg.imageUrl && (
+        <div className="mt-2">
+          <Image
+            src={msg.imageUrl}
+            alt={msg.fileName || "Imagem anexada"}
+            width={200}
+            height={200}
+            className="rounded-md object-contain max-h-[200px] border border-border/30"
+          />
+          {msg.fileName && <p className="text-xs text-muted-foreground/80 mt-1">{msg.fileName}</p>}
+                    </div>
+                  )}
+                </div>
+                {msg.sender === "user" && (
+                  <div className="flex-shrink-0 p-1.5 rounded-full bg-muted border border-border/50 self-start">
+                    <User className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {isPending && (
+              <div className="flex items-end gap-2.5 justify-start">
+                <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
+                  <Bot className="h-5 w-5 text-primary animate-pulse" />
+                </div>
+                <div className="p-3 rounded-lg bg-card max-w-[70%] shadow-sm rounded-bl-none border border-border/50">
+                  <span className="flex gap-1 items-center text-sm text-muted-foreground animate-pulse">
+  <span>D</span><span>i</span><span>g</span><span>i</span><span>t</span><span>a</span><span>n</span><span>d</span><span>o</span><span>.</span>
+  <span className="animate-bounce" style={{ animationDelay: '0s' }}>.</span>
+  <span className="animate-bounce" style={{ animationDelay: '0.15s' }}>.</span>
+  <span className="animate-bounce" style={{ animationDelay: '0.3s' }}>.</span>
+</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Área de entrada de mensagem - Estilo Gemini */}
+      <div className="p-4 mx-auto max-w-3xl w-full border-t border-border/50 bg-background/95">
+        {/* Botões de recursos estilo Gemini aprimorados */}
+        <div className="flex gap-5 mb-5 justify-center">
+          <FeatureButton 
+            icon={<ImageIcon className="h-5 w-5 text-blue-500" />} 
+            label="Imagens" 
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <FeatureButton 
+            icon={<Paperclip className="h-5 w-5 text-emerald-500" />} 
+            label="Anexos" 
+            onClick={() => setIsPopoverOpen(true)}
+          />
+          <FeatureButton 
+            icon={<Mic className="h-5 w-5 text-purple-500" />} 
+            label="Voz" 
+            onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de gravação de voz será implementada." })}
+          />
+        </div>
+        
+        {selectedFileDataUri && (
+          <div className="mb-3 p-2 border border-border/50 rounded-lg flex items-center justify-between bg-card">
+            <div className="flex items-center gap-2">
+              <Image src={selectedFileDataUri} alt={selectedFileName || "Preview"} width={40} height={40} className="rounded object-contain"/>
+              <span className="text-xs text-muted-foreground truncate max-w-[200px]">{selectedFileName || "Imagem selecionada"}</span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={removeSelectedFile} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+              <X size={16}/>
+            </Button>
+          </div>
+        )}
+        
+        <form
+          ref={formRef}
+          action={handleFormSubmit}
+          className="relative"
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*" 
+            className="hidden"
+          />
+          
+          <div className="relative flex w-full items-center overflow-hidden bg-[hsl(var(--chat-input-bg))] rounded-2xl border border-[hsl(var(--border))] shadow-lg focus-within:ring-2 focus-within:ring-primary/30 transition-all duration-200 px-3 py-2 gap-2">
+            {/* Botão de anexar */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-muted-foreground hover:text-primary hover:bg-accent/40"
+              onClick={() => fileInputRef.current?.click()}
+              tabIndex={-1}
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+            {/* Campo de mensagem */}
+            <Input
+              ref={inputRef}
+              name="userInput"
+              placeholder="Escreva sua mensagem..."
+              className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base px-2 py-2 placeholder:text-muted-foreground/70 placeholder:transition-opacity placeholder:duration-200 focus:placeholder:opacity-50"
+              autoComplete="off"
+              disabled={isPending}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && (inputRef.current?.value?.trim() || selectedFileDataUri)) {
+                  e.preventDefault(); 
+                  if (formRef.current) {
+                     handleFormSubmit(new FormData(formRef.current));
+                  }
+                }
+              }}
+            />
+            {/* Botão de voz */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-muted-foreground hover:text-purple-500 hover:bg-purple-100/70"
+              onClick={() => toast({ title: "Em breve!", description: "Funcionalidade de gravação de voz será implementada." })}
+              tabIndex={-1}
+            >
+              <Mic className="h-5 w-5" />
+            </Button>
+            {/* Botão de enviar */}
+            <Button
+              type="submit"
+              size="icon"
+              className={cn(
+                "rounded-full disabled:opacity-60 h-10 w-10 ml-1 shadow-md",
+                inputRef.current?.value?.trim() || selectedFileDataUri
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "text-muted-foreground hover:text-foreground bg-transparent hover:bg-accent/50"
+              )}
+              disabled={isPending}
+              aria-label="Enviar mensagem"
+            >
+              {isPending ? <SparklesIcon className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+            </Button>
+          </div>
+        </form>
+        
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <PopoverContent className="w-auto p-2 space-y-1 bg-popover text-popover-foreground rounded-lg shadow-xl" side="top" align="center">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-sm h-9 px-3 py-2"
+              onClick={() => {
+                fileInputRef.current?.click();
+                setIsPopoverOpen(false);
+              }}
+            >
+              <FileUp className="mr-2 h-4 w-4" />
+              Enviar arquivos
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-sm h-9 px-3 py-2"
+              onClick={() => {
+                toast({ title: "Em breve!", description: "Integração com Google Drive será implementada." });
+                setIsPopoverOpen(false);
+              }}
+            >
+              <UploadCloud className="mr-2 h-4 w-4" /> 
+              Adicionar do Drive
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-sm h-9 px-3 py-2"
+              onClick={() => {
+                toast({ title: "Em breve!", description: "Funcionalidade de importar código." });
+                setIsPopoverOpen(false);
+              }}
+            >
+              <Code2 className="mr-2 h-4 w-4" />
+              Importar código
+            </Button>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+}

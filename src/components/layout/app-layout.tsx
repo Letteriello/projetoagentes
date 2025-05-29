@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ReactNode } from 'react';
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Toaster } from "@/components/ui/toaster";
 
 interface NavItem {
   href: string;
@@ -209,6 +209,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <MainLayout>
         {children}
       </MainLayout>
+      <Toaster />
     </>
   );
 }

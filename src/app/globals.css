@@ -4,7 +4,75 @@
 
 @layer base {
   :root {
-    /* Dark Tech Theme - Base */
+    /* Light Theme - Default */
+    --background: 0 0% 100%; /* White */
+    --foreground: 222.2 84% 4.9%; /* Dark Gray/Almost Black */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 200 100% 45%; /* Blue */
+    --primary-foreground: 210 40% 98%; /* Almost white for contrast */
+
+    --secondary: 210 40% 96.1%; /* Light Gray */
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 180 90% 45%; /* Teal/Turquoise */
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 200 100% 45%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Light Theme */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-primary: 200 100% 45%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 180 90% 45%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 200 100% 45%;
+
+    /* Chat UI específico - Light Theme */
+    --chat-bubble-user: 217 100% 96%; /* Azul claro vibrante */
+    --chat-bubble-agent: 264 100% 98%; /* Roxo claro */
+    --chat-input-bg: 0 0% 100%; /* Branco */
+    --feature-button-bg: 217 100% 97%;
+    --feature-button-hover: 264 100% 96%;
+    --feature-button-icon: 256 100% 60%;
+    --suggestion-card-bg: 0 0% 100%;
+    --suggestion-card-border: 217 100% 90%;
+    --suggestion-card-hover: 217 100% 98%;
+    /* Gradiente para header/chat */
+    --brand-gradient: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+    --brand-gradient-dark: linear-gradient(90deg, #1e40af 0%, #6d28d9 100%);
+    --brand-accent: #2563eb;
+    --brand-accent-dark: #7c3aed;
+
+    --chart-1: 200 80% 45%;
+    --chart-2: 170 70% 40%;
+    --chart-3: 280 70% 55%;
+    --chart-4: 40 90% 50%;
+    --chart-5: 0 80% 55%;
+    
+    /* Transição de tema */
+    --theme-transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+
+  .dark {
+    /* Dark Tech Theme */
     --background: 220 20% 12%; /* Very Dark Blue/Charcoal */
     --foreground: 210 40% 95%; /* Light Gray/Off-white */
 
@@ -32,47 +100,6 @@
     --border: 220 15% 25%; /* Subtle Dark Border */
     --input: 220 15% 25%; /* Same as border for inputs */
     --ring: 200 100% 60%; /* Brighter Primary for rings */
-
-    --radius: 0.5rem;
-
-    /* Sidebar - Dark Tech Theme */
-    --sidebar-background: 220 20% 14%; /* Consistent with popover/darker card */
-    --sidebar-foreground: 210 35% 88%; 
-    --sidebar-primary: 200 100% 55%;
-    --sidebar-primary-foreground: 220 20% 10%;
-    --sidebar-accent: 180 90% 45%;
-    --sidebar-accent-foreground: 220 20% 10%;
-    --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 200 100% 60%;
-
-    --chart-1: 200 80% 60%;
-    --chart-2: 170 70% 50%;
-    --chart-3: 280 70% 65%;
-    --chart-4: 40 90% 60%;
-    --chart-5: 0 80% 65%;
-  }
-
-  .dark {
-    /* Ensuring dark theme explicitly uses the same variables for now */
-    --background: 220 20% 12%;
-    --foreground: 210 40% 95%;
-    --card: 220 20% 16%;
-    --card-foreground: 210 40% 95%;
-    --popover: 220 20% 14%;
-    --popover-foreground: 210 40% 95%;
-    --primary: 200 100% 55%;
-    --primary-foreground: 220 20% 10%;
-    --secondary: 210 15% 30%;
-    --secondary-foreground: 210 30% 85%;
-    --muted: 220 15% 22%;
-    --muted-foreground: 210 25% 65%;
-    --accent: 180 90% 45%;
-    --accent-foreground: 220 20% 10%;
-    --destructive: 0 70% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 25%;
-    --input: 220 15% 25%;
-    --ring: 200 100% 60%;
     
     --sidebar-background: 220 20% 14%;
     --sidebar-foreground: 210 35% 88%;
@@ -82,6 +109,17 @@
     --sidebar-accent-foreground: 220 20% 10%;
     --sidebar-border: 220 15% 20%;
     --sidebar-ring: 200 100% 60%;
+    
+    /* Chat UI específico - Dark Theme */
+    --chat-bubble-user: 200 100% 15%;
+    --chat-bubble-agent: 220 20% 18%;
+    --chat-input-bg: 220 20% 16%;
+    --feature-button-bg: 220 20% 18%;
+    --feature-button-hover: 220 20% 22%;
+    --feature-button-icon: 200 100% 55%;
+    --suggestion-card-bg: 220 20% 16%;
+    --suggestion-card-border: 220 15% 25%;
+    --suggestion-card-hover: 220 20% 20%;
 
     --chart-1: 200 80% 60%;
     --chart-2: 170 70% 50%;
@@ -94,10 +132,60 @@
 @layer base {
   * {
     @apply border-border;
+    transition: var(--theme-transition);
   }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Utilitários para o tema */
+@layer utilities {
+  .chat-bubble-user {
+    @apply bg-[hsl(var(--chat-bubble-user))];
+  }
+  
+  .chat-bubble-agent {
+    @apply bg-[hsl(var(--chat-bubble-agent))];
+  }
+  
+  .chat-input-bg {
+    @apply bg-[hsl(var(--chat-input-bg))];
+  }
+  
+  .feature-button-bg {
+    @apply bg-[hsl(var(--feature-button-bg))];
+  }
+  
+  .feature-button-hover {
+    @apply hover:bg-[hsl(var(--feature-button-hover))];
+  }
+  
+  .suggestion-card-bg {
+    @apply bg-[hsl(var(--suggestion-card-bg))];
+  }
+  
+  .suggestion-card-border {
+    @apply border-[hsl(var(--suggestion-card-border))];
+  }
+  
+  .suggestion-card-hover {
+    @apply hover:bg-[hsl(var(--suggestion-card-hover))];
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom animation for blinking cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
 }
 
 @layer components {

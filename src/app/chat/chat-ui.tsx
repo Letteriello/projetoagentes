@@ -1,33 +1,61 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X, UploadCloud, FileUp, Code2 } from "lucide-react";
-import { useState, useRef, useEffect, useActionState, ChangeEvent } from "react";
+import { Send, User, Bot, SparklesIcon, Cpu, RefreshCcw, MessageSquare, Paperclip, Search as SearchIcon, X, UploadCloud, FileUp, Code2, Image as ImageIcon, Mic, Menu, Plus, Sparkles } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useState, useRef, useEffect, useActionState, ChangeEvent, useCallback, useOptimistic, useMemo } from "react";
+import { v4 as uuidv4 } from 'uuid'; 
 import { submitChatMessage } from "./actions";
 import { toast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
-import type { SavedAgentConfiguration, LLMAgentConfig } from "@/app/agent-builder/page";
+import type { AgentConfig, LLMAgentConfig } from "@/app/agent-builder/page";
+
+// Define SavedAgentConfiguration interface to match actual structure used in the app
+interface SavedAgentConfiguration {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  config: AgentConfig;
+}
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator"; 
 import { Label } from "@/components/ui/label"; 
+import { AgentSelector } from "@/components/agent-selector";
+import { googleADK, GoogleADK as GoogleADKType, sendMessageToAgent } from "@/lib/google-adk"; 
+import ChatHeader from "@/components/features/chat/ChatHeader"; 
+import WelcomeScreen from "@/components/features/chat/WelcomeScreen"; 
+import MessageList from "@/components/features/chat/MessageList"; 
+import MessageInputArea from "@/components/features/chat/MessageInputArea"; 
+import { ChatMessageUI, Conversation } from '@/types/chat'; 
+import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; 
+import { BasicChatInput } from '@/ai/flows/chat-flow';
+import { ADKAgentConfig, ADKTool } from '@/lib/google-adk'; // Import ADK types
 
-interface ChatMessageUI {
-  id: string;
-  text: string;
-  sender: "user" | "agent" | "system";
-  imageUrl?: string;
-  fileName?: string;
-}
+// DEBUG: Inspect the imported googleADK object
+console.log("Inspecting imported googleADK (top level):", googleADK);
 
 interface ChatHistoryMessage {
   role: 'user' | 'model';
-  content: any; // Pode ser string ou array de partes (texto/mídia)
+  content: any; 
+}
+
+interface ServerMessage { 
+  id?: string;
+  role: 'user' | 'model' | 'assistant' | 'tool';
+  content: string | any; 
+  text?: string; 
+  createdAt?: Date | string;
+  timestamp?: Date | string;
+  type?: 'text' | 'image' | 'file' | string; 
+  attachments?: any[];
+  status?: 'sending' | 'delivered' | 'failed' | 'seen';
 }
 
 const initialGems = [
@@ -37,424 +65,597 @@ const initialGems = [
   { id: "researcher", name: "Pesquisador Analítico", prompt: "Você é um pesquisador analítico, foque em dados e informações factuais." },
 ];
 
-const initialState = {
-  message: "",
+// Define ChatFormState based on the return type of submitChatMessage from actions.ts
+interface ChatFormState {
+  message: string; 
+  agentResponse?: string | null; 
+  errors?: { [key: string]: string[] } | null;
+}
+
+const initialChatFormState: ChatFormState = {
+  message: "", 
   agentResponse: null,
   errors: null,
 };
 
+const initialActionState: { message: string | null; serverResponse?: ChatMessageUI; error?: string } = {
+  message: null,
+  serverResponse: undefined,
+  error: undefined,
+};
+
+// Componente de botão de recurso estilo Gemini aprimorado
+const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex flex-col items-center gap-1.5 p-2 feature-button-hover rounded-lg transition-all duration-200 cursor-pointer group"
+  >
+    <div className="p-2.5 feature-button-bg rounded-full shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-200">
+      {icon}
+    </div>
+    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors duration-200">{label}</span>
+  </button>
+);
+
+type OptimisticMessageAction = 
+  | { type: 'addUserMessage'; message: ChatMessageUI }
+  | { type: 'addAgentMessage'; message: ChatMessageUI } 
+  | { type: 'updateAgentMessageChunk'; id: string; chunk: string } 
+  | { type: 'finalizeAgentMessage'; id: string; finalMessage?: string; error?: boolean }
+  | { type: 'reconcileUserMessage'; id: string; serverId?: string; error?: boolean };
+
 export function ChatUI() {
-  const [messages, setMessages] = useState<ChatMessageUI[]>([]); // Para renderização da UI
-  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]); // Para enviar ao backend
-  const [selectedGemId, setSelectedGemId] = useState<string>(initialGems[0].id);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>("none");
+  const [messages, setMessages] = useState<ChatMessageUI[]>([]);
+  const [optimisticMessages, setOptimisticMessages] = useOptimistic<ChatMessageUI[], ChatMessageUI>(
+    messages,
+    (currentMessages, optimisticUpdateMessage) => {
+      const existingMessageIndex = currentMessages.findIndex(msg => msg.id === optimisticUpdateMessage.id);
+
+      if (existingMessageIndex !== -1) {
+        // Update existing message: Merge new properties.
+        const updatedMessage = { 
+          ...currentMessages[existingMessageIndex], 
+          ...optimisticUpdateMessage,
+          text: optimisticUpdateMessage.text !== undefined ? optimisticUpdateMessage.text : currentMessages[existingMessageIndex].text,
+        };
+        return currentMessages.map((msg, index) =>
+          index === existingMessageIndex ? updatedMessage : msg
+        );
+      } else {
+        // Add new message
+        return [...currentMessages, optimisticUpdateMessage];
+      }
+    }
+  );
+
+  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]); 
+  const [selectedGemId, setSelectedGemId] = useState<string | null>(initialGems[0].id);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>("none");
+  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null);
   const [activeChatTarget, setActiveChatTarget] = useState<string>(initialGems[0].name);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [usingADKAgent, setUsingADKAgent] = useState(false);
 
-  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); 
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null); 
+  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); 
   
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false); 
+  const [adkAgents, setAdkAgents] = useState<ADKAgentConfig[]>([]);
+  const [isADKInitializing, setIsADKInitializing] = useState(true);
 
-  const { savedAgents } = useAgents();
-  const [formState, formAction, isPending] = useActionState(submitChatMessage, initialState);
+  // States for ConversationSidebar
+  const [conversations, setConversations] = useState<Conversation[]>([]); 
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+  const { savedAgents } = useAgents(); 
+  const [formState, runFormAction, isActionPending] = useActionState(
+    submitChatMessage, 
+    initialChatFormState
+  );
+
+  const [isPending, setIsPending] = useState<boolean>(false); // For streaming fetch
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null); 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    let targetName = "Chat";
-    if (selectedAgentId !== 'none') {
-      const agent = savedAgents.find(a => a.id === selectedAgentId);
-      targetName = agent ? `${agent.agentName}` : "Agente não encontrado";
-    } else {
-      const gem = initialGems.find(g => g.id === selectedGemId);
-      targetName = gem ? `${gem.name} (Gem)` : "Gem não encontrado";
-    }
-    setActiveChatTarget(targetName);
-  }, [selectedAgentId, selectedGemId, savedAgents]);
+  const [inputValue, setInputValue] = useState('');
 
+  const [lastSentUserMessageInfo, setLastSentUserMessageInfo] = useState<{ id: string; text: string; imageUrl?: string; fileName?: string; timestamp: Date } | null>(null); // For reconciliation
+  
+  const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validação de tipo (exemplo expandido)
+      const allowedImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      // Adicionar outros tipos permitidos, ex: PDF, TXT
+      const allowedOtherTypes = ["application/pdf", "text/plain"];
+      const allAllowedTypes = [...allowedImageTypes, ...allowedOtherTypes];
+      const maxFileSizeMB = 10; // Exemplo: 10MB
+
+      if (!allAllowedTypes.includes(file.type)) {
+        toast({ title: "Tipo de arquivo inválido", description: `Por favor, selecione um tipo de arquivo suportado (${allAllowedTypes.join(', ')}).`, variant: "destructive" });
+        if(fileInputRef.current) fileInputRef.current.value = "";
+        removeSelectedFile();
+        return;
+      }
+
+      if (file.size > maxFileSizeMB * 1024 * 1024) {
+        toast({ title: "Arquivo muito grande", description: `O tamanho máximo do arquivo é ${maxFileSizeMB}MB.`, variant: "destructive" });
+        if(fileInputRef.current) fileInputRef.current.value = "";
+        removeSelectedFile();
+        return;
+      }
+
+      setSelectedFile(file);
+      setSelectedFileName(file.name);
+      // Preview para imagens
+      if (allowedImageTypes.includes(file.type)) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSelectedFileDataUri(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Para outros tipos de arquivo, não geramos data URI por padrão para preview,
+        // mas você pode querer armazenar o arquivo de outra forma ou mostrar um ícone.
+        setSelectedFileDataUri(null); // Limpa se não for imagem, ou define um placeholder/ícone
+      }
+      // Limpa o valor do input para permitir selecionar o mesmo arquivo novamente após remoção
+      // event.target.value = ''; // Cuidado: isso pode ser feito no removeSelectedFile
+    } else {
+      removeSelectedFile();
+    }
+  }, []);
+
+  const removeSelectedFile = useCallback(() => {
+    setSelectedFile(null);
+    setSelectedFileName(null);
+    setSelectedFileDataUri(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const currentInput = inputValue.trim();
+
+    if (!currentInput && !selectedFile) {
+      toast({ title: "Input required", description: "Please type a message or select a file.", variant: "destructive" });
+      return;
+    }
+
+    setIsPending(true); // For streaming UI indication
+
+    const currentSelectedFile = selectedFile;
+    const currentSelectedFileDataUri = selectedFileDataUri;
+
+    const userMessageId = uuidv4();
+    const agentMessageId = uuidv4();
+    const messageTimestamp = new Date();
+
+    const userMessage: ChatMessageUI = {
+      id: userMessageId,
+      sender: 'user',
+      text: currentInput,
+      imageUrl: currentSelectedFile && currentSelectedFile.type.startsWith('image/') ? currentSelectedFileDataUri : undefined,
+      fileName: currentSelectedFile ? currentSelectedFile.name : undefined,
+      fileDataUri: currentSelectedFile && !currentSelectedFile.type.startsWith('image/') ? currentSelectedFileDataUri : undefined,
+      isStreaming: false,
+    };
+    setOptimisticMessages(userMessage);
+
+    setInputValue("");
+    removeSelectedFile(); 
+    inputRef.current?.focus();
+    setIsPending(true); // Set pending state for UI feedback
+
+    // Prepare data for the API route
+    const chatInputForStream: BasicChatInput = {
+      userMessage: currentInput,
+      history: messages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        content: msg.text, // Assuming msg.text holds the content for history
+      })),
+      fileDataUri: currentSelectedFile ? currentSelectedFileDataUri : undefined,
+      modelName: (usingADKAgent && selectedADKAgent 
+        ? selectedADKAgent.model 
+        : ((selectedSavedAgent?.config as LLMAgentConfig)?.agentModel || undefined) // Cast to LLMAgentConfig
+      ), 
+      systemPrompt: (usingADKAgent && selectedADKAgent 
+        ? selectedADKAgent.description 
+        : ((selectedSavedAgent?.config as AgentConfig)?.agentDescription || undefined) // Cast to AgentConfig
+      ), 
+      temperature: (usingADKAgent && selectedADKAgent 
+        ? (selectedADKAgent as any).temperature 
+        : ((selectedSavedAgent?.config as LLMAgentConfig)?.agentTemperature || undefined) // Cast to LLMAgentConfig
+      ), 
+      agentToolsDetails: usingADKAgent && selectedADKAgent 
+        ? selectedADKAgent.tools?.map((t: ADKTool) => ({ id: t.name, name: t.name, description: t.description || '', enabled: true })) 
+        : (selectedSavedAgent?.config as AgentConfig)?.agentTools?.map((toolId: string) => ({ id: toolId, name: toolId, description: `Tool: ${toolId}`, enabled: true }))
+    };
+
+    const pendingAgentMessage: ChatMessageUI = {
+      id: agentMessageId,
+      sender: 'agent', 
+      text: '',         
+      isStreaming: true,
+    };
+    setOptimisticMessages(pendingAgentMessage);
+
+    try {
+      const response = await fetch('/api/chat-stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(chatInputForStream),
+      });
+
+      if (!response.ok) {
+        let errorMessageText = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.error) {
+            errorMessageText = errorData.error;
+          }
+        } catch (e) {
+          console.warn("Could not parse error response as JSON:", e);
+        }
+        throw new Error(errorMessageText);
+      }
+
+      if (!response.body) {
+        throw new Error('Failed to get readable stream body.');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Failed to get readable stream reader.');
+      }
+
+      const decoder = new TextDecoder();
+      let done = false;
+      let accumulatedContent = '';
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedContent += chunk;
+          setOptimisticMessages({
+            id: agentMessageId,
+            sender: 'agent',
+            text: accumulatedContent,
+            isStreaming: true,
+          });
+          // Scroll as new content arrives
+        }
+      }
+      // Finalize the message after stream ends
+      setOptimisticMessages({
+        id: agentMessageId,
+        sender: 'agent',
+        text: accumulatedContent,
+        isStreaming: false,
+      });
+      // TODO: Here you would fetch metadata if needed
+
+      // After stream is complete, update the main messages state
+      setMessages((prevMessages) => {
+        const finalAgentMessage: ChatMessageUI = {
+          id: agentMessageId,
+          sender: 'agent',
+          text: accumulatedContent,
+          isStreaming: false,
+        };
+        
+        let updatedWithUser = prevMessages;
+        if (!prevMessages.find(msg => msg.id === userMessage.id)) {
+          updatedWithUser = [...prevMessages, userMessage];
+        }
+
+        const agentMessageIndex = updatedWithUser.findIndex(msg => msg.id === finalAgentMessage.id);
+        if (agentMessageIndex !== -1) {
+          const newMessages = [...updatedWithUser];
+          newMessages[agentMessageIndex] = finalAgentMessage;
+          return newMessages;
+        } else {
+          return [...updatedWithUser, finalAgentMessage];
+        }
+      });
+
+    } catch (error: any) {
+      let caughtErrorMessage = "Failed to send message. Please try again.";
+      if (error instanceof Error) {
+        caughtErrorMessage = error.message;
+      }
+
+      console.error("Error submitting message:", error);
+      toast({
+        title: "Error",
+        description: caughtErrorMessage,
+        variant: "destructive",
+      });
+
+      setOptimisticMessages({
+        id: agentMessageId,
+        sender: 'agent',
+        text: `Error: ${caughtErrorMessage}`,
+        isStreaming: false,
+      });
+
+      setMessages((prevMessages) => {
+        const errorAgentMessage: ChatMessageUI = {
+          id: agentMessageId,
+          sender: 'agent',
+          text: `Error: ${caughtErrorMessage}`,
+          isStreaming: false,
+        };
+
+        let updatedWithUser = prevMessages;
+        if (!prevMessages.find(msg => msg.id === userMessage.id)) {
+          updatedWithUser = [...prevMessages, userMessage];
+        }
+
+        const agentMessageIndex = updatedWithUser.findIndex(msg => msg.id === errorAgentMessage.id);
+        if (agentMessageIndex !== -1) {
+          const newMessages = [...updatedWithUser];
+          newMessages[agentMessageIndex] = errorAgentMessage;
+          return newMessages;
+        } else {
+          return [...updatedWithUser, errorAgentMessage];
+        }
+      });
+    } finally {
+      setIsPending(false);
+      // Ensure the main messages state is up-to-date with the user message if it wasn't added yet.
+      // This is a safeguard, as try/catch blocks should handle it for agent messages.
+      setMessages((prevMessages) => {
+        if (!prevMessages.find(msg => msg.id === userMessageId)) {
+          return [...prevMessages, userMessage];
+        }
+        return prevMessages;
+      });
+    }
+  };
+
+  // Effect to handle Server Action response (e.g., for metadata after streaming or non-streaming fallback)
+  // This will need adjustment if we fully switch to API routes or use a hybrid approach
+  useEffect(() => {
+    if (formState && formState.message && formState.message !== "") { 
+      if (formState.errors) {
+        toast({ title: "Error from Server Action", description: JSON.stringify(formState.errors), variant: "destructive" });
+        // Cannot reliably update a specific optimistic message here without a stable ID from formState.
+        // If formState.id was available and matched a client-optimistic-id, we could do:
+        // const targetMessage = messages.find(m => m.id === formState.id!);
+        // if (targetMessage) {
+        //   setOptimisticMessages({ 
+        //     id: formState.id!,
+        //     text: targetMessage.text + "\nError from server action.", 
+        //     sender: targetMessage.sender 
+        //   });
+        // }
+      } else if (formState.agentResponse) {
+        toast({ title: "Server Action Success (Non-Streaming)", description: `User: ${formState.message}` });
+        // This branch handles non-streaming responses from the server action.
+        // If the server action is only for metadata or if streaming is handled by API route, this might need adjustment.
+        // For now, assuming it might create a new agent message if no streaming occurred.
+        const serverAgentMessage: ChatMessageUI = {
+            id: uuidv4(), // Generate a new ID for this server response message
+            text: formState.agentResponse,
+            sender: 'agent',
+            isStreaming: false,
+        };
+        // Add this message to the main state and optimistic state
+        setMessages(prev => [...prev, serverAgentMessage]);
+        // setOptimisticMessages(serverAgentMessage); // This would add it optimistically if needed, but setMessages covers it.
+      }
+    }
+  }, [formState, setMessages, setOptimisticMessages]); // Added setMessages, setOptimisticMessages to deps
+
+  // Scroll to bottom when messages change or pending state changes
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [optimisticMessages]);
 
-  useEffect(() => {
-    if (formState.agentResponse && !isPending) {
-      const newAgentMessageUI: ChatMessageUI = {
-        id: Date.now().toString(),
-        text: formState.agentResponse!,
-        sender: "agent",
-      };
-      const newAgentMessageHistory: ChatHistoryMessage = {
-        role: "model",
-        content: [{ text: formState.agentResponse! }],
-      };
-      setMessages((prevMessages) => [...prevMessages, newAgentMessageUI]);
-      setChatHistory((prevHistory) => [...prevHistory, newAgentMessageHistory]);
-      
-      formRef.current?.reset(); 
-      if (inputRef.current) inputRef.current.value = ""; 
-      setSelectedFileDataUri(null);
-      setSelectedFileName(null);
-      if (fileInputRef.current) fileInputRef.current.value = ""; 
-      // @ts-ignore
-      formState.agentResponse = null;
-      // @ts-ignore
-      formState.message = "";
-    }
-    if (formState.message && formState.errors && !isPending) {
-      toast({
-        title: "Erro no Chat",
-        description: formState.message,
-        variant: "destructive",
-      });
-      // @ts-ignore
-      formState.message = "";
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formState, isPending]);
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        toast({ title: "Tipo de arquivo inválido", description: "Por favor, selecione um arquivo de imagem.", variant: "destructive" });
-        if(fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedFileDataUri(reader.result as string);
-        setSelectedFileName(file.name);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeSelectedFile = () => {
-    setSelectedFileDataUri(null);
-    setSelectedFileName(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleFormSubmit = (formData: FormData) => {
-    const userInput = formData.get("userInput") as string;
-    if (!userInput?.trim() && !selectedFileDataUri) {
-        toast({ title: "Mensagem vazia", description: "Digite uma mensagem ou anexe um arquivo.", variant: "destructive" });
-        return;
-    }
-
-    const userMessageText = userInput || ""; 
-
-    const newUserMessageUI: ChatMessageUI = {
-      id: (Date.now() - 1).toString(),
-      text: userMessageText,
-      sender: "user",
-      imageUrl: selectedFileDataUri || undefined,
-      fileName: selectedFileName || undefined,
-    };
-
-    const userMessageContentParts: Array<{text?: string, media?: {url: string, contentType?: string}}> = [];
-    if (userMessageText.trim() !== "") {
-        userMessageContentParts.push({ text: userMessageText });
-    }
-    if (selectedFileDataUri) {
-        const mimeTypeMatch = selectedFileDataUri.match(/^data:(image\/[^;]+);base64,/);
-        const contentType = mimeTypeMatch ? mimeTypeMatch[1] : undefined;
-        userMessageContentParts.push({ media: { url: selectedFileDataUri, contentType } });
-    }
-    
-    const newUserMessageHistory: ChatHistoryMessage = {
-      role: "user",
-      content: userMessageContentParts.length > 0 ? userMessageContentParts : [{text: " "}], // Garante que content não é vazio
-    };
-
-
-    setMessages((prevMessages) => [...prevMessages, newUserMessageUI]);
-    
-    const currentHistory = [...chatHistory, newUserMessageHistory];
-    formData.set("chatHistoryJson", JSON.stringify(currentHistory)); 
-    setChatHistory(currentHistory); 
-
-    if (selectedFileDataUri) {
-      formData.set("fileDataUri", selectedFileDataUri); // Continua enviando como string separada, o backend trata
-    }
-
-    const currentAgent = savedAgents.find(a => a.id === selectedAgentId);
-
-    if (currentAgent && selectedAgentId !== 'none') {
-      const llmAgentConfig = currentAgent as LLMAgentConfig; 
-      formData.set("agentSystemPrompt", llmAgentConfig.systemPromptGenerated || "Você é um assistente prestativo.");
-      if (llmAgentConfig.agentModel) formData.set("agentModel", llmAgentConfig.agentModel!);
-      if (llmAgentConfig.agentTemperature !== undefined) formData.set("agentTemperature", llmAgentConfig.agentTemperature!.toString());
-      
-      if (currentAgent.toolsDetails) {
-        formData.set("agentToolsDetailsJson", JSON.stringify(currentAgent.toolsDetails));
-      }
-    } else {
-      const currentGem = initialGems.find(g => g.id === selectedGemId) || initialGems[0];
-      formData.set("agentSystemPrompt", currentGem.prompt);
-    }
-    formAction(formData);
-  };
-
-  const handleNewConversation = () => {
+  const handleNewConversation = useCallback(() => {
     setMessages([]);
-    setChatHistory([]); 
-    setSelectedFileDataUri(null);
+    setChatHistory([]);
+    setInputValue("");
+    setSelectedFile(null);
     setSelectedFileName(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (inputRef.current) inputRef.current.value = "";
-    toast({ title: "Nova Conversa Iniciada", description: "O histórico do chat e anexos foram limpos." });
+    setSelectedFileDataUri(null);
+    setActiveConversationId(null); 
+    toast({ title: "Nova Conversa", description: "Histórico de chat limpo e nova conversa iniciada." });
+  }, []);
+
+  const handleSelectConversation = useCallback((conversation: Conversation): void => { 
+    if (!conversation || !conversation.id) {
+      console.error("handleSelectConversation called with invalid or missing conversation object/id");
+      setActiveConversationId(null); // Or keep previous, or handle error state
+      setMessages([]);
+      toast({ title: "Erro", description: "Tentativa de selecionar conversa inválida.", variant: "destructive" });
+      return;
+    }
+    const { id } = conversation; // Extract id from conversation
+
+    setActiveConversationId(id);
+    
+    // Assuming conversation.messages contains the messages for the selected conversation
+    if (conversation.messages) {
+      const uiMessages: ChatMessageUI[] = conversation.messages.map(msg => ({ 
+        id: msg.id || uuidv4(),
+        text: msg.content,
+        sender: msg.isUser ? 'user' : 'agent', 
+        isStreaming: msg.isLoading, // Map isLoading to isStreaming for UI consistency
+      }));
+      setMessages(uiMessages);
+    } else {
+      setMessages([]); 
+    }
+
+    toast({ title: "Conversa Carregada", description: `Conversa ${conversation.title || id} selecionada.` });
+  }, [setActiveConversationId, setMessages]); // Removed 'conversations' dependency as we get the full object
+
+  const handleRenameConversation = useCallback(async (id: string, newTitle: string) => {
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+    toast({ title: "Conversa Renomeada", description: `Conversa renomeada para ${newTitle}.` });
+  }, []);
+
+  const handleDeleteConversation = useCallback(async (conversation: Conversation) => { 
+    if (!conversation || !conversation.id) {
+      toast({ title: "Erro", description: "Tentativa de apagar conversa inválida.", variant: "destructive" });
+      return;
+    }
+    const { id } = conversation; // Extract id from conversation
+
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (activeConversationId === id) {
+      setActiveConversationId(null);
+      setMessages([]);
+    }
+    toast({ title: "Conversa Apagada", variant: "destructive" });
+  }, [activeConversationId]);
+
+  // Callback for ConversationSidebar that expects (id: string) => void
+  const handleSelectConversationById = useCallback((id: string): void => {
+    const conversation = conversations.find(c => c.id === id);
+    if (conversation) {
+      handleSelectConversation(conversation);
+    } else {
+      console.error(`Conversation with id ${id} not found for sidebar selection.`);
+      // Optionally, set an error state or show a toast
+      toast({ title: "Erro", description: `Conversa com ID ${id} não encontrada.`, variant: "destructive" });
+    }
+  }, [conversations, handleSelectConversation]);
+
+  const handleSetActiveIdExplicitly = useCallback((id: string | null): void => {
+    setActiveConversationId(id);
+  }, [setActiveConversationId]);
+
+  // Mock conversations for testing - replace with actual data loading
+  useEffect(() => {
+    setConversations([
+      { id: '1', title: 'Primeira Conversa Legal', messages: [], createdAt: new Date(), updatedAt: new Date() },
+      { id: '2', title: 'Ideias para o Projeto X', messages: [], createdAt: new Date(), updatedAt: new Date() },
+      { id: '3', title: 'Rascunho do Email', messages: [], createdAt: new Date(), updatedAt: new Date() },
+    ]);
+  }, []);
+
+  const loadConversationMessages = (conversationId: string) => {
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      const uiMessages: ChatMessageUI[] = conversation.messages.map(msg => ({ 
+        id: msg.id || uuidv4(),
+        text: msg.content,
+        sender: msg.isUser ? 'user' : 'agent', 
+        isStreaming: msg.isLoading, // Map isLoading to isStreaming for UI consistency
+      }));
+      setMessages(uiMessages);
+    } else {
+      setMessages([]);
+    }
   };
+
+  // Handle input change
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setInputValue(event.target.value);
+  };
+
+  // Handle suggestion click (placeholder)
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+    // Optionally, auto-submit the form
+    // formRef.current?.requestSubmit(); // Or call handleFormSubmit directly if appropriate
+  };
+
+  // Load ADK agents from localStorage
+  useEffect(() => {
+    const storedADKAgents = localStorage.getItem('adkAgents');
+    if (storedADKAgents) {
+      setAdkAgents(JSON.parse(storedADKAgents));
+    }
+  }, []);
+
+  const selectedADKAgent = useMemo(() => {
+    if (!selectedADKAgentId || adkAgents.length === 0) return null;
+    // Map ADKAgentConfig to include id property needed by ADKAgent
+    return adkAgents.find(agent => (agent.agentId ?? agent.displayName) === selectedADKAgentId) || null;
+  }, [selectedADKAgentId, adkAgents]);
+
+  const selectedSavedAgent = useMemo(() => {
+    if (!selectedAgentId || selectedAgentId === 'none' || savedAgents.length === 0) return null;
+    return savedAgents.find(agent => agent.id === selectedAgentId) || null;
+  }, [selectedAgentId, savedAgents]);
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background text-foreground">
-      <div className="flex items-center justify-between p-3 md:p-4 border-b border-border/50 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-2 min-w-0">
-            <MessageSquare className="h-5 w-5 text-primary flex-shrink-0" />
-            <h1 className="text-lg font-semibold text-foreground truncate" title={activeChatTarget || "Chat"}>
-              {activeChatTarget || "Chat"}
-            </h1>
-        </div>
-        <div className="flex items-center gap-1.5 md:gap-2">
-          <Select
-            value={selectedAgentId}
-            onValueChange={(value) => { setSelectedAgentId(value); handleNewConversation(); }}
-          >
-            <SelectTrigger
-              id="agent-selector"
-              className="w-auto md:w-[150px] lg:w-[180px] h-8 text-xs bg-card hover:bg-muted/70 border-border/70 focus:ring-primary/50 text-foreground"
-              aria-label="Selecionar Agente"
-            >
-              <Cpu size={14} className="mr-1.5 text-primary/80 hidden sm:inline-block" />
-              <SelectValue placeholder="Agente Específico" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover text-popover-foreground">
-              <SelectItem value="none" className="text-xs hover:bg-accent/50">Assistente Geral (Usar Gem)</SelectItem>
-              {savedAgents.length > 0 && <Separator className="my-1" />} 
-              {savedAgents.length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Meus Agentes</Label>}
-              {savedAgents.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id} className="text-xs hover:bg-accent/50">
-                  <span className="truncate" title={agent.agentName}>{agent.agentName}</span>
-                  <span className="text-muted-foreground/70 ml-1 hidden md:inline">({agent.agentType})</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={selectedGemId}
-            onValueChange={(value) => { setSelectedGemId(value); handleNewConversation(); }}
-            disabled={selectedAgentId !== 'none'}
-          >
-            <SelectTrigger
-              id="gem-selector"
-              className={cn(
-                "w-auto md:w-[140px] lg:w-[160px] h-8 text-xs bg-card hover:bg-muted/70 border-border/70 focus:ring-primary/50 text-foreground",
-                selectedAgentId !== 'none' && "opacity-50 cursor-not-allowed"
-              )}
-              aria-label="Selecionar Personalidade (Gem)"
-            >
-              <SparklesIcon size={14} className="mr-1.5 text-primary/80 hidden sm:inline-block"/>
-              <SelectValue placeholder="Personalidade Base" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover text-popover-foreground">
-              {initialGems.map((gem) => (
-                <SelectItem key={gem.id} value={gem.id} className="text-xs hover:bg-accent/50">
-                  {gem.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" onClick={handleNewConversation} className="h-8 w-8 text-primary/90 hover:text-primary hover:bg-muted/70 border-border/70" aria-label="Nova Conversa">
-              <RefreshCcw size={16}/>
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full p-4 md:p-6" ref={scrollAreaRef}>
-          <div className="space-y-4">
-            {messages.length === 0 && !isPending && (
-                 <div className="flex flex-col items-center justify-center h-[calc(100%-4rem)] text-center text-muted-foreground">
-                    <MessageSquare size={48} className="mb-4 opacity-30"/>
-                    <p className="text-lg font-medium">AgentVerse Chat</p>
-                    <p className="text-sm">
-                      {activeChatTarget ? `Comece a conversar com ${activeChatTarget}.` : "Selecione um agente ou use o Assistente Geral para começar."}
-                    </p>
-                 </div>
+    <div className="flex h-full overflow-hidden bg-background text-foreground">
+      <ConversationSidebar
+        isOpen={isSidebarOpen}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        onSelectConversation={handleSelectConversationById} 
+        onNewConversation={handleNewConversation} 
+        onRenameConversation={handleRenameConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} // Added onToggleSidebar
+      />
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <ChatHeader 
+          activeChatTarget={activeChatTarget}
+          usingADKAgent={usingADKAgent}
+          setUsingADKAgent={setUsingADKAgent}
+          selectedADKAgentId={selectedADKAgentId}
+          setSelectedADKAgentId={setSelectedADKAgentId} 
+          adkAgents={adkAgents.map(agent => ({
+            ...agent,
+            id: agent.agentId || agent.displayName // Ensure id property is present
+          }))}
+          isADKInitializing={isADKInitializing} 
+          selectedAgentId={selectedAgentId}
+          setSelectedAgentId={setSelectedAgentId}
+          savedAgents={savedAgents}
+          selectedGemId={selectedGemId}
+          setSelectedGemId={setSelectedGemId}
+          initialGems={initialGems} 
+          handleNewConversation={handleNewConversation} 
+          isSidebarOpen={isSidebarOpen} 
+          onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
+        />
+        <div className="flex-1 overflow-hidden">
+          {/* Messages Area */}
+          <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 space-y-4" id="message-scroll-area">
+            {optimisticMessages.length === 0 && !isPending && !isActionPending ? ( 
+              <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
+            ) : (
+              <MessageList messages={optimisticMessages} isPending={isPending || isActionPending} /> 
             )}
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex items-end gap-2.5 w-full ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {msg.sender === "agent" && (
-                  <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
-                    <Bot className="h-5 w-5 text-primary" />
-                  </div>
-                )}
-                <div
-                  className={cn(
-                    "p-3 rounded-lg max-w-[75%] md:max-w-[70%] shadow-sm text-sm",
-                    msg.sender === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-none"
-                      : "bg-card text-foreground rounded-bl-none border border-border/50"
-                  )}
-                >
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
-                  {msg.imageUrl && (
-                    <div className="mt-2">
-                      <Image
-                        src={msg.imageUrl}
-                        alt={msg.fileName || "Imagem anexada"}
-                        width={200}
-                        height={200}
-                        className="rounded-md object-contain max-h-[200px] border border-border/30"
-                      />
-                      {msg.fileName && <p className="text-xs text-muted-foreground/80 mt-1">{msg.fileName}</p>}
-                    </div>
-                  )}
-                </div>
-                {msg.sender === "user" && (
-                  <div className="flex-shrink-0 p-1.5 rounded-full bg-muted border border-border/50 self-start">
-                    <User className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            ))}
-            {isPending && (
-              <div className="flex items-end gap-2.5 justify-start">
-                <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
-                  <Bot className="h-5 w-5 text-primary animate-pulse" />
-                </div>
-                <div className="p-3 rounded-lg bg-card max-w-[70%] shadow-sm rounded-bl-none border border-border/50">
-                  <p className="text-sm text-muted-foreground">Digitando...</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+          </ScrollArea>
+        </div>
 
-      <div className="p-3 md:p-4 border-t border-border/50 bg-background/95">
-        {selectedFileDataUri && (
-          <div className="mb-2 p-2 border border-border/50 rounded-lg flex items-center justify-between bg-card">
-            <div className="flex items-center gap-2">
-              <Image src={selectedFileDataUri} alt={selectedFileName || "Preview"} width={40} height={40} className="rounded object-contain"/>
-              <span className="text-xs text-muted-foreground truncate max-w-[200px]">{selectedFileName || "Imagem selecionada"}</span>
-            </div>
-            <Button variant="ghost" size="icon" onClick={removeSelectedFile} className="h-7 w-7 text-muted-foreground hover:text-destructive">
-              <X size={16}/>
-            </Button>
-          </div>
-        )}
-        <form
-            ref={formRef}
-            action={handleFormSubmit}
-            className="flex items-center gap-2 p-1.5 bg-card border border-border/70 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-primary/70 transition-shadow"
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="image/*" 
-            className="hidden"
-          />
-          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary h-8 w-8"
-                aria-label="Anexar arquivo"
-                disabled={isPending}
-              >
-                <Paperclip className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-2 space-y-1 bg-popover text-popover-foreground rounded-lg shadow-xl" side="top" align="start">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-sm h-9 px-3 py-2"
-                onClick={() => {
-                  fileInputRef.current?.click();
-                  setIsPopoverOpen(false);
-                }}
-              >
-                <FileUp className="mr-2 h-4 w-4" />
-                Enviar arquivos
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-sm h-9 px-3 py-2"
-                onClick={() => {
-                  toast({ title: "Em breve!", description: "Integração com Google Drive será implementada." });
-                  setIsPopoverOpen(false);
-                }}
-              >
-                <UploadCloud className="mr-2 h-4 w-4" /> 
-                Adicionar do Drive
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-sm h-9 px-3 py-2"
-                onClick={() => {
-                  toast({ title: "Em breve!", description: "Funcionalidade de importar código." });
-                  setIsPopoverOpen(false);
-                }}
-              >
-                <Code2 className="mr-2 h-4 w-4" />
-                Importar código
-              </Button>
-            </PopoverContent>
-          </Popover>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-primary h-8 w-8"
-            onClick={() => toast({ title: "Funcionalidade em Breve", description: "A busca na web integrada será implementada futuramente."})}
-            aria-label="Buscar na Web"
-            disabled={isPending}
-          >
-            <SearchIcon className="h-5 w-5" />
-          </Button>
-          <Input
-            ref={inputRef}
-            name="userInput"
-            placeholder="Digite sua mensagem ou use '/' para comandos..."
-            className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm h-9 placeholder:text-muted-foreground/70"
-            autoComplete="off"
-            disabled={isPending}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && (inputRef.current?.value?.trim() || selectedFileDataUri)) {
-                e.preventDefault(); 
-                if (formRef.current) {
-                   handleFormSubmit(new FormData(formRef.current));
-                }
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg disabled:opacity-60 h-8 w-8 button-live-glow"
-            disabled={isPending || (!inputRef.current?.value?.trim() && !selectedFileDataUri)}
-            aria-label="Enviar mensagem"
-          >
-            {isPending ? <SparklesIcon className="animate-spin h-4 w-4" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </form>
+        {/* Message Input Area */}
+        <MessageInputArea
+          formRef={formRef} // Pass formRef if MessageInputArea needs to submit the form directly
+          inputRef={inputRef}
+          fileInputRef={fileInputRef}
+          onSubmit={handleFormSubmit} // This now handles fetch-based streaming
+          isPending={isPending || isActionPending} // Combine pending states
+          selectedFile={selectedFile} 
+          selectedFileName={selectedFileName ?? ""} 
+          selectedFileDataUri={selectedFileDataUri} 
+          onRemoveAttachment={removeSelectedFile}
+          handleFileChange={handleFileChange}
+          inputValue={inputValue} 
+          onInputChange={handleInputChange} // Pass handleInputChange
+        />
       </div>
     </div>
   );

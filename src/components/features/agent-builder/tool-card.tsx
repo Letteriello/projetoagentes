@@ -46,7 +46,11 @@ export const ToolCard: React.FC<ToolCardProps> = ({
                 ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20" 
                 : "bg-primary/10"
             )}>
-              {tool.icon}
+              {tool.icon && (
+                React.isValidElement(tool.icon) 
+                  ? tool.icon 
+                  : React.createElement(tool.icon as React.ElementType)
+              )}
             </div>
             <CardTitle className="text-base font-medium">{tool.name}</CardTitle>
           </div>
