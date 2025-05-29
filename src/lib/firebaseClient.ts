@@ -5,12 +5,12 @@ import { onLog } from "firebase/app";
 
 // Configuração do Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyCpUEc2RBN9yUP_AQui12sPv384gVs_b3g",
-  authDomain: "projeto-agentes-36358.firebaseapp.com",
-  projectId: "projeto-agentes-36358",
-  storageBucket: "projeto-agentes-36358.appspot.com",
-  messagingSenderId: "446891961194",
-  appId: "1:446891961194:web:0af15503eb0af90a241313"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Inicializar Firebase App (singleton pattern)

@@ -37,9 +37,13 @@ import { ChatMessageUI, Conversation } from '@/types/chat';
 import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; 
 import { BasicChatInput } from '@/ai/flows/chat-flow';
 import { ADKAgentConfig, ADKTool } from '@/lib/google-adk'; // Import ADK types
+import * as cs from '@/lib/firestoreConversationStorage'; // Firestore Conversation Storage
 
 // DEBUG: Inspect the imported googleADK object
 console.log("Inspecting imported googleADK (top level):", googleADK);
+
+// Define currentUserId - replace with actual auth context later
+const currentUserId = "TEMP_USER_ID";
 
 interface ChatHistoryMessage {
   role: 'user' | 'model';
@@ -145,10 +149,13 @@ export function ChatUI() {
   const [isADKInitializing, setIsADKInitializing] = useState(true);
 
   // States for ConversationSidebar
-  const [conversations, setConversations] = useState<Conversation[]>([]); 
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  const { savedAgents } = useAgents(); 
+
+  const { savedAgents } = useAgents();
   const [formState, runFormAction, isActionPending] = useActionState(
     submitChatMessage, 
     initialChatFormState
@@ -163,8 +170,65 @@ export function ChatUI() {
 
   const [inputValue, setInputValue] = useState('');
 
-  const [lastSentUserMessageInfo, setLastSentUserMessageInfo] = useState<{ id: string; text: string; imageUrl?: string; fileName?: string; timestamp: Date } | null>(null); // For reconciliation
+  // const [lastSentUserMessageInfo, setLastSentUserMessageInfo] = useState<{ id: string; text: string; imageUrl?: string; fileName?: string; timestamp: Date } | null>(null); // For reconciliation
   
+  // Load initial conversations
+  useEffect(() => {
+    const loadConversations = async () => {
+      setIsLoadingConversations(true);
+      try {
+        const fetchedConversations = await cs.getAllConversations(currentUserId);
+        setConversations(fetchedConversations);
+        if (fetchedConversations.length > 0) {
+          // Automatically select the first conversation
+          // setActiveConversationId(fetchedConversations[0].id); // This will trigger another effect to load messages
+        }
+      } catch (error) {
+        console.error("Error loading conversations:", error);
+        toast({ title: "Error", description: "Failed to load conversations.", variant: "destructive" });
+      } finally {
+        setIsLoadingConversations(false);
+      }
+    };
+    loadConversations();
+  }, []);
+  
+  // Load messages when activeConversationId changes
+  useEffect(() => {
+    if (activeConversationId) {
+      const loadMessages = async () => {
+        setIsLoadingMessages(true);
+        setMessages([]); // Clear previous messages
+        try {
+          const conversationWithMessages = await cs.getConversationById(activeConversationId);
+          if (conversationWithMessages && conversationWithMessages.messages) {
+            const uiMessages: ChatMessageUI[] = conversationWithMessages.messages.map(msg => ({
+              id: msg.id || uuidv4(),
+              text: msg.content || msg.text || '',
+              sender: msg.isUser ? 'user' : 'agent',
+              isStreaming: msg.isLoading,
+              imageUrl: msg.imageUrl,
+              fileName: msg.fileName,
+              // map other fields if necessary
+            }));
+            setMessages(uiMessages);
+          } else {
+            setMessages([]); // No messages or conversation not found
+          }
+        } catch (error) {
+          console.error(`Error loading messages for conversation ${activeConversationId}:`, error);
+          toast({ title: "Error", description: "Failed to load messages.", variant: "destructive" });
+          setMessages([]);
+        } finally {
+          setIsLoadingMessages(false);
+        }
+      };
+      loadMessages();
+    } else {
+      setMessages([]); // No active conversation, so no messages
+    }
+  }, [activeConversationId]);
+
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -246,8 +310,44 @@ export function ChatUI() {
       fileName: currentSelectedFile ? currentSelectedFile.name : undefined,
       fileDataUri: currentSelectedFile && !currentSelectedFile.type.startsWith('image/') ? currentSelectedFileDataUri : undefined,
       isStreaming: false,
+      timestamp: messageTimestamp, // Add timestamp for UI consistency
     };
     setOptimisticMessages(userMessage);
+
+    // Save user message to Firestore
+    if (activeConversationId) {
+      const userMessageForStorage: Omit<cs.Message, 'id' | 'timestamp'> = {
+        sender: currentUserId, // Save actual user ID as sender
+        text: currentInput,
+        content: currentInput, // Ensure content is populated
+        isUser: true,
+        isLoading: false,
+        isError: false,
+        imageUrl: userMessage.imageUrl,
+        fileName: userMessage.fileName,
+        // Timestamp will be server-generated
+      };
+      cs.addMessageToConversation(activeConversationId, userMessageForStorage)
+        .then(savedUserMsg => {
+          if (savedUserMsg) {
+            console.log("User message saved to Firestore:", savedUserMsg.id);
+            setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
+            // Optionally, update userMessage in messages state with server ID/timestamp
+            // For optimistic updates, this might not be strictly necessary if UI uses client ID
+            // e.g., setMessages(prev => prev.map(m => m.id === userMessageId ? {...m, id: savedUserMsg.id, timestamp: savedUserMsg.timestamp} : m));
+          }
+        })
+        .catch(err => {
+          console.error("Failed to save user message to Firestore:", err);
+          toast({ title: "Error", description: "Failed to save your message.", variant: "destructive" });
+          // Mark the optimistic message as having an error
+          setMessages(prev => prev.map(m => m.id === userMessageId ? {...m, isError: true } : m));
+        });
+    } else if (!activeConversationId) {
+      toast({ title: "No Active Conversation", description: "Please select or start a new conversation to send messages.", variant: "warning" });
+      setIsPending(false); // Reset pending state
+      return; // Stop if no active conversation
+    }
 
     setInputValue("");
     removeSelectedFile(); 
@@ -281,11 +381,40 @@ export function ChatUI() {
 
     const pendingAgentMessage: ChatMessageUI = {
       id: agentMessageId,
-      sender: 'agent', 
-      text: '',         
+      sender: 'agent',
+      text: '',
       isStreaming: true,
+      timestamp: new Date(), // Add timestamp for UI consistency
     };
     setOptimisticMessages(pendingAgentMessage);
+
+    let agentMessageStorageId: string | null = null;
+    if (activeConversationId) {
+      const agentPlaceholderForStorage: Omit<cs.Message, 'id' | 'timestamp'> = {
+        sender: 'agent', // Or specific agent ID, e.g., selectedADKAgent?.id || selectedSavedAgent?.id
+        text: '',
+        content: '',
+        isUser: false,
+        isLoading: true,
+        isError: false,
+      };
+      try {
+        const savedPlaceholder = await cs.addMessageToConversation(activeConversationId, agentPlaceholderForStorage);
+        if (savedPlaceholder && savedPlaceholder.id) {
+          agentMessageStorageId = savedPlaceholder.id;
+          console.log("Agent placeholder message saved to Firestore:", savedPlaceholder.id);
+          setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
+        } else {
+          throw new Error("Failed to save agent placeholder message or ID is missing.");
+        }
+      } catch (placeholderError) {
+        console.error("Error saving agent placeholder to Firestore:", placeholderError);
+        toast({ title: "Error", description: "Failed to initiate agent response saving.", variant: "destructive" });
+        setMessages(prev => prev.map(m => m.id === agentMessageId ? {...m, text: "Error: Could not save placeholder.", isStreaming: false, isError: true } : m));
+        setIsPending(false);
+        return; 
+      }
+    }
 
     try {
       const response = await fetch('/api/chat-stream', {
@@ -338,84 +467,102 @@ export function ChatUI() {
         }
       }
       // Finalize the message after stream ends
-      setOptimisticMessages({
-        id: agentMessageId,
+      const finalAgentOptimisticMessage: ChatMessageUI = {
+        id: agentMessageId, // Keep client-side optimistic ID for UI mapping
         sender: 'agent',
         text: accumulatedContent,
         isStreaming: false,
-      });
-      // TODO: Here you would fetch metadata if needed
+        timestamp: new Date(),
+      };
+      setOptimisticMessages(finalAgentOptimisticMessage);
+      
+      if (activeConversationId && agentMessageStorageId) {
+        cs.finalizeMessageInConversation(activeConversationId, agentMessageStorageId, accumulatedContent, false)
+          .then(() => {
+            console.log("Agent message finalized in Firestore:", agentMessageStorageId);
+            setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
+          })
+          .catch(err => {
+            console.error("Failed to finalize agent message in Firestore:", err);
+            toast({ title: "Error Saving Response", description: "Agent's full response could not be saved.", variant: "destructive" });
+            setMessages(prev => prev.map(m => m.id === agentMessageId ? {...m, text: accumulatedContent + "\n(Error saving final response)", isError: true, isStreaming: false } : m));
+          });
+      } else if (!activeConversationId) {
+         console.warn("No active conversation to finalize agent message.");
+      }
 
-      // After stream is complete, update the main messages state
+
+      // Update main messages state after stream completion
       setMessages((prevMessages) => {
-        const finalAgentMessage: ChatMessageUI = {
-          id: agentMessageId,
-          sender: 'agent',
-          text: accumulatedContent,
-          isStreaming: false,
-        };
-        
-        let updatedWithUser = prevMessages;
-        if (!prevMessages.find(msg => msg.id === userMessage.id)) {
-          updatedWithUser = [...prevMessages, userMessage];
+        // Ensure user message is in main state
+        const userMessageInState = prevMessages.find(msg => msg.id === userMessageId);
+        let messagesWithUser = prevMessages;
+        if (!userMessageInState) {
+          messagesWithUser = [...prevMessages, userMessage];
         }
-
-        const agentMessageIndex = updatedWithUser.findIndex(msg => msg.id === finalAgentMessage.id);
-        if (agentMessageIndex !== -1) {
-          const newMessages = [...updatedWithUser];
-          newMessages[agentMessageIndex] = finalAgentMessage;
-          return newMessages;
+        
+        // Update or add the agent message
+        const agentMsgIndex = messagesWithUser.findIndex(m => m.id === agentMessageId);
+        if (agentMsgIndex !== -1) {
+          const updatedMessages = [...messagesWithUser];
+          updatedMessages[agentMsgIndex] = { ...finalAgentOptimisticMessage, id: agentMessageStorageId || agentMessageId }; // Prefer storage ID if available
+          return updatedMessages;
         } else {
-          return [...updatedWithUser, finalAgentMessage];
+          return [...messagesWithUser, { ...finalAgentOptimisticMessage, id: agentMessageStorageId || agentMessageId }];
         }
       });
 
     } catch (error: any) {
-      let caughtErrorMessage = "Failed to send message. Please try again.";
+      let caughtErrorMessage = "Failed to get agent response. Please try again.";
       if (error instanceof Error) {
         caughtErrorMessage = error.message;
       }
+      console.error("Error during agent response streaming:", error);
+      toast({ title: "Error", description: caughtErrorMessage, variant: "destructive" });
 
-      console.error("Error submitting message:", error);
-      toast({
-        title: "Error",
-        description: caughtErrorMessage,
-        variant: "destructive",
-      });
-
-      setOptimisticMessages({
-        id: agentMessageId,
+      const errorAgentOptimisticMessage: ChatMessageUI = {
+        id: agentMessageId, // Keep client-side optimistic ID
         sender: 'agent',
         text: `Error: ${caughtErrorMessage}`,
         isStreaming: false,
-      });
+        isError: true,
+        timestamp: new Date(),
+      };
+      setOptimisticMessages(errorAgentOptimisticMessage);
 
-      setMessages((prevMessages) => {
-        const errorAgentMessage: ChatMessageUI = {
-          id: agentMessageId,
-          sender: 'agent',
-          text: `Error: ${caughtErrorMessage}`,
-          isStreaming: false,
-        };
-
-        let updatedWithUser = prevMessages;
-        if (!prevMessages.find(msg => msg.id === userMessage.id)) {
-          updatedWithUser = [...prevMessages, userMessage];
+      if (activeConversationId && agentMessageStorageId) {
+        cs.finalizeMessageInConversation(activeConversationId, agentMessageStorageId, `Error: ${caughtErrorMessage}`, true)
+          .then(() => {
+            console.log("Agent error message finalized in Firestore:", agentMessageStorageId);
+            setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
+          })
+          .catch(err => {
+            console.error("Failed to finalize agent error message in Firestore:", err);
+          });
+      } else if (!activeConversationId) {
+        console.warn("No active conversation to finalize agent error message.");
+      }
+      
+      // Update main messages state with the error
+       setMessages((prevMessages) => {
+        const userMessageInState = prevMessages.find(msg => msg.id === userMessageId);
+        let messagesWithUser = prevMessages;
+        if (!userMessageInState) {
+          messagesWithUser = [...prevMessages, userMessage];
         }
 
-        const agentMessageIndex = updatedWithUser.findIndex(msg => msg.id === errorAgentMessage.id);
-        if (agentMessageIndex !== -1) {
-          const newMessages = [...updatedWithUser];
-          newMessages[agentMessageIndex] = errorAgentMessage;
-          return newMessages;
+        const agentMsgIndex = messagesWithUser.findIndex(m => m.id === agentMessageId);
+        if (agentMsgIndex !== -1) {
+          const updatedMessages = [...messagesWithUser];
+          updatedMessages[agentMsgIndex] = { ...errorAgentOptimisticMessage, id: agentMessageStorageId || agentMessageId };
+          return updatedMessages;
         } else {
-          return [...updatedWithUser, errorAgentMessage];
+          return [...messagesWithUser, { ...errorAgentOptimisticMessage, id: agentMessageStorageId || agentMessageId }];
         }
       });
     } finally {
       setIsPending(false);
-      // Ensure the main messages state is up-to-date with the user message if it wasn't added yet.
-      // This is a safeguard, as try/catch blocks should handle it for agent messages.
+      // Final check to ensure user message is in main state
       setMessages((prevMessages) => {
         if (!prevMessages.find(msg => msg.id === userMessageId)) {
           return [...prevMessages, userMessage];
@@ -466,18 +613,33 @@ export function ChatUI() {
     }
   }, [optimisticMessages]);
 
-  const handleNewConversation = useCallback(() => {
-    setMessages([]);
-    setChatHistory([]);
-    setInputValue("");
-    setSelectedFile(null);
-    setSelectedFileName(null);
-    setSelectedFileDataUri(null);
-    setActiveConversationId(null); 
-    toast({ title: "Nova Conversa", description: "Histórico de chat limpo e nova conversa iniciada." });
-  }, []);
+  const handleNewConversation = useCallback(async () => {
+    // Consider adding a loading state specific to creating a new conversation if preferred
+    setIsLoadingConversations(true); // Re-use general loading state for now
+    try {
+      const newConv = await cs.createNewConversation(currentUserId, "Nova Conversa"); // Default title
+      if (newConv) {
+        setConversations(prev => [newConv, ...prev]); // Add to the top
+        setActiveConversationId(newConv.id); // This will trigger message loading via useEffect
+        // messages will be cleared by the useEffect for activeConversationId
+        setChatHistory([]); 
+        setInputValue("");
+        setSelectedFile(null);
+        setSelectedFileName(null);
+        setSelectedFileDataUri(null);
+        toast({ title: "Nova Conversa Criada", description: `"${newConv.title}" iniciada.` });
+      } else {
+        toast({ title: "Erro", description: "Não foi possível criar uma nova conversa.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error creating new conversation:", error);
+      toast({ title: "Erro ao Criar", description: "Falha ao iniciar uma nova conversa.", variant: "destructive" });
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }, [ setConversations, setActiveConversationId, setChatHistory, setInputValue, setSelectedFile, setSelectedFileName, setSelectedFileDataUri ]); // Dependencies for useCallback
 
-  const handleSelectConversation = useCallback((conversation: Conversation): void => { 
+  const handleSelectConversation = useCallback((conversation: Conversation): void => {
     if (!conversation || !conversation.id) {
       console.error("handleSelectConversation called with invalid or missing conversation object/id");
       setActiveConversationId(null); // Or keep previous, or handle error state
@@ -498,57 +660,68 @@ export function ChatUI() {
         isStreaming: msg.isLoading, // Map isLoading to isStreaming for UI consistency
       }));
       setMessages(uiMessages);
+      toast({ title: "Conversa Carregada", description: `Conversa ${conversation.title || id} selecionada.` });
     } else {
-      setMessages([]); 
+      // This case should ideally be handled by the useEffect [activeConversationId]
+      // by calling getConversationById if messages weren't part of the Conversation object.
+      // For now, if messages are not directly available, we clear them.
+      // A more robust solution might involve fetching them here if conversation.messages is empty/undefined.
+      console.warn(`Conversation ${id} selected, but messages not found directly. Relying on useEffect to load them.`);
+      setMessages([]);
     }
+  }, [setActiveConversationId, setMessages]);
 
-    toast({ title: "Conversa Carregada", description: `Conversa ${conversation.title || id} selecionada.` });
-  }, [setActiveConversationId, setMessages]); // Removed 'conversations' dependency as we get the full object
 
   const handleRenameConversation = useCallback(async (id: string, newTitle: string) => {
-    setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
-    toast({ title: "Conversa Renomeada", description: `Conversa renomeada para ${newTitle}.` });
+    try {
+      await cs.renameConversationInStorage(id, newTitle);
+      setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle, updatedAt: new Date() } : c));
+      toast({ title: "Conversa Renomeada", description: `Conversa renomeada para ${newTitle}.` });
+    } catch (error) {
+      console.error("Error renaming conversation:", error);
+      toast({ title: "Erro", description: "Falha ao renomear conversa.", variant: "destructive" });
+    }
   }, []);
 
-  const handleDeleteConversation = useCallback(async (conversation: Conversation) => { 
-    if (!conversation || !conversation.id) {
+  const handleDeleteConversation = useCallback(async (conversationToDelete: Conversation) => {
+    if (!conversationToDelete || !conversationToDelete.id) {
       toast({ title: "Erro", description: "Tentativa de apagar conversa inválida.", variant: "destructive" });
       return;
     }
-    const { id } = conversation; // Extract id from conversation
+    const { id } = conversationToDelete;
 
-    setConversations(prev => prev.filter(c => c.id !== id));
-    if (activeConversationId === id) {
-      setActiveConversationId(null);
-      setMessages([]);
+    try {
+      await cs.deleteConversationFromStorage(id);
+      setConversations(prev => prev.filter(c => c.id !== id));
+      if (activeConversationId === id) {
+        setActiveConversationId(null); // This will trigger useEffect to clear messages
+      }
+      toast({ title: "Conversa Apagada", variant: "default" });
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      toast({ title: "Erro", description: "Falha ao apagar conversa.", variant: "destructive" });
     }
-    toast({ title: "Conversa Apagada", variant: "destructive" });
   }, [activeConversationId]);
 
+
   // Callback for ConversationSidebar that expects (id: string) => void
+  // This function is now the primary way to select a conversation from the sidebar.
   const handleSelectConversationById = useCallback((id: string): void => {
-    const conversation = conversations.find(c => c.id === id);
-    if (conversation) {
-      handleSelectConversation(conversation);
-    } else {
-      console.error(`Conversation with id ${id} not found for sidebar selection.`);
-      // Optionally, set an error state or show a toast
-      toast({ title: "Erro", description: `Conversa com ID ${id} não encontrada.`, variant: "destructive" });
+    if (!id) {
+      console.error("handleSelectConversationById called with invalid id");
+      toast({ title: "Erro", description: "ID da conversa inválido.", variant: "destructive" });
+      return;
     }
-  }, [conversations, handleSelectConversation]);
+    setActiveConversationId(id); // This will trigger the useEffect to load messages for this conversation
+    // The actual loading of messages is handled by the useEffect watching activeConversationId
+  }, [setActiveConversationId]);
+
 
   const handleSetActiveIdExplicitly = useCallback((id: string | null): void => {
     setActiveConversationId(id);
   }, [setActiveConversationId]);
 
-  // Mock conversations for testing - replace with actual data loading
-  useEffect(() => {
-    setConversations([
-      { id: '1', title: 'Primeira Conversa Legal', messages: [], createdAt: new Date(), updatedAt: new Date() },
-      { id: '2', title: 'Ideias para o Projeto X', messages: [], createdAt: new Date(), updatedAt: new Date() },
-      { id: '3', title: 'Rascunho do Email', messages: [], createdAt: new Date(), updatedAt: new Date() },
-    ]);
-  }, []);
+  // REMOVED MOCK CONVERSATION useEffect
 
   const loadConversationMessages = (conversationId: string) => {
     const conversation = conversations.find(c => c.id === conversationId);
