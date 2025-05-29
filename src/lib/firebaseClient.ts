@@ -1,6 +1,6 @@
 // Firebase client initialization for browser-side Firestore
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, CACHE_SIZE_UNLIMITED, connectFirestoreEmulator } from "firebase/firestore";
 import { onLog } from "firebase/app";
 
 // Configuração do Firebase
@@ -17,20 +17,13 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 // Configurar Firestore com persistência offline aprimorada
-export const firestore = getFirestore(app);
+export const firestore = initializeFirestore(app, {
+  localCache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+});
 
-// Habilitar persistência offline e definir cache ilimitado
-// para melhor experiência do usuário com os agentes AI
-if (typeof window !== 'undefined') {
-  enableIndexedDbPersistence(firestore)
-    .catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Persistência offline do Firestore falhou: múltiplas abas abertas');
-    } else if (err.code === 'unimplemented') {
-      console.warn('Seu navegador não suporta persistência offline do Firestore');
-    }
-  });
-}
+// A persistência agora é configurada durante a inicialização.
+// O SDK do Firestore lida com erros de persistência internamente,
+// geralmente fazendo fallback para o modo somente memória e registrando um aviso.
 
 // Função para inicializar conexão com emulador em ambiente de desenvolvimento
 export function useFirestoreEmulator() {
@@ -42,4 +35,9 @@ export function useFirestoreEmulator() {
       console.warn('Falha ao conectar ao emulador do Firestore:', e);
     }
   }
+}
+
+// Chamar automaticamente a função para conectar ao emulador em ambiente de desenvolvimento
+if (process.env.NODE_ENV === 'development') {
+  useFirestoreEmulator();
 }
