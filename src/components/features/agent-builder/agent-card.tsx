@@ -5,31 +5,40 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, MessageSquare, Trash2, Cpu, Workflow, FileJson, Briefcase, Stethoscope, Plane, Settings2 as ConfigureIcon } from "lucide-react";
+import { 
+  Edit, MessageSquare, Trash2, Cpu, Workflow, FileJson, Briefcase, Stethoscope, Plane, Settings2 as ConfigureIcon,
+  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, GripVertical 
+} from "lucide-react";
 import type { SavedAgentConfiguration, AvailableTool, ToolConfigData, AgentConfig } from '@/app/agent-builder/page'; // Importando tipos da página principal
 
-// Definindo iconComponents aqui, pois será usado exclusivamente por este card
+// Definindo iconComponents aqui, para mapear os nomes de string para os componentes de ícone importados
 const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Search: require('lucide-react').Search, // Exemplo de como importar dinamicamente se necessário
-  Calculator: require('lucide-react').Calculator,
-  FileText: require('lucide-react').FileText,
-  CalendarDays: require('lucide-react').CalendarDays,
-  Network: require('lucide-react').Network,
-  Database: require('lucide-react').Database,
-  Code2: require('lucide-react').Code2,
-  Default: Cpu,
-  Briefcase,
-  Stethoscope,
-  Plane,
-  Workflow,
-  Brain: Cpu, // Reutilizando Cpu para Brain se não houver BrainIcon específico
-  FileJson,
-  GripVertical: require('lucide-react').GripVertical, // Para consistência se usado em outros lugares
+  Search,
+  Calculator,
+  FileText,
+  CalendarDays,
+  Network,
+  Database,
+  Code2,
+  Default: Cpu, // Usando o Cpu importado como padrão
+  Briefcase,    // Já importado
+  Stethoscope,  // Já importado
+  Plane,        // Já importado
+  Workflow,     // Já importado
+  Brain: Cpu,   // Reutilizando Cpu para Brain, já importado
+  FileJson,     // Já importado
+  GripVertical, // Já importado
+  // Adicione outros ícones que são referenciados por string em `agent.toolsDetails` ou `agent.templateId` se necessário
+  // e que não estão cobertos pelos acima.
+  // Por exemplo, se 'Cpu' for usado como string em algum lugar, adicione: Cpu,
+  ConfigureIcon, // Settings2 as ConfigureIcon, já importado
 };
 
-const getToolIconComponent = (iconName?: keyof typeof iconComponents | 'default') => {
-  const Icon = iconName ? iconComponents[iconName] : iconComponents['Default'];
-  return Icon || Cpu;
+const getToolIconComponent = (iconName?: keyof typeof iconComponents | 'default' | string) => {
+  // Permitir string para flexibilidade, mas mapear para iconComponents conhecidos
+  const resolvedIconName = iconName as keyof typeof iconComponents;
+  const Icon = resolvedIconName && iconComponents[resolvedIconName] ? iconComponents[resolvedIconName] : iconComponents['Default'];
+  return Icon || Cpu; // Fallback final
 };
 
 
