@@ -11,7 +11,7 @@ import {
 import { onLog } from "firebase/app";
 
 // Enable debug logging in development
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
   // @ts-ignore - Enable debug logging
   window.LOG_LEVEL = 'debug';
   
