@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ConversationSidebar } from './ConversationSidebar';
-import * as cs from '@/lib/conversationStorage';
+import * as cs from '@/lib/firestoreConversationStorage'; // UPDATED IMPORT
 import { Conversation, Message } from '@/types/chat';
 import { sendMessageToAI } from '@/lib/adk'; 
 import { Modal } from '@/components/ui/Modal';
@@ -35,17 +35,23 @@ function ChatUI() {
 
   // Initial load effect
   useEffect(() => {
-    const loadedConversations = cs.getAllConversations();
-    if (loadedConversations.length > 0) {
-      setConversations(loadedConversations);
-      setActiveConversationId(loadedConversations[0].id);
-      // Messages will be set by the next effect
-    } else {
-      const newConv = cs.createNewConversation("First Chat");
-      setConversations([newConv]);
-      setActiveConversationId(newConv.id);
-      setCurrentMessages([]); // New chat starts with no messages
-    }
+    // TODO: Replace "TEMP_USER_ID" with actual user ID when auth is implemented
+    const fetchConversations = async () => {
+      const loadedConversations = await cs.getAllConversations("TEMP_USER_ID");
+      if (loadedConversations.length > 0) {
+        setConversations(loadedConversations);
+        setActiveConversationId(loadedConversations[0].id);
+        // Messages will be set by the next effect
+      } else {
+        const newConv = await cs.createNewConversation("TEMP_USER_ID", "First Chat");
+        if (newConv) {
+          setConversations([newConv]);
+          setActiveConversationId(newConv.id);
+          setCurrentMessages([]); // New chat starts with no messages
+        }
+      }
+    };
+    fetchConversations();
   }, []);
 
   // Effect to update currentMessages when activeConversationId or conversations change
@@ -62,28 +68,39 @@ function ChatUI() {
     setActiveConversationId(id);
   };
 
-  const handleNewConversation = () => {
-    const newConv = cs.createNewConversation(`Chat ${conversations.length + 1}`);
-    setConversations(prev => [newConv, ...prev]); // Add to the beginning for newest first
-    setActiveConversationId(newConv.id);
-    // currentMessages will be updated by the effect
+  const handleNewConversation = async () => {
+    // TODO: Replace "TEMP_USER_ID" with actual user ID
+    const newConv = await cs.createNewConversation("TEMP_USER_ID", `Chat ${conversations.length + 1}`);
+    if (newConv) {
+      setConversations(prev => [newConv, ...prev]); // Add to the beginning for newest first
+      setActiveConversationId(newConv.id);
+      // currentMessages will be updated by the effect
+    }
   };
 
-  const handleRenameConversation = (id: string, newTitle: string) => {
-    const updatedConv = cs.renameConversationInStorage(id, newTitle);
-    if (updatedConv) {
-      setConversations(prev => prev.map(c => c.id === id ? updatedConv : c));
+  const handleRenameConversation = async (id: string, newTitle: string) => {
+    try {
+      await cs.renameConversationInStorage(id, newTitle);
+      // Optimistically update UI or re-fetch
+      setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle, updatedAt: new Date() } : c));
+    } catch (error) {
+      console.error("Error renaming conversation:", error);
     }
-    console.log("Rename conv:", id, newTitle); // Placeholder
+    console.log("Rename conv:", id, newTitle); 
   };
 
-  const handleDeleteConversation = (id: string) => {
-    const updatedConversations = cs.deleteConversationFromStorage(id);
-    setConversations(updatedConversations);
-    if (activeConversationId === id) {
-      setActiveConversationId(updatedConversations.length > 0 ? updatedConversations[0].id : null);
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await cs.deleteConversationFromStorage(id);
+      const updatedConversations = conversations.filter(c => c.id !== id);
+      setConversations(updatedConversations);
+      if (activeConversationId === id) {
+        setActiveConversationId(updatedConversations.length > 0 ? updatedConversations[0].id : null);
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
     }
-    console.log("Delete conv:", id); // Placeholder
+    console.log("Delete conv:", id);
   };
 
   const promptDeleteConversation = (conversation: Conversation) => {
@@ -115,9 +132,10 @@ function ChatUI() {
     // Update UI immediately
     setCurrentMessages(prev => [...prev, userMessage]);
     // Persist and update conversations state
-    let updatedConv = cs.addMessageToConversation(activeConversationId, userMessage);
-    if (updatedConv) {
-      setConversations(prevConvs => prevConvs.map(c => c.id === activeConversationId ? updatedConv! : c));
+    const addedUserMessage = await cs.addMessageToConversation(activeConversationId, userMessage);
+    if (addedUserMessage) {
+      // Update conversation in state if needed (e.g., for updatedAt timestamp)
+      // For simplicity, we'll assume messages are the primary concern for now
     }
     
     const currentInputValue = inputValue;
@@ -125,56 +143,86 @@ function ChatUI() {
     setIsLoading(true);
 
     // AI Response part
-    const aiPlaceholderMessage: Message = {
-      id: `msg-${Date.now() + 1}`,
+    let aiPlaceholderMessage: Message = {
+      // id will be set by the storage function
+      id: `ai-placeholder-${Date.now()}`, // Temporary client-side ID
       isUser: false,
       content: '',
       timestamp: new Date(),
       isError: false,
+      isLoading: true, // Mark as loading
     };
     setCurrentMessages(prev => [...prev, aiPlaceholderMessage]);
-    updatedConv = cs.addMessageToConversation(activeConversationId, aiPlaceholderMessage);
-    if (updatedConv) {
-        setConversations(prevConvs => prevConvs.map(c => c.id === activeConversationId ? updatedConv! : c));
+    
+    // Add placeholder to storage to get a persistent ID
+    const addedAiMessage = await cs.addMessageToConversation(activeConversationId, {
+      sender: 'ai', 
+      text: '', 
+      isUser: false, 
+      isLoading: true,
+      // any other fields for Omit<Message, 'id' | 'timestamp'>
+    });
+
+    let aiMessageIdToFinalize = '';
+    if (addedAiMessage) {
+      aiMessageIdToFinalize = addedAiMessage.id;
+      // Update the placeholder in currentMessages with the real ID and timestamp
+      setCurrentMessages(prev => prev.map(m => m.id === aiPlaceholderMessage.id ? { ...addedAiMessage, content: '', isLoading: true } : m));
+    } else {
+      // Handle error - AI message placeholder could not be saved
+      console.error("Failed to save AI placeholder message to storage");
+      // Potentially show an error message in the UI for the AI response
+      setIsLoading(false);
+      return;
     }
 
-
+    let accumulatedResponse = "";
     try {
       await sendMessageToAI(currentInputValue, (chunk) => {
+        accumulatedResponse += chunk;
         setCurrentMessages(prevMsgs => {
           const newMsgs = [...prevMsgs];
-          const lastMsgIndex = newMsgs.length - 1;
-          if (lastMsgIndex >= 0 && !newMsgs[lastMsgIndex].isUser) {
-            newMsgs[lastMsgIndex].content += chunk;
+          const lastMsgIndex = newMsgs.findIndex(m => m.id === aiMessageIdToFinalize);
+          if (lastMsgIndex !== -1) {
+            newMsgs[lastMsgIndex].content = accumulatedResponse;
             newMsgs[lastMsgIndex].timestamp = new Date(); // Update timestamp during streaming
+            newMsgs[lastMsgIndex].isLoading = true; 
           }
           return newMsgs;
         });
-        // Persist streaming chunk to storage
-        const convAfterStreamChunk = cs.updateLastMessageInConversation(activeConversationId, chunk);
-         if (convAfterStreamChunk) {
-            setConversations(prevConvs => prevConvs.map(c => c.id === activeConversationId ? convAfterStreamChunk : c));
-        }
+        // No per-chunk storage update here, will finalize at the end or on error
       });
+      // Finalize successful AI response
+      if (activeConversationId && aiMessageIdToFinalize) {
+        await cs.finalizeMessageInConversation(activeConversationId, aiMessageIdToFinalize, accumulatedResponse, false);
+        setCurrentMessages(prevMsgs => prevMsgs.map(m => m.id === aiMessageIdToFinalize ? {...m, content: accumulatedResponse, isLoading: false, isError: false} : m));
+      }
     } catch (error) {
       console.error("Error sending message to AI:", error);
       const errorContent = "⚠️ Sorry, an error occurred. Please try again.";
+      if (activeConversationId && aiMessageIdToFinalize) {
+        await cs.finalizeMessageInConversation(activeConversationId, aiMessageIdToFinalize, errorContent, true);
+      }
       setCurrentMessages(prevMsgs => {
         const newMsgs = [...prevMsgs];
-        const lastMsgIndex = newMsgs.length - 1;
-        if (lastMsgIndex >= 0 && !newMsgs[lastMsgIndex].isUser) {
+        const lastMsgIndex = newMsgs.findIndex(m => m.id === aiMessageIdToFinalize);
+        if (lastMsgIndex !== -1) {
           newMsgs[lastMsgIndex].content = errorContent;
           newMsgs[lastMsgIndex].isError = true;
+          newMsgs[lastMsgIndex].isLoading = false;
           newMsgs[lastMsgIndex].timestamp = new Date();
         }
         return newMsgs;
       });
-       const convAfterError = cs.updateLastMessageInConversation(activeConversationId, errorContent, true);
-        if (convAfterError) {
-            setConversations(prevConvs => prevConvs.map(c => c.id === activeConversationId ? convAfterError : c));
-        }
     } finally {
       setIsLoading(false);
+      // Update conversation's updatedAt (could be done in finalizeMessage or here)
+      if (activeConversationId) {
+          const convToUpdate = conversations.find(c => c.id === activeConversationId);
+          if (convToUpdate) {
+              setConversations(prev => prev.map(c => c.id === activeConversationId ? {...c, updatedAt: new Date()} : c));
+          }
+      }
       // Attempt automatic titling
       if (activeConversationId) {
         const activeConv = conversations.find(c => c.id === activeConversationId);
@@ -300,36 +348,84 @@ This is an XSS attempt:
     // as it directly adds an AI message. For testing auto-titling, use the UI.
     if (activeConversationId) {
         const testAiMessage: Message = {
-            id: `msg-test-${Date.now()}`,
+            id: `msg-test-${Date.now()}`, // Client-side ID for UI
             isUser: false,
             content: content,
             timestamp: new Date(),
             isError: isError,
         };
         setCurrentMessages(prev => [...prev, testAiMessage]); // Update current messages for UI
-        const updatedConv = cs.addMessageToConversation(activeConversationId, testAiMessage); // Persist
-        if (updatedConv) {
-            setConversations(prevConvs => prevConvs.map(c => c.id === activeConversationId ? updatedConv : c));
-        }
+        
+        // Persist the test message
+        // Note: This direct addMessageToConversation might not update the conversation's overall state (e.g. updatedAt)
+        // as robustly as the main handleSubmit flow. For testing, this is usually fine.
+        cs.addMessageToConversation(activeConversationId, {
+            sender: 'ai', 
+            text: content, 
+            isUser: false, 
+            isError: isError,
+            // ensure all required fields for Omit<Message, 'id' | 'timestamp'> are here
+        }).then(persistedMessage => {
+            if (persistedMessage) {
+                // Optionally update the message in currentMessages with persisted ID/timestamp
+                setCurrentMessages(prev => prev.map(m => m.id === testAiMessage.id ? persistedMessage : m));
+                // Update conversation's updatedAt timestamp in UI
+                setConversations(prevConvs => prevConvs.map(c => c.id === activeConversationId ? {...c, updatedAt: new Date()} : c));
+            }
+        });
+
     } else {
         console.warn("No active conversation to add test message to. Create or select a conversation first.");
         // Optionally, create a new conversation for this test message
-        const newConvForTest = cs.createNewConversation("Test Message Holder");
-        setConversations(prev => [newConvForTest, ...prev]);
-        setActiveConversationId(newConvForTest.id);
-        // Now add the message (though this will be an AI message in an empty chat)
-         const testAiMessage: Message = {
-            id: `msg-test-${Date.now()}`,
+        // TODO: Replace "TEMP_USER_ID" with actual user ID
+        cs.createNewConversation("TEMP_USER_ID", "Test Message Holder").then(newConvForTest => {
+            if (newConvForTest) {
+                setConversations(prev => [newConvForTest, ...prev]);
+                setActiveConversationId(newConvForTest.id);
+                // Now add the message (this will be an AI message in an empty chat)
+                const testAiMessage: Message = {
+                    id: `msg-test-${Date.now()}`, // Client-side ID for UI
+                    isUser: false,
+                    content: content,
+                    timestamp: new Date(),
+                    isError: isError,
+                };
+                setCurrentMessages([testAiMessage]); // Set as the only message
+                cs.addMessageToConversation(newConvForTest.id, {
+                    sender: 'ai', 
+                    text: content, 
+                    isUser: false, 
+                    isError: isError 
+                }).then(persistedMessage => {
+                    if (persistedMessage) {
+                        setCurrentMessages(prev => prev.map(m => m.id === testAiMessage.id ? persistedMessage : m));
+                         setConversations(prevConvs => prevConvs.map(c => c.id === newConvForTest.id ? {...newConvForTest, updatedAt: new Date()} : c));
+                    }
+                });
+            }
+        });
+    }
+  };
+
+
+  // Definir estilos em linha para auto-resize-textarea
             isUser: false,
             content: content,
             timestamp: new Date(),
             isError: isError,
         };
         setCurrentMessages([testAiMessage]); // Set as the only message
-        const updatedConvForTest = cs.addMessageToConversation(newConvForTest.id, testAiMessage);
-         if (updatedConvForTest) {
-            setConversations(prevConvs => prevConvs.map(c => c.id === newConvForTest.id ? updatedConvForTest : c));
-        }
+        cs.addMessageToConversation(newConvForTest.id, {
+            sender: 'ai', 
+            text: content, 
+            isUser: false, 
+            isError: isError 
+        }).then(persistedMessage => {
+            if (persistedMessage) {
+                setCurrentMessages(prev => prev.map(m => m.id === testAiMessage.id ? persistedMessage : m));
+                 setConversations(prevConvs => prevConvs.map(c => c.id === newConvForTest.id ? {...newConvForTest, updatedAt: new Date()} : c));
+            }
+        });
     }
   };
 
