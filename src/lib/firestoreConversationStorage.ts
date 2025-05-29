@@ -27,9 +27,9 @@ const MESSAGES_SUBCOLLECTION = 'messages';
  * @param userId The ID of the user whose conversations are to be fetched.
  * @returns A promise that resolves to an array of Conversation objects (without messages).
  */
-export const firestoreGetAllConversations = async (userId: string): Promise<Conversation[]> => {
+export const getAllConversations = async (userId: string): Promise<Conversation[]> => {
   if (!userId) {
-    console.error("firestoreGetAllConversations: userId is required.");
+    console.error("getAllConversations: userId is required.");
     return [];
   }
   try {
@@ -63,9 +63,9 @@ export const firestoreGetAllConversations = async (userId: string): Promise<Conv
  * @param conversationId The ID of the conversation to fetch.
  * @returns A promise that resolves to a Conversation object or undefined if not found.
  */
-export const firestoreGetConversationById = async (conversationId: string): Promise<Conversation | undefined> => {
+export const getConversationById = async (conversationId: string): Promise<Conversation | undefined> => {
   if (!conversationId) {
-    console.error("firestoreGetConversationById: conversationId is required.");
+    console.error("getConversationById: conversationId is required.");
     return undefined;
   }
   try {
@@ -127,9 +127,9 @@ export const firestoreGetConversationById = async (conversationId: string): Prom
  * @param agentId Optional ID of the agent associated with this conversation.
  * @returns A promise that resolves to the new Conversation object or null on error.
  */
-export const firestoreCreateNewConversation = async (userId: string, title?: string, agentId?: string): Promise<Conversation | null> => {
+export const createNewConversation = async (userId: string, title?: string, agentId?: string): Promise<Conversation | null> => {
   if (!userId) {
-    console.error("firestoreCreateNewConversation: userId is required.");
+    console.error("createNewConversation: userId is required.");
     return null;
   }
   try {
@@ -164,12 +164,12 @@ export const firestoreCreateNewConversation = async (userId: string, title?: str
  * @param message The message object to add (excluding id and server-generated timestamp).
  * @returns A promise that resolves to the added Message object with its ID and server timestamp, or null on error.
  */
-export const firestoreAddMessageToConversation = async (
+export const addMessageToConversation = async (
   conversationId: string, 
   message: Omit<Message, 'id' | 'timestamp'>
 ): Promise<Message | null> => {
   if (!conversationId) {
-    console.error("firestoreAddMessageToConversation: conversationId is required.");
+    console.error("addMessageToConversation: conversationId is required.");
     return null;
   }
   try {
@@ -205,9 +205,9 @@ export const firestoreAddMessageToConversation = async (
  * @param newTitle The new title for the conversation.
  * @returns A promise that resolves when the operation is complete, or throws on error.
  */
-export const firestoreRenameConversation = async (conversationId: string, newTitle: string): Promise<void> => {
+export const renameConversationInStorage = async (conversationId: string, newTitle: string): Promise<void> => {
   if (!conversationId || !newTitle) {
-    console.error("firestoreRenameConversation: conversationId and newTitle are required.");
+    console.error("renameConversationInStorage: conversationId and newTitle are required.");
     throw new Error("Conversation ID and new title are required.");
   }
   const conversationRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
@@ -228,9 +228,9 @@ export const firestoreRenameConversation = async (conversationId: string, newTit
  * @param conversationId The ID of the conversation to delete.
  * @returns A promise that resolves when the operation is complete, or throws on error.
  */
-export const firestoreDeleteConversation = async (conversationId: string): Promise<void> => {
+export const deleteConversationFromStorage = async (conversationId: string): Promise<void> => {
   if (!conversationId) {
-    console.error("firestoreDeleteConversation: conversationId is required.");
+    console.error("deleteConversationFromStorage: conversationId is required.");
     throw new Error("Conversation ID is required.");
   }
   const conversationRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
@@ -261,6 +261,47 @@ export const firestoreDeleteConversation = async (conversationId: string): Promi
     throw error; // Re-throw for caller to handle
   }
 };
+
+/**
+ * Finalizes a message in a conversation, typically after streaming content.
+ * Updates the message content, marks it as not loading, and sets error status.
+ * @param conversationId The ID of the conversation.
+ * @param messageId The ID of the message document to update.
+ * @param fullContent The complete content of the message.
+ * @param isError Optional flag indicating if the message finalization is due to an error.
+ * @returns A promise that resolves when the operation is complete, or throws on error.
+ */
+export const finalizeMessageInConversation = async (
+  conversationId: string,
+  messageId: string,
+  fullContent: string,
+  isError: boolean = false
+): Promise<void> => {
+  if (!conversationId || !messageId) {
+    console.error("finalizeMessageInConversation: conversationId and messageId are required.");
+    throw new Error("Conversation ID and Message ID are required.");
+  }
+  try {
+    const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
+    await updateDoc(messageRef, {
+      text: fullContent,
+      content: fullContent, // Ensure 'content' is also updated
+      isError: isError,
+      isLoading: false,
+      timestamp: serverTimestamp(), // Update timestamp to reflect finalization
+    });
+
+    // Update the conversation's updatedAt timestamp
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    await updateDoc(conversationDocRef, {
+        updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error(`Error finalizing message ${messageId} in conversation ${conversationId}:`, error);
+    throw error; // Re-throw for caller to handle
+  }
+};
+
 
 /*
  Firestore Security Rules (Conceptual - to be defined/updated in firestore.rules):
