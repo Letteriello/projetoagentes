@@ -49,7 +49,8 @@ import { Badge } from "@/components/ui/badge";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
 import { MultiAgentTab } from "@/components/features/agent-builder/multi-agent-tab";
 import { ArtifactManagementTab, ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
-import { MemoryKnowledgeTab, RagMemoryConfig, KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab";
+import { RagMemoryTab } from "@/components/features/agent-builder/rag-memory-tab";
+import { RagMemoryConfig, KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab";
 import { A2AConfig as A2AConfigComponent } from "@/components/features/agent-builder/a2a-config";
 import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
 import type { A2AConfig as A2AConfigType } from "@/types/a2a-types";
@@ -1333,7 +1334,7 @@ return (
 
                 <TabsContent value="memoriaConhecimento" className="space-y-6">
                     <TooltipProvider>
-                        <MemoryKnowledgeTab
+                        <RagMemoryTab
                             // Propriedades de Estado e Memória
                             enableStatePersistence={enableStatePersistence}
                             setEnableStatePersistence={setEnableStatePersistence}
@@ -1350,7 +1351,7 @@ return (
                             
                             // Propriedades de RAG e Conhecimento
                             ragMemoryConfig={ragMemoryConfig}
-                            setRagMemoryConfig={(config) => setRagMemoryConfig(config)}
+                            setRagMemoryConfig={(config: RagMemoryConfig) => setRagMemoryConfig(config)}
                         />
                     </TooltipProvider>
                 </TabsContent>

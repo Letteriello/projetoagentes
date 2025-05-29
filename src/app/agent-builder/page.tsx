@@ -173,6 +173,9 @@ export interface SavedAgentConfiguration extends AgentConfigBase {
   // Custom/A2A specific
   customLogicDescription?: string;
   
+  // Framework configuration
+  agentFramework?: string;
+  
   // State and Memory
   enableStatePersistence?: boolean;
   statePersistenceType?: 'session' | 'memory' | 'database';
@@ -508,7 +511,6 @@ export default function AgentBuilderPage() {
         }}
         editingAgent={editingAgent}
         onSave={handleSaveAgent}
-        agentTemplates={agentTemplates}
         availableTools={availableTools}
         agentTypeOptions={agentTypeOptions}
         agentToneOptions={agentToneOptions}

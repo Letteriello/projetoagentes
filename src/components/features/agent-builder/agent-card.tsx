@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   Edit, MessageSquare, Trash2, Cpu, Workflow, FileJson, Briefcase, Stethoscope, Plane, Settings2 as ConfigureIcon,
-  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, GripVertical 
+  Search, Calculator, FileText, CalendarDays, Network, Database, Code2, GripVertical,
+  ClipboardCopy, AlertCircle, Eye, EyeOff, Save, Plus, Layers, Info, Copy as CopyIcon, 
+  Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Eye as EyeIcon, 
+  EyeOff as EyeOffIcon, Save as SaveIcon 
 } from "lucide-react";
 import type { SavedAgentConfiguration, AvailableTool, ToolConfigData, AgentConfig } from '@/app/agent-builder/page'; // Importando tipos da página principal
 
 // Definindo iconComponents aqui, para mapear os nomes de string para os componentes de ícone importados
 const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  // Ícones básicos
   Search,
   Calculator,
   FileText,
@@ -20,25 +24,73 @@ const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = 
   Network,
   Database,
   Code2,
+  Cpu,
   Default: Cpu, // Usando o Cpu importado como padrão
-  Briefcase,    // Já importado
-  Stethoscope,  // Já importado
-  Plane,        // Já importado
-  Workflow,     // Já importado
-  Brain: Cpu,   // Reutilizando Cpu para Brain, já importado
-  FileJson,     // Já importado
-  GripVertical, // Já importado
-  // Adicione outros ícones que são referenciados por string em `agent.toolsDetails` ou `agent.templateId` se necessário
-  // e que não estão cobertos pelos acima.
-  // Por exemplo, se 'Cpu' for usado como string em algum lugar, adicione: Cpu,
-  ConfigureIcon, // Settings2 as ConfigureIcon, já importado
+  
+  // Ícones de agentes específicos
+  Briefcase,
+  Stethoscope,
+  Plane,
+  Workflow,
+  Brain: Cpu,   // Reutilizando Cpu para Brain
+  FileJson,
+  GripVertical,
+  
+  // Ícones de ações
+  ConfigureIcon, // Settings2 renomeado como ConfigureIcon
+  ClipboardCopy,
+  AlertCircle,
+  DeleteIcon,    // Trash2 renomeado como DeleteIcon
+  EditIcon,      // Edit renomeado como EditIcon
+  ChatIcon,      // MessageSquare renomeado como ChatIcon
+  CopyIcon,      // Copy renomeado como CopyIcon
+  EyeIcon,       // Eye renomeado como EyeIcon
+  EyeOffIcon,    // EyeOff renomeado como EyeOffIcon
+  SaveIcon,      // Save renomeado como SaveIcon
+  Plus,
+  Layers,
+  Info,
+  
+  // Garantir que os nomes originais também estão mapeados
+  Edit,
+  MessageSquare,
+  Trash2,
+  Eye,
+  EyeOff,
+  Save
 };
 
-const getToolIconComponent = (iconName?: keyof typeof iconComponents | 'default' | string) => {
-  // Permitir string para flexibilidade, mas mapear para iconComponents conhecidos
-  const resolvedIconName = iconName as keyof typeof iconComponents;
-  const Icon = resolvedIconName && iconComponents[resolvedIconName] ? iconComponents[resolvedIconName] : iconComponents['Default'];
-  return Icon || Cpu; // Fallback final
+const getToolIconComponent = (iconName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
+  // Garantir que nunca retornamos undefined, sempre retornando um componente válido
+  try {
+    // Caso 1: iconName é undefined ou string vazia
+    if (!iconName) {
+      return iconComponents['Default'] || Cpu;
+    }
+    
+    // Caso 2: iconName existe diretamente como chave em iconComponents
+    if (iconName in iconComponents) {
+      const Icon = iconComponents[iconName as keyof typeof iconComponents];
+      if (Icon) return Icon;
+    }
+    
+    // Caso 3: Tentar encontrar uma correspondência case-insensitive
+    const lowercaseName = iconName.toLowerCase();
+    const iconKeys = Object.keys(iconComponents);
+    const matchingKey = iconKeys.find(key => key.toLowerCase() === lowercaseName);
+    
+    if (matchingKey && iconComponents[matchingKey as keyof typeof iconComponents]) {
+      return iconComponents[matchingKey as keyof typeof iconComponents];
+    }
+    
+    // Nenhuma correspondência encontrada, usar o ícone padrão
+    console.log(`Ícone não encontrado para: ${iconName}, usando ícone padrão`);
+    return iconComponents['Default'] || Cpu;
+  } catch (error) {
+    // Capturar qualquer erro inesperado e garantir que sempre retornamos um componente válido
+    console.error(`Erro ao obter ícone para: ${iconName}`, error);
+    return Cpu;
+  }
 };
 
 
@@ -131,8 +183,22 @@ export function AgentCard({ agent, onEdit, onTest, onDelete, availableTools, age
                 <div className="flex flex-wrap gap-1.5">
                     {agent.toolsDetails.map(toolDetail => {
                         const fullTool = availableTools.find(t => t.id === toolDetail.id);
-                        const IconComponent = getToolIconComponent(toolDetail.iconName);
-                        const toolIcon = <IconComponent width={12} height={12} />;
+                        // Wrapper de segurança para garantir que nunca renderizamos undefined
+                        const renderSafeIcon = (): React.ReactNode => {
+                            try {
+                                // Obter o componente do ícone com função aprimorada
+                                const IconComponent = getToolIconComponent(toolDetail.iconName);
+                                // Verificação extra de segurança
+                                return IconComponent 
+                                    ? <IconComponent width={12} height={12} /> 
+                                    : <Cpu width={12} height={12} />;
+                            } catch (error) {
+                                console.error(`Erro ao renderizar ícone para ferramenta ${toolDetail.id}:`, error);
+                                // Fallback final para garantir que sempre temos um elemento React válido
+                                return <Cpu width={12} height={12} />;
+                            }
+                        };
+                        const toolIcon = renderSafeIcon();
 
                         const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] &&
                                             ( (fullTool.id === 'webSearch' && agent.toolConfigsApplied[fullTool.id]?.googleApiKey && agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
@@ -169,13 +235,13 @@ export function AgentCard({ agent, onEdit, onTest, onDelete, availableTools, age
       </CardContent>
       <CardFooter className="gap-2 mt-auto pt-4 border-t">
         <Button variant="outline" size="sm" onClick={() => onEdit(agent)}>
-          <Edit size={16} className="mr-1.5" /> Editar
+          <EditIcon size={16} className="mr-1.5" /> Editar
         </Button>
         <Button variant="outline" size="sm" onClick={() => onTest(agent)}>
-          <MessageSquare size={16} className="mr-1.5" /> Testar
+          <ChatIcon size={16} className="mr-1.5" /> Testar
         </Button>
         <Button variant="destructive" size="sm" className="ml-auto" onClick={() => onDelete(agent.id)}>
-          <Trash2 size={16} className="mr-1.5" /> Excluir
+          <DeleteIcon size={16} className="mr-1.5" /> Excluir
         </Button>
       </CardFooter>
     </Card>

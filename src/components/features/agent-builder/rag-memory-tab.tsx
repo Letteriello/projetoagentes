@@ -73,11 +73,47 @@ interface RagMemoryTabProps {
   // Configuração principal
   ragMemoryConfig: RagMemoryConfig;
   setRagMemoryConfig: (config: RagMemoryConfig) => void;
+  
+  // Propriedades de Estado e Memória
+  enableStatePersistence: boolean;
+  setEnableStatePersistence: (enabled: boolean) => void;
+  statePersistenceType: 'session' | 'memory' | 'database';
+  setStatePersistenceType: (type: 'session' | 'memory' | 'database') => void;
+  initialStateValues: Array<{
+    key: string;
+    value: string;
+    scope: 'global' | 'agent' | 'temporary';
+    description: string;
+  }>;
+  setInitialStateValues: (values: Array<{
+    key: string;
+    value: string;
+    scope: 'global' | 'agent' | 'temporary';
+    description: string;
+  }>) => void;
+  enableStateSharing: boolean;
+  setEnableStateSharing: (enabled: boolean) => void;
+  stateSharingStrategy: 'all' | 'explicit' | 'none';
+  setStateSharingStrategy: (strategy: 'all' | 'explicit' | 'none') => void;
+  enableRAG: boolean;
+  setEnableRAG: (enabled: boolean) => void;
 }
 
 export function RagMemoryTab({
   ragMemoryConfig,
-  setRagMemoryConfig
+  setRagMemoryConfig,
+  enableStatePersistence,
+  setEnableStatePersistence,
+  statePersistenceType,
+  setStatePersistenceType,
+  initialStateValues,
+  setInitialStateValues,
+  enableStateSharing,
+  setEnableStateSharing,
+  stateSharingStrategy,
+  setStateSharingStrategy,
+  enableRAG,
+  setEnableRAG
 }: RagMemoryTabProps) {
   // Estado para o componente de adição de fonte de conhecimento
   const [showNewSourceForm, setShowNewSourceForm] = React.useState(false);
