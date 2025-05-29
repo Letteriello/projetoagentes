@@ -119,6 +119,7 @@ interface MemoryKnowledgeTabProps {
 }
 
 export function MemoryKnowledgeTab({
+
   // Propriedades RAG
   ragMemoryConfig,
   setRagMemoryConfig,
@@ -139,6 +140,7 @@ export function MemoryKnowledgeTab({
 }: MemoryKnowledgeTabProps) {
   // Estado para o componente de adição de fonte de conhecimento
   const [showNewSourceForm, setShowNewSourceForm] = React.useState(false);
+  const [activeMemoryTab, setActiveMemoryTab] = React.useState<string>("estado");
   const [newSource, setNewSource] = React.useState<Partial<KnowledgeSource>>({
     id: `source-${Date.now()}`,
     name: '',
@@ -162,8 +164,8 @@ export function MemoryKnowledgeTab({
     description: ''
   });
 
-  // Estado para seleção de aba
-  const [activeMemoryTab, setActiveMemoryTab] = React.useState<string>("estado");
+  // Estado para controlar a aba ativa
+  // Tab state is already declared above
   
   // Função auxiliar para obter o ícone com base no tipo de fonte
   const getSourceIcon = (type: KnowledgeSourceType) => {
@@ -178,12 +180,9 @@ export function MemoryKnowledgeTab({
   };
 
   // Handler para alteração de configuração RAG
-  const updateRagConfig = (updates: Partial<RagMemoryConfig>) => {
-    setRagMemoryConfig({
-      ...ragMemoryConfig,
-      ...updates
-    });
-  };
+  const updateRagConfig = React.useCallback((updates: Partial<RagMemoryConfig>) => {
+    setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, ...updates}));
+  }, [setRagMemoryConfig]);
 
   // Adicionar uma nova fonte de conhecimento
   const handleAddSource = () => {
@@ -256,18 +255,15 @@ export function MemoryKnowledgeTab({
     
     setShowNewStateForm(false);
   };
-  
+
   // Remover valor de estado
   const handleRemoveStateValue = (index: number) => {
     setInitialStateValues(initialStateValues.filter((_, i) => i !== index));
   };
   
   return (
-    <div>
-      <h3 className="text-lg font-medium mb-3">
-        Memória e Conhecimento
-      </h3>
-      
+    <TooltipProvider>
+      <div>
       <Alert variant="default" className="mb-4 bg-card border-border/70">
         <AlertCircle className="h-4 w-4 text-muted-foreground" />
         <AlertTitle className="text-sm font-medium">Configuração de Memória e Conhecimento</AlertTitle>
@@ -357,7 +353,7 @@ export function MemoryKnowledgeTab({
                                 <TableHead>Valor Inicial
                                     <Tooltip>
                                         <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
-                                        <TooltipContent><p>O valor inicial para esta variável de estado. Deve ser um valor JSON válido (ex: "algum texto", 123, true, {"subChave":"subValor"}, [1,2,3]).</p></TooltipContent>
+                                        <TooltipContent><p>O valor inicial para esta variável de estado. Deve ser um valor JSON válido (ex: "algum texto", 123, true, &#123;"subChave":"subValor"&#125;, [1,2,3]).</p></TooltipContent>
                                     </Tooltip>
                                 </TableHead>
                                 <TableHead>Escopo
@@ -394,24 +390,24 @@ export function MemoryKnowledgeTab({
                     </Table>
                     <Button variant="outline" size="sm" onClick={() => setShowNewStateForm(true)} className="mt-2"><Plus className="mr-2 h-4 w-4" /> Adicionar Valor de Estado</Button>
                     {showNewStateForm && (
-                        <Card className="mt-2 p-4 space-y-3 bg-muted/50">
-                            <Input placeholder="Chave (ex: userRole)" value={newStateValue.key} onChange={(e) => setNewStateValue(prev => ({...prev, key: e.target.value}))} />
-                            <Textarea placeholder='Valor (JSON válido, ex: "admin" ou {"theme":"dark"})' value={newStateValue.value} onChange={(e) => setNewStateValue(prev => ({...prev, value: e.target.value}))} rows={2}/>
-                            <Select value={newStateValue.scope} onValueChange={(v) => setNewStateValue(prev => ({...prev, scope: v as any}))}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="agent">Agente</SelectItem>
-                                    <SelectItem value="global">Global</SelectItem>
-                                    <SelectItem value="temporary">Temporário</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Input placeholder="Descrição (opcional)" value={newStateValue.description} onChange={(e) => setNewStateValue(prev => ({...prev, description: e.target.value}))} />
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => setShowNewStateForm(false)}>Cancelar</Button>
-                                <Button size="sm" onClick={handleAddStateValue}>Adicionar</Button>
-                            </div>
-                        </Card>
-                    )}
+  <Card className="mt-2 p-4 space-y-3 bg-muted/50">
+    <Input placeholder="Chave (ex: userRole)" value={newStateValue.key} onChange={(e) => setNewStateValue(prev => ({...prev, key: e.target.value}))} />
+    <Textarea placeholder='Valor (JSON válido, ex: "admin" ou {"theme":"dark"})' value={newStateValue.value} onChange={(e) => setNewStateValue(prev => ({...prev, value: e.target.value}))} rows={2}/>
+    <Select value={newStateValue.scope} onValueChange={(v) => setNewStateValue(prev => ({...prev, scope: v as any}))}>
+      <SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="agent">Agente</SelectItem>
+        <SelectItem value="global">Global</SelectItem>
+        <SelectItem value="temporary">Temporário</SelectItem>
+      </SelectContent>
+    </Select>
+    <Input placeholder="Descrição (opcional)" value={newStateValue.description} onChange={(e) => setNewStateValue(prev => ({...prev, description: e.target.value}))} />
+    <div className="flex justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={() => setShowNewStateForm(false)}>Cancelar</Button>
+      <Button size="sm" onClick={handleAddStateValue}>Adicionar</Button>
+    </div>
+  </Card>
+)}
                   </div>
                 </div>
               )}
@@ -430,7 +426,7 @@ export function MemoryKnowledgeTab({
                 <Switch
                     id="enableRAG"
                     checked={ragMemoryConfig.enabled}
-                    onCheckedChange={(checked) => setRagMemoryConfig(prev => ({ ...prev, enabled: checked }))}
+                    onCheckedChange={(checked) => setRagMemoryConfig({...ragMemoryConfig, enabled: checked})}
                 />
                 <Label htmlFor="enableRAG" className="flex items-center">
                     Habilitar RAG (Retrieval Augmented Generation)
@@ -695,11 +691,11 @@ export function MemoryKnowledgeTab({
                     </Select>
                 </div>
               )}
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }

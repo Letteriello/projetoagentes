@@ -3,7 +3,7 @@
 
 import type { SavedAgentConfiguration } from '@/app/agent-builder/page';
 import * as React from 'react';
-import { firestore } from '@/lib/firestoreClient'; // Import Firestore client
+import { firestore } from '@/lib/firebaseClient'; // Import Firestore client
 import {
   collection,
   getDocs,

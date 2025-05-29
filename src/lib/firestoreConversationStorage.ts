@@ -1,5 +1,5 @@
 import { Conversation, Message } from '@/types/chat'; // Adjust path if necessary
-import { firestore } from '@/lib/firestoreClient';
+import { firestore } from '@/lib/firebaseClient';
 import {
   collection,
   doc,

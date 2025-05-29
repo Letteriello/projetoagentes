@@ -2,7 +2,7 @@
 
 import type { SavedAgentConfiguration } from '@/app/agent-builder/page'; // Adjust path if necessary
 import * as React from 'react';
-import { firestore } from '@/lib/firestoreClient';
+import { firestore } from '@/lib/firebaseClient';
 import {
   collection,
   getDocs,
