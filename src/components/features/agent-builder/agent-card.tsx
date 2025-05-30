@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Edit, MessageSquare, Trash2, Cpu, Workflow, FileJson, Briefcase, Stethoscope, Plane, Settings2 as ConfigureIcon,
+  Cpu, Workflow, FileJson, Briefcase, Stethoscope, Plane, Settings2 as ConfigureIcon,
   Search, Calculator, FileText, CalendarDays, Network, Database, Code2, GripVertical,
-  ClipboardCopy, AlertCircle, Eye, EyeOff, Save, Plus, Layers, Info, Copy as CopyIcon, 
+  ClipboardCopy, AlertCircle, Plus, Layers, Info, Copy as CopyIcon, 
   Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Eye as EyeIcon, 
   EyeOff as EyeOffIcon, Save as SaveIcon 
 } from "lucide-react";
@@ -49,15 +49,10 @@ const iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = 
   SaveIcon,      // Save renomeado como SaveIcon
   Plus,
   Layers,
-  Info,
-  
-  // Garantir que os nomes originais também estão mapeados
-  Edit,
-  MessageSquare,
-  Trash2,
-  Eye,
-  EyeOff,
-  Save
+  Info
+  // Os nomes originais não precisam ser mapeados separadamente se os aliases são usados consistentemente
+  // e se os componentes originais (Edit, MessageSquare, etc.) não são referenciados diretamente no JSX com seu nome original.
+  // O JSX usa EditIcon, ChatIcon, etc.
 };
 
 const getToolIconComponent = (iconName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
