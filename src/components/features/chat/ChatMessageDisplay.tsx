@@ -11,6 +11,12 @@ interface ChatMessageDisplayProps {
   message: ChatMessageUI;
   isStreaming?: boolean; // isStreaming is optional, directly from ChatMessageUI
 }
+import { Bot, User, Paperclip as PaperclipIcon, Download } from 'lucide-react';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { ChatMessageUI } from '@/types/chat';
+import { SimpleCodeBlock } from './SimpleCodeBlock';
 
 // Simple CSS for blinking cursor (can be moved to a global CSS file)
 const BlinkingCursor = () => (
@@ -23,6 +29,13 @@ export default function ChatMessageDisplay({
   // Removed isStreaming from direct props as it's on message
   const isUser = message.sender === "user";
   const isAgent = message.sender === "agent";
+interface ChatMessageDisplayProps {
+  message: ChatMessageUI;
+}
+
+export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps) {
+  const isUser = message.sender === 'user';
+  const isAgent = message.sender === 'agent';
 
   // Function to handle download if fileDataUri is present
   const handleDownload = () => {
@@ -34,6 +47,67 @@ export default function ChatMessageDisplay({
       link.click();
       document.body.removeChild(link);
     }
+  };
+
+  // Simple markdown rendering for code blocks
+  const renderMarkdown = (text: string) => {
+    // Simple regex to detect code blocks
+    const codeBlockRegex = /```(\w*)\n([\s\S]*?)\n```/g;
+    
+    // Split text into parts, alternating between regular text and code blocks
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      // Add text before the code block
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: text.slice(lastIndex, match.index)
+        });
+      }
+      
+      // Add the code block
+      const [_, language, code] = match;
+      parts.push({
+        type: 'code',
+        language: language || 'text',
+        content: code
+      });
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add any remaining text after the last code block
+    if (lastIndex < text.length) {
+      parts.push({
+        type: 'text',
+        content: text.slice(lastIndex)
+      });
+    }
+    
+    return parts.map((part, index) => {
+      if (part.type === 'code') {
+        return (
+          <div key={index} className="my-2">
+            <SimpleCodeBlock 
+              language={part.language} 
+              value={part.content} 
+            />
+          </div>
+        );
+      }
+      
+      // Simple line breaks for paragraphs
+      const paragraphs = part.content.split('\n\n');
+      return paragraphs.map((paragraph, pIndex) => (
+        <p key={`${index}-${pIndex}`} className="my-2">
+          {paragraph}
+          {pIndex === paragraphs.length - 1 && isAgent && message.isStreaming && <BlinkingCursor />}
+        </p>
+      ));
+    });
   };
 
   return (
@@ -88,6 +162,9 @@ export default function ChatMessageDisplay({
           >
             {message.text}
           </ReactMarkdown>
+          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+            {renderMarkdown(message.text)}
+          </div>
         )}
         {message.imageUrl && (
           <div className="mt-2">
