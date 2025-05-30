@@ -1,9 +1,14 @@
-
 "use client";
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -98,7 +103,8 @@ export default function ProfilePage() {
                 Instruções para Agentes
               </CardTitle>
               <CardDescription>
-                O que os agentes precisam saber sobre você para te ajudar melhor? (Semelhante às instruções personalizadas do ChatGPT)
+                O que os agentes precisam saber sobre você para te ajudar
+                melhor? (Semelhante às instruções personalizadas do ChatGPT)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -123,7 +129,8 @@ export default function ProfilePage() {
                 Minha Memória Global
               </CardTitle>
               <CardDescription>
-                Armazene informações importantes aqui que podem ser acessadas pelos seus agentes (se permitido).
+                Armazene informações importantes aqui que podem ser acessadas
+                pelos seus agentes (se permitido).
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col space-y-4">

@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Edit3, LogOut } from "lucide-react";
@@ -30,9 +36,11 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({
 }) => {
   const getInitials = (name: string): string => {
     if (!name) return "U";
-    const names = name.split(' ');
+    const names = name.split(" ");
     if (names.length === 1) return names[0].charAt(0).toUpperCase();
-    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+    return (
+      names[0].charAt(0) + names[names.length - 1].charAt(0)
+    ).toUpperCase();
   };
 
   const userInitials = user.initials || getInitials(user.name);
@@ -44,9 +52,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({
           {user.avatarUrl ? (
             <AvatarImage src={user.avatarUrl} alt={user.name} />
           ) : null}
-          <AvatarFallback className="text-3xl">
-            {userInitials}
-          </AvatarFallback>
+          <AvatarFallback className="text-3xl">{userInitials}</AvatarFallback>
         </Avatar>
         <CardTitle className="text-2xl">{user.name}</CardTitle>
         <CardDescription>{user.email}</CardDescription>
@@ -59,7 +65,11 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({
         )}
         <div className="space-y-3">
           {onEditProfile && (
-            <Button variant="outline" className="w-full" onClick={onEditProfile}>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={onEditProfile}
+            >
               <Edit3 className="mr-2 h-4 w-4" />
               Editar Perfil
             </Button>

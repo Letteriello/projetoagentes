@@ -1,10 +1,14 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Paperclip, SendHorizontal, Loader2 as Loader } from 'lucide-react';
-import AttachmentPopoverContent from './AttachmentPopoverContent';
-import { cn } from '@/lib/utils';
+import React, { useRef, useState, useEffect } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Paperclip, SendHorizontal, Loader2 as Loader } from "lucide-react";
+import AttachmentPopoverContent from "./AttachmentPopoverContent";
+import { cn } from "@/lib/utils";
 
 interface MessageInputAreaProps {
   formRef: React.RefObject<HTMLFormElement>;
@@ -35,7 +39,6 @@ export default function MessageInputArea({
   inputValue,
   onInputChange,
 }: MessageInputAreaProps) {
-
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   useEffect(() => {
@@ -46,8 +49,10 @@ export default function MessageInputArea({
     }
   }, [selectedFile]);
 
-  const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey && !isPending) {
+  const handleTextareaKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (event.key === "Enter" && !event.shiftKey && !isPending) {
       event.preventDefault();
       if (formRef.current) {
         formRef.current.requestSubmit();
@@ -78,7 +83,11 @@ export default function MessageInputArea({
           </Button>
         </PopoverTrigger>
         {selectedFile && (
-          <PopoverContent side="top" align="start" className="w-auto p-0 border-none shadow-none bg-transparent mb-1">
+          <PopoverContent
+            side="top"
+            align="start"
+            className="w-auto p-0 border-none shadow-none bg-transparent mb-1"
+          >
             <AttachmentPopoverContent
               fileName={selectedFileName}
               fileDataUri={selectedFileDataUri}

@@ -4,36 +4,42 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  AlertCircle, 
-  Ban, 
-  Brain, 
-  Check, 
-  ChevronDown, 
-  ChevronRight, 
-  ChevronUp, 
-  Cpu, 
-  FileJson, 
-  Info, 
-  Layers, 
-  ListChecks, 
-  Loader2, 
-  Network, 
-  Plus, 
-  Save, 
-  Search, 
-  Settings, 
-  Settings2, 
-  Smile, 
-  Target, 
-  Trash2, 
-  Users, 
-  Wand2, 
-  Workflow, 
-  X 
+import {
+  AlertCircle,
+  Ban,
+  Brain,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Cpu,
+  FileJson,
+  Info,
+  Layers,
+  ListChecks,
+  Loader2,
+  Network,
+  Plus,
+  Save,
+  Search,
+  Settings,
+  Settings2,
+  Smile,
+  Target,
+  Trash2,
+  Users,
+  Wand2,
+  Workflow,
+  X,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -51,7 +57,7 @@ import { AvailableTool } from "@/types/tool-types";
 
 /**
  * Componente que integra a nova Tab de Ferramentas ao AgentBuilderDialog
- * 
+ *
  * Esta implementação substitui a seção existente de ferramentas no diálogo
  * do construtor de agentes pela nova interface que separa Tools e MCP Tools.
  */
@@ -60,7 +66,9 @@ export const ToolsTabIntegrationFinal: React.FC<{
   currentAgentTools: string[];
   setCurrentAgentTools: React.Dispatch<React.SetStateAction<string[]>>;
   toolConfigurations: Record<string, any>;
-  setToolConfigurations: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  setToolConfigurations: React.Dispatch<
+    React.SetStateAction<Record<string, any>>
+  >;
   openToolConfigModal: (tool: AvailableTool) => void;
 }> = ({
   availableTools,
@@ -68,16 +76,16 @@ export const ToolsTabIntegrationFinal: React.FC<{
   setCurrentAgentTools,
   toolConfigurations,
   setToolConfigurations,
-  openToolConfigModal
+  openToolConfigModal,
 }) => {
   // Handler para quando uma ferramenta é selecionada ou deselecionada
   const handleToolSelectionChange = (toolId: string, checked: boolean) => {
     if (checked) {
       if (!currentAgentTools.includes(toolId)) {
-        setCurrentAgentTools(prev => [...prev, toolId]);
+        setCurrentAgentTools((prev) => [...prev, toolId]);
       }
     } else {
-      setCurrentAgentTools(prev => prev.filter(id => id !== toolId));
+      setCurrentAgentTools((prev) => prev.filter((id) => id !== toolId));
     }
   };
 
@@ -95,7 +103,7 @@ export const ToolsTabIntegrationFinal: React.FC<{
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ToolsTab 
+        <ToolsTab
           availableTools={availableTools || allTools}
           selectedToolIds={currentAgentTools}
           onToolSelectionChange={handleToolSelectionChange}

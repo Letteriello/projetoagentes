@@ -14,7 +14,10 @@ export interface ToolFilters {
 
 interface ToolSearchProps {
   onSearch: (query: string) => void;
-  onFilterChange: (filterKey: keyof ToolFilters | 'reset', value?: boolean) => void;
+  onFilterChange: (
+    filterKey: keyof ToolFilters | "reset",
+    value?: boolean,
+  ) => void;
   filters: ToolFilters;
 }
 
@@ -34,41 +37,41 @@ export const ToolSearch: React.FC<ToolSearchProps> = ({
           onChange={(e) => onSearch(e.target.value)}
         />
       </div>
-      
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">Filtros:</span>
-        
+
         <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="filter-config" 
+          <Checkbox
+            id="filter-config"
             checked={filters.configurable}
-            onCheckedChange={(checked) => 
-              onFilterChange('configurable', checked === true)
+            onCheckedChange={(checked) =>
+              onFilterChange("configurable", checked === true)
             }
           />
           <Label htmlFor="filter-config" className="text-xs cursor-pointer">
             Configuráveis
           </Label>
         </div>
-        
+
         <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="filter-auth" 
+          <Checkbox
+            id="filter-auth"
             checked={filters.requiresAuth}
-            onCheckedChange={(checked) => 
-              onFilterChange('requiresAuth', checked === true)
+            onCheckedChange={(checked) =>
+              onFilterChange("requiresAuth", checked === true)
             }
           />
           <Label htmlFor="filter-auth" className="text-xs cursor-pointer">
             Requer Autenticação
           </Label>
         </div>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
+
+        <Button
+          variant="ghost"
+          size="sm"
           className="h-7 text-xs ml-auto"
-          onClick={() => onFilterChange('reset')}
+          onClick={() => onFilterChange("reset")}
         >
           Limpar Filtros
         </Button>

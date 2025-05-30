@@ -31,19 +31,19 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
   onUpdate,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newServer, setNewServer] = useState<Omit<MCPServerConfig, "id">>({ 
-    name: '', 
-    url: '', 
-    description: '' 
+  const [newServer, setNewServer] = useState<Omit<MCPServerConfig, "id">>({
+    name: "",
+    url: "",
+    description: "",
   });
-  
+
   return (
     <div className="rounded-md border border-border p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium">Servidores MCP Conectados</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setIsAddModalOpen(true)}
           className="h-7 text-xs"
         >
@@ -51,39 +51,41 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
           Adicionar Servidor
         </Button>
       </div>
-      
+
       {servers.length > 0 ? (
         <div className="space-y-2">
-          {servers.map(server => (
-            <div 
-              key={server.id} 
+          {servers.map((server) => (
+            <div
+              key={server.id}
               className="flex items-center justify-between rounded-md border border-border p-2"
             >
               <div>
                 <div className="flex items-center gap-2">
                   <Cpu size={14} className="text-primary" />
                   <span className="font-medium text-sm">{server.name}</span>
-                  {server.status === 'connected' && (
+                  {server.status === "connected" && (
                     <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
                   )}
-                  {server.status === 'error' && (
+                  {server.status === "error" && (
                     <span className="h-2 w-2 rounded-full bg-red-500"></span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">{server.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  {server.description}
+                </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-7 w-7"
                   onClick={() => onUpdate(server)}
                 >
                   <Settings size={14} />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-7 w-7 text-destructive"
                   onClick={() => onRemove(server.id)}
                 >
@@ -103,7 +105,7 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
           </p>
         </div>
       )}
-      
+
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -112,53 +114,62 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
               Conecte-se a um servidor MCP para habilitar ferramentas avançadas.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 my-4">
             <div className="space-y-2">
               <Label htmlFor="server-name">Nome do Servidor</Label>
-              <Input 
+              <Input
                 id="server-name"
                 value={newServer.name}
-                onChange={(e) => setNewServer(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) =>
+                  setNewServer((prev) => ({ ...prev, name: e.target.value }))
+                }
                 placeholder="Ex: Servidor MCP Local"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="server-url">URL do Servidor</Label>
-              <Input 
+              <Input
                 id="server-url"
                 value={newServer.url}
-                onChange={(e) => setNewServer(prev => ({ ...prev, url: e.target.value }))}
+                onChange={(e) =>
+                  setNewServer((prev) => ({ ...prev, url: e.target.value }))
+                }
                 placeholder="Ex: http://localhost:8000"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="server-description">Descrição (opcional)</Label>
-              <Textarea 
+              <Textarea
                 id="server-description"
                 value={newServer.description}
-                onChange={(e) => setNewServer(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setNewServer((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Descreva o propósito deste servidor MCP"
                 rows={3}
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 onAdd({
                   id: crypto.randomUUID(),
                   ...newServer,
-                  status: 'connected'
+                  status: "connected",
                 });
                 setIsAddModalOpen(false);
-                setNewServer({ name: '', url: '', description: '' });
+                setNewServer({ name: "", url: "", description: "" });
               }}
               className="button-live-glow"
             >

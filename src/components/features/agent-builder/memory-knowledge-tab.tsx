@@ -17,32 +17,66 @@ import {
   Settings,
   Trash2,
   UploadCloud,
-  X
+  X,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Tipos de fontes de conhecimento para RAG
-export type KnowledgeSourceType = 
-  | 'document' 
-  | 'website'
-  | 'api'
-  | 'database'
-  | 'custom';
+export type KnowledgeSourceType =
+  | "document"
+  | "website"
+  | "api"
+  | "database"
+  | "custom";
 
 // Interface para uma fonte de conhecimento RAG
 export interface KnowledgeSource {
@@ -53,15 +87,12 @@ export interface KnowledgeSource {
   location: string;
   credentials?: string;
   format?: string;
-  updateFrequency?: 'static' | 'daily' | 'weekly' | 'monthly' | 'custom';
+  updateFrequency?: "static" | "daily" | "weekly" | "monthly" | "custom";
   enabled: boolean;
 }
 
 // Tipos de serviços de memória/RAG suportados
-export type MemoryServiceType = 
-  | 'in-memory' 
-  | 'vertex-ai-rag' 
-  | 'custom';
+export type MemoryServiceType = "in-memory" | "vertex-ai-rag" | "custom";
 
 // Configuração do serviço de memória/RAG
 export interface RagMemoryConfig {
@@ -83,31 +114,33 @@ interface MemoryKnowledgeTabProps {
   // Configuração principal de RAG
   ragMemoryConfig: RagMemoryConfig;
   setRagMemoryConfig: React.Dispatch<React.SetStateAction<RagMemoryConfig>>;
-  
+
   // Estado e persistência
   enableStatePersistence: boolean;
   setEnableStatePersistence: (enabled: boolean) => void;
-  statePersistenceType: 'session' | 'memory' | 'database';
-  setStatePersistenceType: (type: 'session' | 'memory' | 'database') => void;
+  statePersistenceType: "session" | "memory" | "database";
+  setStatePersistenceType: (type: "session" | "memory" | "database") => void;
   initialStateValues: Array<{
     key: string;
     value: string;
-    scope: 'global' | 'agent' | 'temporary';
+    scope: "global" | "agent" | "temporary";
     description: string;
   }>;
-  setInitialStateValues: (values: Array<{
-    key: string;
-    value: string;
-    scope: 'global' | 'agent' | 'temporary';
-    description: string;
-  }>) => void;
-  
+  setInitialStateValues: (
+    values: Array<{
+      key: string;
+      value: string;
+      scope: "global" | "agent" | "temporary";
+      description: string;
+    }>,
+  ) => void;
+
   // Compartilhamento de estado
   enableStateSharing: boolean;
   setEnableStateSharing: (enabled: boolean) => void;
-  stateSharingStrategy: 'all' | 'explicit' | 'none';
-  setStateSharingStrategy: (strategy: 'all' | 'explicit' | 'none') => void;
-  
+  stateSharingStrategy: "all" | "explicit" | "none";
+  setStateSharingStrategy: (strategy: "all" | "explicit" | "none") => void;
+
   // Configuração de RAG básica
   enableRAG: boolean;
   setEnableRAG: (enabled: boolean) => void;
@@ -117,7 +150,7 @@ export function MemoryKnowledgeTab({
   // Propriedades RAG
   ragMemoryConfig,
   setRagMemoryConfig,
-  
+
   // Propriedades de Estado
   enableStatePersistence,
   setEnableStatePersistence,
@@ -130,7 +163,7 @@ export function MemoryKnowledgeTab({
   stateSharingStrategy,
   setStateSharingStrategy,
   enableRAG,
-  setEnableRAG
+  setEnableRAG,
 }: MemoryKnowledgeTabProps) {
   const [activeMemoryTab, setActiveMemoryTab] = React.useState("estado"); // Aba padrão
 
@@ -138,14 +171,21 @@ export function MemoryKnowledgeTab({
     <div className="space-y-6">
       <Alert>
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Nota sobre Configurações de Memória e Conhecimento</AlertTitle>
+        <AlertTitle>
+          Nota sobre Configurações de Memória e Conhecimento
+        </AlertTitle>
         <AlertDescription>
-          Esta seção permite configurar como o agente gerencia sua memória de curto e longo prazo,
-          e como ele acessa fontes de conhecimento para enriquecer suas respostas (RAG).
+          Esta seção permite configurar como o agente gerencia sua memória de
+          curto e longo prazo, e como ele acessa fontes de conhecimento para
+          enriquecer suas respostas (RAG).
         </AlertDescription>
       </Alert>
 
-      <Tabs value={activeMemoryTab} onValueChange={setActiveMemoryTab} className="space-y-4">
+      <Tabs
+        value={activeMemoryTab}
+        onValueChange={setActiveMemoryTab}
+        className="space-y-4"
+      >
         <TabsList className="grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="estado" className="py-2 px-4">
             Estado e Persistência
@@ -157,38 +197,53 @@ export function MemoryKnowledgeTab({
             Fontes de Conhecimento
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="estado">
           <Card>
             <CardHeader>
               <CardTitle>Gerenciamento de Estado e Persistência</CardTitle>
               <CardDescription>
-                Configure como o estado do agente é mantido entre interações e sessões.
+                Configure como o estado do agente é mantido entre interações e
+                sessões.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-2">
-                <Switch 
-                  id="enable-state-persistence" 
-                  checked={enableStatePersistence} 
-                  onCheckedChange={setEnableStatePersistence} 
+                <Switch
+                  id="enable-state-persistence"
+                  checked={enableStatePersistence}
+                  onCheckedChange={setEnableStatePersistence}
                 />
-                <Label htmlFor="enable-state-persistence">Habilitar Persistência de Estado</Label>
+                <Label htmlFor="enable-state-persistence">
+                  Habilitar Persistência de Estado
+                </Label>
               </div>
               {enableStatePersistence && (
                 <div className="space-y-2">
-                  <Label htmlFor="state-persistence-type">Tipo de Persistência</Label>
-                  <Select 
-                    value={statePersistenceType} 
-                    onValueChange={setStatePersistenceType as (value: 'session' | 'memory' | 'database') => void}
+                  <Label htmlFor="state-persistence-type">
+                    Tipo de Persistência
+                  </Label>
+                  <Select
+                    value={statePersistenceType}
+                    onValueChange={
+                      setStatePersistenceType as (
+                        value: "session" | "memory" | "database",
+                      ) => void
+                    }
                   >
                     <SelectTrigger id="state-persistence-type">
                       <SelectValue placeholder="Selecione o tipo de persistência" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="session">Sessão do Navegador (Temporário)</SelectItem>
-                      <SelectItem value="memory">Memória Interna do Agente</SelectItem>
-                      <SelectItem value="database">Banco de Dados (Ex: Firestore)</SelectItem>
+                      <SelectItem value="session">
+                        Sessão do Navegador (Temporário)
+                      </SelectItem>
+                      <SelectItem value="memory">
+                        Memória Interna do Agente
+                      </SelectItem>
+                      <SelectItem value="database">
+                        Banco de Dados (Ex: Firestore)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -197,21 +252,24 @@ export function MemoryKnowledgeTab({
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="rag">
           <Card>
             <CardHeader>
-              <CardTitle>Configuração RAG (Retrieval Augmented Generation)</CardTitle>
+              <CardTitle>
+                Configuração RAG (Retrieval Augmented Generation)
+              </CardTitle>
               <CardDescription>
-                Ajustes para enriquecer o agente com conhecimento de fontes externas.
+                Ajustes para enriquecer o agente com conhecimento de fontes
+                externas.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-               <div className="flex items-center space-x-2">
-                <Switch 
-                  id="enable-rag" 
-                  checked={enableRAG} 
-                  onCheckedChange={setEnableRAG} 
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="enable-rag"
+                  checked={enableRAG}
+                  onCheckedChange={setEnableRAG}
                 />
                 <Label htmlFor="enable-rag">Habilitar RAG</Label>
               </div>
@@ -219,50 +277,78 @@ export function MemoryKnowledgeTab({
                 <>
                   {/* Exemplo de campos de ragMemoryConfig */}
                   <div className="space-y-2">
-                    <Label htmlFor="similarity-top-k">Top K (Similaridade)</Label>
-                    <Input 
-                      id="similarity-top-k" 
-                      type="number" 
-                      value={ragMemoryConfig.similarityTopK} 
-                      onChange={(e) => setRagMemoryConfig(prev => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 0}))}
+                    <Label htmlFor="similarity-top-k">
+                      Top K (Similaridade)
+                    </Label>
+                    <Input
+                      id="similarity-top-k"
+                      type="number"
+                      value={ragMemoryConfig.similarityTopK}
+                      onChange={(e) =>
+                        setRagMemoryConfig((prev) => ({
+                          ...prev,
+                          similarityTopK: parseInt(e.target.value, 10) || 0,
+                        }))
+                      }
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="vector-distance-threshold">Limite de Distância Vetorial</Label>
-                    <Input 
-                      id="vector-distance-threshold" 
-                      type="number" 
+                    <Label htmlFor="vector-distance-threshold">
+                      Limite de Distância Vetorial
+                    </Label>
+                    <Input
+                      id="vector-distance-threshold"
+                      type="number"
                       step="0.01"
-                      value={ragMemoryConfig.vectorDistanceThreshold} 
-                      onChange={(e) => setRagMemoryConfig(prev => ({...prev, vectorDistanceThreshold: parseFloat(e.target.value) || 0}))}
+                      value={ragMemoryConfig.vectorDistanceThreshold}
+                      onChange={(e) =>
+                        setRagMemoryConfig((prev) => ({
+                          ...prev,
+                          vectorDistanceThreshold:
+                            parseFloat(e.target.value) || 0,
+                        }))
+                      }
                     />
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="include-conversation-context" 
-                      checked={ragMemoryConfig.includeConversationContext} 
-                      onCheckedChange={(checked) => setRagMemoryConfig(prev => ({...prev, includeConversationContext: checked}))} 
+                    <Switch
+                      id="include-conversation-context"
+                      checked={ragMemoryConfig.includeConversationContext}
+                      onCheckedChange={(checked) =>
+                        setRagMemoryConfig((prev) => ({
+                          ...prev,
+                          includeConversationContext: checked,
+                        }))
+                      }
                     />
-                    <Label htmlFor="include-conversation-context">Incluir Contexto da Conversa no RAG</Label>
+                    <Label htmlFor="include-conversation-context">
+                      Incluir Contexto da Conversa no RAG
+                    </Label>
                   </div>
                 </>
               )}
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="fontes">
           <Card>
             <CardHeader>
               <CardTitle>Fontes de Conhecimento para RAG</CardTitle>
               <CardDescription>
-                Gerencie as fontes de dados (documentos, websites, APIs) que o RAG utilizará.
+                Gerencie as fontes de dados (documentos, websites, APIs) que o
+                RAG utilizará.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* TODO: Implementar UI para gerenciar ragMemoryConfig.knowledgeSources */}
-              <p>Lista de fontes de conhecimento e opções para adicionar/remover/configurar cada uma.</p>
-              <Button><Plus className="mr-2 h-4 w-4" /> Adicionar Fonte</Button>
+              <p>
+                Lista de fontes de conhecimento e opções para
+                adicionar/remover/configurar cada uma.
+              </p>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Adicionar Fonte
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
