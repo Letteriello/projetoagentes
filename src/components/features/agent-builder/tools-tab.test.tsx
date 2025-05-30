@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState } from "react";
-import { ToolsTab } from "@/components/agent-builder/tools-tab";
+import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
 import { allTools } from "./available-tools";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
