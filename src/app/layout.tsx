@@ -7,7 +7,7 @@ import { AgentsProvider } from '@/contexts/AgentsContext';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import ErrorBoundaryClient from '@/components/error-boundary-client';
-import { inter } from './fonts';
+import { inter, jetbrainsMono } from './fonts';
 
 export const metadata: Metadata = {
   title: 'AgentVerse',
@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`antialiased font-sans ${inter.className}`} suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} font-sans`}>
+      <body className="antialiased" suppressHydrationWarning>
         <ErrorBoundaryClient>
           <ThemeProvider>
             <AgentsProvider>

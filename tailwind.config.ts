@@ -9,7 +9,8 @@ export default {
   ],
   theme: {
     fontFamily: {
-      sans: ['var(--font-sans)'],
+      sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
     },
     extend: {
   		colors: {
