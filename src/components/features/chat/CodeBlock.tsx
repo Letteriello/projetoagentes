@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { okaidia } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// Attempt to fix SyntaxHighlighter import: use default import
+import SyntaxHighlighter from 'react-syntax-highlighter';
+// TODO: Fix this import - Module not found
+// import okaidia from 'react-syntax-highlighter/dist/esm/styles/prism/okaidia';
 import { cn } from '@/lib/utils';
 
 interface CodeBlockProps {
@@ -39,7 +41,8 @@ export function CodeBlock({ language, value }: CodeBlockProps) {
         {copyStatus}
       </button>
       <SyntaxHighlighter
-        style={okaidia}
+        // TODO: Reinstate okaidia style
+        // style={okaidia}
         language={language}
         PreTag="div"
         className="!p-4 !text-sm custom-scrollbar" // Apply padding here and custom scrollbar class if needed

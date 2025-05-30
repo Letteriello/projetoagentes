@@ -535,13 +535,36 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         .map(toolId => {
             const tool = availableTools.find(t => t.id === toolId);
             if (!tool) return null;
+
+            let iconStringName: keyof typeof iconComponents | 'default' | undefined = 'Default';
+            if (tool.icon) {
+                // Find the string key for the icon component in the iconComponents map
+                const entry = Object.entries(iconComponents).find(([, value]) => value === tool.icon);
+                if (entry) {
+                    iconStringName = entry[0] as keyof typeof iconComponents;
+                } else {
+                    // Fallback: try to use the component's name if it's a direct match
+                    // This is less robust and ideally availableTools would provide the string key directly
+                    const componentName = (tool.icon as React.FC<any>).displayName || (tool.icon as React.FC<any>).name;
+                    if (componentName && iconComponents[componentName]) {
+                        iconStringName = componentName as keyof typeof iconComponents;
+                    }
+                    // If still not found, it remains 'Default'
+                }
+            }
+            
+            // Ensure label is a string. If tool.name is a ReactNode, provide a fallback or string conversion.
+            // For simplicity, assuming tool.name is expected to be a string here for 'label'.
+            // If tool.name can be a ReactNode, this needs more sophisticated handling.
+            const labelString = typeof tool.name === 'string' ? tool.name : tool.id;
+
+
             return {
               id: tool.id,
-              label: tool.name, // Ensure 'label' is mapped from 'tool.name'
-              iconName: tool.icon,
+              label: labelString, 
+              iconName: iconStringName,
               needsConfiguration: tool.hasConfig,
               genkitToolName: getToolGenkitName(tool),
-              // Adicione outros campos conforme necessário para SavedAgentConfiguration['toolsDetails']
             };
           })
         .filter(Boolean) as SavedAgentConfiguration['toolsDetails'];
