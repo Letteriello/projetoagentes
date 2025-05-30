@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react"; import { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,13 +12,13 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon, Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon, LucideIcon } from "lucide-react"; // Updated icons
+import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon, Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon } from "lucide-react"; // Updated icons
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
 
 import { AgentCard } from '@/components/features/agent-builder/agent-card';
-import { AgentBuilderDialog } from '@/components/features/agent-builder/agent-builder-dialog';
+import AgentBuilderDialog from '@/components/features/agent-builder/agent-builder-dialog';
 import {
   Tooltip,
   TooltipContent,

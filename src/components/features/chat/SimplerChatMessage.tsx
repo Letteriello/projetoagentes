@@ -3,18 +3,18 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ChatMessageUI } from '@/types/chat';
-import { SimpleCodeBlock } from './SimpleCodeBlock';
-
-// Simple CSS for blinking cursor (can be moved to a global CSS file)
-const BlinkingCursor = () => (
-  <span className="inline-block w-0.5 h-4 bg-current animate-blink" />
-);
+import SimpleCodeBlock from './SimpleCodeBlock';
 
 interface ChatMessageDisplayProps {
   message: ChatMessageUI;
 }
 
-export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps) {
+// Simple CSS for blinking cursor
+const BlinkingCursor = () => (
+  <span className="inline-block w-0.5 h-4 bg-current animate-blink" />
+);
+
+function SimplerChatMessage({ message }: ChatMessageDisplayProps) {
   const isUser = message.sender === 'user';
   const isAgent = message.sender === 'agent';
 
@@ -149,3 +149,5 @@ export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps)
     </div>
   );
 }
+
+export default SimplerChatMessage;

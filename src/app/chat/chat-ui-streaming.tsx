@@ -8,7 +8,7 @@ import { useAgents } from "@/contexts/AgentsContext";
 import { v4 as uuidv4 } from 'uuid';
 import { useGenkitSession } from "@/hooks/useGenkitSession";
 import { toast } from "@/hooks/use-toast";
-import { genkitSessionService } from "@/services/GenkitSessionService";
+import { GenkitSessionService } from "@/services/GenkitSessionService";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { StreamingMessageList } from "@/components/features/chat/streaming/StreamingMessageList";
@@ -21,14 +21,16 @@ import { SavedAgentConfiguration } from "@/app/agent-builder/page";
 import { getToolsByIds } from "@/ai/tools";
 
 // Mapa de ferramentas disponíveis
+// Mapa de ferramentas disponíveis - será implementado posteriormente
 const availableTools = {
-  webSearch: performWebSearchTool,
+  // webSearch: performWebSearchTool,
 };
 
 export function ChatUIStreaming() {
   // Estado para gestão de agentes e UI
-  const { savedAgents, isLoading } = useAgents();
+  const { savedAgents } = useAgents();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [conversationId, setConversationId] = useState<string>(uuidv4());
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
@@ -45,7 +47,19 @@ export function ChatUIStreaming() {
   }, [savedAgents, selectedAgentId]);
   
   // Obter o agente selecionado
-  const selectedAgent = savedAgents?.find(agent => agent.id === selectedAgentId);
+  const selectedAgent = React.useMemo<SavedAgentConfiguration | undefined>(() => {
+    return savedAgents?.find(agent => agent.id === selectedAgentId);
+  }, [savedAgents, selectedAgentId]);
+  
+  // Criar um agente padrão se não houver agentes
+  const defaultAgent: Partial<SavedAgentConfiguration> = {
+    agentName: 'Assistente Padrão',
+    agentDescription: 'Assistente de IA para conversas',
+    agentModel: 'googleai/gemini-1.5-flash-latest',
+    agentTools: [],
+    agentType: 'llm' as const,
+    agentTemperature: 0.7
+  };
   
   // Callback para processar eventos Genkit
   const handleEvent = useCallback((event: any) => {
@@ -104,14 +118,12 @@ export function ChatUIStreaming() {
   
   // Processar ferramentas configuradas do agente
   const getConfiguredTools = useCallback(() => {
-    if (!selectedAgent?.config.tools) return [];
+    const tools = selectedAgent?.agentTools || [];
+    if (!Array.isArray(tools) || tools.length === 0) return [];
     
-    const enabledToolIds = selectedAgent.config.tools
-      .filter(tool => tool.enabled)
-      .map(tool => tool.id);
-    
-    return getToolsByIds(enabledToolIds);
-  }, [selectedAgent]);
+    // Usar as ferramentas diretamente do agente
+    return getToolsByIds(tools);
+  }, [selectedAgent, getToolsByIds]);
   
   // Manipular envio de mensagem
   const handleSendMessage = async (message: string, fileDataUri?: string) => {
@@ -125,12 +137,14 @@ export function ChatUIStreaming() {
         timestamp: new Date().toISOString()
       }]);
       
+      const agent = selectedAgent || defaultAgent;
+      
       await sendMessage(message, {
-        modelId: selectedAgent?.config.model || 'googleai/gemini-1.5-flash-latest',
-        systemPrompt: selectedAgent?.config.systemPrompt,
+        modelId: agent.agentModel || 'googleai/gemini-1.5-flash-latest',
+        systemPrompt: agent.systemPromptGenerated || '',
         tools: getConfiguredTools(),
-        temperature: selectedAgent?.config.temperature || 0.7,
-        fileDataUri
+        temperature: agent.agentTemperature || 0.7,
+        fileDataUri: fileDataUri || undefined
       });
       
       // Atualizar o scroll depois da resposta
@@ -173,50 +187,89 @@ export function ChatUIStreaming() {
   return (
     <div className="grid h-full grid-cols-1 md:grid-cols-[280px_1fr] gap-0">
       {/* Sidebar para agentes e conversas */}
-      <ConversationSidebar
-        selectedAgentId={selectedAgentId}
-        setSelectedAgentId={setSelectedAgentId}
-        savedAgents={savedAgents}
-        handleNewConversation={handleNewConversation}
-        isSidebarOpen={isSidebarOpen}
-        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-      />
+      <div className={cn(
+        'fixed inset-y-0 left-0 z-30 w-72 bg-background border-r transition-transform duration-300 ease-in-out md:relative md:translate-x-0',
+        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      )}>
+        <div className="flex flex-col h-full">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Conversas</h2>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {/* Lista de conversas aqui */}
+            <div className="p-4 text-center text-muted-foreground">
+              Nenhuma conversa ainda
+            </div>
+          </div>
+          <div className="p-4 border-t">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleNewConversation}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Nova conversa
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Overlay para fechar a sidebar em mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-20 bg-black/50 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       
       {/* Área principal de chat */}
       <Card className="flex flex-col h-full overflow-hidden border-0 rounded-none md:border md:rounded-lg md:ml-2">
         {/* Cabeçalho do chat */}
-        <ChatHeader
-          title={selectedAgent?.name || 'Chat com IA'}
-          description={selectedAgent?.description || 'AgentVerse Chat'}
-          modelInfo={selectedAgent?.config.model || 'Modelo padrão'}
-          tools={selectedAgent?.config.tools?.filter(t => t.enabled).length || 0}
-        >
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="md:hidden"
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
-            className="ml-2"
-            title="Painel de depuração"
-          >
-            <Bug className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleNewConversation} 
-            className="ml-2"
-          >
-            <Plus className="h-4 w-4 mr-2" /> Nova conversa
-          </Button>
-        </ChatHeader>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h2 className="text-xl font-semibold">{selectedAgent?.agentName || 'Chat com IA'}</h2>
+            <p className="text-sm text-muted-foreground">
+              {selectedAgent?.agentDescription || 'AgentVerse Chat'}
+            </p>
+            <div className="flex items-center mt-1 text-xs text-muted-foreground">
+              <span>Modelo: {selectedAgent?.agentModel || 'Modelo padrão'}</span>
+              <span className="mx-2">•</span>
+              <span>Ferramentas: {selectedAgent?.agentTools?.length || 0}</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
+              title="Painel de depuração"
+            >
+              <Bug className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleNewConversation}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Nova conversa
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="md:hidden"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
         
         {/* Área de mensagens */}
         <div className="flex-1 overflow-hidden">
@@ -250,12 +303,11 @@ export function ChatUIStreaming() {
       </Card>
       
       {/* Painel de depuração */}
-      <EventDebugPanel
+      <EventDebugPanel 
         events={events}
-        sessionState={sessionState}
+        sessionState={{}}
         isVisible={isDebugPanelOpen}
         onClose={() => setIsDebugPanelOpen(false)}
-      />
-    </div>
+      /></div>
   );
 }
