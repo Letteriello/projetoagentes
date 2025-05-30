@@ -8,6 +8,7 @@ import {
   CACHE_SIZE_UNLIMITED, 
   connectFirestoreEmulator 
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { onLog } from "firebase/app";
 
 // Enable debug logging in development
@@ -44,6 +45,9 @@ try {
 } catch (e) {
   app = initializeApp(firebaseConfig);
 }
+
+// Initialize Auth
+const auth = getAuth(app);
 
 // Initialize Firestore with enhanced error handling and resilience
 let firestore: Firestore;
@@ -103,14 +107,14 @@ if (firestore) {
   }
 }
 
-export { firestore };
+export { firestore, auth };
 
 // Log Firestore initialization
 console.log('Firestore initialized with offline persistence and optimized connection settings');
 
-// Add error handler for Firestore
+// Add error handler for Firestore & Log connection state changes
 if (firestore) {
-  firestore.toJSON = () => ({}); // Prevent circular reference in logs
+  // firestore.toJSON = () => ({}); // This line is redundant, already set above
 
   // Log connection state changes if available
   try {
@@ -148,9 +152,8 @@ if (firestore) {
 export function useFirestoreEmulator() {
   if (process.env.NODE_ENV === 'development') {
     try {
-      // connectFirestoreEmulator(firestore, 'localhost', 8080);
-      // console.log('Conectado ao emulador do Firestore');
-      console.log('Modo de desenvolvimento: Conexão com emulador DESABILITADA. Usando Firebase na nuvem.');
+      connectFirestoreEmulator(firestore, 'localhost', 8080);
+      console.log('Connected to Firestore emulator');
     } catch (e) {
       console.warn('Falha ao tentar configurar o emulador do Firestore:', e);
     }

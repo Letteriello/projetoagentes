@@ -25,11 +25,11 @@ export const ToolTabIntegration: React.FC<ToolTabIntegrationProps> = ({
   selectedToolIds,
   onToolSelectionChange,
   onConfigureTool,
-  toolConfigsApplied = {}
+  toolConfigsApplied = {},
 }) => {
   return (
     <div className="space-y-4">
-      <ToolsTab 
+      <ToolsTab
         availableTools={availableTools}
         selectedToolIds={selectedToolIds}
         onToolSelectionChange={onToolSelectionChange}
