@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { X as XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface TagInputProps extends Omit<InputProps, 'value' | 'onChange'> {
+export interface TagInputProps extends Omit<InputProps, "value" | "onChange"> {
   tags: string[];
   onTagsChange: (newTags: string[]) => void;
   placeholder?: string;
@@ -69,17 +69,35 @@ export const TagInput: React.FC<TagInputProps> = ({
       onChange={handleInputChange}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      className={cn("flex-grow", inputFieldPosition === "inline" ? "h-auto py-1 px-2 leading-tight" : "", className)}
+      className={cn(
+        "flex-grow",
+        inputFieldPosition === "inline" ? "h-auto py-1 px-2 leading-tight" : "",
+        className,
+      )}
       {...restInputProps}
       disabled={maxTags !== undefined && tags.length >= maxTags}
     />
   );
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2 p-2 border rounded-md bg-background", inputWrapperClassName)}>
-      {inputFieldPosition === "top" && <div className="w-full mb-2">{inputElement}</div>}
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-2 p-2 border rounded-md bg-background",
+        inputWrapperClassName,
+      )}
+    >
+      {inputFieldPosition === "top" && (
+        <div className="w-full mb-2">{inputElement}</div>
+      )}
       {tags.map((tag, index) => (
-        <Badge key={index} variant="secondary" className={cn("flex items-center gap-1 whitespace-nowrap", tagClassName)}>
+        <Badge
+          key={index}
+          variant="secondary"
+          className={cn(
+            "flex items-center gap-1 whitespace-nowrap",
+            tagClassName,
+          )}
+        >
           {tag}
           <button
             type="button"
@@ -92,7 +110,9 @@ export const TagInput: React.FC<TagInputProps> = ({
         </Badge>
       ))}
       {inputFieldPosition === "inline" && inputElement}
-      {inputFieldPosition === "bottom" && <div className="w-full mt-2">{inputElement}</div>}
+      {inputFieldPosition === "bottom" && (
+        <div className="w-full mt-2">{inputElement}</div>
+      )}
     </div>
   );
 };

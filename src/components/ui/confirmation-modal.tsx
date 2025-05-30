@@ -28,7 +28,14 @@ interface ConfirmationModalProps {
 
 // Minimal ButtonProps type to get variant
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: | "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | null;
+  variant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link"
+    | null;
   // Add other props if needed, like size
 }
 
@@ -54,17 +61,24 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      {children && <DialogTrigger asChild>{children}</DialogTrigger>} {/* Optional trigger if not controlled externally */}
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}{" "}
+      {/* Optional trigger if not controlled externally */}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription asChild>
-            {typeof description === "string" ? <p>{description}</p> : description}
+            {typeof description === "string" ? (
+              <p>{description}</p>
+            ) : (
+              description
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="mt-4">
           <DialogClose asChild>
-            <Button variant="outline" disabled={isConfirmLoading}>{cancelText}</Button>
+            <Button variant="outline" disabled={isConfirmLoading}>
+              {cancelText}
+            </Button>
           </DialogClose>
           <Button
             variant={confirmButtonVariant}

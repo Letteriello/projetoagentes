@@ -1,12 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { GoogleADK, sendMessageToAgent } from '@/lib/google-adk';
-import { Cpu, Info, Plus, Settings } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { GoogleADK, sendMessageToAgent } from "@/lib/google-adk";
+import { Cpu, Info, Plus, Settings } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AgentData {
   id: string;
@@ -25,16 +47,16 @@ interface AgentSelectorProps {
   triggerClassName?: string;
 }
 
-export function AgentSelector({ 
-  onAgentSelected, 
-  selectedAgentId, 
-  savedAgents, 
-  showLabel = false, 
-  triggerClassName = '' 
+export function AgentSelector({
+  onAgentSelected,
+  selectedAgentId,
+  savedAgents,
+  showLabel = false,
+  triggerClassName = "",
 }: AgentSelectorProps) {
   const [agents, setAgents] = useState<AgentData[]>([]);
   const [isConfiguring, setIsConfiguring] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState("");
   const googleADK = new GoogleADK();
 
   // Carrega os agentes disponíveis
@@ -45,17 +67,19 @@ export function AgentSelector({
   const loadAgents = () => {
     // Em um cenário real, isso buscaria da API do Google ADK
     // Por enquanto, carregamos do localStorage
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
-        const savedAgents = JSON.parse(localStorage.getItem('ADK_AGENTS') || '{}');
+        const savedAgents = JSON.parse(
+          localStorage.getItem("ADK_AGENTS") || "{}",
+        );
         const agentsList = Object.entries(savedAgents).map(([id, data]) => ({
           id,
-          ...(data as any)
+          ...(data as any),
         }));
-        
+
         setAgents(agentsList);
       } catch (error) {
-        console.error('Erro ao carregar agentes:', error);
+        console.error("Erro ao carregar agentes:", error);
         setAgents([]);
       }
     }
@@ -80,25 +104,28 @@ export function AgentSelector({
       const defaultAgents = [
         {
           name: "Assistente de Pesquisa",
-          description: "Um agente especializado em buscar e resumir informações",
+          description:
+            "Um agente especializado em buscar e resumir informações",
           tools: ["web_search"],
-          systemPrompt: "Você é um assistente de pesquisa focado em encontrar informações precisas e resumir conteúdo de forma clara e concisa."
+          systemPrompt:
+            "Você é um assistente de pesquisa focado em encontrar informações precisas e resumir conteúdo de forma clara e concisa.",
         },
         {
           name: "Analista de Dados",
           description: "Um agente para análise e visualização de dados",
           tools: ["calculator", "web_search"],
-          systemPrompt: "Você é um analista de dados especializado. Ajude a interpretar dados, realizar cálculos e oferecer insights baseados em informações numéricas."
-        }
+          systemPrompt:
+            "Você é um analista de dados especializado. Ajude a interpretar dados, realizar cálculos e oferecer insights baseados em informações numéricas.",
+        },
       ];
 
       for (const agent of defaultAgents) {
-        await import('@/lib/google-adk').then(module => {
+        await import("@/lib/google-adk").then((module) => {
           module.createCustomAgent(
             agent.name,
             agent.description,
             agent.tools,
-            agent.systemPrompt
+            agent.systemPrompt,
           );
         });
       }
@@ -106,7 +133,7 @@ export function AgentSelector({
       // Recarrega os agentes após criar os padrões
       loadAgents();
     } catch (error) {
-      console.error('Erro ao criar agentes padrão:', error);
+      console.error("Erro ao criar agentes padrão:", error);
     }
   };
 
@@ -114,14 +141,14 @@ export function AgentSelector({
     <div className="flex flex-col gap-3 w-full">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Agentes ADK</h3>
-        
+
         <div className="flex items-center gap-2">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="h-7 w-7"
                   onClick={() => setIsConfiguring(true)}
                 >
@@ -133,13 +160,13 @@ export function AgentSelector({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="h-7 w-7"
                   onClick={createDefaultAgents}
                 >
@@ -153,18 +180,15 @@ export function AgentSelector({
           </TooltipProvider>
         </div>
       </div>
-      
+
       {/* Seletor de Agentes */}
       {agents.length > 0 ? (
-        <Select 
-          value={selectedAgentId} 
-          onValueChange={handleAgentSelect}
-        >
+        <Select value={selectedAgentId} onValueChange={handleAgentSelect}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione um agente ADK" />
           </SelectTrigger>
           <SelectContent>
-            {agents.map(agent => (
+            {agents.map((agent) => (
               <SelectItem key={agent.id} value={agent.id}>
                 <div className="flex items-center gap-2">
                   <Cpu className="h-4 w-4 text-primary" />
@@ -189,50 +213,59 @@ export function AgentSelector({
           )}
         </div>
       )}
-      
+
       {/* Detalhes do Agente Selecionado */}
       {selectedAgentId && agents.length > 0 && (
         <div className="mt-2">
-          {agents.filter(a => a.id === selectedAgentId).map(agent => (
-            <Card key={agent.id} className="bg-accent/5 border-accent/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Cpu className="h-4 w-4 text-primary" />
-                  {agent.displayName}
-                </CardTitle>
-                {agent.description && (
-                  <CardDescription className="text-xs">
-                    {agent.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="pb-2">
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {agent.capabilities?.map(cap => (
-                    <Badge key={cap} variant="outline" className="text-[10px] bg-primary/10">
-                      {cap}
-                    </Badge>
-                  ))}
-                </div>
-                
-                {agent.tools && agent.tools.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs font-medium mb-1">Ferramentas:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {agent.tools.map(tool => (
-                        <Badge key={tool.name} className="text-[10px] bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">
-                          {tool.name}
-                        </Badge>
-                      ))}
-                    </div>
+          {agents
+            .filter((a) => a.id === selectedAgentId)
+            .map((agent) => (
+              <Card key={agent.id} className="bg-accent/5 border-accent/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Cpu className="h-4 w-4 text-primary" />
+                    {agent.displayName}
+                  </CardTitle>
+                  {agent.description && (
+                    <CardDescription className="text-xs">
+                      {agent.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {agent.capabilities?.map((cap) => (
+                      <Badge
+                        key={cap}
+                        variant="outline"
+                        className="text-[10px] bg-primary/10"
+                      >
+                        {cap}
+                      </Badge>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+
+                  {agent.tools && agent.tools.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium mb-1">Ferramentas:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {agent.tools.map((tool) => (
+                          <Badge
+                            key={tool.name}
+                            className="text-[10px] bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
+                          >
+                            {tool.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
         </div>
       )}
-      
+
       {/* Modal de Configuração da API */}
       <Popover open={isConfiguring} onOpenChange={setIsConfiguring}>
         <PopoverContent className="w-80">
@@ -242,11 +275,12 @@ export function AgentSelector({
               <div>
                 <h4 className="font-medium">Configurar Google ADK</h4>
                 <p className="text-xs text-muted-foreground">
-                  Insira sua API Key do Google ADK para usar recursos avançados de agentes.
+                  Insira sua API Key do Google ADK para usar recursos avançados
+                  de agentes.
                 </p>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <label htmlFor="api-key" className="text-xs font-medium">
                 API Key
@@ -260,9 +294,13 @@ export function AgentSelector({
                 placeholder="Insira sua API key do Google ADK"
               />
             </div>
-            
+
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsConfiguring(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsConfiguring(false)}
+              >
                 Cancelar
               </Button>
               <Button size="sm" onClick={handleApiKeySave}>

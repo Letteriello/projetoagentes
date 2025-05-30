@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useRef, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { StreamingMessage } from './StreamingMessage';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import React, { useRef, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { StreamingMessage } from "./StreamingMessage";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 export interface StreamingMessageItem {
   id: string;
   content: string;
-  role: 'user' | 'model' | 'system' | 'tool';
+  role: "user" | "model" | "system" | "tool";
   isPartial: boolean;
   timestamp: number;
 }
@@ -23,10 +23,10 @@ interface StreamingMessageListProps {
 export function StreamingMessageList({
   messages,
   isProcessing = false,
-  className
+  className,
 }: StreamingMessageListProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  
+
   // Rolar para o final quando novas mensagens chegarem
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -37,10 +37,7 @@ export function StreamingMessageList({
 
   return (
     <div className={cn("flex-1 overflow-hidden", className)}>
-      <ScrollArea 
-        ref={scrollAreaRef} 
-        className="h-full overflow-auto"
-      >
+      <ScrollArea ref={scrollAreaRef} className="h-full overflow-auto">
         <div className="flex flex-col gap-6 p-4 pb-20">
           <AnimatePresence initial={false}>
             {messages.length === 0 ? (
@@ -50,9 +47,12 @@ export function StreamingMessageList({
                 className="flex flex-col items-center justify-center h-full mt-20"
               >
                 <div className="text-center max-w-md space-y-4">
-                  <h2 className="text-2xl font-semibold tracking-tight">Bem-vindo ao AgentVerse</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight">
+                    Bem-vindo ao AgentVerse
+                  </h2>
                   <p className="text-muted-foreground">
-                    Inicie uma conversa com os agentes de IA. O sistema suporta streaming de respostas para uma experiência mais natural.
+                    Inicie uma conversa com os agentes de IA. O sistema suporta
+                    streaming de respostas para uma experiência mais natural.
                   </p>
                 </div>
               </motion.div>
@@ -75,7 +75,7 @@ export function StreamingMessageList({
               ))
             )}
           </AnimatePresence>
-          
+
           {/* Indicador de processamento */}
           {isProcessing && !messages[messages.length - 1]?.isPartial && (
             <motion.div

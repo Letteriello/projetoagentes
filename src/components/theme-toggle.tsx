@@ -4,17 +4,22 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  
+
   // Evita problema de hidratação (diferença entre servidor e cliente)
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   if (!mounted) {
     return (
       <Button variant="ghost" size="icon" className="w-9 h-9 opacity-0">
@@ -22,15 +27,15 @@ export function ThemeToggle() {
       </Button>
     );
   }
-  
+
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleTheme} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
             className="w-9 h-9 text-muted-foreground hover:text-foreground"
           >
             {theme === "dark" ? (

@@ -1,14 +1,27 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Code, XCircle, ChevronRight, ChevronDown, Bug, Activity, History, Tool } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Code,
+  XCircle,
+  ChevronRight,
+  ChevronDown,
+  Bug,
+  Activity,
+  History,
+  Tool,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface EventDebugPanelProps {
   events: any[];
@@ -21,9 +34,9 @@ export function EventDebugPanel({
   events = [],
   sessionState = {},
   isVisible,
-  onClose
+  onClose,
 }: EventDebugPanelProps) {
-  const [activeTab, setActiveTab] = useState('events');
+  const [activeTab, setActiveTab] = useState("events");
 
   if (!isVisible) return null;
 
@@ -33,13 +46,15 @@ export function EventDebugPanel({
         <div className="flex items-center space-x-2">
           <Bug className="h-4 w-4" />
           <h3 className="font-medium text-sm">Debug Panel</h3>
-          <Badge variant="outline" className="text-xs">Genkit</Badge>
+          <Badge variant="outline" className="text-xs">
+            Genkit
+          </Badge>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <XCircle className="h-4 w-4" />
         </Button>
       </div>
-      
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="px-4 pt-2">
           <TabsTrigger value="events" className="flex items-center gap-1">
@@ -58,13 +73,20 @@ export function EventDebugPanel({
             <span>Ferramentas</span>
           </TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="events" className="overflow-hidden h-[calc(100%-80px)]">
+
+        <TabsContent
+          value="events"
+          className="overflow-hidden h-[calc(100%-80px)]"
+        >
           <ScrollArea className="h-full p-4">
             <div className="space-y-2">
               {events.length > 0 ? (
                 events.map((event, index) => (
-                  <EventItem key={index} event={event} index={events.length - index} />
+                  <EventItem
+                    key={index}
+                    event={event}
+                    index={events.length - index}
+                  />
                 ))
               ) : (
                 <div className="flex items-center justify-center h-32 text-muted-foreground">
@@ -74,16 +96,22 @@ export function EventDebugPanel({
             </div>
           </ScrollArea>
         </TabsContent>
-        
-        <TabsContent value="state" className="overflow-hidden h-[calc(100%-80px)]">
+
+        <TabsContent
+          value="state"
+          className="overflow-hidden h-[calc(100%-80px)]"
+        >
           <ScrollArea className="h-full p-4">
             <pre className="text-xs whitespace-pre-wrap bg-muted p-4 rounded-md">
               {JSON.stringify(sessionState, null, 2)}
             </pre>
           </ScrollArea>
         </TabsContent>
-        
-        <TabsContent value="tools" className="overflow-hidden h-[calc(100%-80px)]">
+
+        <TabsContent
+          value="tools"
+          className="overflow-hidden h-[calc(100%-80px)]"
+        >
           <ScrollArea className="h-full p-4">
             <div className="space-y-4">
               <h4 className="font-medium">Ferramentas Ativas</h4>
@@ -93,7 +121,9 @@ export function EventDebugPanel({
                     <CollapsibleTrigger className="flex items-center justify-between w-full p-3 text-sm">
                       <div className="flex items-center">
                         <Code className="h-4 w-4 mr-2" />
-                        <span className="font-medium">{tool.name || `Ferramenta ${index + 1}`}</span>
+                        <span className="font-medium">
+                          {tool.name || `Ferramenta ${index + 1}`}
+                        </span>
                       </div>
                       <ChevronRight className="h-4 w-4 transition-transform ui-expanded:rotate-90" />
                     </CollapsibleTrigger>
@@ -126,31 +156,35 @@ interface EventItemProps {
 
 function EventItem({ event, index }: EventItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Determinar a cor com base no tipo de evento
   const getEventColor = () => {
     switch (event.type) {
-      case 'error':
-        return 'bg-red-500';
-      case 'tool':
-        return 'bg-blue-500';
-      case 'model':
-        return 'bg-purple-500';
-      case 'user':
-        return 'bg-green-500';
+      case "error":
+        return "bg-red-500";
+      case "tool":
+        return "bg-blue-500";
+      case "model":
+        return "bg-purple-500";
+      case "user":
+        return "bg-green-500";
       default:
-        return 'bg-gray-500';
+        return "bg-gray-500";
     }
   };
-  
+
   // Formato simplificado do timestamp
-  const formattedTime = event.timestamp 
-    ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : '';
-  
+  const formattedTime = event.timestamp
+    ? new Date(event.timestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : "";
+
   return (
     <div className="border rounded-md overflow-hidden">
-      <div 
+      <div
         className="flex items-center cursor-pointer p-2 bg-muted/50 hover:bg-muted"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -164,9 +198,13 @@ function EventItem({ event, index }: EventItemProps) {
             {formattedTime}
           </div>
         )}
-        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        {isExpanded ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
       </div>
-      
+
       {isExpanded && (
         <div className="p-3 text-xs bg-muted/30">
           <pre className="whitespace-pre-wrap">
