@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
-import { useAgents } from "@/lib/hooks/use-agents";
+import { useToast } from "@/hooks/use-toast";
+import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
 
@@ -23,8 +23,8 @@ import type {
   LLMAgentConfig,
   WorkflowAgentConfig,
   CustomAgentConfig,
-  AgentConfig,
-  ToolConfigData
+  AgentConfig as PageAgentConfig,
+  ToolConfigData as PageToolConfigData
 } from '@/app/agent-builder/page';
 
 // Import shared types
@@ -233,12 +233,12 @@ export default function AgentBuilderDialog({
   const { saveAgent } = useAgents();
 
   // Agent configuration state
-  const [agentName, setAgentName] = React.useState(editingAgent?.name || '');
-  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.description || '');
+  const [agentName, setAgentName] = React.useState(editingAgent?.agentName || "");
+  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || "");
   const [selectedAgentType, setSelectedAgentType] = React.useState<AgentType>('llm');
   const [selectedTone, setSelectedTone] = React.useState('professional');
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  const [configuringTool, setConfiguringTool] = React.useState<PageAvailableTool | null>(null);
+  const [configuringTool, setConfiguringTool] = React.useState<string[]>(editingAgent?.agentTools || []);
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, any>>({});
   const [llmConfig, setLlmConfig] = React.useState({
     model: 'gpt-4',
@@ -252,10 +252,7 @@ export default function AgentBuilderDialog({
     maxResults: 5,
     minRelevanceScore: 0.7,
   });
-  const [a2aConfig, setA2aConfig] = React.useState<A2AConfigType>({
-    enabled: false,
-    communicationChannels: [],
-  });
+  const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(editingAgent?.a2aConfig || { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', loggingEnabled: false, maxMessageSize: 1024 * 1024 });
   const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]);
   const [activeTab, setActiveTab] = React.useState('general');
   const [isSaving, setIsSaving] = React.useState(false);
@@ -270,9 +267,9 @@ export default function AgentBuilderDialog({
   // Update state when editingAgent changes
   React.useEffect(() => {
     if (editingAgent) {
-      setAgentName(editingAgent.name || '');
-      setAgentDescription(editingAgent.description || '');
-      setSelectedAgentType(editingAgent.type as AgentType);
+      setAgentName(editingAgent.agentName || "");
+      setAgentDescription(editingAgent.agentDescription || "");
+      setSelectedAgentType(editingAgent.agentType as AgentType);
       // Update other states based on editingAgent
     }
   }, [editingAgent]);
@@ -306,9 +303,9 @@ export default function AgentBuilderDialog({
       
       const agentConfig: AgentConfigBase = {
         id: editingAgent?.id || `agent-${Date.now()}`,
-        name: agentName,
-        description: agentDescription,
-        type: selectedAgentType,
+        agentName: agentName,
+        agentDescription: agentDescription,
+        agentType: selectedAgentType,
         createdAt: editingAgent?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         tools: currentAgentTools.map(tool => ({
@@ -344,7 +341,7 @@ export default function AgentBuilderDialog({
   const [agentName, setAgentName] = React.useState(editingAgent?.agentName || '');
   const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || '');
   const [selectedAgentType, setSelectedAgentType] = React.useState<AgentType>(editingAgent?.agentType || 'llm');
-  const [selectedTone, setSelectedTone] = React.useState(editingAgent?.tone || agentToneOptions[0]?.id || '');
+  const [selectedTone, setSelectedTone] = React.useState(editingAgent?.agentPersonality || (agentToneOptions.length > 0 ? agentToneOptions[0].label : ""));
   
   // Tool configuration state
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
@@ -359,24 +356,15 @@ export default function AgentBuilderDialog({
   );
   
   // RAG configuration state
-  const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>({
-    enabled: false,
-    serviceType: 'in-memory',
-    similarityTopK: 5,
-    vectorDistanceThreshold: 0.8,
-    embeddingModel: 'default',
-    knowledgeSources: [],
-    includeConversationContext: true,
-    persistentMemory: false
-  });
+  const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(editingAgent?.ragMemoryConfig || { enabled: false, serviceType: 'in-memory', similarityTopK: 5, vectorDistanceThreshold: 0.7, embeddingModel: "", knowledgeSources: [], includeConversationContext: true, persistentMemory: false });
   
   // A2A configuration state
   const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     enabled: false,
     communicationChannels: [],
     defaultResponseFormat: 'json',
-    maxMessageSize: 4096,
-    loggingEnabled: true
+    loggingEnabled: false,
+    maxMessageSize: 1024 * 1024
   });
   
   // Artifacts state
@@ -404,7 +392,7 @@ export default function AgentBuilderDialog({
   const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(
     editingAgent?.agentTools || []
   );
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
+  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, PageToolConfigData>>(editingAgent?.toolConfigsApplied || {});
   
   // State persistence
   const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false);
@@ -421,8 +409,8 @@ export default function AgentBuilderDialog({
     enabled: false,
     serviceType: "in-memory",
     similarityTopK: 5,
-    vectorDistanceThreshold: 0.8,
-    embeddingModel: "openai",
+    vectorDistanceThreshold: 0.7,
+    embeddingModel: "",
     knowledgeSources: [],
     includeConversationContext: true,
     persistentMemory: false
@@ -440,8 +428,8 @@ export default function AgentBuilderDialog({
     communicationChannels: [],
     enabled: false,
     defaultResponseFormat: "json",
-    maxMessageSize: 4096,
-    loggingEnabled: true
+    loggingEnabled: false,
+    maxMessageSize: 1024 * 1024
   });
   
   // Tool configuration modal
@@ -452,9 +440,8 @@ export default function AgentBuilderDialog({
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>("");
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>("");
   const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>("");
-  const [modalApiKey, setModalApiKey] = React.useState<string>("");
-  const [modalApiEndpoint, setModalApiEndpoint] = React.useState<string>("");
   const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>("");
+  const [modalApiEndpoint, setModalApiEndpoint] = React.useState<string>("");
   const [modalDbType, setModalDbType] = React.useState<string>("");
   const [modalDbHost, setModalDbHost] = React.useState<string>("");
   const [modalDbPort, setModalDbPort] = React.useState<string>("");
@@ -480,74 +467,6 @@ export default function AgentBuilderDialog({
   };
   
   // Handle saving tool configuration from the modal
-  // handleSaveToolConfiguration is defined later in the file, so we'll remove this duplicate
-
-  const openToolConfigModal = (tool: PageAvailableTool) => {
-    setConfiguringTool(tool);
-    setIsToolConfigModalOpen(true);
-    
-    // Load existing configuration if available
-    const existingConfig = toolConfigurations[tool.id];
-    if (existingConfig) {
-      if (tool.id === "webSearch") {
-        setModalGoogleApiKey(existingConfig.googleApiKey || "");
-        setModalGoogleCseId(existingConfig.googleCseId || "");
-      } else if (tool.id === "customApiIntegration") {
-        setModalOpenapiSpecUrl(existingConfig.openapiSpecUrl || "");
-        setModalOpenapiApiKey(existingConfig.apiKey || "");
-        setModalApiEndpoint(existingConfig.apiEndpoint || "");
-      } else if (tool.id === "databaseAccess") {
-        setModalDbType(existingConfig.dbType || "");
-        setModalDbHost(existingConfig.dbHost || "");
-        setModalDbPort(existingConfig.dbPort || "");
-        setModalDbName(existingConfig.dbName || "");
-        setModalDbUser(existingConfig.dbUser || "");
-        setModalDbPassword(existingConfig.dbPassword || "");
-        setModalDbConnectionString(existingConfig.dbConnectionString || "");
-        setModalDbDescription(existingConfig.dbDescription || "");
-      } else if (tool.id === "knowledgeBase") {
-        setModalKnowledgeBaseId(existingConfig.knowledgeBaseId || "");
-      } else if (tool.id === "calendarAccess") {
-        setModalCalendarApiEndpoint(existingConfig.calendarApiEndpoint || "");
-      }
-    } else {
-      // Reset form fields if no existing configuration
-      setModalGoogleApiKey("");
-      setModalGoogleCseId("");
-      setModalOpenapiSpecUrl("");
-      setModalOpenapiApiKey("");
-      setModalApiEndpoint("");
-      setModalDbType("");
-      setModalDbHost("");
-      setModalDbPort("");
-      setModalDbName("");
-      setModalDbUser("");
-      setModalDbPassword("");
-      setModalDbConnectionString("");
-      setModalDbDescription("");
-      setModalKnowledgeBaseId("");
-      setModalCalendarApiEndpoint("");
-      setModalGoogleCseId(existingConfig.googleCseId || "");
-    } else if (tool.id === "customApiIntegration") {
-        setModalOpenapiSpecUrl(existingConfig.openapiSpecUrl || "");
-        setModalOpenapiApiKey(existingConfig.openapiApiKey || "");
-      } else if (tool.id === "databaseAccess") {
-        setModalDbType(existingConfig.dbType || "");
-        setModalDbHost(existingConfig.dbHost || "");
-        setModalDbPort(existingConfig.dbPort || "");
-        setModalDbName(existingConfig.dbName || "");
-        setModalDbUser(existingConfig.dbUser || "");
-        setModalDbPassword(existingConfig.dbPassword || "");
-        setModalDbConnectionString(existingConfig.dbConnectionString || "");
-        setModalDbDescription(existingConfig.dbDescription || "");
-      } else if (tool.id === "knowledgeBase") {
-        setModalKnowledgeBaseId(existingConfig.knowledgeBaseId || "");
-      } else if (tool.id === "calendarAccess") {
-        setModalCalendarApiEndpoint(existingConfig.calendarApiEndpoint || "");
-      }
-    }
-  };
-
   const handleSaveToolConfiguration = () => {
     if (!configuringTool) return;
     
@@ -827,9 +746,9 @@ const prepareWorkflowConfig = () => {
                                                         />
                                                     </div>
                                                 </>
-                                            )}
-                                        </>
-                                    )}
+                                            </>
+                                        )}
+                                    </>
                                 </div>
                             </>
                         )}
