@@ -1,6 +1,5 @@
 
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Toaster } from "@/components/ui/toaster";
@@ -8,8 +7,7 @@ import { AgentsProvider } from '@/contexts/AgentsContext';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import ErrorBoundaryClient from '@/components/error-boundary-client';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+import { inter } from './fonts';
 
 export const metadata: Metadata = {
   title: 'AgentVerse',
@@ -23,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
+      <body className={`antialiased font-sans ${inter.className}`} suppressHydrationWarning>
         <ErrorBoundaryClient>
           <ThemeProvider>
             <AgentsProvider>

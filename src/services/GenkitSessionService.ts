@@ -115,13 +115,13 @@ export class GenkitSessionService {
     }
     
     // Construir o histórico para o modelo
-    const modelHistory = [];
+    const modelHistory: Array<{role: string; content: any}> = [];
     
     // Adicionar prompt de sistema se existir
     if (options.systemPrompt) {
       modelHistory.push({
         role: 'system',
-        content: [{ text: options.systemPrompt }]
+        content: { parts: [{ text: options.systemPrompt }] }
       });
     }
     
@@ -132,7 +132,7 @@ export class GenkitSessionService {
         if (event.content) {
           modelHistory.push({
             role: event.content.role,
-            content: event.content.parts
+            content: { parts: [...event.content.parts] }
           });
         }
       }
@@ -141,13 +141,13 @@ export class GenkitSessionService {
     // Adicionar a mensagem atual do usuário
     modelHistory.push({
       role: 'user',
-      content: userMessageContent
+      content: { parts: [...userMessageContent] }
     });
     
     // Evento da mensagem do usuário para armazenar no histórico da sessão
     const userEvent: Event = {
       content: {
-        parts: userMessageContent.map(part => part),
+        parts: [...userMessageContent],
         role: 'user'
       }
     };
@@ -164,7 +164,7 @@ export class GenkitSessionService {
       console.log('Gerando conteúdo com modelo:', 
         options.modelId || 'default', 
         'config:', modelConfig,
-        'tools:', options.tools ? options.tools.map(t => t.name) : 'none'
+        'tools:', options.tools ? options.tools.map((t: any) => t.name) : 'none'
       );
       
       // Chamar o modelo com streaming
@@ -196,7 +196,7 @@ export class GenkitSessionService {
             const partialEvent: Event = {
               content: {
                 parts: [{ text: chunkText }],
-                role: 'model'
+                role: 'model' as const
               },
               partial: !done,
               actions: []
@@ -208,7 +208,7 @@ export class GenkitSessionService {
               
               partialEvent.actions = [
                 {
-                  type: 'state_delta',
+                  type: 'state_delta' as const,
                   changes: { 
                     lastUserMessage: input,
                     lastInteractionTime: new Date().toISOString(),
@@ -236,7 +236,7 @@ export class GenkitSessionService {
           yield {
             content: {
               parts: [{ text: `Erro: ${e instanceof Error ? e.message : String(e)}` }],
-              role: 'model'
+              role: 'model' as const
             },
             actions: []
           };
@@ -247,12 +247,12 @@ export class GenkitSessionService {
           const finalEvent: Event = {
             content: {
               parts: [{ text: accumulatedText }],
-              role: 'model'
+              role: 'model' as const
             },
             turn_complete: true,
             actions: [
               {
-                type: 'is_final_response'
+                type: 'is_final_response' as const
               }
             ]
           };
@@ -267,12 +267,12 @@ export class GenkitSessionService {
         const modelEvent: Event = {
           content: {
             parts: [{ text: response.text || 'Sem resposta do modelo.' }],
-            role: 'model'
+            role: 'model' as const
           },
           turn_complete: true,
           actions: [
             {
-              type: 'state_delta',
+              type: 'state_delta' as const,
               changes: { 
                 lastUserMessage: input,
                 lastInteractionTime: new Date().toISOString(),
@@ -359,166 +359,6 @@ export class GenkitSessionService {
     const session = this.sessions.get(sessionId);
     return session ? session.history : null;
   }
-}
-
-// Singleton para uso em toda a aplicação
-export const genkitSessionService = new GenkitSessionService();  /**
-   * Processa eventos gerados durante a interação com o modelo
-   * Ideal para processamento síncrono de eventos com callback
-   */
-  async processUserInputWithCallback({
-    sessionId, 
-    input,
-    options = {},
-    onEvent
-  }: {
-    sessionId: string;
-    input: string;
-    options?: {
-      modelId?: string;
-      systemPrompt?: string;
-      tools?: any[];
-      temperature?: number;
-      fileDataUri?: string;
-    };
-    onEvent: (event: Event) => void;
-  }): Promise<void> {
-    try {
-      // Se existirem ferramentas configuradas, registre-as no estado da sessão
-      if (options.tools && options.tools.length > 0) {
-        const session = await this.getOrCreateSession(sessionId);
-        
-        // Atualizar estado com ferramentas disponíveis
-        this.updateSessionState(sessionId, {
-          availableTools: options.tools.map(tool => ({
-            name: tool.name,
-            description: tool.description,
-            enabled: true
-          }))
-        });
-        
-        // Notificar sobre registro de ferramentas
-        onEvent({
-          type: 'toolsRegistered',
-          content: {
-            parts: [{ text: `${options.tools.length} ferramentas registradas` }],
-            role: 'system'
-          },
-          actions: [
-            {
-              type: 'state_delta',
-              changes: {
-                toolsRegistered: true,
-                toolCount: options.tools.length
-              }
-            }
-          ]
-        } as any);
-      }
-
-      // Criar stream de eventos
-      const eventStream = this.processUserInput(sessionId, input, options);
-      
-      // Processar cada evento do stream
-      for await (const event of eventStream) {
-        // Detectar chamadas de função (ferramentas)
-        if (event.content?.parts?.some(part => part.function_call)) {
-          const functionPart = event.content.parts.find(part => part.function_call);
-          
-          if (functionPart?.function_call) {
-            // Extrair detalhes da chamada de função
-            const { name, arguments: args } = functionPart.function_call;
-            
-            // Encontrar a ferramenta correspondente
-            const tool = options.tools?.find(t => t.name === name);
-            
-            if (tool) {
-              // Evento de início da ferramenta
-              onEvent({
-                type: 'toolStart',
-                content: {
-                  parts: [{ text: `Iniciando ferramenta: ${name}` }],
-                  role: 'tool'
-                },
-                data: {
-                  name,
-                  args,
-                  timestamp: Date.now()
-                }
-              } as any);
-              
-              try {
-                // Executar a ferramenta
-                const result = await tool.handler(args);
-                
-                // Evento de conclusão da ferramenta
-                onEvent({
-                  type: 'toolComplete',
-                  content: {
-                    parts: [
-                      { 
-                        function_response: {
-                          name,
-                          response: result
-                        }
-                      }
-                    ],
-                    role: 'tool'
-                  },
-                  data: {
-                    name,
-                    result,
-                    timestamp: Date.now()
-                  }
-                } as any);
-                
-                // Atualizar estado com resultado da ferramenta
-                this.updateSessionState(sessionId, {
-                  [`toolResult_${name}`]: {
-                    timestamp: Date.now(),
-                    result
-                  }
-                });
-                
-              } catch (error) {
-                // Evento de erro da ferramenta
-                onEvent({
-                  type: 'toolError',
-                  content: {
-                    parts: [{ text: `Erro ao executar ferramenta ${name}: ${error instanceof Error ? error.message : String(error)}` }],
-                    role: 'system'
-                  },
-                  data: {
-                    name,
-                    error: error instanceof Error ? error.message : String(error),
-                    timestamp: Date.now()
-                  }
-                } as any);
-              }
-            }
-          }
-        }
-        
-        // Propagar o evento para o callback
-        onEvent(event);
-      }
-      
-    } catch (error) {
-      console.error("Erro no processamento de entrada com callback:", error);
-      
-      // Notificar erro
-      onEvent({
-        type: 'error',
-        content: {
-          parts: [{ text: `Erro: ${error instanceof Error ? error.message : String(error)}` }],
-          role: 'system'
-        }
-      } as any);
-      
-      throw error;
-    }
-  }
-  
   /**
    * Atualiza o estado de uma sessão
    */

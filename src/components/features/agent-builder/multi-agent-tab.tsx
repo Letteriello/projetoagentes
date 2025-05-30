@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";/sub-agent-selector";
+import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
 
 interface MultiAgentTabProps {
   isRootAgent: boolean;
