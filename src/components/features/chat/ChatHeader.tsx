@@ -44,9 +44,9 @@ interface ChatHeaderProps {
   selectedADKAgentId: string | null;
   setSelectedADKAgentId: (id: string | null) => void;
   adkAgents: ADKAgent[];
-  selectedAgentId: string | null;
-  setSelectedAgentId: (id: string | null) => void;
-  savedAgents: SavedAgentConfiguration[];
+  // selectedAgentId: string | null; // Unused prop
+  // setSelectedAgentId: (id: string | null) => void; // Unused prop
+  // savedAgents: SavedAgentConfiguration[]; // Unused prop
   selectedGemId: string | null;
   setSelectedGemId: (id: string | null) => void;
   initialGems: Gem[];
@@ -65,9 +65,9 @@ export default function ChatHeader({
   selectedADKAgentId,
   setSelectedADKAgentId,
   adkAgents,
-  selectedAgentId,
-  setSelectedAgentId,
-  savedAgents,
+  // selectedAgentId, // Unused prop
+  // setSelectedAgentId, // Unused prop
+  // savedAgents, // Unused prop
   selectedGemId,
   setSelectedGemId,
   initialGems,

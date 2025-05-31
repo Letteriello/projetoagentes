@@ -6,7 +6,7 @@
  */
 import { defineFlow } from '@genkit-ai/core';
 import { z } from 'zod';
-import { ai, generate, type MessageData } from '@genkit-ai/ai'; // For history type
+import { ai, generate, type MessageData, type Part } from '@genkit-ai/ai'; // For history type, added Part
 import { gemini15Pro } from '@genkit-ai/googleai'; // Using Gemini 1.5 Pro, removed unused gemini10Pro
 import { logger } from '@/lib/logger'; // Assuming a logger
 
@@ -110,8 +110,9 @@ export const agentCreatorFlow = defineFlow(
     ];
 
     history.forEach((h: MessageData) => {
-        if (h.role && h.content && Array.isArray(h.content) && h.content.every((c: any) => typeof c.text === 'string')) { // c should be Part, but MessageData/Part resolution is an issue
-            messages.push(h as MessageData);
+        // Ensure content is an array of Parts and all parts are text.
+        if (h.role && h.content && Array.isArray(h.content) && h.content.every((c: Part) => typeof c.text === 'string')) {
+            messages.push(h as MessageData); // Cast is okay if structure aligns, which it does due to the check.
         }
     });
     messages.push({ role: 'user', content: [{ text: userMessage }] });
@@ -138,83 +139,90 @@ export const agentCreatorFlow = defineFlow(
 
         if (match && match[1]) {
           const jsonString = match[1];
-          // Potential JSON block found. We need to ensure it's complete.
-          // This simple check assumes the JSON block, once started with ```json, will end with ```.
-          // A more robust solution might involve checking for balanced braces or using a streaming JSON parser.
+          // Potential JSON block found.
+          // Attempt to parse ONLY if it seems like a complete block (ends with ```)
+          // This is a heuristic; a more robust parser would track nesting.
+          // For now, we rely on the stream ending to finalize parsing attempts.
+          if (accumulatedText.trim().endsWith("```")) {
+            try {
+              const parsedConfig = JSON.parse(jsonString);
+              logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON during stream.");
 
-          try {
-            const parsedConfig = JSON.parse(jsonString);
-            logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON.");
+              const textBeforeJson = accumulatedText.substring(0, match.index!).trim();
+              if (textBeforeJson) {
+                streamCallback?.({ agentResponseChunk: textBeforeJson });
+              }
 
-            // What was before the JSON block? Stream it if it exists and wasn't just whitespace.
-            const textBeforeJson = accumulatedText.substring(0, match.index).trim();
-            if (textBeforeJson) {
-              streamCallback?.({ agentResponseChunk: textBeforeJson });
+              streamCallback?.({
+                agentResponseChunk: "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes.",
+                suggestedConfig: parsedConfig
+              });
+
+              const textAfterJson = accumulatedText.substring(match.index! + match[0].length).trim();
+              if (textAfterJson) {
+                streamCallback?.({ agentResponseChunk: textAfterJson });
+              }
+              accumulatedText = ""; // Clear buffer as JSON part is handled and considered complete.
+              return; // End processing for this flow.
+            } catch (e: any) {
+              // Parsing failed, but it's inside the loop.
+              // Do nothing here; continue accumulating. The JSON might be incomplete.
+              // The final check after the loop will handle persistent errors.
+              logger.debug('[AgentCreatorFlow] JSON parsing failed mid-stream, continuing accumulation. Error:', e.message);
             }
-
-            streamCallback?.({
-              agentResponseChunk: "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes.",
-              suggestedConfig: parsedConfig
-            });
-
-            // What was after the JSON block? Stream it.
-            const textAfterJson = accumulatedText.substring(match.index! + match[0].length).trim();
-            if (textAfterJson) {
-              streamCallback?.({ agentResponseChunk: textAfterJson });
-            }
-            accumulatedText = ""; // Clear buffer as JSON part is handled
-            return; // End processing for this flow after successfully sending config.
-          } catch (e: any) {
-            // JSON parsing error. This could mean the JSON is incomplete in this chunk.
-            // Or it's genuinely malformed. For now, we'll assume it might be incomplete and continue accumulating.
-            // If it's the *very end* of the stream and it's still broken, then it's an error.
-            if (!llmResponse.stream().readable) { // Approximating end of stream
-                logger.warn('[AgentCreatorFlow] Failed to parse agent configuration JSON at end of stream:', e);
-                streamCallback?.({
-                    agentResponseChunk: "I tried to generate the agent configuration as JSON, but there was an issue with its format. Raw data: \n" + jsonString,
-                    error: `Failed to parse agent configuration JSON. Error: ${e.message}`,
-                    rawJsonForDebug: jsonString
-                });
-                accumulatedText = ""; // Clear buffer
-            }
-            // else, continue accumulating, assuming JSON might be split across chunks
           }
         }
       } // End of for-await loop
 
-      // If loop finishes and there's accumulated text without recognized/parsed JSON
+      // After the stream has finished, process the fully accumulatedText
       if (accumulatedText.trim()) {
-        // Check one last time for JSON, in case it was the entire accumulated text
         const jsonRegex = /```json\n([\s\S]*?)\n```/;
         const match = accumulatedText.match(jsonRegex);
+
         if (match && match[1]) {
-            const jsonString = match[1];
-            try {
-                const parsedConfig = JSON.parse(jsonString);
-                logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON from final accumulated text.");
-                streamCallback?.({
-                  agentResponseChunk: "I've drafted the agent configuration. Please review it.",
-                  suggestedConfig: parsedConfig
-                });
-            } catch (e:any) {
-                logger.warn('[AgentCreatorFlow] Failed to parse JSON from final accumulated text:', e);
-                streamCallback?.({
-                    agentResponseChunk: "I attempted to provide a configuration, but it seems to be malformed. Accumulated text: " + accumulatedText,
-                    error: `Malformed configuration JSON in final accumulated text. Error: ${e.message}`,
-                    rawJsonForDebug: jsonString
-                });
+          const jsonString = match[1];
+          try {
+            const parsedConfig = JSON.parse(jsonString);
+            logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON from final accumulated text.");
+
+            const textBeforeJson = accumulatedText.substring(0, match.index!).trim();
+            if (textBeforeJson) {
+                streamCallback?.({ agentResponseChunk: textBeforeJson });
             }
+
+            streamCallback?.({
+              agentResponseChunk: "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes.", // Consistent message
+              suggestedConfig: parsedConfig
+            });
+
+            const textAfterJson = accumulatedText.substring(match.index! + match[0].length).trim();
+            if (textAfterJson) {
+                streamCallback?.({ agentResponseChunk: textAfterJson });
+            }
+
+          } catch (e: any) {
+            logger.warn('[AgentCreatorFlow] Failed to parse JSON from final accumulated text:', e);
+            // Send the conversational part that might have preceded the malformed JSON.
+            const textBeforePotentialJson = match.index! > 0 ? accumulatedText.substring(0, match.index!).trim() : "";
+            if (textBeforePotentialJson) {
+                 streamCallback?.({ agentResponseChunk: textBeforePotentialJson });
+            }
+            streamCallback?.({
+              agentResponseChunk: "\n\nI attempted to provide a configuration, but it seems to be malformed.",
+              error: `Malformed configuration JSON. Please review the raw output. Error: ${e.message}`,
+              rawJsonForDebug: jsonString // jsonString is from match[1], so it's the content within ```json ... ```
+            });
+          }
         } else {
-            // No JSON found, just stream the remaining text
-            streamCallback?.({ agentResponseChunk: accumulatedText });
+          // No JSON block found in the entire accumulated text, stream as plain text.
+          streamCallback?.({ agentResponseChunk: accumulatedText });
         }
       }
-
     } catch (err: unknown) {
       logger.error('[AgentCreatorFlow] Error in generate call or streaming loop:', err);
-      if (streamCallback) { // Ensure streamCallback is defined before using
+      if (streamCallback) {
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during agent creation LLM call.';
-        streamCallback?.({ error: errorMessage });
+        streamCallback({ error: errorMessage }); // Removed optional chaining as we are inside an if (streamCallback)
       }
     }
   }
