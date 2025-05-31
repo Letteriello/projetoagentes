@@ -1,3 +1,7 @@
+// DEPRECATED: This file and its functions (e.g., convertToGoogleADKConfig) do not appear to be actively used or imported elsewhere in the project.
+// It might be related to an old or experimental Google ADK integration.
+// Verify no active critical dependencies before actual removal.
+
 /**
  * Utilitários para conversão entre o formato interno de agentes e o formato do Google ADK
  */

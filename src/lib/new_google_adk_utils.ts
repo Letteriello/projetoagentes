@@ -1,3 +1,7 @@
+// DEPRECATED: This file and its functions (e.g., convertToGoogleADKConfig) do not appear to be actively used or imported elsewhere in the project.
+// It might be related to an old or experimental Google ADK integration. The types imported from "@ "@/types/new_agent_types" also seem to be part of this unused feature.
+// Verify no active critical dependencies before actual removal.
+
 // In src/lib/new_google_adk_utils.ts
 import type {
   AgentConfig,
