@@ -168,6 +168,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       onOpenChange(open);
     }}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+  <DialogHeader>
+    <DialogTitle>Configurar Agente</DialogTitle>
+  </DialogHeader>
         {isToolConfigModalOpen && (
           <DialogContent className="max-w-md">
             <DialogHeader>
