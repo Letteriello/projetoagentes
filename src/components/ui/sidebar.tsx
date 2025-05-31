@@ -35,6 +35,8 @@ type SidebarContextValue = {
   toggleSidebar: () => void;
   collapsible?: "offcanvas" | "icon" | "none";
   mounted: boolean;
+  isPinnedOpen: boolean; // For icon collapsible hover behavior
+  setIsPinnedOpen: (pinned: boolean) => void; // For icon collapsible hover behavior
 };
 
 const SidebarContext = React.createContext<SidebarContextValue | null>(null);
@@ -74,6 +76,7 @@ export const SidebarProvider = React.forwardRef<
     // Initialize with defaultOpen, cookie override happens in useEffect
     const [_open, _setOpen] = React.useState(defaultOpen);
     const [mounted, setMounted] = React.useState(false);
+    const [isPinnedOpen, setIsPinnedOpen] = React.useState(false); // State for pinned open
 
     const collapsible = isMobile ? "offcanvas" : collapsibleProp;
 
@@ -120,9 +123,13 @@ export const SidebarProvider = React.forwardRef<
       if (isMobile) {
         setOpenMobile((current) => !current);
       } else if (collapsible !== "none") {
-        setOpen((current) => !current);
+        const newOpenState = !open; // Calculate new state based on current `open`
+        setOpen(newOpenState);
+        if (collapsible === 'icon') {
+          setIsPinnedOpen(newOpenState); // Pin if opened, unpin if closed by toggle
+        }
       }
-    }, [isMobile, setOpen, setOpenMobile, collapsible]);
+    }, [isMobile, setOpen, setOpenMobile, collapsible, open, setIsPinnedOpen]); // Added open and setIsPinnedOpen to dependencies
 
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
@@ -153,6 +160,8 @@ export const SidebarProvider = React.forwardRef<
         toggleSidebar,
         collapsible,
         mounted,
+        isPinnedOpen,
+        setIsPinnedOpen,
       }),
       [
         state,
@@ -164,6 +173,8 @@ export const SidebarProvider = React.forwardRef<
         toggleSidebar,
         collapsible,
         mounted,
+        isPinnedOpen,
+        setIsPinnedOpen,
       ],
     );
 
@@ -217,28 +228,26 @@ export const Sidebar = React.forwardRef<
     ref,
   ) => {
     const context = useSidebar();
-    const { isMobile, state, open, setOpen, openMobile, setOpenMobile, mounted } = context;
+    const { isMobile, state, open, setOpen, openMobile, setOpenMobile, mounted, isPinnedOpen, setIsPinnedOpen } = context;
     const collapsible = collapsibleOverride || context.collapsible; // Prefer override, then context
     const variant = variantProp || "sidebar"; // Default to sidebar if not provided
     
-    // Estado para controlar a expansão automática por hover
-    const [isHovering, setIsHovering] = React.useState(false)
-    
-    // Handler para quando o mouse entra na área da sidebar
+    // Estado para controlar a expansão automática por hover (isHovering local ao Sidebar)
+    const [isHoveringLocal, setIsHoveringLocal] = React.useState(false);
+
     const handleMouseEnter = React.useCallback(() => {
-      if (!isMobile && collapsible === 'icon' && !isHovering) {
-        setIsHovering(true)
-        setOpen(true)
+      if (!isMobile && collapsible === 'icon' && !isPinnedOpen && !isHoveringLocal) {
+        setIsHoveringLocal(true);
+        setOpen(true);
       }
-    }, [isMobile, collapsible, isHovering, setOpen])
+    }, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen, setIsHoveringLocal]);
     
-    // Handler para quando o mouse sai da área da sidebar
     const handleMouseLeave = React.useCallback(() => {
-      if (!isMobile && collapsible === 'icon' && isHovering) {
-        setIsHovering(false)
-        setOpen(false)
+      if (!isMobile && collapsible === 'icon' && !isPinnedOpen && isHoveringLocal) {
+        setIsHoveringLocal(false);
+        setOpen(false);
       }
-    }, [isMobile, collapsible, isHovering, setOpen])
+    }, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen, setIsHoveringLocal]);
 
     if (!mounted) {
       return null; // Defer rendering until client-mounted to avoid hydration issues

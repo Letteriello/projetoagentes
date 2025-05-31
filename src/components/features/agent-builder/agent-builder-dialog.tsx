@@ -58,7 +58,19 @@ import {
 
 import { v4 as uuidv4 } from "uuid";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AgentFramework, AgentConfig, SavedAgentConfiguration, A2AConfig, RagMemoryConfig, ArtifactDefinition, ToolConfigData, AvailableTool, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig } from "@/types/agent-configs"; // AvailableTool type is re-exported by agent-configs, KnowledgeSource removed, added specific agent configs
+// Consolidated imports:
+import {
+  AgentFramework,
+  AgentConfig,
+  SavedAgentConfiguration,
+  A2AConfig,
+  RagMemoryConfig,
+  ArtifactDefinition,
+  ToolConfigData,
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig
+} from "@/types/agent-configs";
 import type { KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab"; // Correct import for KnowledgeSource
 import { availableTools as availableToolsList } from "@/data/available-tools"; 
 import { useAgents } from "@/contexts/AgentsContext";
@@ -73,33 +85,14 @@ import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
 
-
-// Types are now imported from @/types/agent-configs and @/types/agent-types
-import type {
-  SavedAgentConfiguration,
-  AgentConfig, // General union type
-  LLMAgentConfig,
-  WorkflowAgentConfig,
-  CustomAgentConfig, // Added for completeness
-  A2AAgentSpecialistConfig, // Added for completeness
-  ToolConfigData
-} from "@/types/agent-configs";
-import { AvailableTool } from "@/types/agent-types"; // This seems to be the correct source
-import { ArtifactDefinition, RagMemoryConfig, TerminationConditionType, A2AConfigType } from "@/types/agent-types";
-// Definimos localmente os tipos que estão faltando
-// RagMemoryConfig está disponível em memory-knowledge-tab, mas não é exportado, então definimos aqui
-
-// Definindo tipos que estavam faltando
-type TerminationConditionType = "none" | "tool" | "state";
-
-// Definindo o tipo A2AConfigType usado nas configurações de comunicação entre agentes
-type A2AConfigType = {
-  enabled: boolean;
-  communicationChannels: any[]; 
-  defaultResponseFormat: string;
-  maxMessageSize: number;
-  loggingEnabled: boolean;
-};
+// agent-types imports:
+import {
+  AvailableTool,
+  TerminationConditionType
+  // A2AConfigType is removed in favor of A2AConfig from agent-configs
+  // ArtifactDefinition and RagMemoryConfig are taken from agent-configs
+} from "@/types/agent-types";
+// Removed redundant local type definitions for TerminationConditionType and A2AConfigType
 
 import { AgentTemplate } from "@/data/agentBuilderConfig";
 
@@ -112,7 +105,6 @@ interface AgentBuilderDialogProps {
   agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string; }>;
   agentToneOptions: { id: string; label: string; }[];
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>; // Mapeamento de nomes de ícones para componentes React, usado na aba Ferramentas.
-  iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
   agentTemplates: AgentTemplate[];
 }
 
@@ -156,7 +148,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   // --- Estados para Gerenciamento de Artefatos ---
   const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(false); // Controla se o armazenamento de artefatos está habilitado.
-  const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>('memory'); // Tipo de armazenamento para artefatos (memória, sistema de arquivos local, nuvem).
+  const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'local' | 'cloud'>('memory'); // Tipo de armazenamento para artefatos (memória, sistema de arquivos local, nuvem). Aligned with AgentConfig type.
   const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]); // Lista de definições de artefatos que o agente pode produzir ou consumir.
   const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(""); // Nome do bucket na nuvem para armazenamento de artefatos.
   const [localStoragePath, setLocalStoragePath] = React.useState<string>(""); // Caminho no sistema de arquivos local para armazenamento de artefatos, usado se `artifactStorageType` for 'filesystem'.
@@ -182,14 +174,16 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [enableRAG, setEnableRAG] = React.useState<boolean>(false); // Chave booleana geral para habilitar/desabilitar a seção RAG na UI.
 
   // --- Estado para Configuração A2A (Agent-to-Agent Communication) ---
-  const initialA2AConfig: A2AConfigType = { // Configuração inicial/padrão para A2A.
+  const initialA2AConfig: A2AConfig = { // Configuração inicial/padrão para A2A using imported A2AConfig type.
       enabled: false, // Indica se a comunicação A2A está habilitada para o agente.
       communicationChannels: [], // Lista de canais de comunicação (ex: direct, message_queue) configurados para A2A.
       defaultResponseFormat: 'text', // Formato padrão das respostas nas comunicações A2A.
       maxMessageSize: 1024 * 1024, // Tamanho máximo (em bytes) para mensagens trocadas via A2A.
       loggingEnabled: false, // Se o logging detalhado deve ser habilitado para a comunicação A2A.
+      // specialists: [], // Added if specialists is a required field in A2AConfig
+      // allowedOrigins: [], // Added if allowedOrigins is a required field in A2AConfig
   };
-  const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig); // Objeto que armazena a configuração detalhada para comunicação A2A.
+  const [a2aConfig, setA2AConfig] = React.useState<A2AConfig>(initialA2AConfig); // Objeto que armazena a configuração detalhada para comunicação A2A.
 
   // --- Estados para Campos de Workflow (relevante se `selectedAgentType` for 'workflow') ---
   const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>("none"); // Define como um loop em um workflow pode ser terminado (ex: 'none', 'tool_success', 'state_change').
@@ -237,166 +231,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const { savedAgents: allSavedAgents } = useAgents(); // Para popular o seletor de sub-agentes.
 
   // Memoiza a lista de agentes disponíveis para seleção como sub-agentes, excluindo o agente atualmente em edição.
-  // Core Agent Properties
-  const [agentName, setAgentName] = React.useState<string>("");
-  const [agentDescription, setAgentDescription] = React.useState<string>("");
-  const [agentVersion, setAgentVersion] = React.useState<string>("1.0.0");
-  const [agentFramework, setAgentFramework] = React.useState<AgentFramework>("genkit");
-  const [selectedAgentType, setSelectedAgentType] = React.useState<"llm" | "workflow" | "custom" | "a2a">("llm");
-
-  // Multi-Agent Properties
-  const [isRootAgent, setIsRootAgent] = React.useState<boolean>(true);
-  const [subAgentIds, setSubAgentIds] = React.useState<string[]>([]);
-
-  // Behavior & Prompting - Common
-  const [globalInstruction, setGlobalInstruction] = React.useState<string>("");
-  const [systemPromptGenerated, setSystemPromptGenerated] = React.useState<string>("");
-
-  // Behavior & Prompting - LLM Specific
-  const [agentGoal, setAgentGoal] = React.useState<string>("");
-  const [agentTasks, setAgentTasks] = React.useState<string[]>([]);
-  const [agentPersonality, setAgentPersonality] = React.useState<string>(agentToneOptions[0]?.id || "");
-  const [agentRestrictions, setAgentRestrictions] = React.useState<string[]>([]);
-  const [agentModel, setAgentModel] = React.useState<string>("gemini-1.5-flash");
-  const [agentTemperature, setAgentTemperature] = React.useState<number>(0.7);
-
-  // Behavior & Prompting - Workflow Specific
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<"sequential" | "graph" | "stateMachine" | undefined>("sequential");
-  const [workflowDescription, setWorkflowDescription] = React.useState<string>("");
-  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(undefined);
-
-  // Behavior & Prompting - Custom Specific
-  // customLogicDescription state will be declared once further down.
-
-  // Multi-agent fields (Google ADK)
-  // (Removido: declarações duplicadas de isRootAgent, subAgents, globalInstruction e agentFramework)
-
-  // Função genérica para manipular alterações de campo
-  const handleFieldChange = (fieldName: string, value: any) => {
-    // Manipula diferentes campos com base no nome
-    switch (fieldName) {
-      case 'agentName':
-        setAgentName(value);
-        break;
-      case 'agentDescription':
-        setAgentDescription(value);
-        break;
-    case 'agentVersion':
-      setAgentVersion(value);
-      break;
-    case 'agentGoal':
-      setAgentGoal(value);
-      break;
-    case 'agentTasks':
-      setAgentTasks(value);
-      break;
-    case 'agentPersonality':
-      setAgentPersonality(value);
-      break;
-    case 'agentRestrictions':
-      setAgentRestrictions(value);
-      break;
-    case 'agentModel':
-      setAgentModel(value);
-      break;
-    case 'isRootAgent':
-      setIsRootAgent(value);
-      break;
-    case 'agentFramework':
-      setAgentFramework(value);
-      break;
-    default:
-      console.log(`Campo não manipulado: ${fieldName}`);
-  }
-};
-
-// (Removido: duplicidades de estados para gerenciamento de estado, memória e RAG)
-
-// Estados para gerenciamento de artefatos
-const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(
-    editingAgent?.config.artifacts?.enabled || false
-);
-const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'local' | 'cloud'>('memory');
-// Initialize artifacts as empty; useEffect will populate it from editingAgent.config.artifacts.definitions
-const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]);
-const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(
-    "" // Initialize as empty; useEffect will populate
-);
-const [localStoragePath, setLocalStoragePath] = React.useState<string>(
-    "" // Initialize as empty; useEffect will populate
-);
-
-// Estado para ferramentas selecionadas
-const [selectedTools, setSelectedTools] = React.useState<string[]>([]); // Initialize as empty; useEffect will populate
-
-
-// Estados para RAG e memória - Initialize with minimal valid defaults; useEffect will populate
-const initialRagMemoryConfig: RagMemoryConfig = {
-    enabled: false,
-    serviceType: 'vertexAISearch', // Default from UI
-    similarityTopK: 5,
-    vectorDistanceThreshold: 0.5,
-    knowledgeSources: [],
-    includeConversationContext: true,
-    persistentMemory: { enabled: false },
-    vertexAISearchConfig: {
-        projectId: '',
-        location: '',
-        dataStoreId: '', // Was ragCorpusName
-        embeddingModelName: '' // Was embeddingModel
-    },
-    pineconeConfig: undefined,
-    localFaissConfig: undefined,
-    googleSearchConfig: undefined
-};
-const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(initialRagMemoryConfig);
-
-// Estado para configuração A2A - Initialize with minimal valid defaults; useEffect will populate
-const initialA2AConfig: A2AConfigType = {
-    enabled: false,
-    communicationChannels: [],
-    defaultResponseFormat: 'text',
-    maxMessageSize: 1024 * 1024, // 1MB default
-    loggingEnabled: false,
-};
-const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
-    ...initialA2AConfig,
-    maxMessageSize: initialA2AConfig.maxMessageSize ?? 0,
-    defaultResponseFormat: (initialA2AConfig.defaultResponseFormat as A2AConfig['defaultResponseFormat']) || 'text',
-});
-
-// Workflow Fields
-  // (Removido: duplicidades de workflowDescription, detailedWorkflowType e loopMaxIterations)
-  // Simplified initialization, useEffect will populate from editingAgent.config
-  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>("none");
-  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(undefined);
-  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(undefined);
-  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(undefined);
-  
-  // Custom/A2A/Task Fields (some might overlap or use LLM fields)
-  // Simplified initialization for customLogicDescription
-  const [customLogicDescription, setCustomLogicDescription] = React.useState<string>("");
-
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // Initialize as empty
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
-
-  // State & Memory
-  const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false);
-  const [statePersistenceType, setStatePersistenceType] = React.useState<string>("session");
-  const [initialStateValues, setInitialStateValues] = React.useState<Array<{key: string, value: string}>>([]);
-
-  // RAG
-  const [enableRAG, setEnableRAG] = React.useState<boolean>(false);
-  // (Removido: declaração duplicada de ragMemoryConfig e a2aConfig)
-
-  // Artifacts
-  // (Removido: declarações duplicadas de enableArtifacts, artifactStorageType, cloudStorageBucket e localStoragePath)
-
-  // A2A Config
-  // (Removido: declaração duplicada de a2aConfig)
-
+  // (Removido: bloco de declarações duplicadas de useState)
+  // (Removido: Função handleFieldChange que não estava sendo utilizada consistentemente e causava problemas com estados duplicados)
+  // (Removido: duplicidades de estados para gerenciamento de estado, memória e RAG)
+  // (Removido: bloco de declarações duplicadas de useState para artifacts, selectedTools, RAG, A2A, workflow, customLogic, toolConfigurations, state/memory)
   // Modal specific states for tool configuration
+  // Os estados do modal (modalGoogleApiKey, etc.) são declarados uma vez no início e mantidos.
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
   const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>('');
@@ -412,7 +252,6 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
   const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
   const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
 
-  const { toast } = useToast();
   const { savedAgents: allSavedAgents } = useAgents(); // For SubAgentSelector
 
   const availableAgentsForSubSelector = React.useMemo(() =>
@@ -433,13 +272,10 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
     if (isOpen) {
       if (editingAgent) {
         // Preenche o formulário com os dados de um agente existente.
-        setAgentName(editingAgent.agentName);
-        setAgentDescription(editingAgent.description || "");
-        setAgentVersion(editingAgent.version || "1.0.0");
         // Populate with editingAgent data
         setAgentName(editingAgent.agentName || "Novo Agente");
-        setAgentDescription(editingAgent.agentDescription || "");
-        setAgentVersion(editingAgent.agentVersion || "1.0.0"); // Use new type structure
+        setAgentDescription(editingAgent.description || ""); // Uses editingAgent.description
+        setAgentVersion(editingAgent.version || "1.0.0"); // Uses editingAgent.version
 
         const agentConfig = editingAgent.config; // Acessa a configuração central do agente.
 
@@ -498,63 +334,60 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
 
         // Configurações de RAG.
         setEnableRAG(agentConfig.rag?.enabled || false);
-        const defaultRagConfigForEdit: RagMemoryConfig = { // Define um default completo para o caso de `agentConfig.rag?.config` ser parcial.
-          enabled: false, serviceType: "vertexAISearch", projectId: "", location: "", ragCorpusName: "", embeddingModel: "",
-          similarityTopK: 5, vectorDistanceThreshold: 0.5, knowledgeSources: [], includeConversationContext: true, persistentMemory: false,
-        };
-        setRagMemoryConfig({...defaultRagConfigForEdit, ...(agentConfig.rag?.config || {})});
-
+        // Uses initialRagMemoryConfig defined at the top of the component
+        setRagMemoryConfig(agentConfig.rag?.config ? {...initialRagMemoryConfig, ...agentConfig.rag.config} : initialRagMemoryConfig);
 
         // Configurações de Artefatos.
         setEnableArtifacts(agentConfig.artifacts?.enabled || false);
-        // Mapeia 'local' (potencialmente de dados legados) para 'filesystem' para manter a compatibilidade.
-        // 'filesystem' é o tipo padrão para armazenamento local persistente.
-        // 'memory' é para armazenamento temporário em memória.
-        // 'cloud' é para armazenamento em nuvem (ex: GCS, S3).
-        // Use 'local' as the standard storage type
         const artifactStorageTypeValue = agentConfig.artifacts?.storageType;
-        setArtifactStorageType(
-          artifactStorageTypeValue === 'filesystem' ? 'local' : (artifactStorageTypeValue as "local" | "memory" | "cloud" || 'memory')
-        );
+        // Ensures artifactStorageType is one of the valid literals from AgentConfig.
+        let validArtifactStorageType: 'memory' | 'local' | 'cloud' = 'memory';
+        if (artifactStorageTypeValue === 'memory' || artifactStorageTypeValue === 'local' || artifactStorageTypeValue === 'cloud') {
+            validArtifactStorageType = artifactStorageTypeValue;
+        } else if (artifactStorageTypeValue === 'filesystem') { // Handle UI 'filesystem' as 'local' for config
+            validArtifactStorageType = 'local';
+        }
+        setArtifactStorageType(validArtifactStorageType);
         setCloudStorageBucket(agentConfig.artifacts?.cloudStorageBucket || "");
-        setLocalStoragePath(agentConfig.artifacts?.localStoragePath || "./artifacts");
+        setLocalStoragePath(agentConfig.artifacts?.localStoragePath || "./artifacts"); // Default to ./artifacts
         setArtifacts(agentConfig.artifacts?.definitions || []);
 
         // Configurações A2A.
-        const defaultA2AConfigForEdit: A2AConfigType = {enabled: false, communicationChannels: [], defaultResponseFormat: 'text', maxMessageSize: 1024*1024, loggingEnabled: false};
-        setA2AConfig({...defaultA2AConfigForEdit, ...(agentConfig.a2a || {})});
-
-
+        // Uses initialA2AConfig (now typed with imported A2AConfig)
         setA2AConfig(agentConfig.a2a ? {
-          ...initialA2AConfig, // Start with defaults to ensure all keys are present
-          ...agentConfig.a2a,
-          maxMessageSize: agentConfig.a2a.maxMessageSize ?? initialA2AConfig.maxMessageSize ?? 0,
-          defaultResponseFormat: (agentConfig.a2a.defaultResponseFormat as A2AConfig['defaultResponseFormat']) || initialA2AConfig.defaultResponseFormat || 'text',
-          communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels) ? agentConfig.a2a.communicationChannels : initialA2AConfig.communicationChannels || [],
-        } : { ...initialA2AConfig });
+            ...initialA2AConfig, // Start with defaults to ensure all keys are present
+            ...agentConfig.a2a, // Override with saved data
+            maxMessageSize: agentConfig.a2a.maxMessageSize ?? initialA2AConfig.maxMessageSize,
+            defaultResponseFormat: agentConfig.a2a.defaultResponseFormat || initialA2AConfig.defaultResponseFormat,
+            communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels)
+                ? agentConfig.a2a.communicationChannels
+                : initialA2AConfig.communicationChannels,
+            // Ensure other potentially mandatory fields from A2AConfig are handled if not optional
+            // specialists: agentConfig.a2a.specialists || [],
+            // allowedOrigins: agentConfig.a2a.allowedOrigins || [],
+        } : initialA2AConfig);
 
       } else {
         // Reseta todos os campos para valores padrão ao criar um novo agente.
-        setAgentName(""); setAgentDescription(""); setAgentVersion("1.0.0");
-        setSelectedAgentType("llm"); setAgentFramework("genkit");
-        setIsRootAgent(true); setSubAgentIds([]);
-        setGlobalInstruction(""); setSystemPromptGenerated("");
-        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]);
-        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7);
+        // agentName, agentDescription, agentVersion are reset using their setters
+        setAgentName(""); setAgentDescription(""); setAgentVersion("1.0.0"); // Standard defaults
+        setSelectedAgentType("llm"); setAgentFramework("genkit"); // Standard defaults
+        setIsRootAgent(true); setSubAgentIds([]); // Standard defaults
+        setGlobalInstruction(""); setSystemPromptGenerated(""); // Standard defaults
+        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]); // Standard LLM defaults
+        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7); // Standard LLM defaults
 
-        setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined);
-        setLoopTerminationConditionType("none"); setLoopExitToolName(undefined);
-        setLoopExitStateKey(undefined); setLoopExitStateValue(undefined);
+        setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined); // Standard Workflow defaults
+        setLoopTerminationConditionType("none"); setLoopExitToolName(undefined); // Standard Workflow defaults
+        setLoopExitStateKey(undefined); setLoopExitStateValue(undefined); // Standard Workflow defaults
 
-        setCustomLogicDescription("");
-        setSelectedTools([]); setToolConfigurations({});
-        setEnableStatePersistence(false); setStatePersistenceType("session"); setInitialStateValues([]);
-        setEnableRAG(false);
-        // Usa a constante initialRagMemoryConfig para resetar.
-        setRagMemoryConfig(initialRagMemoryConfig);
-        setEnableArtifacts(false); setArtifactStorageType("memory"); setCloudStorageBucket(""); setLocalStoragePath("./artifacts"); setArtifacts([]);
-        // Usa a constante initialA2AConfig para resetar.
-        setA2AConfig(initialA2AConfig);
+        setCustomLogicDescription(""); // Standard Custom default
+        setSelectedTools([]); setToolConfigurations({}); // Standard Tool defaults
+        setEnableStatePersistence(false); setStatePersistenceType("session"); setInitialStateValues([]); // Standard State Persistence defaults
+        setEnableRAG(false); // Standard RAG default
+        setRagMemoryConfig(initialRagMemoryConfig); // Resets to initialRagMemoryConfig
+        setEnableArtifacts(false); setArtifactStorageType('memory'); setCloudStorageBucket(""); setLocalStoragePath("./artifacts"); setArtifacts([]); // Standard Artifact defaults, storage type is 'memory'
+        setA2AConfig(initialA2AConfig); // Resets to initialA2AConfig
       }
     }
     // Limpa o estado do modal de configuração de ferramenta se o diálogo principal for fechado.
@@ -664,7 +497,7 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
         artifacts: { // Configuração de artefatos.
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined, // Save path if 'local' (formerly 'filesystem' in UI state)
         type: "llm",
         framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
@@ -780,12 +613,11 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
             return toolDetail ? {
                 id: toolDetail.id,
                 name: toolDetail.name,
-                label: toolDetail.label,
+                label: toolDetail.label, // AvailableTool has label
                 description: toolDetail.description,
-                // Encontra o nome do componente do ícone ou usa um padrão.
-                label: toolDetail.name, // Usando 'name' em vez de 'label' que não existe no tipo
-                description: toolDetail.description, // Keep description
-                iconName: toolDetail.icon ? (Object.keys(iconComponents).find(key => iconComponents[key] === toolDetail.icon) || "Settings") : "Settings",
+                iconName: typeof toolDetail.icon === 'string' && iconComponents[toolDetail.icon]
+                    ? toolDetail.icon
+                    : (typeof toolDetail.icon === 'string' ? toolDetail.icon : "Settings"), // Use string icon key directly, or default
                 hasConfig: toolDetail.hasConfig,
                 genkitToolName: toolDetail.genkitToolName
             } : null;
@@ -1419,19 +1251,15 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
                             <SelectValue placeholder="Selecione o tipo de armazenamento" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="memory">Memória (Temporário, perdido ao reiniciar)</SelectItem>
-                            <SelectItem value="filesystem">Sistema de Arquivos Local (Persistente no servidor)</SelectItem>
-                            <SelectItem value="cloud">Nuvem (Ex: Google Cloud Storage, AWS S3)</SelectItem>
                             <SelectItem value="memory">Memória (Temporário)</SelectItem>
-                            <SelectItem value="local">Sistema de Arquivos Local</SelectItem>
+                            <SelectItem value="local">Sistema de Arquivos Local</SelectItem> {/* Value changed to 'local' */}
                             <SelectItem value="cloud">Nuvem (Ex: Google Cloud Storage)</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">Define onde os artefatos serão guardados.</p>
                       </div>
 
-                      {/* Campo para caminho local, renderizado se o tipo de armazenamento for 'filesystem' ou 'local' (compatibilidade). */}
-                      {(artifactStorageType === 'filesystem' || artifactStorageType === 'local') && (
+                      {/* Campo para caminho local, renderizado se o tipo de armazenamento for 'local'. */}
                       {artifactStorageType === 'local' && (
                         <div className="space-y-2">
                           <Label htmlFor="localStoragePath">Caminho de Armazenamento Local</Label>
@@ -1545,7 +1373,7 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
                     <Switch
                       id="a2aEnabled"
                       checked={a2aConfig.enabled || false}
-                      onCheckedChange={(checked) => setA2aConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
+                            onCheckedChange={(checked) => setA2AConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
                     />
                     <Label htmlFor="a2aEnabled" className="text-base">Habilitar Comunicação A2A</Label>
                   </div>
@@ -1568,11 +1396,10 @@ const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
                         onChange={(e) => {
                           try {
                             const val = e.target.value.trim();
-                            if(!val) { setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
+                            if(!val) { setA2AConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
                             const parsedChannels = JSON.parse(val);
                             // Adicionar validação mais robusta da estrutura `CommunicationChannelItem` se necessário.
-                            setA2AConfig(prev => ({...prev, communicationChannels: parsedChannels}));
-                            setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
+                            setA2AConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
                           } catch (error) {
                             console.error("Erro ao parsear JSON dos canais A2A:", error);
                             toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A. Verifique o console para mais detalhes."})
