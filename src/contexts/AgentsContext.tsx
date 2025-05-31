@@ -2,7 +2,6 @@
 
 import type { SavedAgentConfiguration } from '@/app/agent-builder/page';
 import * as React from 'react';
-<<<<<<< Updated upstream
 import { firestore } from '@/lib/firebaseClient'; // Import Firestore client
 import {
   collection,
@@ -17,16 +16,13 @@ import {
   orderBy,
   Timestamp
 } from 'firebase/firestore';
-=======
 // Versão client-safe para operações do Firestore
 import { 
   fetchAgents as fetchAgentsFromClient, 
   addAgent as addAgentToClient, 
   updateAgent as updateAgentInClient, 
-  deleteAgent as deleteAgentFromClient, 
-  serverTimestamp 
+  deleteAgent as deleteAgentFromClient
 } from '@/lib/firestore-client';
->>>>>>> Stashed changes
 import { useToast } from '@/hooks/use-toast'; 
 
 // Placeholder para userId - substituir com gerenciamento de usuário real mais tarde

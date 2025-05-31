@@ -38,6 +38,140 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AvailableTool } from "@/types/tool-types";
+
+// Interface já importada de @/types/tool-types
+
+export const availableTools: AvailableTool[] = [
+  {
+    id: "webSearch",
+    label: "Busca na Web (Google)",
+    name: "webSearch",
+    type: "genkit_native",
+    icon: Search,
+    description:
+      "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.",
+    hasConfig: true,
+    genkitToolName: "performWebSearch",
+  },
+  {
+    id: "calculator",
+    label: "Calculadora",
+    name: "calculator",
+    type: "genkit_native",
+    icon: Calculator,
+    description: "Permite realizar cálculos matemáticos (via função Genkit).",
+    genkitToolName: "calculator",
+  }, // Fixed escaped quote
+  {
+    id: "knowledgeBase",
+    label: "Consulta à Base de Conhecimento (RAG)",
+    name: "knowledgeBase",
+    type: "genkit_native",
+    icon: FileText,
+    description:
+      "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.",
+    hasConfig: true,
+    genkitToolName: "queryKnowledgeBase",
+  }, // Fixed escaped quote
+  {
+    id: "calendarAccess",
+    label: "Acesso à Agenda/Calendário",
+    name: "calendarAccess",
+    type: "genkit_native",
+    icon: CalendarDays,
+    description:
+      "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.",
+    hasConfig: true,
+    genkitToolName: "accessCalendar",
+  }, // Fixed escaped quote
+  {
+    id: "customApiIntegration",
+    label: "Integração com API Externa (OpenAPI)",
+    name: "customApiIntegration",
+    type: "genkit_native",
+    icon: Network,
+    description:
+      "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.",
+    hasConfig: true,
+    genkitToolName: "invokeOpenAPI",
+  }, // Fixed escaped quote
+  {
+    id: "databaseAccess",
+    label: "Acesso a Banco de Dados (SQL)",
+    name: "databaseAccess",
+    type: "genkit_native",
+    icon: Database,
+    description:
+      "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.",
+    hasConfig: true,
+    genkitToolName: "queryDatabase",
+  }, // Fixed escaped quote
+  {
+    id: "codeExecutor",
+    label: "Execução de Código (Python Sandbox)",
+    name: "codeExecutor",
+    type: "genkit_native",
+    icon: Code2,
+    description:
+      "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.",
+    hasConfig: true,
+    genkitToolName: "executeCode",
+  }, // Última ferramenta da lista
+]; // Fechamento do array de ferramentas
+
+// Interface já importada de @/types/tool-types
+
+// A lista de ferramentas já foi definida acima.
+// Se precisar adicionar mais ferramentas, adicione-as ao array existente acima.
+
+export const agentToneOptions = [
+  { id: "friendly", label: "Amigável e Prestativo" },
+  { id: "professional", label: "Profissional e Direto" },
+  { id: "formal", label: "Formal e Educado" },
+  { id: "casual", label: "Casual e Descontraído" },
+  { id: "funny", label: "Engraçado e Divertido" },
+  { id: "analytical", label: "Analítico e Detalhista" },
+  { id: "concise", label: "Conciso e Objetivo" },
+  { id: "empathetic", label: "Empático e Compreensivo" },
+  { id: "creative", label: "Criativo e Inspirador" },
+];
+
+export const agentTypeOptions = [
+  {
+    id: "custom" as const,
+    label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)",
+    icon: FileJson as ReactNode,
+    description:
+      "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl).",
+  },
+  {
+    id: "a2a" as const,
+    label: "Agente-para-Agente (A2A)",
+    icon: Network as ReactNode,
+    description:
+      "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas.",
+  },
+];
+
+export type AgentFramework =
+  | "genkit"
+  | "crewai"
+  | "langchain"
+  | "custom"
+  | "none"; // Added AgentFramework type
+
+export interface AgentConfigBase {
+  agentName: string;
+  agentDescription: string;
+  agentVersion: string;
+  agentIcon?: string; // Ícone do agente (nome do componente do ícone)
+  agentTools: string[];
+  isRootAgent?: boolean; // Indica se este é um agente raiz em um sistema multi-agente
+  subAgents?: string[]; // Lista de IDs de agentes que podem ser delegados
+  globalInstruction?: string; // Instrução global que se aplica a todos os agentes na árvore
+  agentFramework?: AgentFramework; // Added agentFramework
+}
 
 // Imports from the new data file
 import {

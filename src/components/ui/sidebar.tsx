@@ -216,13 +216,8 @@ export const Sidebar = React.forwardRef<
     },
     ref,
   ) => {
-<<<<<<< Updated upstream
     const context = useSidebar();
-    const { isMobile, state, openMobile, setOpenMobile, mounted } = context;
-=======
-    const context = useSidebar()
-    const { isMobile, state, open, setOpen, openMobile, setOpenMobile, mounted } = context
->>>>>>> Stashed changes
+    const { isMobile, state, open, setOpen, openMobile, setOpenMobile, mounted } = context;
     const collapsible = collapsibleOverride || context.collapsible; // Prefer override, then context
     const variant = variantProp || "sidebar"; // Default to sidebar if not provided
     
@@ -875,3 +870,16 @@ export const SidebarMenuSubButton = React.forwardRef<
   );
 });
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
+
+export {
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  useSidebar,
+  SidebarProvider,
+};
