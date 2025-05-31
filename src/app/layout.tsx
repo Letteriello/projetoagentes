@@ -2,14 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Toaster } from "@/components/ui/toaster";
-<<<<<<< Updated upstream
-import { AgentsProvider } from "@/contexts/AgentsContext";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import ErrorBoundaryClient from "@/components/error-boundary-client";
-import { inter, jetbrainsMono } from "./fonts";
-=======
 import { AgentsProvider } from '@/contexts/AgentsContext';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -20,7 +12,6 @@ import '@/lib/polyfills';
 import '@/lib/node-polyfills';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
->>>>>>> Stashed changes
 
 export const metadata: Metadata = {
   title: "AgentVerse",
@@ -68,26 +59,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-<<<<<<< Updated upstream
-    <html
-      lang="pt-BR"
-      suppressHydrationWarning
-      className={`${inter.variable} ${jetbrainsMono.variable} font-sans`}
-    >
-      <body className="antialiased" suppressHydrationWarning>
-        <ErrorBoundaryClient>
-          <ThemeProvider>
-            <AuthProvider>
-              <AgentsProvider>
-                <SidebarProvider defaultOpen>
-                  <AppLayout>{children}</AppLayout>
-                </SidebarProvider>
-              </AgentsProvider>
-            </AuthProvider>
-            <Toaster />
-          </ThemeProvider>
-        </ErrorBoundaryClient>
-=======
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <NodePolyfillScript />
@@ -105,7 +76,6 @@ export default function RootLayout({
             <Toaster />
           </EnvironmentProvider>
         </ThemeProvider>
->>>>>>> Stashed changes
       </body>
     </html>
   );
