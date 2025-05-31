@@ -35,7 +35,7 @@ import ConversationSidebar from "@/components/features/chat/ConversationSidebar"
 // BasicChatInput is used for /api/chat-stream, AgentCreatorFlowInputSchema for /api/agent-creator-stream
 // import { BasicChatInput } from "@/ai/flows/chat-flow";
 // import { AgentCreatorFlowInputSchema } from "@/ai/flows/agent-creator-flow";
-import { ADKAgentConfig, ADKTool } from "@/lib/google-adk";
+// import { ADKAgentConfig, ADKTool } from "@/lib/google-adk"; // Removed deprecated import
 import * as cs from "@/lib/firestoreConversationStorage";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -171,7 +171,7 @@ export function ChatUI() {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
 
-  const [adkAgents, setAdkAgents] = useState<ADKAgentConfig[]>([]); // ADK agents list
+  const [adkAgents, setAdkAgents] = useState<SavedAgentConfigType[]>([]); // ADK agents list - Changed ADKAgentConfig to SavedAgentConfigType
   const [isADKInitializing, setIsADKInitializing] = useState(true); // ADK initialization status
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -631,10 +631,12 @@ export function ChatUI() {
 
   // Load ADK agents from localStorage (example)
   useEffect(() => {
-    const storedADKAgents = localStorage.getItem("adkAgents");
+    const storedADKAgents = localStorage.getItem("adkAgents"); // This localStorage key might need update if structure changed
     if (storedADKAgents) {
       try {
-        setAdkAgents(JSON.parse(storedADKAgents));
+        // Assuming the structure in "adkAgents" localStorage is compatible with SavedAgentConfigType or needs mapping
+        const parsedAgents = JSON.parse(storedADKAgents) as SavedAgentConfigType[]; // Cast to SavedAgentConfigType
+        setAdkAgents(parsedAgents);
       } catch (e) { console.error("Failed to parse ADK agents from localStorage", e); }
     }
     setIsADKInitializing(false); // Assuming quick load or default to false
@@ -642,7 +644,8 @@ export function ChatUI() {
 
   const selectedADKAgent = useMemo(() => {
     if (!selectedADKAgentId || adkAgents.length === 0) return null;
-    return adkAgents.find((agent) => (agent.agentId ?? agent.displayName) === selectedADKAgentId) || null;
+    // Assuming SavedAgentConfigType has an 'id' and 'name' (displayName might be 'name')
+    return adkAgents.find((agent) => (agent.id ?? agent.name) === selectedADKAgentId) || null;
   }, [selectedADKAgentId, adkAgents]);
 
   const currentSelectedAgentForHeader = useMemo(() => {
@@ -680,7 +683,8 @@ export function ChatUI() {
           setUsingADKAgent={setUsingADKAgent} // Pass actual setter
           selectedADKAgentId={selectedADKAgentId}
           setSelectedADKAgentId={setSelectedADKAgentId}
-          adkAgents={adkAgents.map((agent) => ({ ...agent, id: agent.agentId || agent.displayName }))}
+          // Assuming SavedAgentConfigType has 'id' and 'name'. Adapt if structure is different.
+          adkAgents={adkAgents.map((agent) => ({ ...agent, id: agent.id || agent.name, displayName: agent.name }))}
           isADKInitializing={isADKInitializing}
           selectedAgentId={selectedAgentId} // For saved agents
           setSelectedAgentId={setSelectedAgentId}

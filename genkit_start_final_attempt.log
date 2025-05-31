@@ -1,0 +1,32 @@
+[Telemetry Server] initialized local file trace store at root: /app/.genkit/traces
+Telemetry API running on http://localhost:4033
+Project root: /app
+Genkit Developer UI: http://localhost:4000
+/app/src/ai/tools/calculator-tool.ts:18
+export const calculatorTool = defineTool(
+                              ^
+
+
+TypeError: (0 , import_genkit.defineTool) is not a function
+    at <anonymous> (/app/src/ai/tools/calculator-tool.ts:18:31)
+    at Object.<anonymous> (/app/src/ai/tools/calculator-tool.ts:146:1)
+    at Module._compile (node:internal/modules/cjs/loader:1356:14)
+    at Object.transformer (/app/node_modules/tsx/dist/register-D2KMMyKp.cjs:2:1186)
+    at Module.load (node:internal/modules/cjs/loader:1197:32)
+    at Module._load (node:internal/modules/cjs/loader:1013:12)
+    at Module.require (node:internal/modules/cjs/loader:1225:19)
+    at require (node:internal/modules/helpers:177:18)
+    at process (/app/src/ai/flows/chat-flow.ts:13:32)
+    at Object.<anonymous> (/app/src/ai/flows/chat-flow.ts:69:23)
+
+Node.js v18.19.1
+/app/node_modules/genkit-cli/dist/commands/start.js:95
+                    reject(new Error(`app process exited with code ${code}`));
+                           ^
+
+Error: app process exited with code 1
+    at ChildProcess.<anonymous> (/app/node_modules/genkit-cli/dist/commands/start.js:95:28)
+    at ChildProcess.emit (node:events:517:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:292:12)
+
+Node.js v18.19.1
