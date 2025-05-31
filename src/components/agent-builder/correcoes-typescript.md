@@ -1,119 +1,59 @@
-# Correções para Erros TypeScript Restantes
+// INFO: This is a Markdown documentation file, not an active React component.
+// It likely contains notes related to TypeScript corrections during development.
 
-## 1. Erro na linha 1221 - Badge Component
+## Correções TypeScript e Melhorias no AgentBuilderDialog
 
-Localizar:
-```tsx
-{getToolDisplayName(tool)}
-```
+Esta seção detalha as correções TypeScript aplicadas e outras melhorias no componente `AgentBuilderDialog` e seus componentes filhos.
 
-Substituir por:
-```tsx
-{safeToReactNode(getToolDisplayName(tool))}
-```
+### Tipagem e Props
 
-## 2. Erro na linha 1145-1155 - Span com Settings Icon
+*   **`AgentBuilderDialogProps`**:
+    *   `agentTypeOptions`: Especificado o tipo do array e dos seus objetos, incluindo `id` como união de literais (`"llm" | "workflow" | "custom" | "a2a"`).
+    *   `iconComponents`: Tipo `Record<string, React.FC<React.SVGProps<SVGSVGElement>>>` para o mapa de componentes de ícone.
+*   **`ToolConfigModalProps`**:
+    *   `tool`: Tipo `AvailableTool | null` para clareza.
+    *   `currentConfig`: Tipo `ToolConfigData | undefined`.
+    *   `onSave`: Função que recebe `ToolConfigData`.
+*   **`StateManagementAccordionProps`**:
+    *   `initialStateValues`, `setInitialStateValues`: Tipagem para array de `{ key: string, value: string }`.
+    *   `validationRules`, `setValidationRules`: Tipagem para array de `{ id: string, name: string, type: 'JSON_SCHEMA' | 'REGEX', rule: string }`.
+*   **`RAGAccordionProps`**:
+    *   `knowledgeSources`, `setKnowledgeSources`: Tipagem para array de `{ id: string, type: 'web_url' | 'gcs_uri' | 'document', content: string, status?: string }`.
+*   **`ArtifactAccordionProps`**:
+    *   `definedArtifacts`, `setDefinedArtifacts`: Tipagem para array de `{ id: string, name: string, type: string, description: string }`.
 
-Para garantir que o retorno do IIFE seja corretamente tipado como ReactNode, atualize o código adicionando uma assinatura de tipo explícita:
+### Estado e Handlers
 
-Localizar:
-```tsx
-{needsConfig && (() => {
-  // Usando IIFE para garantir que o retorno é ReactNode
-  return (
-    <span className={cn(
-        "ml-2 group-hover:text-primary transition-colors", 
-        isToolConfigured ? "text-green-500" : "text-muted-foreground"
-      )}>
-      <Settings2 size={14} />
-    </span>
-  );
-})()}
-```
+*   **`AgentBuilderDialog`**:
+    *   `selectedAgentType`: Estado tipado como `"llm" | "workflow" | "custom" | "a2a"`.
+    *   `agentTasks`, `agentRestrictions`: Estados convertidos para `string[]` e manipulados com `join('\n')` e `split('\n')` para Textarea.
+    *   `handleSaveAgent`:
+        *   Lógica de construção do `AgentConfig` agora considera `selectedAgentType` para incluir campos específicos do tipo (LLM, Workflow, Custom).
+        *   Propriedades como `statePersistence`, `rag`, `artifacts`, `a2a` são construídas a partir dos estados correspondentes.
+        *   `toolsDetails` é populado mapeando `selectedTools` (array de IDs) para os detalhes completos de `availableTools`.
+*   **`ToolConfigModal`**:
+    *   Reset de estados modais (`modalGoogleApiKey`, etc.) ao fechar ou mudar de ferramenta.
+    *   `handleSave`: Cria o objeto `configData` corretamente.
+*   **`StateManagementAccordion`**:
+    *   Adição e remoção de `initialStateValues` e `validationRules` com IDs únicos.
+*   **`RAGAccordion`**:
+    *   Adição e remoção de `knowledgeSources` com IDs únicos.
+*   **`ArtifactAccordion`**:
+    *   Adição e remoção de `definedArtifacts` com IDs únicos.
 
-Substituir por:
-```tsx
-{needsConfig && (() => {
-  // Usando IIFE com assinatura de tipo explícita
-  const icon = (): React.ReactNode => {
-    return (
-      <span className={cn(
-          "ml-2 group-hover:text-primary transition-colors", 
-          isToolConfigured ? "text-green-500" : "text-muted-foreground"
-        )}>
-        <Settings2 size={14} />
-      </span>
-    );
-  };
-  return icon();
-})()}
-```
+### UI e Componentes
 
-## 3. Erro na linha 1159-1184 - Button Component
+*   Uso de `defaultValue` nos Sliders para evitar warning de componente não controlado mudando para controlado.
+*   Melhoria na apresentação de badges e descriptions em vários locais.
+*   Renderização condicional de campos de formulário baseada em `selectedAgentType` e switches (`enableRAG`, `enableStatePersistence`, etc.).
+*   `SubAgentSelector`: Adicionado como componente para seleção de sub-agentes, usando `savedAgents` do contexto.
 
-Usar o mesmo padrão de correção com assinatura de tipo explícita:
+### Pontos de Atenção e TODOs Futuros
 
-Localizar:
-```tsx
-{needsConfig && isToolSelected && (() => {
-  // Usando IIFE para garantir que o retorno é ReactNode
-  return (
-    <Button 
-      variant="outline" 
-      size="sm" 
-      className={cn(
-        "ml-auto shrink-0 h-8 px-3", 
-        isToolConfigured ? "border-green-500/50 hover:border-green-500 text-green-600 hover:text-green-500 hover:bg-green-500/10" : ""
-      )} 
-      onClick={() => openToolConfigModal(tool)}
-    >
-      {isToolConfigured ? (
-        <>
-          <Settings2 className="text-green-500 mr-1.5" size={16} />
-          Reconfigurar
-        </>
-      ) : (
-        <>
-          <Settings2 className="text-amber-500 mr-1.5" size={16} />
-          Configurar
-        </>
-      )}
-    </Button>
-  );
-})()}
-```
+*   **Tipos Compartilhados**: Idealmente, tipos como `SavedAgentConfiguration`, `AgentConfig`, `AvailableTool` deveriam vir de um local centralizado (`@/types/...`) para evitar duplicação ou inconsistência, especialmente se `agentManagementActions.ts` for usado no servidor.
+*   **Validação de Formulário**: Implementar validação mais robusta (ex: com Zod) para os campos do formulário principal antes de salvar.
+*   **Complexidade do `AgentBuilderDialog`**: O componente está ficando grande. Considerar refatorar em subcomponentes menores para cada aba ou seção principal, cada um gerenciando seu próprio estado interno e passando os dados para o componente pai ao salvar.
+*   **`toolsDetails` em `ChatUI`**: A lógica para popular `toolsDetails` ao salvar um agente criado pelo "Agent Creator Assistant" em `ChatUI.tsx` é simplificada. Uma solução mais robusta acessaria a lista completa de `availableTools` (talvez via contexto ou prop) para obter todos os detalhes da ferramenta.
+*   **Tratamento de Erro no JSON**: Melhorar o feedback ao usuário caso o JSON inserido em Textareas (como `initialStateValues`) seja inválido.
 
-Substituir por:
-```tsx
-{needsConfig && isToolSelected && (() => {
-  // Usando IIFE com assinatura de tipo explícita
-  const configButton = (): React.ReactNode => {
-    return (
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className={cn(
-          "ml-auto shrink-0 h-8 px-3", 
-          isToolConfigured ? "border-green-500/50 hover:border-green-500 text-green-600 hover:text-green-500 hover:bg-green-500/10" : ""
-        )} 
-        onClick={() => openToolConfigModal(tool)}
-      >
-        {isToolConfigured ? (
-          <>
-            <Settings2 className="text-green-500 mr-1.5" size={16} />
-            Reconfigurar
-          </>
-        ) : (
-          <>
-            <Settings2 className="text-amber-500 mr-1.5" size={16} />
-            Configurar
-          </>
-        )}
-      </Button>
-    );
-  };
-  return configButton();
-})()}
-```
-
-Estas correções devem resolver todos os erros de TypeScript restantes no arquivo.
+Este resumo cobre as principais alterações e o estado atual do desenvolvimento focado na tipagem e funcionalidade do formulário de criação de agentes.

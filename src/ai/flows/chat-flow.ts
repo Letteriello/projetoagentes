@@ -7,7 +7,15 @@
  */
 
 import { ai } from '@/ai/genkit'; 
+// Adjusted import path assuming tools/index.ts exports all tools from the tools directory
+// If performWebSearchTool and calculatorTool are directly exported from their files:
 import { performWebSearchTool } from '@/ai/tools/web-search-tool';
+import { calculatorTool } from '@/ai/tools/calculator-tool';
+import { knowledgeBaseTool } from '@/ai/tools/knowledge-base-tool';
+import { customApiTool } from '@/ai/tools/custom-api-tool';
+import { calendarAccessTool } from '@/ai/tools/calendar-access-tool';
+import { databaseAccessTool } from '@/ai/tools/database-access-tool';
+import { codeExecutorTool } from '@/ai/tools/code-executor-tool'; // Added import
 
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
@@ -15,6 +23,12 @@ import { ReadableStream } from 'node:stream/web';
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
 const allAvailableTools = {
   performWebSearch: performWebSearchTool,
+  calculator: calculatorTool,
+  knowledgeBase: knowledgeBaseTool,
+  customApiIntegration: customApiTool,
+  calendarAccess: calendarAccessTool,
+  databaseAccess: databaseAccessTool,
+  codeExecutor: codeExecutorTool, // Added codeExecutor tool
 };
 
 export interface BasicChatInput {

@@ -19,9 +19,9 @@ import {
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from "@/app/agent-builder/page";
 import { useAuth } from "@/contexts/AuthContext"; // Ajustado para alias
-import { auth } from "@/lib/firebaseClient"; // Ajustado para alias
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"; // Added
-import { toast } from "@/hooks/use-toast"; // Added
+// import { auth } from "@/lib/firebaseClient"; // No longer needed here
+// import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"; // No longer needed here
+import { toast } from "@/hooks/use-toast"; // Keep for potential other toasts, or remove if not used
 
 interface Gem {
   id: string;
@@ -51,6 +51,8 @@ interface ChatHeaderProps {
   handleNewConversation: () => void;
   isSidebarOpen?: boolean;
   isADKInitializing?: boolean;
+  handleLogin: () => void; // Added
+  handleLogout: () => void; // Added
 }
 
 export default function ChatHeader({
@@ -70,6 +72,8 @@ export default function ChatHeader({
   handleNewConversation,
   isSidebarOpen,
   isADKInitializing,
+  handleLogin, // Added
+  handleLogout, // Added
 }: ChatHeaderProps) {
   const { currentUser, loading: authLoading } = useAuth(); // Added
 
@@ -77,42 +81,7 @@ export default function ChatHeader({
     setSelectedGemId(id);
   };
 
-  const handleLogin = async () => {
-    // Added
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      toast({
-        title: "Login Successful",
-        description: "You are now logged in.",
-      });
-    } catch (error) {
-      console.error("Error during Google login:", error);
-      toast({
-        title: "Login Failed",
-        description: "Could not sign in with Google. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleLogout = async () => {
-    // Added
-    try {
-      await signOut(auth);
-      toast({
-        title: "Logout Successful",
-        description: "You have been logged out.",
-      });
-    } catch (error) {
-      console.error("Error during logout:", error);
-      toast({
-        title: "Logout Failed",
-        description: "Could not sign out. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  // handleLogin and handleLogout are now passed as props
 
   return (
     <div className="flex items-center justify-between p-4 border-b bg-background">
