@@ -854,12 +854,12 @@
   resolved "https://registry.yarnpkg.com/@floating-ui/utils/-/utils-0.2.9.tgz#50dea3616bc8191fb8e112283b49eaff03e78429"
   integrity sha512-MDWhGtE+eHw5JW7lq4qhc5yRLS11ERl1c7Z6Xd0a58DozHES6EnNNwUWbMiG4J9Cgj053Bhk8zvlhFYKVhULwg==
 
-"@genkit-ai/ai@1.10.0":
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/@genkit-ai/ai/-/ai-1.10.0.tgz#74168f89c1821838367c5f6605a7d6deecab769c"
-  integrity sha512-1Ql7jlIA02UsWIiH9xJ4LKKerho1iP2J/x23nls4m6V9HXn5APUEseCWPDKs9eYBDa2WWxvYYNS975KDai1hnw==
+"@genkit-ai/ai@1.11.0":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@genkit-ai/ai/-/ai-1.11.0.tgz#612a14c436b1ed5c6510ca72a5885b47253ab905"
+  integrity sha512-gPk/NUxJRkiefNfFh8dgg3rH8AU7qiecKg/fv7lNTN9L7cIDkQtuG8zT96DHMDLfrybK485F8QIgiXYebYhMdA==
   dependencies:
-    "@genkit-ai/core" "1.10.0"
+    "@genkit-ai/core" "1.11.0"
     "@opentelemetry/api" "^1.9.0"
     "@types/node" "^20.11.19"
     colorette "^2.0.20"
@@ -869,10 +869,10 @@
     partial-json "^0.1.7"
     uuid "^10.0.0"
 
-"@genkit-ai/core@1.10.0":
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/@genkit-ai/core/-/core-1.10.0.tgz#11211ad0c642de091b4fa35e5c1ee17667d33b2d"
-  integrity sha512-aySikAJEfCIFXskrp5xy+GjGa4lF4Y/pR4LUNxVVYEHFqI3cU5gXqa09vQvfTWYVKIe5IXW0fVMas4B6vPAw+Q==
+"@genkit-ai/core@1.11.0":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@genkit-ai/core/-/core-1.11.0.tgz#7a8f701bd017a9823bb01eee3a2bfd59eeb57ec6"
+  integrity sha512-76J6fcAFVQCqqJErND2NdE0qTx2mEp/574cYBW59BQLRYaD8YtBj1CTQXhO/bxYRtSDlUvGJjF2xX0yfUmIMtA==
   dependencies:
     "@opentelemetry/api" "^1.9.0"
     "@opentelemetry/context-async-hooks" "^1.25.0"
@@ -893,27 +893,27 @@
     zod "^3.23.8"
     zod-to-json-schema "^3.22.4"
 
-"@genkit-ai/googleai@^1.10.0":
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/@genkit-ai/googleai/-/googleai-1.10.0.tgz#23067c91109c63316bca2fafc2def6665b70bf64"
-  integrity sha512-k7yTIBbII9W63cIc5dc3ndJxDDb4ZAyj+C+1KX2yHBqcFX3vNXSC755emzhj3Cb+tp+F7H4Q3a9UwHKwAEe0hQ==
+"@genkit-ai/googleai@latest":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@genkit-ai/googleai/-/googleai-1.11.0.tgz#950ced96d9d7d6ca67c578e2b288192e1194d71b"
+  integrity sha512-p7EsOk8BwkvuO8tVyZ4gLCGPgOp8ewSasoHXStpA/FzeIDfkgT6Y8fAtxR9D9z7t3xJJwMGoO6yoZL7pOGdy0A==
   dependencies:
     "@google/generative-ai" "^0.24.0"
     google-auth-library "^9.6.3"
     node-fetch "^3.3.2"
 
-"@genkit-ai/next@^1.10.0":
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/@genkit-ai/next/-/next-1.10.0.tgz#9cea3aca40613ae8d392c7e9047a29db63c2d2ce"
-  integrity sha512-6hpUHWZDuf+6OLM+P+0HTGc2tlBCiIPB6iys5hjRc7WddJgDMNEHObb0STWTLyKXzPOLHr2qxD1gwMuiIcP76g==
+"@genkit-ai/next@latest":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@genkit-ai/next/-/next-1.11.0.tgz#ac852b9401a4211b720a2b5ace6a776cf0a1abfa"
+  integrity sha512-vpcTNQP/c5Af4J1gPny0AIvo2lonEJIyDmgrH4VkJD9lEbRiD86/BMhjK9Nk6rZkyEgUQvla94+gfFIG46yB7Q==
 
-"@genkit-ai/telemetry-server@1.10.0":
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/@genkit-ai/telemetry-server/-/telemetry-server-1.10.0.tgz#a281c9dbd98e45d1e22cb053690adda9a6016a71"
-  integrity sha512-cgycjmOrMZxHdQp3NiDGb7ctP557EseXmarfizBPVJVtNRJH3KECu7X2v4t5Mn71MD18udjI9h85yeYRDbLkRw==
+"@genkit-ai/telemetry-server@1.11.0":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@genkit-ai/telemetry-server/-/telemetry-server-1.11.0.tgz#4c853103ec1655d1ce9d6e7fff059228f604f9dd"
+  integrity sha512-PNJnj98OoX9VdV9KZbFZY1wAs4NEB09jaVuNoExqEEIu+VXiPymyQAoUMscPypOa5O70LfZHrtK90vM3mqu6jw==
   dependencies:
     "@asteasolutions/zod-to-openapi" "^7.0.0"
-    "@genkit-ai/tools-common" "1.10.0"
+    "@genkit-ai/tools-common" "1.11.0"
     "@google-cloud/firestore" "^7.6.0"
     "@opentelemetry/api" "^1.9.0"
     "@opentelemetry/context-async-hooks" "^1.25.0"
@@ -926,10 +926,10 @@
     lockfile "^1.0.4"
     zod "^3.22.4"
 
-"@genkit-ai/tools-common@1.10.0":
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/@genkit-ai/tools-common/-/tools-common-1.10.0.tgz#4446daea31f0fe465369aa5dd7ac041f8ff934bd"
-  integrity sha512-MRsa5bQY2QU1/B5TzpRiK8j5rp0jGgFQKjvMS/Yhuu+0BfFuMP5zSqkR9x3I+uWOp/aWlpvA3WEc1EJEfPP2Wg==
+"@genkit-ai/tools-common@1.11.0":
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/@genkit-ai/tools-common/-/tools-common-1.11.0.tgz#8db77a1dfd298331c2f9407e70603501041c868c"
+  integrity sha512-+Mq0MY0S/3fXrxaoXJWqNmw5QivOfE/MzlQAbph9EYw1bLJG4URWhXESX1R/mXpziIS7P6V6hWQ/yX9bRsILRQ==
   dependencies:
     "@asteasolutions/zod-to-openapi" "^7.0.0"
     "@trpc/server" "^10.45.2"
@@ -2564,23 +2564,23 @@
     form-data "^4.0.0"
 
 "@types/node@*", "@types/node@>=12.12.47", "@types/node@>=13.7.0":
-  version "22.15.28"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.15.28.tgz#97d851fda6db030612fa0b472577bbc0fe0bc668"
-  integrity sha512-I0okKVDmyKR281I0UIFV7EWAWRnR0gkuSKob5wVcByyyhr7Px/slhkQapcYX4u00ekzNWaS1gznKZnuzxwo4pw==
+  version "22.15.29"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.15.29.tgz#c75999124a8224a3f79dd8b6ccfb37d74098f678"
+  integrity sha512-LNdjOkUDlU1RZb8e1kOIUpN1qQUlzGkEtbVNo53vbrwDg5om6oduhm4SiUaPW5ASTXhAiP0jInWG8Qx9fVlOeQ==
   dependencies:
     undici-types "~6.21.0"
 
 "@types/node@^18.11.18":
-  version "18.19.109"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.109.tgz#88a7bd53db8856fa90f734a64ecc7490e314b773"
-  integrity sha512-aTMjVJGd4dEYg2Y+sIg5WmLlJc3vw9Da42ohoq+j4OX42JmQoLHyBwzbkOu7htkZekhlCey5TDYbvMqZuVY2KA==
+  version "18.19.110"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.110.tgz#33e25fa1796ba5023cee137f24f15d332d2d45d1"
+  integrity sha512-WW2o4gTmREtSnqKty9nhqF/vA0GKd0V/rbC0OyjSk9Bz6bzlsXKT+i7WDdS/a0z74rfT2PO4dArVCSnapNLA5Q==
   dependencies:
     undici-types "~5.26.4"
 
 "@types/node@^20", "@types/node@^20.11.19":
-  version "20.17.56"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-20.17.56.tgz#ac1400dd6f10394899bdb41925cf8f5f213229aa"
-  integrity sha512-HQk2cDZsA+HYGyqCfWbScO+OUI9RKEZr/sqiASBFpeYoN4Ro3PyaApDG5ipcLY//PvQPhK/a3VsFq2NrQ+Zz1A==
+  version "20.17.57"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-20.17.57.tgz#f807455e3303ba8ba08fcb1db90619356abfaa99"
+  integrity sha512-f3T4y6VU4fVQDKVqJV4Uppy8c1p/sVvS3peyqxyWnzkqXFJLRU7Y1Bl7rMS1Qe9z0v4M6McY0Fp9yBsgHJUsWQ==
   dependencies:
     undici-types "~6.19.2"
 
@@ -4538,12 +4538,12 @@ gcp-metadata@^6.1.0:
     json-bigint "^1.0.0"
 
 genkit-cli@^1.8.0:
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/genkit-cli/-/genkit-cli-1.10.0.tgz#833e6046f83af7845ec5292adcf085879afe04d2"
-  integrity sha512-YynRkaZlw6P7Bi17DsuJwYGYA46GCtf88Tvoop/0QxNfuwY61bBeKMSDsfqjx8Q1HbAgb0g0GPf+nITQfq3vkQ==
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/genkit-cli/-/genkit-cli-1.11.0.tgz#e94e61c081ac41d69dc24fbcf11207a18d402fb1"
+  integrity sha512-aBjenr54ediQigiumgbvilnkFS106Q2kZNSWQVi+cNE0403WcbeMfQvyEBfROx96qbwX1Uc4fNLnEmeSt6d2mQ==
   dependencies:
-    "@genkit-ai/telemetry-server" "1.10.0"
-    "@genkit-ai/tools-common" "1.10.0"
+    "@genkit-ai/telemetry-server" "1.11.0"
+    "@genkit-ai/tools-common" "1.11.0"
     axios "^1.7.7"
     colorette "^2.0.20"
     commander "^11.1.0"
@@ -4553,23 +4553,23 @@ genkit-cli@^1.8.0:
     open "^6.3.0"
     ora "^5.4.1"
 
-genkit@^1.10.0:
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/genkit/-/genkit-1.10.0.tgz#59d6c3482465ec2f392fdf33245701490f686fc7"
-  integrity sha512-YiGnUxbf6+t7dgQFb40ZUkwTKJfCNm4B4xltD5WkH3ddmP9hO08s7ZHVYyvggQNEWNxhcCPsxzWEMyWrBLIwgg==
+genkit@latest:
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/genkit/-/genkit-1.11.0.tgz#4d21fcc21deea89ed378ee979a35d37224898f0c"
+  integrity sha512-cp7wFVF5YbyuQLUpii3lfAVXe+XjAsgTTG1mZkGz0dylfrSL2C5ikyjEi8QEJr6nOLrWJ+5jFTiYE5WlMe2X2A==
   dependencies:
-    "@genkit-ai/ai" "1.10.0"
-    "@genkit-ai/core" "1.10.0"
+    "@genkit-ai/ai" "1.11.0"
+    "@genkit-ai/core" "1.11.0"
     uuid "^10.0.0"
 
-genkitx-ollama@^1.10.0:
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/genkitx-ollama/-/genkitx-ollama-1.10.0.tgz#7d53436d493ad7fb46cc18dd7afff90e740e8a40"
-  integrity sha512-KplrROJW9PSIbMIwTLem3Lz6YExAKqF3v9s+Qy0bAJbYszn/MKOW2ezjHfigs64eDIURt+UOTwFAMbzRUbNdyg==
+genkitx-ollama@latest:
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/genkitx-ollama/-/genkitx-ollama-1.11.0.tgz#1435310e8f429cd59a9abf324c65013f9dbdc6a2"
+  integrity sha512-1jRPGbFVPzNj+Zj90gbycV22grwWHMsfApERfaUalyFoQQDCU9UHktnGNAwglsGYz0qOVoSKCQO1LJIsdtwmAw==
   dependencies:
     ollama "^0.5.9"
 
-genkitx-openai@^0.22.3:
+genkitx-openai@latest:
   version "0.22.3"
   resolved "https://registry.yarnpkg.com/genkitx-openai/-/genkitx-openai-0.22.3.tgz#8799afc74f1cf96e5b4e6f483336b28c7a5e2f3a"
   integrity sha512-g+4I2QOHfBcHz6R9N/z5mqXsMNc7+jtF258jwBOi1X5YuJ7hFIpbTxF8QktfUdH8w440t7s7Upa0aZRw+JhfsA==

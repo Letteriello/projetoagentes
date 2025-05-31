@@ -1,0 +1,43 @@
+[Telemetry Server] initialized local file trace store at root: /app/.genkit/traces
+Indexed 0 traces in 0ms in /app/.genkit/traces_idx
+Telemetry API running on http://localhost:4033
+Project root: /app
+Genkit Developer UI: http://localhost:4000
+node:internal/modules/cjs/loader:1134
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module '@genkit-ai/sdk'
+Require stack:
+- /app/src/ai/tools/calculator-tool.ts
+- /app/src/ai/flows/chat-flow.ts
+- /app/src/ai/dev.ts
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1134:15)
+    at nextResolveSimple (/app/node_modules/tsx/dist/register-D2KMMyKp.cjs:3:942)
+    at /app/node_modules/tsx/dist/register-D2KMMyKp.cjs:2:2550
+    at /app/node_modules/tsx/dist/register-D2KMMyKp.cjs:2:1624
+    at resolveTsPaths (/app/node_modules/tsx/dist/register-D2KMMyKp.cjs:3:760)
+    at /app/node_modules/tsx/dist/register-D2KMMyKp.cjs:3:1038
+    at m._resolveFilename (file:///app/node_modules/tsx/dist/register-hc1YoAqe.mjs:1:789)
+    at Module._load (node:internal/modules/cjs/loader:975:27)
+    at Module.require (node:internal/modules/cjs/loader:1225:19)
+    at require (node:internal/modules/helpers:177:18) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/app/src/ai/tools/calculator-tool.ts',
+    '/app/src/ai/flows/chat-flow.ts',
+    '/app/src/ai/dev.ts'
+  ]
+}
+
+Node.js v18.19.1
+/app/node_modules/genkit-cli/dist/commands/start.js:95
+                    reject(new Error(`app process exited with code ${code}`));
+                           ^
+
+Error: app process exited with code 1
+    at ChildProcess.<anonymous> (/app/node_modules/genkit-cli/dist/commands/start.js:95:28)
+    at ChildProcess.emit (node:events:517:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:292:12)
+
+Node.js v18.19.1

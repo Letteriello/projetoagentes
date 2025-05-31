@@ -1,0 +1,47 @@
+yarn run v1.22.22
+$ next dev
+   ▲ Next.js 15.3.3
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.2:3000
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 527ms (27 modules)
+ ⨯ SyntaxError: Cannot use import statement outside a module
+    at 717 (.next/server/app/page.js:41:1)
+    at __webpack_require__ (.next/server/webpack-runtime.js:33:43)
+    at __webpack_exec__ (.next/server/app/page.js:51:39)
+    at <unknown> (.next/server/app/page.js:52:28)
+    at Object.<anonymous> (.next/server/app/page.js:55:3) {
+  page: '/'
+}
+ ✓ Compiled /_error in 212ms (37 modules)
+ ⨯ Error: Cannot find module '../shared/lib/constants'
+Require stack:
+- /app/.next/server/framework.js
+- /app/.next/server/webpack-runtime.js
+- /app/.next/server/pages/_document.js
+- /app/node_modules/next/dist/server/require.js
+- /app/node_modules/next/dist/server/load-components.js
+- /app/node_modules/next/dist/build/utils.js
+- /app/node_modules/next/dist/build/swc/options.js
+- /app/node_modules/next/dist/build/swc/index.js
+- /app/node_modules/next/dist/build/analysis/parse-module.js
+- /app/node_modules/next/dist/build/analysis/get-page-static-info.js
+- /app/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
+- /app/node_modules/next/dist/server/lib/router-server.js
+- /app/node_modules/next/dist/server/lib/start-server.js
+    at eval (webpack-internal:///548:41:20)
+    at 548 (.next/server/framework.js:29:1)
+    at __webpack_require__ (.next/server/webpack-runtime.js:33:43)
+    at __webpack_exec__ (.next/server/pages/_document.js:20:39)
+    at <unknown> (.next/server/pages/_document.js:21:74)
+    at __webpack_require__.X (.next/server/webpack-runtime.js:81:21)
+    at <unknown> (.next/server/pages/_document.js:21:47)
+    at Object.<anonymous> (.next/server/pages/_document.js:24:3) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ HEAD / 500 in 3131ms
