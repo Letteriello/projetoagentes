@@ -12,17 +12,13 @@ import { AgentSelector } from "@/components/agent-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Menu,
-  // RefreshCcw, // Unused
   Cpu,
-  // Sparkles, // Unused
   Plus,
   LogIn,
   LogOut,
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from "@/types/agent-configs";
 import { useAuth } from "@/contexts/AuthContext"; // Ajustado para alias
-// import { auth } from "@/lib/firebaseClient"; // No longer needed here
-// import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"; // No longer needed here
 import { toast } from "@/hooks/use-toast"; // Keep for potential other toasts, or remove if not used
 
 interface Gem {
@@ -44,9 +40,6 @@ interface ChatHeaderProps {
   selectedADKAgentId: string | null;
   setSelectedADKAgentId: (id: string | null) => void;
   adkAgents: ADKAgent[];
-  // selectedAgentId: string | null; // Unused prop
-  // setSelectedAgentId: (id: string | null) => void; // Unused prop
-  // savedAgents: SavedAgentConfiguration[]; // Unused prop
   selectedGemId: string | null;
   setSelectedGemId: (id: string | null) => void;
   initialGems: Gem[];
@@ -65,9 +58,6 @@ export default function ChatHeader({
   selectedADKAgentId,
   setSelectedADKAgentId,
   adkAgents,
-  // selectedAgentId, // Unused prop
-  // setSelectedAgentId, // Unused prop
-  // savedAgents, // Unused prop
   selectedGemId,
   setSelectedGemId,
   initialGems,

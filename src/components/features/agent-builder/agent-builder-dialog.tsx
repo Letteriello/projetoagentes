@@ -180,8 +180,6 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       defaultResponseFormat: 'text', // Formato padrão das respostas nas comunicações A2A.
       maxMessageSize: 1024 * 1024, // Tamanho máximo (em bytes) para mensagens trocadas via A2A.
       loggingEnabled: false, // Se o logging detalhado deve ser habilitado para a comunicação A2A.
-      // specialists: [], // Added if specialists is a required field in A2AConfig
-      // allowedOrigins: [], // Added if allowedOrigins is a required field in A2AConfig
   };
   const [a2aConfig, setA2AConfig] = React.useState<A2AConfig>(initialA2AConfig); // Objeto que armazena a configuração detalhada para comunicação A2A.
 
@@ -362,9 +360,6 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
             communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels)
                 ? agentConfig.a2a.communicationChannels
                 : initialA2AConfig.communicationChannels,
-            // Ensure other potentially mandatory fields from A2AConfig are handled if not optional
-            // specialists: agentConfig.a2a.specialists || [],
-            // allowedOrigins: agentConfig.a2a.allowedOrigins || [],
         } : initialA2AConfig);
 
       } else {
@@ -588,21 +583,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
     // Constrói o objeto final `SavedAgentConfiguration` que será salvo.
     const agentDataToSave: SavedAgentConfiguration = {
-      id: editingAgent?.id || uuidv4(), // Usa ID existente ou gera um novo.
-      templateId: editingAgent?.templateId || 'custom_manual_dialog', // ID do template, se houver.
-      agentName: agentName,
-      description: agentDescription,
-      version: agentVersion,
-      icon: editingAgent?.icon || `${selectedAgentType}-agent-icon.svg`, // Ícone padrão baseado no tipo, se novo.
-      config: coreConfig, // Configuração central do agente.
-      tools: selectedTools, // Lista de IDs de ferramentas selecionadas.
-      toolConfigsApplied: toolConfigurations, // Configurações específicas das ferramentas.
-      // Mapeia detalhes das ferramentas selecionadas para `toolsDetails`.
       id: editingAgent?.id || uuidv4(),
       templateId: editingAgent?.templateId || 'custom_manual_dialog',
       agentName: agentName, // Renamed from 'name' in new SavedAgentConfiguration
-      agentDescription: agentDescription,
-      agentVersion: agentVersion,
+      description: agentDescription, // Corrected from agentDescription
+      version: agentVersion, // Corrected from agentVersion
       icon: editingAgent?.icon || `${selectedAgentType}-agent-icon.svg`, // Default icon if new
       config: coreConfig, // The fully constructed core configuration
       tools: selectedTools, // Renamed from agentTools to match SavedAgentConfiguration type
@@ -653,7 +638,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
         <div className="flex-grow overflow-y-auto"> {/* Área de conteúdo principal com scroll */}
           <Tabs defaultValue="general" className="w-full p-6">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-8 mb-4 sticky top-0 bg-background z-10">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-8 mb-4 sticky top-0 bg-background z-10">
               <TabsTrigger value="general">Geral</TabsTrigger>
               <TabsTrigger value="behavior">Comportamento</TabsTrigger>
               <TabsTrigger value="tools">Ferramentas</TabsTrigger>

@@ -125,7 +125,8 @@ export const agentCreatorFlow = defineFlow(
         config: { temperature: 0.5 },
       });
 
-      let accumulatedText = ""; // Accumulate text if JSON block might span chunks
+      let accumulatedText = "";
+      let jsonProcessedMidStream = false; // Flag to track if JSON was handled mid-stream
 
       for await (const chunk of llmResponse.stream()) {
         const textContent = chunk.text();
@@ -133,20 +134,16 @@ export const agentCreatorFlow = defineFlow(
 
         accumulatedText += textContent;
 
-        // Try to find JSON block in the accumulated text
-        const jsonRegex = /```json\n([\s\S]*?)\n```/;
-        const match = accumulatedText.match(jsonRegex);
+        // Optimistic mid-stream parsing for early preview
+        if (accumulatedText.includes("```json") && accumulatedText.trim().endsWith("```")) {
+          const jsonRegex = /```json\n([\s\S]*?)\n```/;
+          const match = accumulatedText.match(jsonRegex);
 
-        if (match && match[1]) {
-          const jsonString = match[1];
-          // Potential JSON block found.
-          // Attempt to parse ONLY if it seems like a complete block (ends with ```)
-          // This is a heuristic; a more robust parser would track nesting.
-          // For now, we rely on the stream ending to finalize parsing attempts.
-          if (accumulatedText.trim().endsWith("```")) {
+          if (match && match[1]) {
+            const jsonString = match[1];
             try {
               const parsedConfig = JSON.parse(jsonString);
-              logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON during stream.");
+              logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON mid-stream (optimistic).");
 
               const textBeforeJson = accumulatedText.substring(0, match.index!).trim();
               if (textBeforeJson) {
@@ -158,23 +155,20 @@ export const agentCreatorFlow = defineFlow(
                 suggestedConfig: parsedConfig
               });
 
-              const textAfterJson = accumulatedText.substring(match.index! + match[0].length).trim();
-              if (textAfterJson) {
-                streamCallback?.({ agentResponseChunk: textAfterJson });
-              }
-              accumulatedText = ""; // Clear buffer as JSON part is handled and considered complete.
-              return; // End processing for this flow.
+              // Clear the processed part from accumulatedText
+              accumulatedText = accumulatedText.substring(match.index! + match[0].length);
+              jsonProcessedMidStream = true; // Mark that we've processed JSON
+
             } catch (e: any) {
-              // Parsing failed, but it's inside the loop.
-              // Do nothing here; continue accumulating. The JSON might be incomplete.
-              // The final check after the loop will handle persistent errors.
-              logger.debug('[AgentCreatorFlow] JSON parsing failed mid-stream, continuing accumulation. Error:', e.message);
+              // Parsing failed mid-stream, could be incomplete JSON.
+              // Log and continue accumulating. The robust post-loop parsing will handle it.
+              logger.debug('[AgentCreatorFlow] Optimistic JSON parsing failed mid-stream, continuing accumulation. Error details:', e);
             }
           }
         }
       } // End of for-await loop
 
-      // After the stream has finished, process the fully accumulatedText
+      // Robust post-loop processing for any remaining accumulatedText
       if (accumulatedText.trim()) {
         const jsonRegex = /```json\n([\s\S]*?)\n```/;
         const match = accumulatedText.match(jsonRegex);
@@ -185,13 +179,17 @@ export const agentCreatorFlow = defineFlow(
             const parsedConfig = JSON.parse(jsonString);
             logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON from final accumulated text.");
 
+            // Stream text before JSON, if any, and if JSON wasn't already handled mid-stream
             const textBeforeJson = accumulatedText.substring(0, match.index!).trim();
             if (textBeforeJson) {
                 streamCallback?.({ agentResponseChunk: textBeforeJson });
             }
 
+            // Send the suggested config. If it was already sent mid-stream, this might be redundant
+            // or could be a corrected version if the LLM sent more data.
+            // UI should ideally handle duplicate `suggestedConfig` if states are the same.
             streamCallback?.({
-              agentResponseChunk: "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes.", // Consistent message
+              agentResponseChunk: !jsonProcessedMidStream ? "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes." : "",
               suggestedConfig: parsedConfig
             });
 
@@ -199,30 +197,41 @@ export const agentCreatorFlow = defineFlow(
             if (textAfterJson) {
                 streamCallback?.({ agentResponseChunk: textAfterJson });
             }
-
           } catch (e: any) {
-            logger.warn('[AgentCreatorFlow] Failed to parse JSON from final accumulated text:', e);
+            logger.warn('[AgentCreatorFlow] Failed to parse JSON from final accumulated text. Error details:', e);
             // Send the conversational part that might have preceded the malformed JSON.
             const textBeforePotentialJson = match.index! > 0 ? accumulatedText.substring(0, match.index!).trim() : "";
+
+            // If JSON was processed mid-stream, we might have already sent the text before it.
+            // Only send textBeforePotentialJson if it's different from what might have been part of mid-stream processing.
+            // However, accumulatedText here is *only* what remained *after* mid-stream processing. So this is fine.
             if (textBeforePotentialJson) {
                  streamCallback?.({ agentResponseChunk: textBeforePotentialJson });
             }
             streamCallback?.({
               agentResponseChunk: "\n\nI attempted to provide a configuration, but it seems to be malformed.",
-              error: `Malformed configuration JSON. Please review the raw output. Error: ${e.message}`,
-              rawJsonForDebug: jsonString // jsonString is from match[1], so it's the content within ```json ... ```
+              error: `Malformed configuration JSON. Please review the raw output. Error: ${e instanceof Error ? e.message : String(e)}`,
+              rawJsonForDebug: jsonString
             });
           }
         } else {
-          // No JSON block found in the entire accumulated text, stream as plain text.
+          // No JSON block found in the remaining accumulated text.
+          // If JSON was already processed mid-stream, this is just trailing text.
+          // If no JSON was ever processed, this is the full conversational response.
           streamCallback?.({ agentResponseChunk: accumulatedText });
         }
+      } else if (jsonProcessedMidStream && !accumulatedText.trim()) {
+        // This case means JSON was processed mid-stream and there was no trailing text.
+        // We might want to send a confirmation or ensure the UI knows the stream ended.
+        // For now, this is implicitly handled as the loop ends and no more chunks are sent.
+        logger.info("[AgentCreatorFlow] JSON processed mid-stream and no further text followed.");
       }
+
     } catch (err: unknown) {
-      logger.error('[AgentCreatorFlow] Error in generate call or streaming loop:', err);
+      logger.error('[AgentCreatorFlow] Error in generate call or streaming loop. Error details:', err);
       if (streamCallback) {
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during agent creation LLM call.';
-        streamCallback({ error: errorMessage }); // Removed optional chaining as we are inside an if (streamCallback)
+        streamCallback({ error: errorMessage });
       }
     }
   }
