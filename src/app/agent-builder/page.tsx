@@ -198,6 +198,7 @@ export interface AgentConfigBase {
   agentName: string;
   agentDescription: string;
   agentVersion: string;
+  agentIcon?: string; // Ícone do agente (nome do componente do ícone)
   agentTools: string[];
   isRootAgent?: boolean; // Indica se este é um agente raiz em um sistema multi-agente
   subAgents?: string[]; // Lista de IDs de agentes que podem ser delegados

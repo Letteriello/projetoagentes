@@ -190,6 +190,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       agentName,
       agentDescription,
       agentIcon,
+      agentVersion: editingAgent?.agentVersion || "1.0.0", // Versão padrão ou manter a existente
       agentTools: selectedToolIds,
       toolConfigsApplied: toolConfigurations,
     };
