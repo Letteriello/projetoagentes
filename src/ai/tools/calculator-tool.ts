@@ -4,7 +4,7 @@
  * basic order of operations, and returns the result or an error message.
  * It's designed to avoid direct use of `eval()` for security.
  */
-import { defineTool } from 'genkit/tool';
+import { defineTool } from 'genkit';
 import { z } from 'zod';
 
 export const CalculatorInputSchema = z.object({
