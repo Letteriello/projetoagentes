@@ -13,7 +13,7 @@ import {
   ChevronsRight,
   // Home, // Unused
 } from "lucide-react";
-import { MainLayout } from "@/components/layout/main-layout";
+// import { MainLayout } from "@/components/layout/main-layout";
 import {
   Sidebar,
   SidebarHeader,
