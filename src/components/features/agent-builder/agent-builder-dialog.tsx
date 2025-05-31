@@ -71,9 +71,11 @@ import type {
   AgentConfig,
   LLMAgentConfig,
   WorkflowAgentConfig,
-  AvailableTool,
   ToolConfigData
 } from "@/app/agent-builder/page";
+import { AvailableTool } from "@/types/agent-types";
+import { ArtifactDefinition, RagMemoryConfig, TerminationConditionType } from "@/types/agent-types";
+import { A2AConfigType } from "@/types/agent-config";
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -125,29 +127,23 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(undefined);
 
   // Behavior & Prompting - Custom Specific
-  const [customLogicDescription, setCustomLogicDescription] = React.useState<string>("");
+  // Estado para lógica customizada (remover duplicatas)
+// Mantém apenas esta declaração!
+const [customLogicDescription, setCustomLogicDescription] = React.useState<string>("");
 
-<<<<<<< Updated upstream
-  // Tools
-  const [selectedTools, setSelectedTools] = React.useState<string[]>([]);
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
-=======
   // Multi-agent fields (Google ADK)
-const [isRootAgent, setIsRootAgent] = React.useState(editingAgent?.isRootAgent || false);
-const [subAgents, setSubAgents] = React.useState<string[]>(editingAgent?.subAgents || []);
-const [globalInstruction, setGlobalInstruction] = React.useState(editingAgent?.globalInstruction || "");
-const [agentFramework, setAgentFramework] = React.useState<string>("custom");
+  // (Removido: declarações duplicadas de isRootAgent, subAgents, globalInstruction e agentFramework)
 
-// Função genérica para manipular alterações de campo
-const handleFieldChange = (fieldName: string, value: any) => {
-  // Manipula diferentes campos com base no nome
-  switch (fieldName) {
-    case 'agentName':
-      setAgentName(value);
-      break;
-    case 'agentDescription':
-      setAgentDescription(value);
-      break;
+  // Função genérica para manipular alterações de campo
+  const handleFieldChange = (fieldName: string, value: any) => {
+    // Manipula diferentes campos com base no nome
+    switch (fieldName) {
+      case 'agentName':
+        setAgentName(value);
+        break;
+      case 'agentDescription':
+        setAgentDescription(value);
+        break;
     case 'agentVersion':
       setAgentVersion(value);
       break;
@@ -177,35 +173,14 @@ const handleFieldChange = (fieldName: string, value: any) => {
   }
 };
 
-// Estados para gerenciamento de estado e memória
-const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(
-    editingAgent?.enableStatePersistence || false
-);
-const [statePersistenceType, setStatePersistenceType] = React.useState<'session' | 'memory' | 'database'>(
-    editingAgent?.statePersistenceType || 'memory'
-);
-const [initialStateValues, setInitialStateValues] = React.useState<Array<{
-    key: string;
-    value: string;
-    scope: 'global' | 'agent' | 'temporary';
-    description: string;
-}>>(editingAgent?.initialStateValues || []);
-const [enableStateSharing, setEnableStateSharing] = React.useState<boolean>(
-    editingAgent?.enableStateSharing || false
-);
-const [stateSharingStrategy, setStateSharingStrategy] = React.useState<'all' | 'explicit' | 'none'>(
-    editingAgent?.stateSharingStrategy || 'explicit'
-);
-const [enableRAG, setEnableRAG] = React.useState<boolean>(
-    editingAgent?.enableRAG || false
-);
+// (Removido: duplicidades de estados para gerenciamento de estado, memória e RAG)
 
 // Estados para gerenciamento de artefatos
 const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(
     editingAgent?.enableArtifacts || false
 );
 const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>(
-    editingAgent?.artifactStorageType || 'memory'
+    (editingAgent?.artifactStorageType === 'local' ? 'filesystem' : editingAgent?.artifactStorageType) || 'memory'
 );
 const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>(
     editingAgent?.artifacts || []
@@ -217,10 +192,14 @@ const [localStoragePath, setLocalStoragePath] = React.useState<string>(
     editingAgent?.localStoragePath || ''
 );
 
+// Estado para ferramentas selecionadas
+const [selectedTools, setSelectedTools] = React.useState<string[]>(editingAgent?.tools || []);
+
+
 // Estados para RAG e memória
 const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>({
   enabled: editingAgent?.ragMemoryConfig?.enabled || false,
-  serviceType: (editingAgent?.ragMemoryConfig?.serviceType as MemoryServiceType) || 'in-memory',
+  serviceType: editingAgent?.ragMemoryConfig?.serviceType || 'in-memory',
   projectId: editingAgent?.ragMemoryConfig?.projectId || '',
   location: editingAgent?.ragMemoryConfig?.location || '',
   ragCorpusName: editingAgent?.ragMemoryConfig?.ragCorpusName || '',
@@ -242,22 +221,32 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
 });
 
 // Workflow Fields
-  const [workflowDescription, setWorkflowDescription] = React.useState(editingAgent?.agentType === 'workflow' ? editingAgent.workflowDescription : (editingAgent?.workflowDescription || defaultWorkflowConfigValues.workflowDescription || ""));
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.detailedWorkflowType : defaultWorkflowConfigValues.detailedWorkflowType);
-  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopMaxIterations : defaultWorkflowConfigValues.loopMaxIterations);
+  // (Removido: duplicidades de workflowDescription, detailedWorkflowType e loopMaxIterations)
   const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>(editingAgent?.loopTerminationConditionType as TerminationConditionType || "none");
-  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitToolName : defaultWorkflowConfigValues.loopExitToolName);
-  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateKey : defaultWorkflowConfigValues.loopExitStateKey);
-  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateValue : defaultWorkflowConfigValues.loopExitStateValue);
+  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitToolName : {
+  loopExitToolName: '',
+  loopExitStateKey: '',
+  loopExitStateValue: ''
+}.loopExitToolName);
+  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateKey : {
+  loopExitToolName: '',
+  loopExitStateKey: '',
+  loopExitStateValue: ''
+}.loopExitStateKey);
+  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateValue : {
+  loopExitToolName: '',
+  loopExitStateKey: '',
+  loopExitStateValue: ''
+}.loopExitStateValue);
   
   // Custom/A2A/Task Fields (some might overlap or use LLM fields)
-  const [customLogicDescription, setCustomLogicDescription] = React.useState(editingAgent?.agentType === 'custom' ? editingAgent.customLogicDescription : (editingAgent?.customLogicDescription || defaultCustomConfigValues.customLogicDescription || ""));
+  const [customLogicDescription, setCustomLogicDescription] = React.useState(editingAgent?.agentType === 'custom' ? editingAgent.customLogicDescription : (editingAgent?.customLogicDescription || {
+  customLogicDescription: ''
+}.customLogicDescription || ""));
 
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>(editingAgent?.toolConfigsApplied || {});
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
->>>>>>> Stashed changes
   const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState<boolean>(false);
 
   // State & Memory
   const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false);
@@ -266,21 +255,13 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
 
   // RAG
   const [enableRAG, setEnableRAG] = React.useState<boolean>(false);
-  const [ragMemoryConfig, setRagMemoryConfig] = React.useState<any>({
-    serviceType: "googleSearch", projectId: "", location: "", corpusName: "",
-    similarityTopK: 5, vectorDistanceThreshold: 0.5, knowledgeSources: [],
-  });
+  // (Removido: declaração duplicada de ragMemoryConfig e a2aConfig)
 
   // Artifacts
-  const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(false);
-  const [artifactStorageType, setArtifactStorageType] = React.useState<string>("local");
-  const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>("");
-  const [localStoragePath, setLocalStoragePath] = React.useState<string>("./artifacts");
+  // (Removido: declarações duplicadas de enableArtifacts, artifactStorageType, cloudStorageBucket e localStoragePath)
 
   // A2A Config
-  const [a2aConfig, setA2aConfig] = React.useState<any>({
-    enabled: false, communicationChannels: [],
-  });
+  // (Removido: declaração duplicada de a2aConfig)
 
   // Modal specific states for tool configuration
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
@@ -316,11 +297,11 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     if (isOpen) {
       if (editingAgent) {
         // Populate with editingAgent data
-        setAgentName(editingAgent.name);
-        setAgentDescription(editingAgent.description || "");
-        setAgentVersion(editingAgent.version || "1.0.0");
+        setAgentName(editingAgent.agentName);
+        setAgentDescription(editingAgent.agentDescription || "");
+        setAgentVersion(editingAgent.agentVersion || "1.0.0");
 
-        const config = editingAgent.config || {} as AgentConfig; // Ensure config object exists
+        const config = editingAgent.toolConfigsApplied || {} as AgentConfig; // Ensure config object exists
         setSelectedAgentType(config.type || "llm");
         setAgentFramework(config.framework || "genkit");
         setIsRootAgent(config.isRootAgent !== undefined ? config.isRootAgent : true);
@@ -357,7 +338,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
             // setCustomLogicDescription("");
         }
 
-        setSelectedTools(editingAgent.tools || []);
+        setSelectedTools(editingAgent.agentTools || []);
         setToolConfigurations(editingAgent.toolConfigsApplied || {});
 
         setEnableStatePersistence(config.statePersistence?.enabled || false);
@@ -372,7 +353,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         setCloudStorageBucket(config.artifacts?.cloudStorageBucket || "");
         setLocalStoragePath(config.artifacts?.localStoragePath || "./artifacts");
 
-        setA2aConfig(config.a2a || { enabled: false, communicationChannels: [] });
+        setA2AConfig(config.a2a || { enabled: false, communicationChannels: [] });
 
       } else {
         // Reset to default values for new agent
@@ -388,7 +369,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         setEnableStatePersistence(false); setStatePersistenceType("session"); setInitialStateValues([]);
         setEnableRAG(false); setRagMemoryConfig({ serviceType: "googleSearch", projectId:"", location:"", corpusName:"", similarityTopK: 5, vectorDistanceThreshold: 0.5, knowledgeSources: [] });
         setEnableArtifacts(false); setArtifactStorageType("local"); setCloudStorageBucket(""); setLocalStoragePath("./artifacts");
-        setA2aConfig({ enabled: false, communicationChannels: [] });
+        setA2AConfig({ enabled: false, communicationChannels: [] });
       }
     }
     if (!isOpen) {
@@ -458,7 +439,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
       newConfig.calendarApiEndpoint = modalCalendarApiEndpoint;
     }
 
-    setToolConfigurations((prev) => ({ ...prev, [configuringTool.id!]: newConfig })); // Fix A1: Save the newConfig
+    setToolConfigurations((prev: string[]) => ({ ...prev, [configuringTool.id!]: newConfig })); // Fix A1: Save the newConfig
     setIsToolConfigModalOpen(false);
     setConfiguringTool(null);
 
@@ -466,10 +447,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
     toast({ title: `Configuração salva para ${toolDisplayName}` });
   };
 
-<<<<<<< HEAD
   // Manipulador para salvar o agente
-=======
->>>>>>> e25e875887811835bfd90335966098006e72c9d9
   const handleSaveAgent = () => {
     if (!agentName.trim()) {
       toast({ title: "Erro de Validação", description: "O nome do agente é obrigatório.", variant: "destructive" });
@@ -555,7 +533,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle>{editingAgent ? "Editar Agente" : "Criar Novo Agente"}</DialogTitle>
           <DialogDescription>
-            {editingAgent ? `Modifique os detalhes do agente ${editingAgent.name}.` : "Configure um novo agente para suas tarefas."}
+            {editingAgent ? `Modifique os detalhes do agente ${editingAgent.agentName}.` : "Configure um novo agente para suas tarefas."}
           </DialogDescription>
         </DialogHeader>
 
@@ -775,7 +753,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                           id={`tool-${tool.id}`}
                           checked={selectedTools.includes(tool.id)}
                           onCheckedChange={(checked) => {
-                            setSelectedTools(prev =>
+                            setSelectedTools(prev: string[] =>
                               checked ? [...prev, tool.id] : prev.filter(id => id !== tool.id)
                             );
                           }}
@@ -919,7 +897,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                           <Label htmlFor="ragServiceType">Serviço de Busca/Vetorização</Label>
                           <Select
                             value={ragMemoryConfig.serviceType || "vertexAISearch"}
-                            onValueChange={(value) => setRagMemoryConfig(prev => ({...prev, serviceType: value}))}
+                            onValueChange={(value) => setRagMemoryConfig(prev: string[] => ({...prev, serviceType: value}))}
                           >
                             <SelectTrigger id="ragServiceType">
                               <SelectValue placeholder="Selecione o serviço" />
@@ -940,7 +918,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                 id="ragProjectId"
                                 placeholder="Seu ID do projeto GCP ou similar"
                                 value={ragMemoryConfig.projectId || ""}
-                                onChange={(e) => setRagMemoryConfig(prev => ({...prev, projectId: e.target.value}))}
+                                onChange={(e) => setRagMemoryConfig(prev: string[] => ({...prev, projectId: e.target.value}))}
                               />
                             </div>
                             <div className="space-y-2">
@@ -949,7 +927,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                                 id="ragLocation"
                                 placeholder="Ex: us-central1"
                                 value={ragMemoryConfig.location || ""}
-                                onChange={(e) => setRagMemoryConfig(prev => ({...prev, location: e.target.value}))}
+                                onChange={(e) => setRagMemoryConfig(prev: string[] => ({...prev, location: e.target.value}))}
                               />
                             </div>
                           </>
@@ -960,7 +938,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                             id="ragCorpusName"
                             placeholder="Ex: meu-datastore-de-documentos"
                             value={ragMemoryConfig.corpusName || ""}
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, corpusName: e.target.value}))}
+                            onChange={(e) => setRagMemoryConfig(prev: string[] => ({...prev, corpusName: e.target.value}))}
                           />
                         </div>
                       </div>
@@ -971,7 +949,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                             id="ragSimilarityTopK"
                             type="number"
                             value={String(ragMemoryConfig.similarityTopK || 5)}
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
+                            onChange={(e) => setRagMemoryConfig(prev: string[] => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
                           />
                           <p className="text-xs text-muted-foreground">Número de resultados mais similares a serem recuperados.</p>
                         </div>
@@ -981,7 +959,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                             id="ragVectorDistanceThreshold"
                             min={0} max={1} step={0.05}
                             value={[ragMemoryConfig.vectorDistanceThreshold || 0.5]}
-                            onValueChange={(value) => setRagMemoryConfig(prev => ({...prev, vectorDistanceThreshold: value[0]}))}
+                            onValueChange={(value) => setRagMemoryConfig(prev: string[] => ({...prev, vectorDistanceThreshold: value[0]}))}
                           />
                           <p className="text-xs text-muted-foreground">Distância máxima para considerar um resultado relevante (0 a 1).</p>
                         </div>
@@ -995,9 +973,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                           onChange={(e) => {
                             try {
                               const val = e.target.value.trim();
-                              if(!val) { setRagMemoryConfig(prev => ({...prev, knowledgeSources: []})); return; }
+                              if(!val) { setRagMemoryConfig(prev: string[] => ({...prev, knowledgeSources: []})); return; }
                               const parsed = JSON.parse(val);
-                              setRagMemoryConfig(prev => ({...prev, knowledgeSources: parsed}));
+                              setRagMemoryConfig(prev: string[] => ({...prev, knowledgeSources: parsed}));
                             } catch (error) {
                               console.error("Erro ao parsear JSON das fontes de conhecimento:", error);
                               toast({variant: "destructive", title: "Erro no JSON", description: "Verifique Fontes de Conhecimento."})
@@ -1156,7 +1134,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                     <Switch
                       id="a2aEnabled"
                       checked={a2aConfig.enabled || false}
-                      onCheckedChange={(checked) => setA2aConfig(prev => ({...prev, enabled: checked}))}
+                      onCheckedChange={(checked) => setA2AConfig(prev: string[] => ({...prev, enabled: checked}))}
                     />
                     <Label htmlFor="a2aEnabled" className="text-base">Habilitar Comunicação A2A</Label>
                   </div>
@@ -1177,9 +1155,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
                         onChange={(e) => {
                           try {
                             const val = e.target.value.trim();
-                            if(!val) { setA2aConfig(prev => ({...prev, communicationChannels: []})); return; }
+                            if(!val) { setA2AConfig(prev: string[] => ({...prev, communicationChannels: []})); return; }
                             const parsedChannels = JSON.parse(val);
-                            setA2aConfig(prev => ({...prev, communicationChannels: parsedChannels}));
+                            setA2AConfig(prev: string[] => ({...prev, communicationChannels: parsedChannels}));
                           } catch (error) {
                             console.error("Erro ao parsear JSON dos canais A2A:", error);
                             toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para canais A2A."})

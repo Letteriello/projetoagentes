@@ -55,25 +55,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AvailableTool } from "@/types/tool-types";
 
-<<<<<<< Updated upstream
-export interface AvailableTool {
-  id: string;
-  label: string;
-  name: string;
-  type: "genkit_native";
-  icon: React.FC<React.SVGProps<SVGSVGElement>> | undefined;
-  description: string;
-  hasConfig?: boolean; // Changed from needsConfiguration
-  genkitToolName?: string;
-  configFields?: Array<{
-    id: string;
-    label: string;
-    type: "text" | "password" | "select";
-    options?: Array<{ label: string; value: string }>;
-    placeholder?: string;
-    description?: string;
-  }>;
-}
+// Interface já importada de @/types/tool-types
 
 export const availableTools: AvailableTool[] = [
   {
@@ -150,75 +132,13 @@ export const availableTools: AvailableTool[] = [
       "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.",
     hasConfig: true,
     genkitToolName: "executeCode",
-  }, // Fixed escaped quote
-=======
+  }, // Última ferramenta da lista
+]; // Fechamento do array de ferramentas
+
 // Interface já importada de @/types/tool-types
 
-export const availableTools: AvailableTool[] = [
-  { 
-    id: "webSearch", 
-    name: "Busca na Web (Google)", 
-    icon: Search, 
-    description: "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.", 
-    hasConfig: true, 
-    genkitToolName: "performWebSearch",
-    type: "genkit_native"
-  },
-  { 
-    id: "calculator", 
-    name: "Calculadora", 
-    icon: Calculator, 
-    description: "Permite realizar cálculos matemáticos (via função Genkit).", 
-    genkitToolName: "calculator",
-    type: "genkit_native" 
-  },
-  { 
-    id: "knowledgeBase", 
-    name: "Consulta à Base de Conhecimento (RAG)", 
-    icon: FileText, 
-    description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.", 
-    hasConfig: true, 
-    genkitToolName: "queryKnowledgeBase",
-    type: "genkit_native" 
-  },
-  { 
-    id: "calendarAccess", 
-    name: "Acesso à Agenda/Calendário", 
-    icon: CalendarDays, 
-    description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.", 
-    hasConfig: true, 
-    genkitToolName: "accessCalendar",
-    type: "genkit_native" 
-  },
-  { 
-    id: "customApiIntegration", 
-    name: "Integração com API Externa (OpenAPI)", 
-    icon: Network, 
-    description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.", 
-    hasConfig: true, 
-    genkitToolName: "invokeOpenAPI",
-    type: "genkit_native" 
-  },
-  { 
-    id: "databaseAccess", 
-    name: "Acesso a Banco de Dados (SQL)", 
-    icon: Database, 
-    description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.", 
-    hasConfig: true, 
-    genkitToolName: "queryDatabase",
-    type: "genkit_native" 
-  },
-  { 
-    id: "codeExecutor", 
-    name: "Execução de Código (Python Sandbox)", 
-    icon: Code2, 
-    description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.", 
-    hasConfig: true, 
-    genkitToolName: "executeCode",
-    type: "genkit_native" 
-  },
->>>>>>> Stashed changes
-];
+// A lista de ferramentas já foi definida acima.
+// Se precisar adicionar mais ferramentas, adicione-as ao array existente acima.
 
 export const agentToneOptions = [
   { id: "friendly", label: "Amigável e Prestativo" },
@@ -232,22 +152,7 @@ export const agentToneOptions = [
   { id: "creative", label: "Criativo e Inspirador" },
 ];
 
-<<<<<<< Updated upstream
 export const agentTypeOptions = [
-  {
-    id: "llm" as const,
-    label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)",
-    icon: Brain as ReactNode,
-    description:
-      "Usa Modelos de Linguagem (LLMs) para raciocinar, planear, gerar respostas e usar ferramentas. A descrição do agente é usada por outros agentes LLM para decidir se devem delegar tarefas a ele.",
-  },
-  {
-    id: "workflow" as const,
-    label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)",
-    icon: Workflow as ReactNode,
-    description:
-      "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística, sem consultar um LLM para a orquestração em si.",
-  },
   {
     id: "custom" as const,
     label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)",
@@ -255,13 +160,13 @@ export const agentTypeOptions = [
     description:
       "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl).",
   },
-=======
-export const agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string }> = [
-  { id: "llm", label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)", icon: <Brain size={16} />, description: "Usa Modelos de Linguagem (LLMs) para raciocinar, planejar, gerar respostas e usar ferramentas. A description do agente é usada por outros agentes LLM para decidir se devem delegar tarefas a ele." },
-  { id: "workflow", label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)", icon: <Workflow size={16} />, description: "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística, sem consultar um LLM para a orquestração em si." },
-  { id: "custom", label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)", icon: <FileJson size={16} />, description: "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl)." },
-  { id: "a2a", label: "Agente-para-Agente (A2A)", icon: <Network size={16} />, description: "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas." },
->>>>>>> Stashed changes
+  {
+    id: "a2a" as const,
+    label: "Agente-para-Agente (A2A)",
+    icon: Network as ReactNode,
+    description:
+      "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas.",
+  },
 ];
 
 export type AgentFramework =
