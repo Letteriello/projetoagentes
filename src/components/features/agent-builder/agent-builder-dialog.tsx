@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 // Removido import duplicado de tipos já definidos localmente ou importados abaixo para evitar conflito
 // Import removido para evitar conflito de tipos já definidos localmente ou importados abaixo.
 import { CommunicationChannelItem } from "./a2a-communication-channel";
+import { MemoryServiceType } from "./memory-knowledge-tab"; // Ensure this matches the type used in RagMemoryConfig definition
 import { Textarea } from "@/components/ui/textarea";
 import { 
   AlertCircle, 
@@ -53,8 +54,12 @@ import {
 } from "lucide-react";
 
 import { v4 as uuidv4 } from "uuid";
-import { useToast } from "@/hooks/use-toast";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AgentFramework, AgentConfig, SavedAgentConfiguration, A2AConfig, RagMemoryConfig, ArtifactDefinition, ToolConfigData, AvailableTool, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig } from "@/types/agent-configs"; // AvailableTool type is re-exported by agent-configs, KnowledgeSource removed, added specific agent configs
+import type { KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab"; // Correct import for KnowledgeSource
+import { availableTools as availableToolsList } from "@/data/available-tools"; 
 import { useAgents } from "@/contexts/AgentsContext";
+import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,21 +70,22 @@ import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
 
-// Types are now imported from @/types/agent-configs and @/types/agent-types
-import type {
-  SavedAgentConfiguration,
-  AgentConfig, // General union type
-  LLMAgentConfig,
-  WorkflowAgentConfig,
-  CustomAgentConfig, // Added for completeness
-  A2AAgentSpecialistConfig, // Added for completeness
-  ToolConfigData
-} from "@/types/agent-configs";
-import { AvailableTool } from "@/types/agent-types"; // This seems to be the correct source
-import { ArtifactDefinition, RagMemoryConfig, TerminationConditionType, A2AConfigType } from "@/types/agent-types";
-// A2AConfigType might be defined in agent-types or agent-configs. Assuming agent-types for now.
-// If A2AConfigType is part of the new agent-configs.ts, adjust path.
-// Based on new src/types/agent-configs.ts, A2AConfigType is imported by it from agent-types. So this is fine.
+// Definimos localmente os tipos que estão faltando
+// RagMemoryConfig está disponível em memory-knowledge-tab, mas não é exportado, então definimos aqui
+
+// Definindo tipos que estavam faltando
+type TerminationConditionType = "none" | "tool" | "state";
+
+// Definindo o tipo A2AConfigType usado nas configurações de comunicação entre agentes
+type A2AConfigType = {
+  enabled: boolean;
+  communicationChannels: any[]; 
+  defaultResponseFormat: string;
+  maxMessageSize: number;
+  loggingEnabled: boolean;
+};
+
+import { AgentTemplate } from "@/data/agentBuilderConfig";
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -90,6 +96,7 @@ interface AgentBuilderDialogProps {
   agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string; }>;
   agentToneOptions: { id: string; label: string; }[];
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
+  agentTemplates: AgentTemplate[];
 }
 
 const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
@@ -106,7 +113,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [agentName, setAgentName] = React.useState<string>("");
   const [agentDescription, setAgentDescription] = React.useState<string>("");
   const [agentVersion, setAgentVersion] = React.useState<string>("1.0.0");
-  const [agentFramework, setAgentFramework] = React.useState<string>("genkit");
+  const [agentFramework, setAgentFramework] = React.useState<AgentFramework>("genkit");
   const [selectedAgentType, setSelectedAgentType] = React.useState<"llm" | "workflow" | "custom" | "a2a">("llm");
 
   // Multi-Agent Properties
@@ -126,7 +133,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [agentTemperature, setAgentTemperature] = React.useState<number>(0.7);
 
   // Behavior & Prompting - Workflow Specific
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<string>("sequential");
+  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<"sequential" | "graph" | "stateMachine" | undefined>("sequential");
   const [workflowDescription, setWorkflowDescription] = React.useState<string>("");
   const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(undefined);
 
@@ -179,9 +186,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
 // Estados para gerenciamento de artefatos
 const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(
-    editingAgent?.enableArtifacts || false
+    editingAgent?.config.artifacts?.enabled || false
 );
-const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>('memory');
+const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'local' | 'cloud'>('memory');
 // Initialize artifacts as empty; useEffect will populate it from editingAgent.config.artifacts.definitions
 const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]);
 const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(
@@ -199,15 +206,20 @@ const [selectedTools, setSelectedTools] = React.useState<string[]>([]); // Initi
 const initialRagMemoryConfig: RagMemoryConfig = {
     enabled: false,
     serviceType: 'vertexAISearch', // Default from UI
-    projectId: '',
-    location: '',
-    ragCorpusName: '',
     similarityTopK: 5,
     vectorDistanceThreshold: 0.5,
-    embeddingModel: '',
     knowledgeSources: [],
     includeConversationContext: true,
-    persistentMemory: false,
+    persistentMemory: { enabled: false },
+    vertexAISearchConfig: {
+        projectId: '',
+        location: '',
+        dataStoreId: '', // Was ragCorpusName
+        embeddingModelName: '' // Was embeddingModel
+    },
+    pineconeConfig: undefined,
+    localFaissConfig: undefined,
+    googleSearchConfig: undefined
 };
 const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(initialRagMemoryConfig);
 
@@ -219,7 +231,11 @@ const initialA2AConfig: A2AConfigType = {
     maxMessageSize: 1024 * 1024, // 1MB default
     loggingEnabled: false,
 };
-const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig);
+const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
+    ...initialA2AConfig,
+    maxMessageSize: initialA2AConfig.maxMessageSize ?? 0,
+    defaultResponseFormat: (initialA2AConfig.defaultResponseFormat as A2AConfig['defaultResponseFormat']) || 'text',
+});
 
 // Workflow Fields
   // (Removido: duplicidades de workflowDescription, detailedWorkflowType e loopMaxIterations)
@@ -286,9 +302,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
     if (isOpen) {
       if (editingAgent) {
         // Populate with editingAgent data
-        setAgentName(editingAgent.agentName);
-        setAgentDescription(editingAgent.description || ""); // Use new type structure
-        setAgentVersion(editingAgent.version || "1.0.0"); // Use new type structure
+        setAgentName(editingAgent.agentName || "Novo Agente");
+        setAgentDescription(editingAgent.agentDescription || "");
+        setAgentVersion(editingAgent.agentVersion || "1.0.0"); // Use new type structure
 
         // const config = editingAgent.toolConfigsApplied || {} as AgentConfig; // OLD - Incorrect
         const agentConfig = editingAgent.config; // NEW - Correct way to access core config
@@ -338,7 +354,6 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
         setSelectedTools(editingAgent.tools || []);
         setToolConfigurations(editingAgent.toolConfigsApplied || {});
 
-
         setEnableStatePersistence(agentConfig.statePersistence?.enabled || false);
         setStatePersistenceType(agentConfig.statePersistence?.type || "session");
         setInitialStateValues(agentConfig.statePersistence?.initialState || []);
@@ -359,16 +374,22 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
         setRagMemoryConfig(agentConfig.rag?.config || defaultRagConfig);
 
         setEnableArtifacts(agentConfig.artifacts?.enabled || false);
-        // Map 'local' to 'filesystem' if that's the new standard, or adjust type
+        // Use 'local' as the standard storage type
         const artifactStorageTypeValue = agentConfig.artifacts?.storageType;
         setArtifactStorageType(
-          artifactStorageTypeValue === 'local' ? 'filesystem' : (artifactStorageTypeValue || 'memory')
+          artifactStorageTypeValue === 'filesystem' ? 'local' : (artifactStorageTypeValue as "local" | "memory" | "cloud" || 'memory')
         );
         setCloudStorageBucket(agentConfig.artifacts?.cloudStorageBucket || "");
         setLocalStoragePath(agentConfig.artifacts?.localStoragePath || "./artifacts");
         setArtifacts(agentConfig.artifacts?.definitions || []); // Populate artifact definitions
 
-        setA2AConfig(agentConfig.a2a || { enabled: false, communicationChannels: [], defaultResponseFormat: 'text', maxMessageSize: 1024*1024, loggingEnabled: false });
+        setA2AConfig(agentConfig.a2a ? {
+          ...initialA2AConfig, // Start with defaults to ensure all keys are present
+          ...agentConfig.a2a,
+          maxMessageSize: agentConfig.a2a.maxMessageSize ?? initialA2AConfig.maxMessageSize ?? 0,
+          defaultResponseFormat: (agentConfig.a2a.defaultResponseFormat as A2AConfig['defaultResponseFormat']) || initialA2AConfig.defaultResponseFormat || 'text',
+          communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels) ? agentConfig.a2a.communicationChannels : initialA2AConfig.communicationChannels || [],
+        } : { ...initialA2AConfig });
 
       } else {
         // Reset to default values for new agent
@@ -376,8 +397,8 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
         setSelectedAgentType("llm"); setAgentFramework("genkit");
         setIsRootAgent(true); setSubAgentIds([]);
         setGlobalInstruction(""); setSystemPromptGenerated("");
-        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || "");
-        setAgentRestrictions([]); setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7);
+        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]);
+        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7);
 
         // Reset Workflow fields
         setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined);
@@ -485,14 +506,14 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
     if (selectedAgentType === "llm") {
       coreConfig = {
         type: "llm",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined, // 'local' might come from older data
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig,
@@ -503,14 +524,14 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
     } else if (selectedAgentType === "workflow") {
       coreConfig = {
         type: "workflow",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig,
@@ -521,14 +542,14 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
     } else if (selectedAgentType === "custom") {
       coreConfig = {
         type: "custom",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig,
@@ -538,14 +559,14 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
     } else if (selectedAgentType === "a2a") {
       coreConfig = {
         type: "a2a",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig,
@@ -561,11 +582,11 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
       id: editingAgent?.id || uuidv4(),
       templateId: editingAgent?.templateId || 'custom_manual_dialog',
       agentName: agentName, // Renamed from 'name' in new SavedAgentConfiguration
-      description: agentDescription,
-      version: agentVersion,
+      agentDescription: agentDescription,
+      agentVersion: agentVersion,
       icon: editingAgent?.icon || `${selectedAgentType}-agent-icon.svg`, // Default icon if new
       config: coreConfig, // The fully constructed core configuration
-      tools: selectedTools,
+      tools: selectedTools, // Renamed from agentTools to match SavedAgentConfiguration type
       toolConfigsApplied: toolConfigurations,
       toolsDetails: selectedTools
         .map(toolId => {
@@ -573,7 +594,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
             return toolDetail ? {
                 id: toolDetail.id,
                 name: toolDetail.name,
-                label: toolDetail.label, // Keep label for display consistency
+                label: toolDetail.name, // Usando 'name' em vez de 'label' que não existe no tipo
                 description: toolDetail.description, // Keep description
                 iconName: toolDetail.icon ? (Object.keys(iconComponents).find(key => iconComponents[key] === toolDetail.icon) || "Settings") : "Settings",
                 hasConfig: toolDetail.hasConfig, // Keep hasConfig
@@ -625,16 +646,16 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="agentName">Nome do Agente</Label>
-                  <Input id="agentName" placeholder="Ex: Agente de Pesquisa Avançada" value={agentName} onChange={(e) => setAgentName(e.target.value)} />
+                  <Input id="agentName" placeholder="Ex: Agente de Pesquisa Avançada" value={agentName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="agentVersion">Versão</Label>
-                  <Input id="agentVersion" placeholder="Ex: 1.0.1" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} />
+                  <Input id="agentVersion" placeholder="Ex: 1.0.1" value={agentVersion} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentVersion(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agentDescription">Descrição do Agente</Label>
-                <Textarea id="agentDescription" placeholder="Descreva o propósito principal, capacidades e limitações do agente." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} rows={3} />
+                <Textarea id="agentDescription" placeholder="Descreva o propósito principal, capacidades e limitações do agente." value={agentDescription} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAgentDescription(e.target.value)} rows={3} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -656,7 +677,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="agentFramework">Framework do Agente</Label>
-                  <Select value={agentFramework} onValueChange={setAgentFramework}>
+                  <Select value={agentFramework} onValueChange={(value) => setAgentFramework(value as AgentFramework)}>
                     <SelectTrigger id="agentFramework">
                       <SelectValue placeholder="Selecione o framework" />
                     </SelectTrigger>
@@ -743,7 +764,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                         value={[agentTemperature]}
                         onValueChange={(value) => setAgentTemperature(value[0])}
                       />
-                      <p className="text-xs text-muted-foreground">Controla a criatividade/aleatoriedade das respostas (0=determinístico, 1=máximo).</p>
+                      <p className="text-xs text-muted-foreground">
+                        Controla a criatividade/aleatoriedade das respostas (0=determinístico, 1=máximo).
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -765,7 +788,10 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="detailedWorkflowType">Tipo de Workflow</Label>
-                    <Select value={detailedWorkflowType} onValueChange={setDetailedWorkflowType}>
+                    <Select 
+                      value={detailedWorkflowType} 
+                      onValueChange={(value: "sequential" | "graph" | "stateMachine") => setDetailedWorkflowType(value)}
+                    >
                       <SelectTrigger id="detailedWorkflowType">
                         <SelectValue placeholder="Selecione o tipo de workflow" />
                       </SelectTrigger>
@@ -824,13 +850,19 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                           id={`tool-${tool.id}`}
                           checked={selectedTools.includes(tool.id)}
                           onCheckedChange={(checked) => {
-                            setSelectedTools(prev: string[] =>
+                            setSelectedTools((prev: string[]) =>
                               checked ? [...prev, tool.id] : prev.filter(id => id !== tool.id)
                             );
                           }}
                         />
                       </CardTitle>
-                      {tool.icon && React.cloneElement(iconComponents[tool.icon as string] || <Wand2 className="h-5 w-5 text-muted-foreground" />, { className: "h-6 w-6 mb-2 text-primary" })}
+                      {tool.icon ? 
+                        (() => {
+                          const IconComponent = iconComponents[tool.icon as string] || Wand2;
+                          return <IconComponent className="h-6 w-6 mb-2 text-primary" />;
+                        })() : 
+                        <Wand2 className="h-5 w-5 text-muted-foreground" />
+                      }
                       <CardDescription className="text-xs">{tool.description}</CardDescription>
                     </CardHeader>
                     <CardFooter>
@@ -967,8 +999,8 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                         <div className="space-y-2">
                           <Label htmlFor="ragServiceType">Serviço de Busca/Vetorização</Label>
                           <Select
-                            value={ragMemoryConfig.serviceType || "vertexAISearch"}
-                            onValueChange={(value) => setRagMemoryConfig(prev => ({...prev, serviceType: value}))}
+                            value={ragMemoryConfig.serviceType || "vertexAISearch" as MemoryServiceType}
+                            onValueChange={(value) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, serviceType: value as MemoryServiceType}))}
                           >
                             <SelectTrigger id="ragServiceType">
                               <SelectValue placeholder="Selecione o serviço" />
@@ -981,15 +1013,24 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                             </SelectContent>
                           </Select>
                         </div>
-                        { (ragMemoryConfig.serviceType === "vertexAISearch" || ragMemoryConfig.serviceType === "pinecone") &&
+                        { (ragMemoryConfig.serviceType === "vertexAISearch") && // Condition updated to be Vertex AI Search specific
                           <>
                             <div className="space-y-2">
-                              <Label htmlFor="ragProjectId">ID do Projeto Cloud</Label>
+                              <Label htmlFor="ragProjectId">ID do Projeto Cloud (Vertex AI)</Label> {/* Label updated for clarity */}
                               <Input
                                 id="ragProjectId"
                                 placeholder="Seu ID do projeto GCP ou similar"
-                                value={ragMemoryConfig.projectId || ""}
-                                onChange={(e) => setRagMemoryConfig(prev => ({...prev, projectId: e.target.value}))}
+                                value={ragMemoryConfig.vertexAISearchConfig?.projectId || ""}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setRagMemoryConfig((prev) => ({
+                                    ...prev,
+                                    vertexAISearchConfig: {
+                                      ...(prev.vertexAISearchConfig || {}),
+                                      projectId: newValue,
+                                    },
+                                  }));
+                                }}
                               />
                             </div>
                             <div className="space-y-2">
@@ -997,30 +1038,48 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                               <Input
                                 id="ragLocation"
                                 placeholder="Ex: us-central1"
-                                value={ragMemoryConfig.location || ""}
-                                onChange={(e) => setRagMemoryConfig(prev => ({...prev, location: e.target.value}))}
-                              />
-                            </div>
-                          </>
-                        }
-                         <div className="space-y-2">
-                          <Label htmlFor="ragCorpusName">Nome do Corpus/Índice/DataStore</Label>
+                                value={ragMemoryConfig.vertexAISearchConfig?.location || ""}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setRagMemoryConfig((prev) => ({
+                                    ...prev,
+                                    vertexAISearchConfig: {
+                                      ...(prev.vertexAISearchConfig || {}),
+                                      location: newValue,
+                                    },
+                                  }));
                           <Input
-                            id="ragCorpusName"
-                            placeholder="Ex: meu-datastore-de-documentos"
-                            value={ragMemoryConfig.ragCorpusName || ""} // Corrected field name
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, ragCorpusName: e.target.value}))} // Corrected field name
+                            id="vertexDataStoreId"
+                            placeholder="ID do seu DataStore no Vertex AI Search"
+                            value={ragMemoryConfig.vertexAISearchConfig?.dataStoreId || ""}
+                            onChange={(e) => {
+                              const newValue = e.target.value;
+                              setRagMemoryConfig((prev) => ({
+                                ...prev,
+                                vertexAISearchConfig: { ...(prev.vertexAISearchConfig || {}), dataStoreId: newValue },
+                              }));
+                            }}
                           />
                         </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      )}
+                      {ragMemoryConfig.serviceType === 'pinecone' && (
                         <div className="space-y-2">
-                          <Label htmlFor="ragSimilarityTopK">Top K (Resultados)</Label>
+                          <Label htmlFor="pineconeIndexName">Nome do Índice (Pinecone)</Label>
                           <Input
+                            id="pineconeIndexName"
+                            placeholder="Nome do seu índice no Pinecone"
+                            value={ragMemoryConfig.pineconeConfig?.indexName || ""}
+                            onChange={(e) => {
+                              const newValue = e.target.value;
+                              setRagMemoryConfig((prev) => ({
+                                ...prev,
+                                pineconeConfig: { ...(prev.pineconeConfig || {}), indexName: newValue },
+                              }));
+                            }}
                             id="ragSimilarityTopK"
                             type="number"
                             value={String(ragMemoryConfig.similarityTopK || 5)}
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
+                            onChange={(e) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
                           />
                           <p className="text-xs text-muted-foreground">Número de resultados mais similares a serem recuperados.</p>
                         </div>
@@ -1030,7 +1089,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                             id="ragVectorDistanceThreshold"
                             min={0} max={1} step={0.05}
                             value={[ragMemoryConfig.vectorDistanceThreshold || 0.5]}
-                            onValueChange={(value) => setRagMemoryConfig(prev => ({...prev, vectorDistanceThreshold: value[0]}))}
+                            onValueChange={(value) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, vectorDistanceThreshold: value[0]}))}
                           />
                           <p className="text-xs text-muted-foreground">Distância máxima para considerar um resultado relevante (0 a 1).</p>
                         </div>
@@ -1044,9 +1103,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                           onChange={(e) => {
                             try {
                               const val = e.target.value.trim();
-                              if(!val) { setRagMemoryConfig(prev => ({...prev, knowledgeSources: []})); return; }
+                              if(!val) { setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, knowledgeSources: []})); return; }
                               const parsed = JSON.parse(val);
-                              setRagMemoryConfig(prev => ({...prev, knowledgeSources: parsed}));
+                              setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, knowledgeSources: parsed}));
                             } catch (error) {
                               console.error("Erro ao parsear JSON das fontes de conhecimento:", error);
                               toast({variant: "destructive", title: "Erro no JSON", description: "Verifique Fontes de Conhecimento."})
@@ -1090,19 +1149,19 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                     <>
                       <div className="space-y-2">
                         <Label htmlFor="artifactStorageType">Tipo de Armazenamento</Label>
-                        <Select value={artifactStorageType} onValueChange={(value: 'memory' | 'filesystem' | 'cloud') => setArtifactStorageType(value)}>
+                        <Select value={artifactStorageType} onValueChange={(value: 'memory' | 'local' | 'cloud') => setArtifactStorageType(value)}>
                           <SelectTrigger id="artifactStorageType">
                             <SelectValue placeholder="Selecione o tipo de armazenamento" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="memory">Memória (Temporário)</SelectItem>
-                            <SelectItem value="filesystem">Sistema de Arquivos Local</SelectItem>
+                            <SelectItem value="local">Sistema de Arquivos Local</SelectItem>
                             <SelectItem value="cloud">Nuvem (Ex: Google Cloud Storage)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
-                      {(artifactStorageType === 'filesystem' || artifactStorageType === 'local') && ( // Keep 'local' for compatibility if it appears in data
+                      {artifactStorageType === 'local' && (
                         <div className="space-y-2">
                           <Label htmlFor="localStoragePath">Caminho de Armazenamento Local</Label>
                           <Input
@@ -1166,10 +1225,10 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                     <Label htmlFor="subAgentIds">IDs dos Sub-Agentes / Colaboradores</Label>
                     { availableAgentsForSubSelector && availableAgentsForSubSelector.length > 0 ? (
                        <SubAgentSelector
-                        allAgents={availableAgentsForSubSelector}
-                        selectedAgentIds={subAgentIds}
-                        onSelectedAgentIdsChange={setSubAgentIds}
-                        currentEditingAgentId={editingAgent?.id}
+                        availableAgents={availableAgentsForSubSelector}
+                        selectedAgents={subAgentIds}
+                        onChange={setSubAgentIds}
+                        disabled={false}
                       />
                     ) : (
                       <Textarea
@@ -1206,7 +1265,7 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                     <Switch
                       id="a2aEnabled"
                       checked={a2aConfig.enabled || false}
-                      onCheckedChange={(checked) => setA2AConfig(prev => ({...prev, enabled: checked}))}
+                      onCheckedChange={(checked) => setA2aConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
                     />
                     <Label htmlFor="a2aEnabled" className="text-base">Habilitar Comunicação A2A</Label>
                   </div>
@@ -1227,9 +1286,9 @@ const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(initialA2AConfig
                         onChange={(e) => {
                           try {
                             const val = e.target.value.trim();
-                            if(!val) { setA2AConfig(prev => ({...prev, communicationChannels: []})); return; }
+                            if(!val) { setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
                             const parsedChannels = JSON.parse(val);
-                            setA2AConfig(prev => ({...prev, communicationChannels: parsedChannels}));
+                            setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
                           } catch (error) {
                             console.error("Erro ao parsear JSON dos canais A2A:", error);
                             toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para canais A2A."})

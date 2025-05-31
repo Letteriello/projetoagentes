@@ -4,11 +4,22 @@
  * and aims to extract a structured JSON configuration once the user confirms the details.
  * It supports streaming responses for a more interactive experience.
  */
-import { defineFlow, ai, generate } from 'genkit/flow';
+import { defineFlow } from '@genkit-ai/core';
 import { z } from 'zod';
-import { type MessageData } from 'genkit/ai'; // For history type
-import { geminiPro, gemini15Pro } from 'genkitx-googleai'; // Assuming specific model import
+import { ai, generate, type MessageData } from '@genkit-ai/ai'; // For history type
+import { gemini15Pro } from '@genkit-ai/googleai'; // Using Gemini 1.5 Pro, removed unused gemini10Pro
 import { logger } from '@/lib/logger'; // Assuming a logger
+
+// Define the output schema for the agent creator flow stream
+import { SavedAgentConfiguration } from '@/types/agent-configs'; // Import for precise typing
+export const AgentCreatorFlowStreamOutputSchema = z.object({
+  agentResponseChunk: z.string().optional(),
+  suggestedConfig: z.custom<SavedAgentConfiguration>().optional(),
+  error: z.string().optional(),
+  rawJsonForDebug: z.string().optional()
+});
+export type AgentCreatorFlowStreamOutput = z.infer<typeof AgentCreatorFlowStreamOutputSchema>;
+
 
 // 2. System Prompt - REFINED
 export const SYSTEM_PROMPT_AGENT_CREATOR = `
@@ -77,13 +88,6 @@ export const AgentCreatorFlowInputSchema = z.object({
   stream: z.boolean().optional().default(true).describe("Whether to stream the response."),
 });
 
-// Output schema for each streamed chunk
-export const AgentCreatorFlowStreamOutputSchema = z.object({
-  agentResponseChunk: z.string().optional(),
-  suggestedConfig: z.any().optional().describe("The structured agent configuration, sent as the final part of a successful design session."),
-  error: z.string().optional(),
-  rawJsonForDebug: z.string().optional().describe("Raw JSON string if parsing failed, for debugging.")
-});
 
 
 // 3. Agent Creator Flow Definition
@@ -92,8 +96,8 @@ export const agentCreatorFlow = defineFlow(
     name: 'agentCreatorFlow',
     inputSchema: AgentCreatorFlowInputSchema,
     outputSchema: z.void(), // Output is handled via streamCallback
-  },
-  async (input, streamCallback) => {
+  } as const,
+  async (input: AgentCreatorFlowInput, streamCallback?: (chunk: any) => void | Promise<void>) => {
     const { userMessage, history = [], stream = true } = input;
 
     if (!streamCallback && stream) {
@@ -105,8 +109,8 @@ export const agentCreatorFlow = defineFlow(
       { role: 'system', content: [{ text: SYSTEM_PROMPT_AGENT_CREATOR }] },
     ];
 
-    history.forEach(h => {
-        if (h.role && h.content && Array.isArray(h.content) && h.content.every(c => typeof c.text === 'string')) {
+    history.forEach((h: MessageData) => {
+        if (h.role && h.content && Array.isArray(h.content) && h.content.every((c: any) => typeof c.text === 'string')) { // c should be Part, but MessageData/Part resolution is an issue
             messages.push(h as MessageData);
         }
     });
@@ -145,10 +149,10 @@ export const agentCreatorFlow = defineFlow(
             // What was before the JSON block? Stream it if it exists and wasn't just whitespace.
             const textBeforeJson = accumulatedText.substring(0, match.index).trim();
             if (textBeforeJson) {
-              streamCallback({ agentResponseChunk: textBeforeJson });
+              streamCallback?.({ agentResponseChunk: textBeforeJson });
             }
 
-            streamCallback({
+            streamCallback?.({
               agentResponseChunk: "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes.",
               suggestedConfig: parsedConfig
             });
@@ -156,7 +160,7 @@ export const agentCreatorFlow = defineFlow(
             // What was after the JSON block? Stream it.
             const textAfterJson = accumulatedText.substring(match.index! + match[0].length).trim();
             if (textAfterJson) {
-              streamCallback({ agentResponseChunk: textAfterJson });
+              streamCallback?.({ agentResponseChunk: textAfterJson });
             }
             accumulatedText = ""; // Clear buffer as JSON part is handled
             return; // End processing for this flow after successfully sending config.
@@ -166,7 +170,7 @@ export const agentCreatorFlow = defineFlow(
             // If it's the *very end* of the stream and it's still broken, then it's an error.
             if (!llmResponse.stream().readable) { // Approximating end of stream
                 logger.warn('[AgentCreatorFlow] Failed to parse agent configuration JSON at end of stream:', e);
-                streamCallback({
+                streamCallback?.({
                     agentResponseChunk: "I tried to generate the agent configuration as JSON, but there was an issue with its format. Raw data: \n" + jsonString,
                     error: `Failed to parse agent configuration JSON. Error: ${e.message}`,
                     rawJsonForDebug: jsonString
@@ -188,13 +192,13 @@ export const agentCreatorFlow = defineFlow(
             try {
                 const parsedConfig = JSON.parse(jsonString);
                 logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON from final accumulated text.");
-                streamCallback({
+                streamCallback?.({
                   agentResponseChunk: "I've drafted the agent configuration. Please review it.",
                   suggestedConfig: parsedConfig
                 });
             } catch (e:any) {
                 logger.warn('[AgentCreatorFlow] Failed to parse JSON from final accumulated text:', e);
-                streamCallback({
+                streamCallback?.({
                     agentResponseChunk: "I attempted to provide a configuration, but it seems to be malformed. Accumulated text: " + accumulatedText,
                     error: `Malformed configuration JSON in final accumulated text. Error: ${e.message}`,
                     rawJsonForDebug: jsonString
@@ -202,14 +206,15 @@ export const agentCreatorFlow = defineFlow(
             }
         } else {
             // No JSON found, just stream the remaining text
-            streamCallback({ agentResponseChunk: accumulatedText });
+            streamCallback?.({ agentResponseChunk: accumulatedText });
         }
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('[AgentCreatorFlow] Error in generate call or streaming loop:', err);
       if (streamCallback) { // Ensure streamCallback is defined before using
-        streamCallback({ error: err.message || 'An unexpected error occurred during agent creation LLM call.' });
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during agent creation LLM call.';
+        streamCallback?.({ error: errorMessage });
       }
     }
   }

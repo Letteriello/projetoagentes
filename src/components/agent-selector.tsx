@@ -40,10 +40,12 @@ interface AgentData {
   capabilities?: string[];
 }
 
+import type { SavedAgentConfiguration } from "@/types/agent-configs";
+
 interface AgentSelectorProps {
   onAgentSelected: (agentId: string) => void;
   selectedAgentId?: string;
-  savedAgents: any[]; // Adjust the type as needed
+  savedAgents: SavedAgentConfiguration[]; 
   showLabel?: boolean;
   triggerClassName?: string;
 }

@@ -20,7 +20,9 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Importamos apenas o tipo SavedAgentConfiguration, sem precisar criar uma dependência circular
-type SavedAgentConfiguration = {
+import type { SavedAgentConfiguration as ImportedSavedAgentConfiguration } from "@/types/agent-configs";
+
+type SavedAgentConfiguration = ImportedSavedAgentConfiguration & {
   id: string;
   agentName: string;
   [key: string]: any;

@@ -16,7 +16,7 @@ import {
   Plus,
   Layers,
   Info,
-  // Icons below are now part of iconComponents in agentBuilderConfig.ts,
+  // Icons below are now part of iconComponents in agentBuilderConfig.tsx,
   // so they are not directly needed here UNLESS AgentBuilderPage itself uses them.
   // Search, Calculator, FileText, CalendarDays, Network, Database, Code2, // Removed these direct icon imports
   // Workflow, Brain, FileJson, Settings2 as ConfigureIcon,
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
+import type { SavedAgentConfiguration } from "@/types/agent-configs"; // Adjusted path
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
@@ -184,7 +185,6 @@ import {
   iconComponents, // This is the data for icons
   agentTemplates // Used by AgentBuilderDialog
 } from "@/data/agentBuilderConfig";
-import type { SavedAgentConfiguration } from "@/types/agent-configs"; // Import the new type
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
