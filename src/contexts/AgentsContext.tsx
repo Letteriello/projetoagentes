@@ -1,8 +1,8 @@
-
 "use client";
 
 import type { SavedAgentConfiguration } from '@/app/agent-builder/page';
 import * as React from 'react';
+<<<<<<< Updated upstream
 import { firestore } from '@/lib/firebaseClient'; // Import Firestore client
 import {
   collection,
@@ -17,14 +17,24 @@ import {
   orderBy,
   Timestamp
 } from 'firebase/firestore';
+=======
+// Versão client-safe para operações do Firestore
+import { 
+  fetchAgents as fetchAgentsFromClient, 
+  addAgent as addAgentToClient, 
+  updateAgent as updateAgentInClient, 
+  deleteAgent as deleteAgentFromClient, 
+  serverTimestamp 
+} from '@/lib/firestore-client';
+>>>>>>> Stashed changes
 import { useToast } from '@/hooks/use-toast'; 
 
-// Placeholder for userId - replace with actual user management later
+// Placeholder para userId - substituir com gerenciamento de usuário real mais tarde
 const PLACEHOLDER_USER_ID = "defaultUser";
 
 interface AgentsContextType {
   savedAgents: SavedAgentConfiguration[];
-  setSavedAgents: React.Dispatch<React.SetStateAction<SavedAgentConfiguration[]>>; // Kept for direct manipulation if ever needed, though Firestore ops are preferred
+  setSavedAgents: React.Dispatch<React.SetStateAction<SavedAgentConfiguration[]>>;
   addAgent: (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<SavedAgentConfiguration | null>;
   updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;
@@ -39,70 +49,14 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    const fetchAgents = async () => {
+    const loadAgents = async () => {
       setIsLoadingAgents(true);
       try {
-        const agentsCollectionRef = collection(firestore, 'agents');
-        // TODO: Replace PLACEHOLDER_USER_ID with actual authenticated user ID when auth is implemented
-        const q = query(agentsCollectionRef, where("userId", "==", PLACEHOLDER_USER_ID), orderBy("updatedAt", "desc"));
-        
-        const querySnapshot = await getDocs(q);
-        const agents: SavedAgentConfiguration[] = [];
-        querySnapshot.forEach((docSnap) => { // Renamed doc to docSnap to avoid conflict with firebase/firestore doc function
-          const data = docSnap.data();
-          // Ensure all fields are correctly mapped, especially Timestamps to Dates
-          // This mapping needs to be comprehensive and match the SavedAgentConfiguration structure.
-          const agentData: SavedAgentConfiguration = {
-            id: docSnap.id,
-            userId: data.userId,
-            agentName: data.agentName,
-            agentDescription: data.agentDescription,
-            agentVersion: data.agentVersion,
-            // Assuming agentConfiguration holds the specific type details (LLM, Workflow, etc.)
-            // and common fields are at the top level of the Firestore document.
-            agentType: data.agentType, 
-            agentGoal: data.agentGoal,
-            agentTasks: data.agentTasks,
-            agentPersonality: data.agentPersonality,
-            agentRestrictions: data.agentRestrictions,
-            agentModel: data.agentModel,
-            agentTemperature: data.agentTemperature,
-            agentTools: data.agentTools || [],
-            toolConfigsApplied: data.toolConfigsApplied || {},
-            systemPromptGenerated: data.systemPromptGenerated || "",
-            isRootAgent: data.isRootAgent || false,
-            subAgents: data.subAgents || [],
-            globalInstruction: data.globalInstruction || "",
-            enableStatePersistence: data.enableStatePersistence || false,
-            statePersistenceType: data.statePersistenceType || 'memory',
-            initialStateValues: data.initialStateValues || [],
-            enableStateSharing: data.enableStateSharing || false,
-            stateSharingStrategy: data.stateSharingStrategy || 'explicit',
-            enableRAG: data.enableRAG || false,
-            ragMemoryConfig: data.ragMemoryConfig, 
-            enableArtifacts: data.enableArtifacts || false,
-            artifactStorageType: data.artifactStorageType || 'memory',
-            artifacts: data.artifacts || [],
-            cloudStorageBucket: data.cloudStorageBucket,
-            localStoragePath: data.localStoragePath,
-            a2aConfig: data.a2aConfig,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
-            // Ensure all other specific fields for different agent types are mapped here
-            // For example, for LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentConfig
-            // This might require a more dynamic mapping or ensuring Firestore structure matches these types.
-            // The current SavedAgentConfiguration is a union type, so direct spreading might not be safe
-            // without ensuring the Firestore data strictly matches one of the union members.
-            // For simplicity, we assume top-level fields cover most common properties.
-            // Detailed specific properties might be nested under an 'agentConfiguration' field or similar
-            // if they are not flat in Firestore. If they are flat, they need to be explicitly listed.
-            ...(data.agentConfiguration || {}), // Spread if specific config is nested
-          };
-          agents.push(agentData);
-        });
+        // Usar nossa versão client-safe para buscar agentes
+        const agents = await fetchAgentsFromClient();
         setSavedAgents(agents);
       } catch (error) {
-        console.error("Error fetching agents from Firestore:", error);
+        console.error("Erro ao buscar agentes:", error);
         toast({
           title: "Erro ao Carregar Agentes",
           description: "Não foi possível buscar os agentes salvos. Tente novamente mais tarde.",
@@ -113,33 +67,29 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    fetchAgents();
+    loadAgents();
   }, [toast]);
 
+  // Ajustamos os campos omitidos para compatibilidade com o tipo esperado
   const addAgent = async (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<SavedAgentConfiguration | null> => {
     setIsLoadingAgents(true);
     try {
-      const fullAgentData = {
-        ...agentConfigData, // Spread all properties from the form
-        userId: PLACEHOLDER_USER_ID,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      const docRef = await addDoc(collection(firestore, 'agents'), fullAgentData);
+      // Usar versão client-safe para adicionar agente
+      const newAgent = await addAgentToClient(agentConfigData);
       
-      const newAgentForState: SavedAgentConfiguration = {
-        ...agentConfigData, // Use the input data which should conform to one of the union types
-        id: docRef.id,
-        userId: PLACEHOLDER_USER_ID,
-        createdAt: new Date(), 
-        updatedAt: new Date(), 
-      };
-
-      setSavedAgents(prev => [newAgentForState, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
-      toast({ title: "Agente Adicionado", description: `"${newAgentForState.agentName}" foi salvo com sucesso.` });
-      return newAgentForState;
+      if (newAgent) {
+        // Simplesmente adicionamos o novo agente no início da lista
+        // sem tentar ordenar por updatedAt que não existe no tipo SavedAgentConfiguration
+        setSavedAgents(prev => [newAgent, ...prev]);
+        toast({ 
+          title: "Agente Adicionado", 
+          description: `"${newAgent.agentName}" foi salvo com sucesso.` 
+        });
+      }
+      
+      return newAgent;
     } catch (error) {
-      console.error("Error adding agent to Firestore:", error);
+      console.error("Erro ao adicionar agente:", error);
       toast({
         title: "Erro ao Adicionar Agente",
         description: "Não foi possível salvar o agente. Tente novamente.",
@@ -151,26 +101,32 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateAgent = async (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => {
+  const updateAgent = async (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id'>>) => {
     setIsLoadingAgents(true);
-    const agentRef = doc(firestore, 'agents', agentId);
     try {
-      // Construct the update payload carefully, excluding fields that shouldn't be directly updated (like id, userId, createdAt)
-      const { id, userId, createdAt, updatedAt, ...updatePayload } = agentConfigUpdate;
+      // Usar versão client-safe para atualizar agente
+      const success = await updateAgentInClient(agentId, agentConfigUpdate);
       
-      await updateDoc(agentRef, {
-        ...updatePayload, // This will spread all fields from agentConfigUpdate
-        updatedAt: serverTimestamp(),
-      });
-      
-      setSavedAgents(prev =>
-        prev.map(agent =>
-          agent.id === agentId ? { ...agent, ...updatePayload, updatedAt: new Date() } : agent
-        ).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-      );
-      toast({ title: "Agente Atualizado", description: "As alterações foram salvas." });
+      if (success) {
+        // Apenas atualizamos o estado local se a API foi bem-sucedida
+        setSavedAgents(prev =>
+          prev.map(agent =>
+            agent.id === agentId 
+              ? { 
+                  ...agent, 
+                  ...agentConfigUpdate
+                  // Nota: updatedAt não existe no tipo SavedAgentConfiguration
+                  // será atualizado apenas no Firestore, não no modelo do cliente
+                } 
+              : agent
+          )
+        );
+        toast({ title: "Agente Atualizado", description: "As alterações foram salvas." });
+      } else {
+        throw new Error("Falha ao atualizar o agente");
+      }
     } catch (error) {
-      console.error("Error updating agent in Firestore:", error);
+      console.error("Erro ao atualizar agente:", error);
       toast({
         title: "Erro ao Atualizar Agente",
         description: "Não foi possível salvar as alterações. Tente novamente.",
@@ -183,13 +139,18 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAgent = async (agentId: string) => {
     setIsLoadingAgents(true);
-    const agentRef = doc(firestore, 'agents', agentId);
     try {
-      await deleteDoc(agentRef);
-      setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
-      toast({ title: "Agente Excluído", description: "O agente foi removido com sucesso." });
+      // Usar versão client-safe para excluir agente
+      const success = await deleteAgentFromClient(agentId);
+      
+      if (success) {
+        setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
+        toast({ title: "Agente Excluído", description: "O agente foi removido com sucesso." });
+      } else {
+        throw new Error("Falha ao excluir o agente");
+      }
     } catch (error) {
-      console.error("Error deleting agent from Firestore:", error);
+      console.error("Erro ao excluir agente:", error);
       toast({
         title: "Erro ao Excluir Agente",
         description: "Não foi possível remover o agente. Tente novamente.",

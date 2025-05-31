@@ -166,6 +166,7 @@ export default function ChatHeader({
           </div>
         ) : (
           <AgentSelector
+<<<<<<< Updated upstream
             onAgentSelected={handleGemSelect}
             selectedAgentId={selectedGemId ?? undefined}
             savedAgents={initialGems.map((gem) => ({
@@ -176,6 +177,12 @@ export default function ChatHeader({
             }))}
             showLabel={false}
             triggerClassName=""
+=======
+            savedAgents={initialGems.map(gem => ({ id: gem.id, displayName: gem.name, description: gem.prompt }))}
+            selectedAgentId={selectedGemId ?? undefined}
+            onAgentSelected={(id) => handleGemSelect(id)}
+            showLabel={true}
+>>>>>>> Stashed changes
           />
         )}
 

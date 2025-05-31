@@ -216,10 +216,34 @@ export const Sidebar = React.forwardRef<
     },
     ref,
   ) => {
+<<<<<<< Updated upstream
     const context = useSidebar();
     const { isMobile, state, openMobile, setOpenMobile, mounted } = context;
+=======
+    const context = useSidebar()
+    const { isMobile, state, open, setOpen, openMobile, setOpenMobile, mounted } = context
+>>>>>>> Stashed changes
     const collapsible = collapsibleOverride || context.collapsible; // Prefer override, then context
     const variant = variantProp || "sidebar"; // Default to sidebar if not provided
+    
+    // Estado para controlar a expansão automática por hover
+    const [isHovering, setIsHovering] = React.useState(false)
+    
+    // Handler para quando o mouse entra na área da sidebar
+    const handleMouseEnter = React.useCallback(() => {
+      if (!isMobile && collapsible === 'icon' && !isHovering) {
+        setIsHovering(true)
+        setOpen(true)
+      }
+    }, [isMobile, collapsible, isHovering, setOpen])
+    
+    // Handler para quando o mouse sai da área da sidebar
+    const handleMouseLeave = React.useCallback(() => {
+      if (!isMobile && collapsible === 'icon' && isHovering) {
+        setIsHovering(false)
+        setOpen(false)
+      }
+    }, [isMobile, collapsible, isHovering, setOpen])
 
     if (!mounted) {
       return null; // Defer rendering until client-mounted to avoid hydration issues
@@ -269,6 +293,8 @@ export const Sidebar = React.forwardRef<
         data-collapsible={collapsible || "none"}
         data-variant={variant}
         data-side={side}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Spacer div to occupy space in the document flow */}
         <div

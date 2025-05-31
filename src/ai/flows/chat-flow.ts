@@ -82,12 +82,16 @@ export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (
     }
 
     // Prepare user message with any attachments
-    const userMessageContent = [{ text: input.userMessage }];
+    let userMessageContent: any[] = [{ text: input.userMessage }];
     if (input.fileDataUri) {
       const [header, base64Data] = input.fileDataUri.split(',');
       const mimeType = header.match(/:(.*?);/)?.[1];
       if (mimeType && base64Data) {
-        userMessageContent.push({ media: { url: input.fileDataUri, contentType: mimeType } });
+        // Use a estrutura correta para mídia conforme esperado pela API
+        userMessageContent = [
+          { text: input.userMessage },
+          { data: { mimeType, data: input.fileDataUri } }
+        ];
       }
     }
     history.push({ role: 'user', content: userMessageContent });
@@ -95,32 +99,42 @@ export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (
     console.log('Generating content with model:', modelId, 'config:', config, 'tools:', tools ? tools.map(t => t.name) : 'none');
 
     // Call the AI generation
-    const response = await ai.generate({
-      model: modelId,
-      messages: history,
-      tools,
-      config,
-      stream: !!streamingCallback,
+    const parts = history.map(msg => {
+      return {
+        role: msg.role,
+        parts: Array.isArray(msg.content) 
+          ? msg.content.map(c => c.text ? { text: c.text } : c) 
+          : [{ text: msg.content }]
+      };
     });
+    
+    // Configuração para gerar conteúdo
+    const generateOptions = {
+      model: modelId,
+      parts,
+      tools: tools,
+      generationConfig: config,
+      streamMode: !!streamingCallback ? 'streaming' : 'standard',
+    };
+    
+    const response = await ai.generateContent(generateOptions);
 
     // Handle streaming response if callback provided
-    if (streamingCallback && response.stream) {
+    if (streamingCallback && generateOptions.streamMode === 'streaming') {
       const outputStream = new ReadableStream({
         async start(controller) {
-          const reader = response.stream.getReader();
           try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              streamingCallback(value);
-              controller.enqueue(value);
+            for await (const chunk of response.stream) {
+              if (chunk) {
+                streamingCallback(chunk);
+                controller.enqueue(chunk);
+              }
             }
           } catch (e: any) {
             console.error('Streaming error:', e);
             controller.error(e);
           } finally {
             controller.close();
-            reader.releaseLock();
           }
         },
       });
@@ -129,10 +143,22 @@ export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (
     } 
     
     // Handle non-streaming response
+    // Extrair o texto da resposta
+    const responseText = response.response?.text?.toString() || '';
+    
+    // Extrair informações de ferramentas, se disponíveis
+    const toolCalls = response.response?.candidates?.[0]?.content?.parts
+      ?.filter(part => part.functionCall)
+      .map(part => part.functionCall) || [];
+      
+    const toolResults = response.response?.candidates?.[0]?.content?.parts
+      ?.filter(part => part.functionResponse)
+      .map(part => part.functionResponse) || [];
+    
     return {
-      outputMessage: response.text,
-      toolRequests: response.toolRequests || [],
-      toolResults: response.toolResponses || [],
+      outputMessage: responseText,
+      toolRequests: toolCalls,
+      toolResults: toolResults,
     };
   } catch (e: any) {
     console.error("Error in basicChatFlow:", e);

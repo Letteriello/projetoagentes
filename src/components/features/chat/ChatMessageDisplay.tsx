@@ -132,9 +132,10 @@ export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps)
       >
         {message.text && (
           <ReactMarkdown
-            className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2"
             remarkPlugins={[remarkGfm]}
+            className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2"
             components={{
+<<<<<<< Updated upstream
               code({ node, inline, className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || "");
                 return !inline && match ? (
@@ -143,6 +144,13 @@ export default function ChatMessageDisplay({ message }: ChatMessageDisplayProps)
                     value={String(children).replace(/\n$/, "")}
                     {...props}
                   />
+=======
+              code({ className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || '');
+                const isInline = !className || !match;
+                return !isInline ? (
+                  <CodeBlock language={match[1]} value={String(children).replace(/\n$/, '')} {...props} />
+>>>>>>> Stashed changes
                 ) : (
                   <code className={cn(className, "text-sm")} {...props}>
                     {children}

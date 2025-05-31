@@ -127,9 +127,135 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   // Behavior & Prompting - Custom Specific
   const [customLogicDescription, setCustomLogicDescription] = React.useState<string>("");
 
+<<<<<<< Updated upstream
   // Tools
   const [selectedTools, setSelectedTools] = React.useState<string[]>([]);
   const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({});
+=======
+  // Multi-agent fields (Google ADK)
+const [isRootAgent, setIsRootAgent] = React.useState(editingAgent?.isRootAgent || false);
+const [subAgents, setSubAgents] = React.useState<string[]>(editingAgent?.subAgents || []);
+const [globalInstruction, setGlobalInstruction] = React.useState(editingAgent?.globalInstruction || "");
+const [agentFramework, setAgentFramework] = React.useState<string>("custom");
+
+// Função genérica para manipular alterações de campo
+const handleFieldChange = (fieldName: string, value: any) => {
+  // Manipula diferentes campos com base no nome
+  switch (fieldName) {
+    case 'agentName':
+      setAgentName(value);
+      break;
+    case 'agentDescription':
+      setAgentDescription(value);
+      break;
+    case 'agentVersion':
+      setAgentVersion(value);
+      break;
+    case 'agentGoal':
+      setAgentGoal(value);
+      break;
+    case 'agentTasks':
+      setAgentTasks(value);
+      break;
+    case 'agentPersonality':
+      setAgentPersonality(value);
+      break;
+    case 'agentRestrictions':
+      setAgentRestrictions(value);
+      break;
+    case 'agentModel':
+      setAgentModel(value);
+      break;
+    case 'isRootAgent':
+      setIsRootAgent(value);
+      break;
+    case 'agentFramework':
+      setAgentFramework(value);
+      break;
+    default:
+      console.log(`Campo não manipulado: ${fieldName}`);
+  }
+};
+
+// Estados para gerenciamento de estado e memória
+const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(
+    editingAgent?.enableStatePersistence || false
+);
+const [statePersistenceType, setStatePersistenceType] = React.useState<'session' | 'memory' | 'database'>(
+    editingAgent?.statePersistenceType || 'memory'
+);
+const [initialStateValues, setInitialStateValues] = React.useState<Array<{
+    key: string;
+    value: string;
+    scope: 'global' | 'agent' | 'temporary';
+    description: string;
+}>>(editingAgent?.initialStateValues || []);
+const [enableStateSharing, setEnableStateSharing] = React.useState<boolean>(
+    editingAgent?.enableStateSharing || false
+);
+const [stateSharingStrategy, setStateSharingStrategy] = React.useState<'all' | 'explicit' | 'none'>(
+    editingAgent?.stateSharingStrategy || 'explicit'
+);
+const [enableRAG, setEnableRAG] = React.useState<boolean>(
+    editingAgent?.enableRAG || false
+);
+
+// Estados para gerenciamento de artefatos
+const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(
+    editingAgent?.enableArtifacts || false
+);
+const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>(
+    editingAgent?.artifactStorageType || 'memory'
+);
+const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>(
+    editingAgent?.artifacts || []
+);
+const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(
+    editingAgent?.cloudStorageBucket || ''
+);
+const [localStoragePath, setLocalStoragePath] = React.useState<string>(
+    editingAgent?.localStoragePath || ''
+);
+
+// Estados para RAG e memória
+const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>({
+  enabled: editingAgent?.ragMemoryConfig?.enabled || false,
+  serviceType: (editingAgent?.ragMemoryConfig?.serviceType as MemoryServiceType) || 'in-memory',
+  projectId: editingAgent?.ragMemoryConfig?.projectId || '',
+  location: editingAgent?.ragMemoryConfig?.location || '',
+  ragCorpusName: editingAgent?.ragMemoryConfig?.ragCorpusName || '',
+  similarityTopK: editingAgent?.ragMemoryConfig?.similarityTopK || 5,
+  vectorDistanceThreshold: editingAgent?.ragMemoryConfig?.vectorDistanceThreshold || 0.7,
+  embeddingModel: editingAgent?.ragMemoryConfig?.embeddingModel || '',
+  knowledgeSources: editingAgent?.ragMemoryConfig?.knowledgeSources || [],
+  includeConversationContext: editingAgent?.ragMemoryConfig?.includeConversationContext || true,
+  persistentMemory: editingAgent?.ragMemoryConfig?.persistentMemory || false,
+});
+
+// Estado para configuração A2A
+const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
+  enabled: editingAgent?.a2aConfig?.enabled || false,
+  communicationChannels: editingAgent?.a2aConfig?.communicationChannels || [],
+  defaultResponseFormat: editingAgent?.a2aConfig?.defaultResponseFormat === 'json' ? 'json' : 'text',
+  maxMessageSize: editingAgent?.a2aConfig?.maxMessageSize || 1024 * 1024, // 1MB default
+  loggingEnabled: editingAgent?.a2aConfig?.loggingEnabled || false,
+});
+
+// Workflow Fields
+  const [workflowDescription, setWorkflowDescription] = React.useState(editingAgent?.agentType === 'workflow' ? editingAgent.workflowDescription : (editingAgent?.workflowDescription || defaultWorkflowConfigValues.workflowDescription || ""));
+  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.detailedWorkflowType : defaultWorkflowConfigValues.detailedWorkflowType);
+  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopMaxIterations : defaultWorkflowConfigValues.loopMaxIterations);
+  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>(editingAgent?.loopTerminationConditionType as TerminationConditionType || "none");
+  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitToolName : defaultWorkflowConfigValues.loopExitToolName);
+  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateKey : defaultWorkflowConfigValues.loopExitStateKey);
+  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopExitStateValue : defaultWorkflowConfigValues.loopExitStateValue);
+  
+  // Custom/A2A/Task Fields (some might overlap or use LLM fields)
+  const [customLogicDescription, setCustomLogicDescription] = React.useState(editingAgent?.agentType === 'custom' ? editingAgent.customLogicDescription : (editingAgent?.customLogicDescription || defaultCustomConfigValues.customLogicDescription || ""));
+
+  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>(editingAgent?.toolConfigsApplied || {});
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+>>>>>>> Stashed changes
   const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
   const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState<boolean>(false);
 

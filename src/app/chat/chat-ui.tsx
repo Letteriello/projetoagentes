@@ -26,6 +26,7 @@ import { auth } from "@/lib/firebaseClient";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType } from "@/app/agent-builder/page"; // Renamed to avoid conflict
 
+<<<<<<< Updated upstream
 import ChatHeader from "@/components/features/chat/ChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
@@ -39,6 +40,79 @@ import ConversationSidebar from "@/components/features/chat/ConversationSidebar"
 import * as cs from "@/lib/firestoreConversationStorage";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
+=======
+// Define SavedAgentConfiguration interface to match actual structure used in the app
+interface SavedAgentConfiguration {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  agentName: string;
+  agentDescription: string;
+  agentType: string;
+  agentModel?: string;
+  agentTemperature?: number;
+  agentTools?: string[];
+  agentGoal?: string;
+  // Add all the necessary properties from the extended AgentConfigBase
+  toolsDetails?: Array<{
+    id: string;
+    label: string;
+    iconName?: string;
+    needsConfiguration?: boolean;
+    genkitToolName?: string;
+  }>;
+}
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator"; 
+import { Label } from "@/components/ui/label"; 
+import { AgentSelector } from "@/components/agent-selector";
+// Importação do googleADK removida para evitar dependências Node.js 
+import ChatHeader from "@/components/features/chat/ChatHeader"; 
+import WelcomeScreen from "@/components/features/chat/WelcomeScreen"; 
+import MessageList from "@/components/features/chat/MessageList"; 
+import MessageInputArea from "@/components/features/chat/MessageInputArea"; 
+import { ChatMessageUI, Conversation } from '@/types/chat'; 
+import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; 
+// Import our client-safe API and types
+import { sendMessageToAI, streamChatFromAI } from '@/lib/client-api';
+import { ChatInput, ChatOutput, ChatFormState as ImportedChatFormState } from '@/types/chat-types';
+import { ADKAgentConfig, ADKTool } from '@/types/adk-types';
+
+// Função para enviar mensagem para IA via nossa API client-safe
+async function enviarMensagemIA(input: ChatInput) {
+  try {
+    const result = await sendMessageToAI(input);
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    return result.outputMessage;
+  } catch (error) {
+    throw new Error((error as Error).message || "Erro ao gerar texto");
+  }
+}
+
+// Removido import de ADK direto para evitar dependências Node.js no client
+
+interface ChatHistoryMessage {
+  role: 'user' | 'model';
+  content: any; 
+}
+
+interface ServerMessage { 
+  id?: string;
+  role: 'user' | 'model' | 'assistant' | 'tool';
+  content: string | any; 
+  text?: string; 
+  createdAt?: Date | string;
+  timestamp?: Date | string;
+  type?: 'text' | 'image' | 'file' | string; 
+  attachments?: any[];
+  status?: 'sending' | 'delivered' | 'failed' | 'seen';
+}
+>>>>>>> Stashed changes
 
 const initialGems = [
   {
@@ -75,6 +149,45 @@ const initialGems = [
   },
 ];
 
+<<<<<<< Updated upstream
+=======
+// Usando o ChatFormState importado dos tipos compartilhados
+type ChatFormState = ImportedChatFormState;
+
+const initialChatFormState: ChatFormState = {
+  message: "", 
+  agentResponse: null,
+  errors: null,
+};
+
+const initialActionState: { message: string | null; serverResponse?: ChatMessageUI; error?: string } = {
+  message: null,
+  serverResponse: undefined,
+  error: undefined,
+};
+
+// Componente de botão de recurso estilo Gemini aprimorado
+const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex flex-col items-center gap-1.5 p-2 feature-button-hover rounded-lg transition-all duration-200 cursor-pointer group"
+  >
+    <div className="p-2.5 feature-button-bg rounded-full shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-200">
+      {icon}
+    </div>
+    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors duration-200">{label}</span>
+  </button>
+);
+
+type OptimisticMessageAction = 
+  | { type: 'addUserMessage'; message: ChatMessageUI }
+  | { type: 'addAgentMessage'; message: ChatMessageUI } 
+  | { type: 'updateAgentMessageChunk'; id: string; chunk: string } 
+  | { type: 'finalizeAgentMessage'; id: string; finalMessage?: string; error?: boolean }
+  | { type: 'reconcileUserMessage'; id: string; serverId?: string; error?: boolean };
+
+>>>>>>> Stashed changes
 export function ChatUI() {
   const { currentUser, loading: authLoading } = useAuth();
   const currentUserId = currentUser?.uid;
@@ -167,9 +280,18 @@ export function ChatUI() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [usingADKAgent, setUsingADKAgent] = useState(false); // Example state
 
+<<<<<<< Updated upstream
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+=======
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); 
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null); 
+  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); 
+  
+  const [adkAgents, setAdkAgents] = useState<ADKAgentConfig[]>([]);
+  const [isADKInitializing, setIsADKInitializing] = useState(false); // Set to false since we're not initializing ADK
+>>>>>>> Stashed changes
 
   const [adkAgents, setAdkAgents] = useState<SavedAgentConfigType[]>([]); // ADK agents list - Changed ADKAgentConfig to SavedAgentConfigType
   const [isADKInitializing, setIsADKInitializing] = useState(true); // ADK initialization status
@@ -303,8 +425,14 @@ export function ChatUI() {
       id: userMessageId,
       sender: "user",
       text: currentInput,
+<<<<<<< Updated upstream
       imageUrl: selectedFile && selectedFile.type.startsWith("image/") ? selectedFileDataUri : undefined,
       fileName: selectedFile ? selectedFile.name : undefined,
+=======
+      imageUrl: currentSelectedFile && currentSelectedFile.type.startsWith('image/') ? (currentSelectedFileDataUri || undefined) : undefined,
+      fileName: currentSelectedFile ? currentSelectedFile.name : undefined,
+      fileDataUri: currentSelectedFile && !currentSelectedFile.type.startsWith('image/') ? (currentSelectedFileDataUri || undefined) : undefined,
+>>>>>>> Stashed changes
       isStreaming: false,
       timestamp: new Date(),
     };
@@ -325,6 +453,7 @@ export function ChatUI() {
       return;
     }
 
+<<<<<<< Updated upstream
     setInputValue("");
     removeSelectedFile();
     inputRef.current?.focus();
@@ -342,6 +471,31 @@ export function ChatUI() {
       history: historyForBackend,
       userId: currentUserId,
       stream: true,
+=======
+    // Prepare data for the API route
+    const chatInputForStream: ChatInput = {
+      userMessage: currentInput,
+      history: messages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        content: msg.text, // Assuming msg.text holds the content for history
+      })),
+      fileDataUri: currentSelectedFile && currentSelectedFileDataUri ? (currentSelectedFileDataUri || undefined) : undefined,
+      modelName: (usingADKAgent && selectedADKAgent && selectedADKAgent.model) 
+        ? selectedADKAgent.model 
+        : (selectedSavedAgent?.agentModel || undefined) 
+      , 
+      systemPrompt: (usingADKAgent && selectedADKAgent && selectedADKAgent.description) 
+        ? selectedADKAgent.description 
+        : (selectedSavedAgent?.agentDescription || undefined) 
+      , 
+      temperature: (usingADKAgent && selectedADKAgent 
+        ? (selectedADKAgent as any).temperature 
+        : (selectedSavedAgent?.agentTemperature || undefined) 
+      ), 
+      agentToolsDetails: usingADKAgent && selectedADKAgent 
+        ? selectedADKAgent.tools?.map((t: ADKTool) => ({ id: t.name, name: t.name, description: t.description || '', enabled: true })) 
+        : selectedSavedAgent?.agentTools?.map((toolId: string) => ({ id: toolId, name: toolId, description: `Tool: ${toolId}`, enabled: true }))
+>>>>>>> Stashed changes
     };
 
     if (!isAgentCreatorSession) {
