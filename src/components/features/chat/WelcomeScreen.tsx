@@ -1,4 +1,5 @@
-// Componente WelcomeScreen
+// Componente WelcomeScreen: Responsivo através do uso de grid responsivo (sm:grid-cols-2) para sugestões e classes de max-width para o texto.
+// O layout é centralizado e se adapta bem a diferentes larguras de tela.
 import { Bot, Sparkles, Lightbulb, Code, Search, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

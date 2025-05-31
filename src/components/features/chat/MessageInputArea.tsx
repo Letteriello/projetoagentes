@@ -1,3 +1,5 @@
+// Componente MessageInputArea: Responsivo através de flexbox e classes de tamanho/padding.
+// O Textarea se ajusta dinamicamente em altura (max-h-36) e os botões mantêm tamanho fixo.
 import React, { useRef, useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -138,5 +140,3 @@ export default function MessageInputArea({
     </form>
   );
 }
-
-
