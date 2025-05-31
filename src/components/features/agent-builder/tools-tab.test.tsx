@@ -3,9 +3,11 @@
 import * as React from "react";
 import { useState } from "react";
 import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
-import { allTools } from "./available-tools";
+import { allTools } from "./available-tools"; // Assuming this exports AvailableTool[]
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { AvailableTool } from "@/types/tool-types"; // Import AvailableTool
+import type { ToolConfigData } from "@/types/agent-configs"; // Import ToolConfigData
 import { Cpu } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -18,11 +20,12 @@ export default function ToolsTabTestPage() {
     "webSearch",
   ]);
 
-  const [toolConfigs, setToolConfigs] = useState<Record<string, any>>({
-    webSearch: {
+  const [toolConfigs, setToolConfigs] = useState<Record<string, ToolConfigData>>({ // Use ToolConfigData
+    webSearch: { // This structure should be compatible with ToolConfigData for webSearch
       googleApiKey: "DEMO_KEY",
       googleCseId: "DEMO_CSE",
     },
+    // If other tools were in toolConfigs, their structure should also match ToolConfigData
   });
 
   const handleToolSelectionChange = (toolId: string, checked: boolean) => {
@@ -33,9 +36,9 @@ export default function ToolsTabTestPage() {
     }
   };
 
-  const handleConfigureTool = (tool: any) => {
+  const handleConfigureTool = (tool: AvailableTool) => { // Use AvailableTool type
     toast({
-      title: `Configurando ferramenta: ${tool.name}`,
+      title: `Configurando ferramenta: ${tool.name}`, // tool.name is valid for AvailableTool
       description: "Esta é uma demonstração da funcionalidade de configuração.",
     });
   };

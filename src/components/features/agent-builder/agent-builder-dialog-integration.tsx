@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+// useState and useEffect are imported but not used.
+// import { useState, useEffect } from "react";
 import { ToolsTab } from "./tools-tab";
-import { allTools } from "@/app/agent-builder/available-tools";
+// import { allTools } from "@/app/agent-builder/available-tools"; // Unused import
 import { AvailableTool } from "@/types/tool-types";
+import type { ToolConfigData } from "@/types/agent-configs"; // Import the new type
 
 // Tipos e importações adicionais necessários para a integração
 // Estes serão utilizados para adaptar o componente ToolsTab à estrutura existente
@@ -13,7 +15,7 @@ export interface ToolTabIntegrationProps {
   selectedToolIds: string[];
   onToolSelectionChange: (toolId: string, checked: boolean) => void;
   onConfigureTool: (tool: AvailableTool) => void;
-  toolConfigsApplied?: Record<string, any>;
+  toolConfigsApplied?: Record<string, ToolConfigData>; // Use ToolConfigData
 }
 
 /**
