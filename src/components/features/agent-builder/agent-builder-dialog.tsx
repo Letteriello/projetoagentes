@@ -340,66 +340,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     toast({ title: `Configuração salva para ${toolDisplayName}` });
   };
 
-<<<<<<< HEAD
-  // Estados para os campos do formulário principal do agente
-  const [agentName, setAgentName] = React.useState<string>(editingAgent?.agentName || '');
-  const [agentDescription, setAgentDescription] = React.useState<string>(editingAgent?.agentDescription || '');
-  const [agentIcon, setAgentIcon] = React.useState<string>(editingAgent?.agentIcon || 'Bot');
-  
-  // Estados para configuração de agente LLM
-  const [agentGoal, setAgentGoal] = React.useState<string>(editingAgent?.agentType === 'llm' ? (editingAgent as any).agentGoal || '' : '');
-  const [agentTasks, setAgentTasks] = React.useState<string>(editingAgent?.agentType === 'llm' ? (editingAgent as any).agentTasks || '' : '');
-  const [agentPersonality, setAgentPersonality] = React.useState<string>(editingAgent?.agentType === 'llm' ? (editingAgent as any).agentPersonality || '' : '');
-  const [agentRestrictions, setAgentRestrictions] = React.useState<string>(editingAgent?.agentType === 'llm' ? (editingAgent as any).agentRestrictions || '' : '');
-  const [agentModel, setAgentModel] = React.useState<string>(editingAgent?.agentType === 'llm' ? (editingAgent as any).agentModel || 'googleai/gemini-1.5-flash-latest' : 'googleai/gemini-1.5-flash-latest');
-  const [agentTemperature, setAgentTemperature] = React.useState<number>(editingAgent?.agentType === 'llm' ? (editingAgent as any).agentTemperature || 0.7 : 0.7);
-  
-  // Estado para ferramentas selecionadas
-  const [selectedToolIds, setSelectedToolIds] = React.useState<string[]>(editingAgent?.agentTools || []);
-
-  // Manipulador de ferramenta selecionada
-  const handleToolSelectionChange = (toolId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedToolIds(prev => [...prev, toolId]);
-    } else {
-      setSelectedToolIds(prev => prev.filter(id => id !== toolId));
-    }
-  };
-
   // Manipulador para salvar o agente
-  const handleSaveAgent = () => {
-    // Construir a configuração do agente baseado no tipo selecionado
-    let agentConfig: any = {
-      agentType: selectedAgentType,
-      agentName,
-      agentDescription,
-      agentIcon,
-      agentVersion: editingAgent?.agentVersion || "1.0.0", // Versão padrão ou manter a existente
-      agentTools: selectedToolIds,
-      toolConfigsApplied: toolConfigurations,
-    };
-
-    // Adicionar campos específicos de acordo com o tipo de agente
-    if (selectedAgentType === 'llm') {
-      agentConfig = {
-        ...agentConfig,
-        agentGoal,
-        agentTasks,
-        agentPersonality,
-        agentRestrictions,
-        agentModel,
-        agentTemperature,
-      };
-    }
-
-    // Gerar ID único se for um novo agente
-    const savedAgent: SavedAgentConfiguration = {
-      id: editingAgent?.id || `agent_${Date.now()}`,
-      ...agentConfig,
-    };
-
-    onSave(savedAgent);
-=======
   const handleSaveAgent = () => {
     if (!agentName.trim()) {
       toast({ title: "Erro de Validação", description: "O nome do agente é obrigatório.", variant: "destructive" });
