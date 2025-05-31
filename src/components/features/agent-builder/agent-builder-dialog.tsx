@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 // Componente principal para criar e editar configurações de agentes.
 // Permite definir nome, tipo, comportamento, ferramentas, memória, RAG, artefatos e configurações multi-agente/A2A.
 import { CommunicationChannelItem } from "./a2a-communication-channel";
+import { MemoryServiceType } from "./memory-knowledge-tab"; // Ensure this matches the type used in RagMemoryConfig definition
 import { Textarea } from "@/components/ui/textarea";
 import { 
   AlertCircle, 
@@ -56,8 +57,12 @@ import {
 } from "lucide-react";
 
 import { v4 as uuidv4 } from "uuid";
-import { useToast } from "@/hooks/use-toast";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AgentFramework, AgentConfig, SavedAgentConfiguration, A2AConfig, RagMemoryConfig, ArtifactDefinition, ToolConfigData, AvailableTool, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig } from "@/types/agent-configs"; // AvailableTool type is re-exported by agent-configs, KnowledgeSource removed, added specific agent configs
+import type { KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab"; // Correct import for KnowledgeSource
+import { availableTools as availableToolsList } from "@/data/available-tools"; 
 import { useAgents } from "@/contexts/AgentsContext";
+import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,6 +72,7 @@ import { Badge } from "@/components/ui/badge";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
+
 
 // Types are now imported from @/types/agent-configs and @/types/agent-types
 import type {
@@ -80,6 +86,22 @@ import type {
 } from "@/types/agent-configs";
 import { AvailableTool } from "@/types/agent-types"; // This seems to be the correct source
 import { ArtifactDefinition, RagMemoryConfig, TerminationConditionType, A2AConfigType } from "@/types/agent-types";
+// Definimos localmente os tipos que estão faltando
+// RagMemoryConfig está disponível em memory-knowledge-tab, mas não é exportado, então definimos aqui
+
+// Definindo tipos que estavam faltando
+type TerminationConditionType = "none" | "tool" | "state";
+
+// Definindo o tipo A2AConfigType usado nas configurações de comunicação entre agentes
+type A2AConfigType = {
+  enabled: boolean;
+  communicationChannels: any[]; 
+  defaultResponseFormat: string;
+  maxMessageSize: number;
+  loggingEnabled: boolean;
+};
+
+import { AgentTemplate } from "@/data/agentBuilderConfig";
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -90,6 +112,8 @@ interface AgentBuilderDialogProps {
   agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string; }>;
   agentToneOptions: { id: string; label: string; }[];
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>; // Mapeamento de nomes de ícones para componentes React, usado na aba Ferramentas.
+  iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
+  agentTemplates: AgentTemplate[];
 }
 
 const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
@@ -213,6 +237,184 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const { savedAgents: allSavedAgents } = useAgents(); // Para popular o seletor de sub-agentes.
 
   // Memoiza a lista de agentes disponíveis para seleção como sub-agentes, excluindo o agente atualmente em edição.
+  // Core Agent Properties
+  const [agentName, setAgentName] = React.useState<string>("");
+  const [agentDescription, setAgentDescription] = React.useState<string>("");
+  const [agentVersion, setAgentVersion] = React.useState<string>("1.0.0");
+  const [agentFramework, setAgentFramework] = React.useState<AgentFramework>("genkit");
+  const [selectedAgentType, setSelectedAgentType] = React.useState<"llm" | "workflow" | "custom" | "a2a">("llm");
+
+  // Multi-Agent Properties
+  const [isRootAgent, setIsRootAgent] = React.useState<boolean>(true);
+  const [subAgentIds, setSubAgentIds] = React.useState<string[]>([]);
+
+  // Behavior & Prompting - Common
+  const [globalInstruction, setGlobalInstruction] = React.useState<string>("");
+  const [systemPromptGenerated, setSystemPromptGenerated] = React.useState<string>("");
+
+  // Behavior & Prompting - LLM Specific
+  const [agentGoal, setAgentGoal] = React.useState<string>("");
+  const [agentTasks, setAgentTasks] = React.useState<string[]>([]);
+  const [agentPersonality, setAgentPersonality] = React.useState<string>(agentToneOptions[0]?.id || "");
+  const [agentRestrictions, setAgentRestrictions] = React.useState<string[]>([]);
+  const [agentModel, setAgentModel] = React.useState<string>("gemini-1.5-flash");
+  const [agentTemperature, setAgentTemperature] = React.useState<number>(0.7);
+
+  // Behavior & Prompting - Workflow Specific
+  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<"sequential" | "graph" | "stateMachine" | undefined>("sequential");
+  const [workflowDescription, setWorkflowDescription] = React.useState<string>("");
+  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(undefined);
+
+  // Behavior & Prompting - Custom Specific
+  // customLogicDescription state will be declared once further down.
+
+  // Multi-agent fields (Google ADK)
+  // (Removido: declarações duplicadas de isRootAgent, subAgents, globalInstruction e agentFramework)
+
+  // Função genérica para manipular alterações de campo
+  const handleFieldChange = (fieldName: string, value: any) => {
+    // Manipula diferentes campos com base no nome
+    switch (fieldName) {
+      case 'agentName':
+        setAgentName(value);
+        break;
+      case 'agentDescription':
+        setAgentDescription(value);
+        break;
+    case 'agentVersion':
+      setAgentVersion(value);
+      break;
+    case 'agentGoal':
+      setAgentGoal(value);
+      break;
+    case 'agentTasks':
+      setAgentTasks(value);
+      break;
+    case 'agentPersonality':
+      setAgentPersonality(value);
+      break;
+    case 'agentRestrictions':
+      setAgentRestrictions(value);
+      break;
+    case 'agentModel':
+      setAgentModel(value);
+      break;
+    case 'isRootAgent':
+      setIsRootAgent(value);
+      break;
+    case 'agentFramework':
+      setAgentFramework(value);
+      break;
+    default:
+      console.log(`Campo não manipulado: ${fieldName}`);
+  }
+};
+
+// (Removido: duplicidades de estados para gerenciamento de estado, memória e RAG)
+
+// Estados para gerenciamento de artefatos
+const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(
+    editingAgent?.config.artifacts?.enabled || false
+);
+const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'local' | 'cloud'>('memory');
+// Initialize artifacts as empty; useEffect will populate it from editingAgent.config.artifacts.definitions
+const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]);
+const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(
+    "" // Initialize as empty; useEffect will populate
+);
+const [localStoragePath, setLocalStoragePath] = React.useState<string>(
+    "" // Initialize as empty; useEffect will populate
+);
+
+// Estado para ferramentas selecionadas
+const [selectedTools, setSelectedTools] = React.useState<string[]>([]); // Initialize as empty; useEffect will populate
+
+
+// Estados para RAG e memória - Initialize with minimal valid defaults; useEffect will populate
+const initialRagMemoryConfig: RagMemoryConfig = {
+    enabled: false,
+    serviceType: 'vertexAISearch', // Default from UI
+    similarityTopK: 5,
+    vectorDistanceThreshold: 0.5,
+    knowledgeSources: [],
+    includeConversationContext: true,
+    persistentMemory: { enabled: false },
+    vertexAISearchConfig: {
+        projectId: '',
+        location: '',
+        dataStoreId: '', // Was ragCorpusName
+        embeddingModelName: '' // Was embeddingModel
+    },
+    pineconeConfig: undefined,
+    localFaissConfig: undefined,
+    googleSearchConfig: undefined
+};
+const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(initialRagMemoryConfig);
+
+// Estado para configuração A2A - Initialize with minimal valid defaults; useEffect will populate
+const initialA2AConfig: A2AConfigType = {
+    enabled: false,
+    communicationChannels: [],
+    defaultResponseFormat: 'text',
+    maxMessageSize: 1024 * 1024, // 1MB default
+    loggingEnabled: false,
+};
+const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>({
+    ...initialA2AConfig,
+    maxMessageSize: initialA2AConfig.maxMessageSize ?? 0,
+    defaultResponseFormat: (initialA2AConfig.defaultResponseFormat as A2AConfig['defaultResponseFormat']) || 'text',
+});
+
+// Workflow Fields
+  // (Removido: duplicidades de workflowDescription, detailedWorkflowType e loopMaxIterations)
+  // Simplified initialization, useEffect will populate from editingAgent.config
+  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>("none");
+  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(undefined);
+  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(undefined);
+  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(undefined);
+  
+  // Custom/A2A/Task Fields (some might overlap or use LLM fields)
+  // Simplified initialization for customLogicDescription
+  const [customLogicDescription, setCustomLogicDescription] = React.useState<string>("");
+
+  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // Initialize as empty
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
+
+  // State & Memory
+  const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false);
+  const [statePersistenceType, setStatePersistenceType] = React.useState<string>("session");
+  const [initialStateValues, setInitialStateValues] = React.useState<Array<{key: string, value: string}>>([]);
+
+  // RAG
+  const [enableRAG, setEnableRAG] = React.useState<boolean>(false);
+  // (Removido: declaração duplicada de ragMemoryConfig e a2aConfig)
+
+  // Artifacts
+  // (Removido: declarações duplicadas de enableArtifacts, artifactStorageType, cloudStorageBucket e localStoragePath)
+
+  // A2A Config
+  // (Removido: declaração duplicada de a2aConfig)
+
+  // Modal specific states for tool configuration
+  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
+  const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
+  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>('');
+  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>('');
+  const [modalDbType, setModalDbType] = React.useState<string>('');
+  const [modalDbHost, setModalDbHost] = React.useState<string>('');
+  const [modalDbPort, setModalDbPort] = React.useState<number>(0);
+  const [modalDbName, setModalDbName] = React.useState<string>('');
+  const [modalDbUser, setModalDbUser] = React.useState<string>('');
+  const [modalDbPassword, setModalDbPassword] = React.useState<string>('');
+  const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>('');
+  const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
+  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
+  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
+
+  const { toast } = useToast();
+  const { savedAgents: allSavedAgents } = useAgents(); // For SubAgentSelector
+
   const availableAgentsForSubSelector = React.useMemo(() =>
     allSavedAgents.filter(agent => agent.id !== editingAgent?.id),
     [allSavedAgents, editingAgent?.id]
@@ -234,6 +436,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         setAgentName(editingAgent.agentName);
         setAgentDescription(editingAgent.description || "");
         setAgentVersion(editingAgent.version || "1.0.0");
+        // Populate with editingAgent data
+        setAgentName(editingAgent.agentName || "Novo Agente");
+        setAgentDescription(editingAgent.agentDescription || "");
+        setAgentVersion(editingAgent.agentVersion || "1.0.0"); // Use new type structure
 
         const agentConfig = editingAgent.config; // Acessa a configuração central do agente.
 
@@ -305,9 +511,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         // 'filesystem' é o tipo padrão para armazenamento local persistente.
         // 'memory' é para armazenamento temporário em memória.
         // 'cloud' é para armazenamento em nuvem (ex: GCS, S3).
+        // Use 'local' as the standard storage type
         const artifactStorageTypeValue = agentConfig.artifacts?.storageType;
         setArtifactStorageType(
-          artifactStorageTypeValue === 'local' ? 'filesystem' : (artifactStorageTypeValue || 'memory')
+          artifactStorageTypeValue === 'filesystem' ? 'local' : (artifactStorageTypeValue as "local" | "memory" | "cloud" || 'memory')
         );
         setCloudStorageBucket(agentConfig.artifacts?.cloudStorageBucket || "");
         setLocalStoragePath(agentConfig.artifacts?.localStoragePath || "./artifacts");
@@ -318,14 +525,22 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         setA2AConfig({...defaultA2AConfigForEdit, ...(agentConfig.a2a || {})});
 
 
+        setA2AConfig(agentConfig.a2a ? {
+          ...initialA2AConfig, // Start with defaults to ensure all keys are present
+          ...agentConfig.a2a,
+          maxMessageSize: agentConfig.a2a.maxMessageSize ?? initialA2AConfig.maxMessageSize ?? 0,
+          defaultResponseFormat: (agentConfig.a2a.defaultResponseFormat as A2AConfig['defaultResponseFormat']) || initialA2AConfig.defaultResponseFormat || 'text',
+          communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels) ? agentConfig.a2a.communicationChannels : initialA2AConfig.communicationChannels || [],
+        } : { ...initialA2AConfig });
+
       } else {
         // Reseta todos os campos para valores padrão ao criar um novo agente.
         setAgentName(""); setAgentDescription(""); setAgentVersion("1.0.0");
         setSelectedAgentType("llm"); setAgentFramework("genkit");
         setIsRootAgent(true); setSubAgentIds([]);
         setGlobalInstruction(""); setSystemPromptGenerated("");
-        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || "");
-        setAgentRestrictions([]); setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7);
+        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]);
+        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7);
 
         setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined);
         setLoopTerminationConditionType("none"); setLoopExitToolName(undefined);
@@ -450,6 +665,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
           localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+        type: "llm",
+        framework: agentFramework as AgentFramework,
+        isRootAgent, subAgentIds, globalInstruction,
+        statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
+        rag: { enabled: enableRAG, config: ragMemoryConfig },
+        artifacts: {
+          enabled: enableArtifacts, storageType: artifactStorageType,
+          cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig, // Configuração A2A.
@@ -467,14 +691,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     else if (selectedAgentType === "workflow") {
       coreConfig = {
         type: "workflow",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig,
@@ -492,14 +716,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     else if (selectedAgentType === "custom") {
       coreConfig = {
         type: "custom",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig,
@@ -511,14 +735,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     else if (selectedAgentType === "a2a") {
       coreConfig = {
         type: "a2a",
-        framework: agentFramework,
+        framework: agentFramework as AgentFramework,
         isRootAgent, subAgentIds, globalInstruction,
         statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts, storageType: artifactStorageType,
           cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: (artifactStorageType === 'filesystem' || artifactStorageType === 'local') ? localStoragePath : undefined,
+          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
           definitions: artifacts
         },
         a2a: a2aConfig, // Configuração A2A é a principal para este tipo, mapeada de `a2aConfig` (estado).
@@ -541,6 +765,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       tools: selectedTools, // Lista de IDs de ferramentas selecionadas.
       toolConfigsApplied: toolConfigurations, // Configurações específicas das ferramentas.
       // Mapeia detalhes das ferramentas selecionadas para `toolsDetails`.
+      id: editingAgent?.id || uuidv4(),
+      templateId: editingAgent?.templateId || 'custom_manual_dialog',
+      agentName: agentName, // Renamed from 'name' in new SavedAgentConfiguration
+      agentDescription: agentDescription,
+      agentVersion: agentVersion,
+      icon: editingAgent?.icon || `${selectedAgentType}-agent-icon.svg`, // Default icon if new
+      config: coreConfig, // The fully constructed core configuration
+      tools: selectedTools, // Renamed from agentTools to match SavedAgentConfiguration type
+      toolConfigsApplied: toolConfigurations,
       toolsDetails: selectedTools
         .map(toolId => {
             const toolDetail = availableTools.find(t => t.id === toolId);
@@ -550,6 +783,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 label: toolDetail.label,
                 description: toolDetail.description,
                 // Encontra o nome do componente do ícone ou usa um padrão.
+                label: toolDetail.name, // Usando 'name' em vez de 'label' que não existe no tipo
+                description: toolDetail.description, // Keep description
                 iconName: toolDetail.icon ? (Object.keys(iconComponents).find(key => iconComponents[key] === toolDetail.icon) || "Settings") : "Settings",
                 hasConfig: toolDetail.hasConfig,
                 genkitToolName: toolDetail.genkitToolName
@@ -602,16 +837,16 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="agentName">Nome do Agente</Label>
-                  <Input id="agentName" placeholder="Ex: Agente de Pesquisa Avançada" value={agentName} onChange={(e) => setAgentName(e.target.value)} />
+                  <Input id="agentName" placeholder="Ex: Agente de Pesquisa Avançada" value={agentName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="agentVersion">Versão</Label>
-                  <Input id="agentVersion" placeholder="Ex: 1.0.1" value={agentVersion} onChange={(e) => setAgentVersion(e.target.value)} />
+                  <Input id="agentVersion" placeholder="Ex: 1.0.1" value={agentVersion} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentVersion(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agentDescription">Descrição do Agente</Label>
-                <Textarea id="agentDescription" placeholder="Descreva o propósito principal, capacidades e limitações do agente." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} rows={3} />
+                <Textarea id="agentDescription" placeholder="Descreva o propósito principal, capacidades e limitações do agente." value={agentDescription} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAgentDescription(e.target.value)} rows={3} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -635,7 +870,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="agentFramework">Framework do Agente</Label>
-                  <Select value={agentFramework} onValueChange={setAgentFramework}>
+                  <Select value={agentFramework} onValueChange={(value) => setAgentFramework(value as AgentFramework)}>
                     <SelectTrigger id="agentFramework">
                       <SelectValue placeholder="Selecione o framework" />
                     </SelectTrigger>
@@ -730,6 +965,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         onValueChange={(value) => setAgentTemperature(value[0])}
                       />
                       <p className="text-xs text-muted-foreground">Controla a criatividade/aleatoriedade das respostas (0=mais determinístico, 1=mais criativo).</p>
+                      <p className="text-xs text-muted-foreground">
+                        Controla a criatividade/aleatoriedade das respostas (0=determinístico, 1=máximo).
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -751,7 +989,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="detailedWorkflowType">Tipo de Workflow</Label>
-                    <Select value={detailedWorkflowType} onValueChange={setDetailedWorkflowType}>
+                    <Select 
+                      value={detailedWorkflowType} 
+                      onValueChange={(value: "sequential" | "graph" | "stateMachine") => setDetailedWorkflowType(value)}
+                    >
                       <SelectTrigger id="detailedWorkflowType">
                         <SelectValue placeholder="Selecione o tipo de workflow" />
                       </SelectTrigger>
@@ -821,6 +1062,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                           checked={selectedTools.includes(tool.id)} // Controla se a ferramenta está selecionada.
                           onCheckedChange={(checked) => { // Atualiza a lista de ferramentas selecionadas.
                             setSelectedTools(prev: string[] =>
+                          checked={selectedTools.includes(tool.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedTools((prev: string[]) =>
                               checked ? [...prev, tool.id] : prev.filter(id => id !== tool.id)
                             );
                           }}
@@ -829,6 +1073,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                       {/* Renderiza o ícone da ferramenta dinamicamente, usando o nome do ícone fornecido na `tool.icon` e o mapeamento `iconComponents`. */}
                       {tool.icon && React.cloneElement(iconComponents[tool.icon as string] || <Wand2 className="h-5 w-5 text-muted-foreground" />, { className: "h-6 w-6 mb-2 text-primary" })}
                       <CardDescription className="text-xs">{tool.description}</CardDescription> {/* Descrição da ferramenta. */}
+                      {tool.icon ? 
+                        (() => {
+                          const IconComponent = iconComponents[tool.icon as string] || Wand2;
+                          return <IconComponent className="h-6 w-6 mb-2 text-primary" />;
+                        })() : 
+                        <Wand2 className="h-5 w-5 text-muted-foreground" />
+                      }
+                      <CardDescription className="text-xs">{tool.description}</CardDescription>
                     </CardHeader>
                     <CardFooter>
                       {/* Se a ferramenta requer configuração (`tool.hasConfig`), exibe o botão 'Configurar'. */}
@@ -973,8 +1225,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         <div className="space-y-2">
                           <Label htmlFor="ragServiceType">Serviço de Busca/Vetorização</Label>
                           <Select
-                            value={ragMemoryConfig.serviceType || "vertexAISearch"}
-                            onValueChange={(value) => setRagMemoryConfig(prev => ({...prev, serviceType: value}))}
+                            value={ragMemoryConfig.serviceType || "vertexAISearch" as MemoryServiceType}
+                            onValueChange={(value) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, serviceType: value as MemoryServiceType}))}
                           >
                             <SelectTrigger id="ragServiceType">
                               <SelectValue placeholder="Selecione o serviço" />
@@ -990,14 +1242,24 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         </div>
                         {/* Campos condicionais para serviços que requerem ID de projeto e localização. */}
                         { (ragMemoryConfig.serviceType === "vertexAISearch" || ragMemoryConfig.serviceType === "pinecone") &&
+                        { (ragMemoryConfig.serviceType === "vertexAISearch") && // Condition updated to be Vertex AI Search specific
                           <>
                             <div className="space-y-2">
-                              <Label htmlFor="ragProjectId">ID do Projeto Cloud</Label>
+                              <Label htmlFor="ragProjectId">ID do Projeto Cloud (Vertex AI)</Label> {/* Label updated for clarity */}
                               <Input
                                 id="ragProjectId"
                                 placeholder="Seu ID do projeto GCP ou similar"
-                                value={ragMemoryConfig.projectId || ""}
-                                onChange={(e) => setRagMemoryConfig(prev => ({...prev, projectId: e.target.value}))}
+                                value={ragMemoryConfig.vertexAISearchConfig?.projectId || ""}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setRagMemoryConfig((prev) => ({
+                                    ...prev,
+                                    vertexAISearchConfig: {
+                                      ...(prev.vertexAISearchConfig || {}),
+                                      projectId: newValue,
+                                    },
+                                  }));
+                                }}
                               />
                             </div>
                             <div className="space-y-2">
@@ -1005,19 +1267,31 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                               <Input
                                 id="ragLocation"
                                 placeholder="Ex: us-central1"
-                                value={ragMemoryConfig.location || ""}
-                                onChange={(e) => setRagMemoryConfig(prev => ({...prev, location: e.target.value}))}
-                              />
-                            </div>
-                          </>
-                        }
-                         <div className="space-y-2">
-                          <Label htmlFor="ragCorpusName">Nome do Corpus/Índice/DataStore</Label>
+                                value={ragMemoryConfig.vertexAISearchConfig?.location || ""}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setRagMemoryConfig((prev) => ({
+                                    ...prev,
+                                    vertexAISearchConfig: {
+                                      ...(prev.vertexAISearchConfig || {}),
+                                      location: newValue,
+                                    },
+                                  }));
                           <Input
                             id="ragCorpusName"
                             placeholder="Ex: meu-datastore-de-documentos"
                             value={ragMemoryConfig.ragCorpusName || ""}
                             onChange={(e) => setRagMemoryConfig(prev => ({...prev, ragCorpusName: e.target.value}))}
+                            id="vertexDataStoreId"
+                            placeholder="ID do seu DataStore no Vertex AI Search"
+                            value={ragMemoryConfig.vertexAISearchConfig?.dataStoreId || ""}
+                            onChange={(e) => {
+                              const newValue = e.target.value;
+                              setRagMemoryConfig((prev) => ({
+                                ...prev,
+                                vertexAISearchConfig: { ...(prev.vertexAISearchConfig || {}), dataStoreId: newValue },
+                              }));
+                            }}
                           />
                           <p className="text-xs text-muted-foreground">Identificador da sua coleção de dados no serviço RAG.</p>
                         </div>
@@ -1031,15 +1305,25 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                           />
                            <p className="text-xs text-muted-foreground">Modelo usado para gerar embeddings (vetores) dos seus dados. Deixe em branco para usar o padrão do serviço.</p>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      )}
+                      {ragMemoryConfig.serviceType === 'pinecone' && (
                         <div className="space-y-2">
-                          <Label htmlFor="ragSimilarityTopK">Top K (Resultados)</Label>
+                          <Label htmlFor="pineconeIndexName">Nome do Índice (Pinecone)</Label>
                           <Input
+                            id="pineconeIndexName"
+                            placeholder="Nome do seu índice no Pinecone"
+                            value={ragMemoryConfig.pineconeConfig?.indexName || ""}
+                            onChange={(e) => {
+                              const newValue = e.target.value;
+                              setRagMemoryConfig((prev) => ({
+                                ...prev,
+                                pineconeConfig: { ...(prev.pineconeConfig || {}), indexName: newValue },
+                              }));
+                            }}
                             id="ragSimilarityTopK"
                             type="number"
                             value={String(ragMemoryConfig.similarityTopK || 5)}
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
+                            onChange={(e) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
                           />
                           <p className="text-xs text-muted-foreground">Número de resultados mais similares a serem recuperados.</p>
                         </div>
@@ -1049,7 +1333,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                             id="ragVectorDistanceThreshold"
                             min={0} max={1} step={0.05}
                             value={[ragMemoryConfig.vectorDistanceThreshold || 0.5]}
-                            onValueChange={(value) => setRagMemoryConfig(prev => ({...prev, vectorDistanceThreshold: value[0]}))}
+                            onValueChange={(value) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, vectorDistanceThreshold: value[0]}))}
                           />
                           <p className="text-xs text-muted-foreground">Distância máxima para considerar um resultado relevante (0 a 1). Menor = mais estrito.</p>
                         </div>
@@ -1063,7 +1347,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                           onChange={(e) => {
                             try {
                               const val = e.target.value.trim();
-                              if(!val) { setRagMemoryConfig(prev => ({...prev, knowledgeSources: []})); return; }
+                              if(!val) { setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, knowledgeSources: []})); return; }
                               const parsed = JSON.parse(val);
                               // Validação básica da estrutura do JSON para fontes de conhecimento.
                               if(Array.isArray(parsed) && parsed.every(item => typeof item === 'object' && 'type' in item && 'content' in item && 'name' in item)) {
@@ -1071,6 +1355,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                               } else {
                                 toast({variant: "destructive", title: "JSON Inválido", description: "Fontes de Conhecimento devem ser um array de objetos com 'type', 'content' e 'name'."})
                               }
+                              setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, knowledgeSources: parsed}));
                             } catch (error) {
                               console.error("Erro ao parsear JSON das fontes de conhecimento:", error);
                               toast({variant: "destructive", title: "Erro no JSON", description: "Verifique a sintaxe do JSON para Fontes de Conhecimento."})
@@ -1129,7 +1414,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     <>
                       <div className="space-y-2">
                         <Label htmlFor="artifactStorageType">Tipo de Armazenamento</Label>
-                        <Select value={artifactStorageType} onValueChange={(value: 'memory' | 'filesystem' | 'cloud') => setArtifactStorageType(value)}>
+                        <Select value={artifactStorageType} onValueChange={(value: 'memory' | 'local' | 'cloud') => setArtifactStorageType(value)}>
                           <SelectTrigger id="artifactStorageType">
                             <SelectValue placeholder="Selecione o tipo de armazenamento" />
                           </SelectTrigger>
@@ -1137,6 +1422,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                             <SelectItem value="memory">Memória (Temporário, perdido ao reiniciar)</SelectItem>
                             <SelectItem value="filesystem">Sistema de Arquivos Local (Persistente no servidor)</SelectItem>
                             <SelectItem value="cloud">Nuvem (Ex: Google Cloud Storage, AWS S3)</SelectItem>
+                            <SelectItem value="memory">Memória (Temporário)</SelectItem>
+                            <SelectItem value="local">Sistema de Arquivos Local</SelectItem>
+                            <SelectItem value="cloud">Nuvem (Ex: Google Cloud Storage)</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">Define onde os artefatos serão guardados.</p>
@@ -1144,6 +1432,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
                       {/* Campo para caminho local, renderizado se o tipo de armazenamento for 'filesystem' ou 'local' (compatibilidade). */}
                       {(artifactStorageType === 'filesystem' || artifactStorageType === 'local') && (
+                      {artifactStorageType === 'local' && (
                         <div className="space-y-2">
                           <Label htmlFor="localStoragePath">Caminho de Armazenamento Local</Label>
                           <Input
@@ -1213,10 +1502,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     {/* Seletor de sub-agentes ou input manual se não houver outros agentes. */}
                     { availableAgentsForSubSelector && availableAgentsForSubSelector.length > 0 ? (
                        <SubAgentSelector
-                        allAgents={availableAgentsForSubSelector}
-                        selectedAgentIds={subAgentIds}
-                        onSelectedAgentIdsChange={setSubAgentIds}
-                        currentEditingAgentId={editingAgent?.id}
+                        availableAgents={availableAgentsForSubSelector}
+                        selectedAgents={subAgentIds}
+                        onChange={setSubAgentIds}
+                        disabled={false}
                       />
                     ) : (
                       <Textarea
@@ -1256,7 +1545,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     <Switch
                       id="a2aEnabled"
                       checked={a2aConfig.enabled || false}
-                      onCheckedChange={(checked) => setA2AConfig(prev => ({...prev, enabled: checked}))}
+                      onCheckedChange={(checked) => setA2aConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
                     />
                     <Label htmlFor="a2aEnabled" className="text-base">Habilitar Comunicação A2A</Label>
                   </div>
@@ -1279,10 +1568,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         onChange={(e) => {
                           try {
                             const val = e.target.value.trim();
-                            if(!val) { setA2AConfig(prev => ({...prev, communicationChannels: []})); return; }
+                            if(!val) { setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
                             const parsedChannels = JSON.parse(val);
                             // Adicionar validação mais robusta da estrutura `CommunicationChannelItem` se necessário.
                             setA2AConfig(prev => ({...prev, communicationChannels: parsedChannels}));
+                            setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
                           } catch (error) {
                             console.error("Erro ao parsear JSON dos canais A2A:", error);
                             toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A. Verifique o console para mais detalhes."})

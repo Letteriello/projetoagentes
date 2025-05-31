@@ -79,7 +79,15 @@ export interface KnowledgeSource {
 }
 
 // Tipos de serviços de memória/RAG suportados
-export type MemoryServiceType = "in-memory" | "vertex-ai-rag" | "custom";
+export type MemoryServiceType =
+  | "in-memory"
+  | "vertex-ai-rag"
+  | "custom"
+  | "filesystem"
+  | "vertexAISearch"
+  | "pinecone"
+  | "localFaiss"
+  | "googleSearch";
 
 // Configuração do serviço de memória/RAG
 export interface RagMemoryConfig {

@@ -70,22 +70,57 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Import centralized types
-import type {
-  RagMemoryConfig,
-  KnowledgeSource,
-  KnowledgeSourceType,
-  MemoryServiceType, // Assuming MemoryServiceType is also part of agent-types.ts or a similar central place.
-                     // If not, it might need to be added there or kept local if truly specific.
-                     // For now, let's assume it's available from agent-types.ts or should be.
-  InitialStateValue // Define or import this if it's the new structure for initialStateValues
-} from "@/types/agent-types"; // Adjust path if RagMemoryConfig and others are elsewhere (e.g. agent-configs re-exporting them)
+// Centralized RAG and Knowledge Source Types defined locally and exported
+export type MemoryServiceType =
+  | "in-memory"
+  | "vectorstore"
+  | "graph"
+  | "document"
+  | "chroma"
+  | "weaviate"
+  | "firestore"
+  | "googleSearch"
+  | "vertexAISearch"
+  | "pinecone"
+  | "localFaiss"
+  | "filesystem"
+  | "custom"; // Added 'custom'
+
+export type KnowledgeSourceType = "file" | "url" | "text" | "googleDoc" | "notion" | "document" | "website" | "api" | "database" | "custom"; // Keep as is, seems correct now
+
+export interface KnowledgeSource {
+  id: string;
+  type: KnowledgeSourceType;
+  name: string;
+  pathOrContent: string;
+  description?: string;
+  credentials?: any; 
+  format?: string;   
+  updateFrequency?: string; 
+  enabled?: boolean;
+  metadata?: Record<string, any>;
+  status?: "pending" | "processing" | "ready" | "error";
+}
+
+export interface RagMemoryConfig {
+  enabled: boolean;
+  serviceType: MemoryServiceType;
+  embeddingModel?: string;
+  knowledgeSources: KnowledgeSource[]; 
+  similarityTopK?: number;
+  vectorDistanceThreshold?: number;
+  includeConversationContext?: boolean;
+  persistentMemory?: { // Added to align with rag-memory-tab.tsx definition
+    enabled: boolean;
+    // Potentially other fields like path, connectionString, etc.
+  };
+}
 
 // Interface para o componente
 interface MemoryKnowledgeTabProps {
   // Configuração principal de RAG
-  ragMemoryConfig: RagMemoryConfig; // Uses imported RagMemoryConfig
-  setRagMemoryConfig: React.Dispatch<React.SetStateAction<RagMemoryConfig>>; // Uses imported RagMemoryConfig
+  ragMemoryConfig: RagMemoryConfig; 
+  setRagMemoryConfig: React.Dispatch<React.SetStateAction<RagMemoryConfig>>;
 
   // Estado e persistência
   enableStatePersistence: boolean;
@@ -135,9 +170,9 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
   const [newSource, setNewSource] = React.useState<Partial<KnowledgeSource>>({
     id: `source-${Date.now()}`,
     name: '',
-    type: 'document',
+    type: 'document' as KnowledgeSourceType,
+    pathOrContent: '',
     description: '',
-    location: '',
     enabled: true
   });
   
@@ -159,7 +194,8 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
   // O estado para seleção de aba já foi definido na linha 140
   
   // Função auxiliar para obter o ícone com base no tipo de fonte
-  const getSourceIcon = (type: KnowledgeSourceType) => {
+  const getSourceIcon = (type?: KnowledgeSourceType) => { // Allow type to be undefined initially for newSource
+    if (!type) return <FileText className="h-4 w-4" />; // Default icon if type is undefined
     switch (type) {
       case 'document': return <Book className="h-4 w-4" />;
       case 'website': return <Globe className="h-4 w-4" />;
@@ -180,31 +216,33 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
 
   // Adicionar uma nova fonte de conhecimento
   const handleAddSource = () => {
-    if (!newSource.name || !newSource.location) return;
+    if (!newSource.name || !newSource.pathOrContent) return;
 
     const completeSource: KnowledgeSource = {
       id: newSource.id || `source-${Date.now()}`,
-      name: newSource.name,
-      type: newSource.type || 'document',
+      name: newSource.name!,
+      type: (newSource.type || 'document') as KnowledgeSourceType,
+      pathOrContent: newSource.pathOrContent!,
       description: newSource.description || '',
-      location: newSource.location,
       credentials: newSource.credentials,
       format: newSource.format,
       updateFrequency: newSource.updateFrequency,
-      enabled: newSource.enabled !== undefined ? newSource.enabled : true
+      enabled: newSource.enabled !== undefined ? newSource.enabled : true,
+      metadata: newSource.metadata,
+      status: newSource.status
     };
 
     updateRagConfig({
-      knowledgeSources: [...ragMemoryConfig.knowledgeSources, completeSource]
+      knowledgeSources: [...(ragMemoryConfig.knowledgeSources || []), completeSource] // Handle case where it might still be undefined from props
     });
     
     // Resetar o formulário
     setNewSource({
       id: `source-${Date.now() + 1}`,
       name: '',
-      type: 'document',
+      type: 'document' as KnowledgeSourceType,
+      pathOrContent: '', 
       description: '',
-      location: '',
       enabled: true
     });
     
@@ -214,16 +252,16 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
   // Remover uma fonte de conhecimento
   const handleRemoveSource = (id: string) => {
     updateRagConfig({
-      knowledgeSources: ragMemoryConfig.knowledgeSources.filter(source => source.id !== id)
+      knowledgeSources: (ragMemoryConfig.knowledgeSources || []).filter(source => source.id !== id)
     });
   };
 
   // Alternar o estado de habilitado/desabilitado de uma fonte
   const toggleSourceEnabled = (id: string) => {
     updateRagConfig({
-      knowledgeSources: ragMemoryConfig.knowledgeSources.map(source => 
+      knowledgeSources: (ragMemoryConfig.knowledgeSources || []).map(source => 
         source.id === id 
-          ? { ...source, enabled: !source.enabled } 
+          ? { ...source, enabled: !(source.enabled) } 
           : source
       )
     });

@@ -1,143 +1,48 @@
-import { A2AConfig } from "./a2a-types";
-import { ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
-import { KnowledgeSource, RagMemoryConfig } from "@/components/features/agent-builder/memory-knowledge-tab";
+import { A2AConfig as ImportedA2AConfig } from "./a2a-types";
+import { ArtifactDefinition as ImportedArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
+import { KnowledgeSource as ImportedKnowledgeSource, RagMemoryConfig as ImportedRagMemoryConfig } from "@/components/features/agent-builder/memory-knowledge-tab";
+
+// Export imported types for use in other type definition files
+export type ArtifactDefinition = ImportedArtifactDefinition;
+export type KnowledgeSource = ImportedKnowledgeSource;
+export type RagMemoryConfig = ImportedRagMemoryConfig;
+export type A2AConfig = ImportedA2AConfig; // Exporting with the original name for direct use
 
 export interface ToolConfigData {
   [key: string]: any;
 }
 
-// Unifica com o tipo de tool-types.ts para evitar conflitos de tipagem em toda a aplicação
 import type { AvailableTool as UIAvailableTool } from './tool-types';
 export type AvailableTool = UIAvailableTool;
 
 export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
+export type TerminationConditionType = 'tool' | 'state' | 'none';
 
-export interface AgentConfig {
-  agentType: 'llm' | 'task' | 'workflow' | 'sequential' | 'parallel' | 'loop' | 'custom' | 'a2a';
-  agentName: string;
-  agentDescription: string;
-  agentVersion: string;
-  agentTools: string[];
-  
-  // Campos opcionais dependendo do tipo de agente
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-  
-  // Campos para fluxos de trabalho
-  detailedWorkflowType?: 'sequential' | 'parallel' | 'loop';
-  workflowDescription?: string;
-  loopMaxIterations?: number;
-  loopTerminationConditionType?: 'tool' | 'state';
-  loopExitToolName?: string;
-  loopExitStateKey?: string;
-  loopExitStateValue?: string;
-  
-  // Campo para lógica customizada
-  customLogicDescription?: string;
-  
-  // Campos para gerenciamento de estado
-  enableStatePersistence?: boolean;
-  statePersistenceType?: 'session' | 'memory' | 'database';
-  initialStateValues?: Array<{
-    key: string;
-    value: string;
-    scope: 'global' | 'agent' | 'temporary';
-    description: string;
-  }>;
-  enableStateSharing?: boolean;
-  stateSharingStrategy?: 'all' | 'explicit' | 'none';
-  
-  // Campos para RAG e conhecimento
-  enableRAG?: boolean;
-  ragMemoryConfig?: RagMemoryConfig;
-  
-  // Campos para artefatos
-  enableArtifacts?: boolean;
-  artifactStorageType?: 'memory' | 'filesystem' | 'cloud';
-  artifacts?: ArtifactDefinition[];
-  cloudStorageBucket?: string;
-  localStoragePath?: string;
-  
-  // Campos para multi-agente
-  isRootAgent?: boolean;
-  subAgents?: string[];
-  globalInstruction?: string;
-  
-  // Campos para A2A
-  a2aConfig?: A2AConfig;
-}
+// Types previously defined here are now canonical in agent-configs.ts
+// Re-exporting for compatibility or until all imports are updated.
+export type {
+  AgentConfig,
+  SavedAgentConfiguration,
+  LLMAgentConfig,
+  // TaskAgentConfig, // Assuming TaskAgentConfig is not in agent-configs.ts or needs specific handling
+  WorkflowAgentConfig,
+  CustomAgentConfig,
+  // A2AAgentConfig // Assuming A2AAgentConfig is covered by A2AAgentSpecialistConfig in agent-configs.ts
+} from './agent-configs';
 
-export interface SavedAgentConfiguration extends AgentConfig {
-  id: string;
-  templateId: string;
-  systemPromptGenerated?: string;
-  toolsDetails?: AvailableTool[];
-  toolConfigsApplied?: Record<string, ToolConfigData>;
-}
+// Keep specific types from this file that are not in agent-configs.ts or are genuinely distinct
+// For example, if TaskAgentConfig or A2AAgentConfig here had truly different structures
+// than what's derived from agent-configs.ts, they might need to stay or be merged carefully.
+// For now, I'm commenting them out from re-export if they seem to have equivalents.
 
-// Tipos específicos para diferentes tipos de agente
-export interface LLMAgentConfig extends AgentConfig {
-  agentType: 'llm';
-  agentGoal: string;
-  agentTasks: string;
-  agentPersonality: string;
-  agentRestrictions?: string;
-  agentModel: string;
-  agentTemperature: number;
-}
+// If TaskAgentConfig is needed and distinct:
+// export interface TaskAgentConfig extends BaseAgentConfigFromConfigs { // extend from a base in agent-configs
+//   type: 'task'; 
+//   // ... specific properties
+// }
 
-export interface TaskAgentConfig extends AgentConfig {
-  agentType: 'task';
-  agentGoal: string;
-  agentTasks: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-}
-
-export interface WorkflowAgentConfig extends AgentConfig {
-  agentType: 'workflow' | 'sequential' | 'parallel' | 'loop';
-  detailedWorkflowType?: 'sequential' | 'parallel' | 'loop';
-  workflowDescription?: string;
-  loopMaxIterations?: number;
-  loopTerminationConditionType?: 'tool' | 'state';
-  loopExitToolName?: string;
-  loopExitStateKey?: string;
-  loopExitStateValue?: string;
-  // Opcional: pode ter campos de LLM para metadescriçao/capacidades
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-}
-
-export interface CustomAgentConfig extends AgentConfig {
-  agentType: 'custom';
-  customLogicDescription: string;
-  // Opcional: pode ter campos de LLM
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-}
-
-export interface A2AAgentConfig extends AgentConfig {
-  agentType: 'a2a';
-  a2aConfig: A2AConfig;
-  // Opcional: pode ter campos de LLM
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-}
+// If A2AAgentConfig is needed and distinct:
+// export interface A2AAgentConfig extends BaseAgentConfigFromConfigs {
+//   type: 'a2a';
+//   // ... specific properties
+// }
