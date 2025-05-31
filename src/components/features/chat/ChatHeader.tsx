@@ -18,8 +18,8 @@ import {
   LogOut,
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from "@/app/agent-builder/page";
-import { useAuth } from "../../../../contexts/AuthContext"; // Added
-import { auth } from "../../../../lib/firebaseClient"; // Added
+import { useAuth } from "@/contexts/AuthContext"; // Ajustado para alias
+import { auth } from "@/lib/firebaseClient"; // Ajustado para alias
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"; // Added
 import { toast } from "@/hooks/use-toast"; // Added
 
@@ -197,14 +197,16 @@ export default function ChatHeader({
           </div>
         ) : (
           <AgentSelector
-            agents={initialGems.map((gem) => ({
-              id: gem.id,
-              name: gem.name,
-              description: gem.prompt,
-            }))}
+            onAgentSelected={handleGemSelect}
             selectedAgentId={selectedGemId ?? undefined}
-            onSelectAgent={(id) => handleGemSelect(id ?? "")}
-            agentType="Gems"
+            savedAgents={initialGems.map((gem) => ({
+              id: gem.id,
+              displayName: gem.name,
+              description: gem.prompt,
+              model: '', // ajuste conforme necessário
+            }))}
+            showLabel={false}
+            triggerClassName=""
           />
         )}
 
