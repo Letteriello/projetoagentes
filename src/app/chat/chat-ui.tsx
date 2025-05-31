@@ -20,82 +20,40 @@ import {
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "@/hooks/use-toast";
-import { useAgents } from "@/contexts/AgentsContext"; // For saving agents
+import { useAgents } from "@/contexts/AgentsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebaseClient";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType } from "@/app/agent-builder/page"; // Renamed to avoid conflict
+// Updated import path for SavedAgentConfigType
+import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig";
 
-<<<<<<< Updated upstream
+// UI Components & Types
 import ChatHeader from "@/components/features/chat/ChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
 import { ChatMessageUI, Conversation } from "@/types/chat";
 import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
-// BasicChatInput is used for /api/chat-stream, AgentCreatorFlowInputSchema for /api/agent-creator-stream
-// import { BasicChatInput } from "@/ai/flows/chat-flow";
-// import { AgentCreatorFlowInputSchema } from "@/ai/flows/agent-creator-flow";
-// import { ADKAgentConfig, ADKTool } from "@/lib/google-adk"; // Removed deprecated import
-import * as cs from "@/lib/firestoreConversationStorage";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-
-=======
-// Define SavedAgentConfiguration interface to match actual structure used in the app
-interface SavedAgentConfiguration {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  agentName: string;
-  agentDescription: string;
-  agentType: string;
-  agentModel?: string;
-  agentTemperature?: number;
-  agentTools?: string[];
-  agentGoal?: string;
-  // Add all the necessary properties from the extended AgentConfigBase
-  toolsDetails?: Array<{
-    id: string;
-    label: string;
-    iconName?: string;
-    needsConfiguration?: boolean;
-    genkitToolName?: string;
-  }>;
-}
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator"; 
+import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label"; 
 import { AgentSelector } from "@/components/agent-selector";
-// Importação do googleADK removida para evitar dependências Node.js 
-import ChatHeader from "@/components/features/chat/ChatHeader"; 
-import WelcomeScreen from "@/components/features/chat/WelcomeScreen"; 
-import MessageList from "@/components/features/chat/MessageList"; 
-import MessageInputArea from "@/components/features/chat/MessageInputArea"; 
-import { ChatMessageUI, Conversation } from '@/types/chat'; 
-import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; 
-// Import our client-safe API and types
-import { sendMessageToAI, streamChatFromAI } from '@/lib/client-api';
+
+// Firestore Conversation Storage
+import * as cs from "@/lib/firestoreConversationStorage";
+
+// Client-safe API and types
+import { sendMessageToAI, streamChatFromAI } from '@/lib/client-api'; // Not used in the final merged version but kept for now
 import { ChatInput, ChatOutput, ChatFormState as ImportedChatFormState } from '@/types/chat-types';
 import { ADKAgentConfig, ADKTool } from '@/types/adk-types';
 
-// Função para enviar mensagem para IA via nossa API client-safe
-async function enviarMensagemIA(input: ChatInput) {
-  try {
-    const result = await sendMessageToAI(input);
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    return result.outputMessage;
-  } catch (error) {
-    throw new Error((error as Error).message || "Erro ao gerar texto");
-  }
-}
+// Import initialGems from its new location
+import { initialGems } from '@/data/chatConfig';
 
-// Removido import de ADK direto para evitar dependências Node.js no client
-
+// Type definitions that were part of Stashed Changes (kept during merge)
 interface ChatHistoryMessage {
   role: 'user' | 'model';
   content: any; 
@@ -112,45 +70,9 @@ interface ServerMessage {
   attachments?: any[];
   status?: 'sending' | 'delivered' | 'failed' | 'seen';
 }
->>>>>>> Stashed changes
 
-const initialGems = [
-  {
-    id: "general",
-    name: "Assistente Geral",
-    description: "Um assistente de IA de uso geral para ajudar com uma variedade de tarefas e perguntas.",
-    prompt: "Você é um assistente prestativo e conciso.",
-  },
-  {
-    id: "creative",
-    name: "Escritor Criativo",
-    description: "Um assistente de IA para ajudar na escrita criativa, brainstorming e geração de ideias.",
-    prompt:
-      "Você é um escritor criativo, ajude a gerar ideias e textos com um tom inspirador.",
-  },
-  {
-    id: "code",
-    name: "Programador Expert",
-    description: "Um assistente de IA especializado em programação, explicação de código e depuração.",
-    prompt:
-      "Você é um programador expert, forneça explicações claras e exemplos de código eficientes.",
-  },
-  {
-    id: "researcher",
-    name: "Pesquisador Analítico",
-    description: "Um assistente de IA focado em pesquisa, análise de dados e fornecimento de informações factuais.",
-    prompt:
-      "Você é um pesquisador analítico, foque em dados e informações factuais.",
-  },
-  {
-    id: "agent_creator_assistant",
-    name: "Agent Creator Assistant",
-    description: "Converse comigo para projetar e configurar novos agentes de IA. Eu o guiarei pelo processo.",
-  },
-];
+// `initialGems` is now imported from "@/data/chatConfig"
 
-<<<<<<< Updated upstream
-=======
 // Usando o ChatFormState importado dos tipos compartilhados
 type ChatFormState = ImportedChatFormState;
 
@@ -187,12 +109,11 @@ type OptimisticMessageAction =
   | { type: 'finalizeAgentMessage'; id: string; finalMessage?: string; error?: boolean }
   | { type: 'reconcileUserMessage'; id: string; serverId?: string; error?: boolean };
 
->>>>>>> Stashed changes
 export function ChatUI() {
   const { currentUser, loading: authLoading } = useAuth();
   const currentUserId = currentUser?.uid;
 
-  const { savedAgents, setSavedAgents, availableTools: builderAvailableTools } = useAgents(); // Get saving capabilities and available tools for details
+  const { savedAgents, setSavedAgents, availableTools: builderAvailableTools } = useAgents();
   const [pendingAgentConfig, setPendingAgentConfig] = useState<Partial<SavedAgentConfigType> | null>(null);
 
 
@@ -221,7 +142,7 @@ export function ChatUI() {
         title: "Logout Successful",
         description: "You have been logged out.",
       });
-      setPendingAgentConfig(null); // Clear pending config on logout
+      setPendingAgentConfig(null);
     } catch (error) {
       console.error("Error during logout:", error);
       toast({
@@ -261,40 +182,33 @@ export function ChatUI() {
   const [selectedGemId, setSelectedGemId] = useState<string | null>(
     initialGems[0].id,
   );
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>("none"); // For saved agents
-  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null); // For ADK agents
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>("none");
+  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null);
 
-  // Determine activeChatTarget based on selection
   const activeChatTarget = useMemo(() => {
     if (selectedGemId && selectedGemId !== "none") {
       return initialGems.find(g => g.id === selectedGemId)?.name || "Chat";
     }
-    if (selectedAgentId && selectedAgentId !== "none") {
-      return savedAgents.find(a => a.id === selectedAgentId)?.name || "Chat";
+    if (selectedAgentId && selectedAgentId !== "none" && savedAgents) { // Ensure savedAgents is not null
+      return savedAgents.find(a => a.id === selectedAgentId)?.agentName || "Chat"; // Use agentName
     }
-    // Could add ADK agent name here too if needed
-    return initialGems[0].name; // Default
-  }, [selectedGemId, selectedAgentId, savedAgents]);
+    if (usingADKAgent && selectedADKAgentId && adkAgents) { // Ensure adkAgents is not null
+        const adkAgent = adkAgents.find(a => a.name === selectedADKAgentId);
+        if (adkAgent) return adkAgent.name;
+    }
+    return initialGems[0].name;
+  }, [selectedGemId, selectedAgentId, savedAgents, usingADKAgent, selectedADKAgentId, adkAgents]);
 
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [usingADKAgent, setUsingADKAgent] = useState(false); // Example state
+  const [usingADKAgent, setUsingADKAgent] = useState(false);
 
-<<<<<<< Updated upstream
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
-=======
   const [selectedFile, setSelectedFile] = useState<File | null>(null); 
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null); 
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); 
   
   const [adkAgents, setAdkAgents] = useState<ADKAgentConfig[]>([]);
-  const [isADKInitializing, setIsADKInitializing] = useState(false); // Set to false since we're not initializing ADK
->>>>>>> Stashed changes
-
-  const [adkAgents, setAdkAgents] = useState<SavedAgentConfigType[]>([]); // ADK agents list - Changed ADKAgentConfig to SavedAgentConfigType
-  const [isADKInitializing, setIsADKInitializing] = useState(true); // ADK initialization status
+  const [isADKInitializing, setIsADKInitializing] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -308,11 +222,9 @@ export function ChatUI() {
   const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
-    // Reset pending config if the selected agent changes
     setPendingAgentConfig(null);
   }, [selectedGemId, selectedAgentId]);
 
-  // Load initial conversations (useEffect for this remains unchanged)
   useEffect(() => {
     const loadConversations = async () => {
       if (!currentUserId) {
@@ -334,7 +246,6 @@ export function ChatUI() {
     loadConversations();
   }, [currentUserId]);
 
-  // Load messages when activeConversationId changes (useEffect for this remains unchanged)
   useEffect(() => {
     if (activeConversationId) {
       const loadMessages = async () => {
@@ -371,7 +282,6 @@ export function ChatUI() {
 
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    // Simplified, actual implementation has more validation
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
@@ -381,7 +291,11 @@ export function ChatUI() {
         reader.onloadend = () => setSelectedFileDataUri(reader.result as string);
         reader.readAsDataURL(file);
       } else {
-        setSelectedFileDataUri(null);
+        // For non-image files, could also read as data URI if backend expects that for files
+        // Or handle ArrayBuffer for direct upload elsewhere
+        const reader = new FileReader();
+        reader.onloadend = () => setSelectedFileDataUri(reader.result as string);
+        reader.readAsDataURL(file); // Example: pass as data URI
       }
     } else {
       setSelectedFile(null);
@@ -409,14 +323,13 @@ export function ChatUI() {
       toast({ title: "Input required", description: "Please type a message or select a file.", variant: "destructive" });
       return;
     }
-     if (pendingAgentConfig && isPending) { // Prevent sending new messages while reviewing a config and another response is pending
+     if (pendingAgentConfig && isPending) {
       toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
       return;
     }
 
-
     setIsPending(true);
-    setPendingAgentConfig(null); // Clear any previous pending config when a new message is sent
+    setPendingAgentConfig(null);
 
     const userMessageId = uuidv4();
     const agentMessageId = uuidv4();
@@ -425,14 +338,9 @@ export function ChatUI() {
       id: userMessageId,
       sender: "user",
       text: currentInput,
-<<<<<<< Updated upstream
       imageUrl: selectedFile && selectedFile.type.startsWith("image/") ? selectedFileDataUri : undefined,
       fileName: selectedFile ? selectedFile.name : undefined,
-=======
-      imageUrl: currentSelectedFile && currentSelectedFile.type.startsWith('image/') ? (currentSelectedFileDataUri || undefined) : undefined,
-      fileName: currentSelectedFile ? currentSelectedFile.name : undefined,
-      fileDataUri: currentSelectedFile && !currentSelectedFile.type.startsWith('image/') ? (currentSelectedFileDataUri || undefined) : undefined,
->>>>>>> Stashed changes
+      // fileDataUri: selectedFile && !selectedFile.type.startsWith("image/") ? selectedFileDataUri : undefined, // If passing non-image file data
       isStreaming: false,
       timestamp: new Date(),
     };
@@ -440,8 +348,16 @@ export function ChatUI() {
 
     if (activeConversationId) {
         await cs.addMessageToConversation(activeConversationId, {
-            sender: currentUserId, text: currentInput, isUser: true, isLoading: false, isError: false,
-            imageUrl: userMessage.imageUrl, fileName: userMessage.fileName, content: currentInput,
+            id: userMessageId, // ensure we use the same ID
+            sender: currentUserId,
+            text: currentInput,
+            isUser: true,
+            isLoading: false,
+            isError: false,
+            imageUrl: userMessage.imageUrl,
+            fileName: userMessage.fileName,
+            content: currentInput,
+            timestamp: userMessage.timestamp,
         }).catch(err => {
             console.error("Failed to save user message:", err);
             toast({ title: "Error saving message", variant: "destructive" });
@@ -453,7 +369,6 @@ export function ChatUI() {
       return;
     }
 
-<<<<<<< Updated upstream
     setInputValue("");
     removeSelectedFile();
     inputRef.current?.focus();
@@ -461,55 +376,37 @@ export function ChatUI() {
     const isAgentCreatorSession = selectedGemId === "agent_creator_assistant";
     let apiEndpoint = isAgentCreatorSession ? "/api/agent-creator-stream" : "/api/chat-stream";
 
-    const historyForBackend = messages.map(msg => ({
+    const historyForBackend = messages.map(msg => ({ // use 'messages' for more stable history
       role: msg.sender === "user" ? "user" : "model",
       content: isAgentCreatorSession ? [{ text: msg.text || "" }] : (msg.text || ""),
     }));
 
-    let requestBody: any = {
+    let requestBody: ChatInput | any = {
       userMessage: currentInput,
       history: historyForBackend,
       userId: currentUserId,
       stream: true,
-=======
-    // Prepare data for the API route
-    const chatInputForStream: ChatInput = {
-      userMessage: currentInput,
-      history: messages.map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'model',
-        content: msg.text, // Assuming msg.text holds the content for history
-      })),
-      fileDataUri: currentSelectedFile && currentSelectedFileDataUri ? (currentSelectedFileDataUri || undefined) : undefined,
-      modelName: (usingADKAgent && selectedADKAgent && selectedADKAgent.model) 
-        ? selectedADKAgent.model 
-        : (selectedSavedAgent?.agentModel || undefined) 
-      , 
-      systemPrompt: (usingADKAgent && selectedADKAgent && selectedADKAgent.description) 
-        ? selectedADKAgent.description 
-        : (selectedSavedAgent?.agentDescription || undefined) 
-      , 
-      temperature: (usingADKAgent && selectedADKAgent 
-        ? (selectedADKAgent as any).temperature 
-        : (selectedSavedAgent?.agentTemperature || undefined) 
-      ), 
-      agentToolsDetails: usingADKAgent && selectedADKAgent 
-        ? selectedADKAgent.tools?.map((t: ADKTool) => ({ id: t.name, name: t.name, description: t.description || '', enabled: true })) 
-        : selectedSavedAgent?.agentTools?.map((toolId: string) => ({ id: toolId, name: toolId, description: `Tool: ${toolId}`, enabled: true }))
->>>>>>> Stashed changes
+      fileDataUri: selectedFile && selectedFileDataUri ? selectedFileDataUri : undefined, // Pass file data URI for all types
     };
 
     if (!isAgentCreatorSession) {
-      const currentSavedAgentConfig = savedAgents.find(a => a.id === selectedAgentId)?.config;
+      const currentSavedAgent = savedAgents.find(a => a.id === selectedAgentId);
+      const activeADKAgent = usingADKAgent ? adkAgents.find(a => a.name === selectedADKAgentId) : null;
+
       requestBody = {
         ...requestBody,
-        fileDataUri: selectedFile && !selectedFile.type.startsWith("image/") ? selectedFileDataUri : undefined, // Assuming non-image files might be passed as data URIs
-        modelName: (currentSavedAgentConfig as LLMAgentConfig)?.agentModel,
-        systemPrompt: (currentSavedAgentConfig as AgentConfig)?.globalInstruction, // Or agentDescription
-        temperature: (currentSavedAgentConfig as LLMAgentConfig)?.agentTemperature,
-        agentToolsDetails: (currentSavedAgentConfig as AgentConfig)?.agentTools?.map(toolId => {
-            const toolDetail = builderAvailableTools.find(t => t.id === toolId);
-            return { id: toolId, name: toolDetail?.name || toolId, description: toolDetail?.description || `Tool: ${toolId}`, enabled: true };
-        })
+        modelName: activeADKAgent
+          ? activeADKAgent.model?.name
+          : currentSavedAgent?.agentModel,
+        systemPrompt: activeADKAgent
+          ? activeADKAgent.description
+          : currentSavedAgent?.agentDescription || (currentSavedAgent as SavedAgentConfigType)?.globalInstruction,
+        temperature: activeADKAgent
+          ? activeADKAgent.model?.temperature
+          : currentSavedAgent?.agentTemperature,
+        agentToolsDetails: activeADKAgent
+          ? activeADKAgent.tools?.map((t: ADKTool) => ({ id: t.name, name: t.name, description: t.description || t.name, enabled: true }))
+          : currentSavedAgent?.toolsDetails?.map(tool => ({ id: tool.id, name: tool.label, description: tool.genkitToolName || tool.label, enabled: true }))
       };
     }
 
@@ -521,7 +418,9 @@ export function ChatUI() {
     let agentMessageStorageId: string | null = null;
     if (activeConversationId) {
         const placeholder = await cs.addMessageToConversation(activeConversationId, {
+            id: agentMessageId, // ensure we use the same ID
             sender: "agent", text: "", content: "", isUser: false, isLoading: true, isError: false,
+            timestamp: pendingAgentMessage.timestamp,
         });
         if (placeholder && placeholder.id) agentMessageStorageId = placeholder.id;
         setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
@@ -563,7 +462,6 @@ export function ChatUI() {
                 }
                 if (jsonChunk.suggestedConfig) {
                   setPendingAgentConfig(jsonChunk.suggestedConfig as SavedAgentConfigType);
-                  // No need to add to accumulatedContent, the confirmation message will be separate
                 }
                 if (jsonChunk.error) {
                   accumulatedContent += `\n\n[STREAM ERROR]: ${jsonChunk.error}`;
@@ -571,19 +469,24 @@ export function ChatUI() {
                 }
                  if (jsonChunk.rawJsonForDebug) {
                   console.log("Raw JSON for debug (parsing failed by flow):", jsonChunk.rawJsonForDebug);
-                  // Potentially display this to user or in a debug view
                 }
               } catch (e) {
                 console.warn("ChatUI: Failed to parse JSON chunk from agent creator stream:", line, e);
+                // If parsing fails, but we have content, append it as text
+                if (line.includes("agentResponseChunk") || line.includes("suggestedConfig")) { // Basic check
+                    // Avoid adding malformed JSON directly if it's not simple text
+                } else {
+                    accumulatedContent += line + "\n";
+                }
               }
             } else {
-              accumulatedContent += line + "\n"; // Regular chat stream, treat as plain text lines
+              accumulatedContent += line + "\n";
             }
           }
         }
         setOptimisticMessages({ id: agentMessageId, sender: "agent", text: accumulatedContent, isStreaming: true });
       }
-      // Process any remaining data in buffer
+
       if (buffer.trim()) {
          if (isAgentCreatorSession) {
             try {
@@ -591,7 +494,12 @@ export function ChatUI() {
                  if (jsonChunk.agentResponseChunk) accumulatedContent += jsonChunk.agentResponseChunk;
                  if (jsonChunk.suggestedConfig) setPendingAgentConfig(jsonChunk.suggestedConfig as SavedAgentConfigType);
                  if (jsonChunk.error) accumulatedContent += `\n\n[STREAM ERROR]: ${jsonChunk.error}`;
-            } catch (e) {console.warn("ChatUI: Failed to parse final JSON chunk:", buffer.trim(), e);}
+            } catch (e) {
+                console.warn("ChatUI: Failed to parse final JSON chunk:", buffer.trim(), e);
+                if (!isAgentCreatorSession || (!buffer.includes("agentResponseChunk") && !buffer.includes("suggestedConfig"))) {
+                   accumulatedContent += buffer.trim();
+                }
+            }
          } else {
             accumulatedContent += buffer.trim();
          }
@@ -600,9 +508,15 @@ export function ChatUI() {
 
       if (activeConversationId && agentMessageStorageId) {
         await cs.finalizeMessageInConversation(activeConversationId, agentMessageStorageId, accumulatedContent, false);
-        setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
       }
-      setMessages(prev => prev.map(m => m.id === agentMessageId ? {...m, text: accumulatedContent, isStreaming: false} : m));
+      // Final update to the main messages state
+        setMessages(prevMsgs =>
+            prevMsgs.map(msg =>
+                msg.id === userMessageId ? userMessage : // ensure user message is the optimistic one
+                (msg.id === agentMessageId ? { ...pendingAgentMessage, text: accumulatedContent, isStreaming: false } : msg)
+            ).filter(msg => !(msg.id === agentMessageId && prevMsgs.find(pm => pm.id === agentMessageId && pm.sender === "agent"))) // Avoid duplicates if already added
+            .concat(prevMsgs.find(pm => pm.id === agentMessageId) ? [] : [{ ...pendingAgentMessage, text: accumulatedContent, isStreaming: false }]) // Add if not present
+        );
 
 
     } catch (error: any) {
@@ -611,9 +525,13 @@ export function ChatUI() {
       setOptimisticMessages({ id: agentMessageId, sender: "agent", text: errorText, isStreaming: false, isError: true });
       if (activeConversationId && agentMessageStorageId) {
         await cs.finalizeMessageInConversation(activeConversationId, agentMessageStorageId, errorText, true);
-         setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
       }
-       setMessages(prev => prev.map(m => m.id === agentMessageId ? {...m, text: errorText, isStreaming: false, isError: true} : m));
+       setMessages(prevMsgs =>
+            prevMsgs.map(msg =>
+                msg.id === agentMessageId ? { ...pendingAgentMessage, text: errorText, isStreaming: false, isError: true } : msg
+            ).filter(msg => !(msg.id === agentMessageId && msg.isError && prevMsgs.find(pm => pm.id === agentMessageId && pm.isError)))
+            .concat(prevMsgs.find(pm => pm.id === agentMessageId) ? [] : [{ ...pendingAgentMessage, text: errorText, isStreaming: false, isError: true }])
+        );
     } finally {
       setIsPending(false);
     }
@@ -622,84 +540,73 @@ export function ChatUI() {
   const handleSavePendingAgent = () => {
     if (!pendingAgentConfig || !setSavedAgents) return;
 
-    // Simplified toolsDetails population
     const toolsDetails = (pendingAgentConfig.agentTools || []).map(toolId => {
         const foundTool = builderAvailableTools.find(t => t.id === toolId);
         return {
             id: toolId,
-            name: foundTool?.name || toolId,
+            label: foundTool?.label || toolId, // Use label from builderAvailableTools
+            name: foundTool?.name || toolId, // Ensure name is populated
             description: foundTool?.description || `Details for ${toolId}`,
-            // Ensure other required fields for AvailableTool are present, even if minimal
             hasConfig: foundTool?.hasConfig || false,
-            icon: foundTool?.icon || "Settings", // Default icon
-            schema: foundTool?.schema || {},
+            iconName: foundTool?.icon ? (Object.keys(iconComponents).find(key => iconComponents[key] === foundTool.icon) || "Default") : "Default", // Map icon component to name
+            genkitToolName: foundTool?.genkitToolName,
         };
     });
 
-
     const finalConfig: SavedAgentConfigType = {
       id: pendingAgentConfig.id || uuidv4(),
-      name: pendingAgentConfig.agentName || "Untitled Agent",
-      description: pendingAgentConfig.agentDescription || "",
-      version: pendingAgentConfig.agentVersion || "1.0.0",
-      icon: pendingAgentConfig.icon || "Sparkles", // Default icon
-      config: { // This should be the 'config' object within SavedAgentConfiguration
-        type: pendingAgentConfig.agentType || 'llm',
-        framework: pendingAgentConfig.agentFramework || 'genkit',
-        globalInstruction: pendingAgentConfig.globalInstruction || pendingAgentConfig.agentGoal || "", // Map from old structure potentially
-        // LLM specific
-        ...(pendingAgentConfig.agentType === 'llm' && {
-            agentGoal: pendingAgentConfig.agentGoal || "",
-            agentTasks: pendingAgentConfig.agentTasks ? (Array.isArray(pendingAgentConfig.agentTasks) ? pendingAgentConfig.agentTasks : [pendingAgentConfig.agentTasks]) : [],
-            agentPersonality: pendingAgentConfig.agentPersonality || "",
-            agentModel: pendingAgentConfig.agentModel || "googleai/gemini-1.5-flash-latest",
-            agentTemperature: pendingAgentConfig.agentTemperature !== undefined ? pendingAgentConfig.agentTemperature : 0.7,
-        }),
-        // Workflow specific (add if defined in your pendingAgentConfig structure from LLM)
-        ...(pendingAgentConfig.agentType === 'workflow' && {
-            detailedWorkflowType: pendingAgentConfig.detailedWorkflowType || "sequential",
-            workflowDescription: pendingAgentConfig.workflowDescription || "",
-        }),
-        // Other common config fields like statePersistence, rag, artifacts, a2a, subAgentIds, isRootAgent
-        // should be part of pendingAgentConfig.config if the LLM structures it that way,
-        // or handled here if the LLM provides them at the top level of pendingAgentConfig.
-        // For simplicity, assuming they might be top-level in pendingAgentConfig for now if LLM sends flat structure.
-        agentTools: pendingAgentConfig.agentTools || [], // Ensure agentTools is an array
-        // Default other complex configs if not provided by LLM
-        statePersistence: pendingAgentConfig.statePersistence || { enabled: false, type: 'session', initialState: [] },
-        rag: pendingAgentConfig.rag || { enabled: false, config: {} },
-        artifacts: pendingAgentConfig.artifacts || { enabled: false, storageType: 'local' },
-        a2a: pendingAgentConfig.a2a || { enabled: false, communicationChannels: [] },
-        subAgentIds: pendingAgentConfig.subAgentIds || [],
-        isRootAgent: pendingAgentConfig.isRootAgent !== undefined ? pendingAgentConfig.isRootAgent : true,
-
-      },
-      tools: pendingAgentConfig.agentTools || [], // Already an array of strings from LLM
+      agentName: pendingAgentConfig.agentName || "Untitled Agent",
+      agentDescription: pendingAgentConfig.agentDescription || "",
+      agentVersion: pendingAgentConfig.agentVersion || "1.0.0",
+      agentIcon: pendingAgentConfig.agentIcon || "Sparkles",
+      agentTools: pendingAgentConfig.agentTools || [],
+      agentType: pendingAgentConfig.agentType || 'llm',
+      agentFramework: pendingAgentConfig.agentFramework || 'genkit',
+      globalInstruction: pendingAgentConfig.globalInstruction || pendingAgentConfig.agentGoal || "",
+      agentGoal: pendingAgentConfig.agentGoal || "",
+      agentTasks: pendingAgentConfig.agentTasks || "",
+      agentPersonality: pendingAgentConfig.agentPersonality || "",
+      agentRestrictions: pendingAgentConfig.agentRestrictions || "",
+      agentModel: pendingAgentConfig.agentModel || "googleai/gemini-1.5-flash-latest",
+      agentTemperature: pendingAgentConfig.agentTemperature !== undefined ? pendingAgentConfig.agentTemperature : 0.7,
+      detailedWorkflowType: pendingAgentConfig.detailedWorkflowType,
+      workflowDescription: pendingAgentConfig.workflowDescription,
+      loopMaxIterations: pendingAgentConfig.loopMaxIterations,
+      loopTerminationConditionType: pendingAgentConfig.loopTerminationConditionType,
+      loopExitToolName: pendingAgentConfig.loopExitToolName,
+      loopExitStateKey: pendingAgentConfig.loopExitStateKey,
+      loopExitStateValue: pendingAgentConfig.loopExitStateValue,
+      customLogicDescription: pendingAgentConfig.customLogicDescription,
+      enableStatePersistence: pendingAgentConfig.enableStatePersistence || false,
+      statePersistenceType: pendingAgentConfig.statePersistenceType || 'session',
+      initialStateValues: pendingAgentConfig.initialStateValues || [],
+      enableStateSharing: pendingAgentConfig.enableStateSharing || false,
+      stateSharingStrategy: pendingAgentConfig.stateSharingStrategy || 'none',
+      enableRAG: pendingAgentConfig.enableRAG || false,
+      enableArtifacts: pendingAgentConfig.enableArtifacts || false,
+      artifactStorageType: pendingAgentConfig.artifactStorageType || 'memory',
+      artifacts: pendingAgentConfig.artifacts || [],
+      cloudStorageBucket: pendingAgentConfig.cloudStorageBucket || "",
+      localStoragePath: pendingAgentConfig.localStoragePath || "",
+      ragMemoryConfig: pendingAgentConfig.ragMemoryConfig || { enabled: false, serviceType: "", projectId: "", location: "", ragCorpusName: "", similarityTopK: 0, vectorDistanceThreshold: 0, embeddingModel: "", knowledgeSources: [], includeConversationContext: false, persistentMemory: false },
+      a2aConfig: pendingAgentConfig.a2aConfig || { enabled: false, communicationChannels: [], defaultResponseFormat: "", maxMessageSize: 0, loggingEnabled: false },
+      toolsDetails: toolsDetails,
       toolConfigsApplied: pendingAgentConfig.toolConfigsApplied || {},
-      toolsDetails: toolsDetails, // Populate based on agentTools
-      createdAt: pendingAgentConfig.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      templateId: 'custom_by_creator', // Special ID for agents created this way
+      templateId: 'custom_by_creator',
+      systemPromptGenerated: pendingAgentConfig.systemPromptGenerated || "",
+      subAgents: pendingAgentConfig.subAgents || [],
+      isRootAgent: pendingAgentConfig.isRootAgent !== undefined ? pendingAgentConfig.isRootAgent : true,
     };
 
     setSavedAgents(prev => [...(prev || []), finalConfig]);
-    toast({ title: "Agent Saved!", description: `Agent "${finalConfig.name}" has been saved.` });
+    toast({ title: "Agent Saved!", description: `Agent "${finalConfig.agentName}" has been saved.` });
     setPendingAgentConfig(null);
-
-    // Optionally send a follow-up message
-    // This would require adding this message to `messages` and `optimisticMessages`
-    // and potentially re-triggering a non-streaming call to the agent creator if you want its response.
-    // For simplicity, just clearing the config for now.
   };
 
   const handleDiscardPendingAgent = () => {
     toast({ title: "Configuration Discarded", variant: "default" });
     setPendingAgentConfig(null);
-    // Optionally send a message like "Let's try again" or "I want to make some changes."
-    // setInputValue("I'd like to make some changes to that configuration.");
-    // setTimeout(() => formRef.current?.requestSubmit(), 100); // Auto-submit this message
   };
-
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -708,7 +615,7 @@ export function ChatUI() {
         behavior: "smooth",
       });
     }
-  }, [optimisticMessages, pendingAgentConfig]); // Also scroll if pending config appears/disappears
+  }, [optimisticMessages, pendingAgentConfig]);
 
   const handleNewConversation = useCallback(async () => {
     if (!currentUserId) {
@@ -721,10 +628,10 @@ export function ChatUI() {
       if (newConv) {
         setConversations((prev) => [newConv, ...prev]);
         setActiveConversationId(newConv.id);
-        setMessages([]); // Clear messages for new conversation
-        setPendingAgentConfig(null); // Clear pending config
+        setMessages([]);
+        setPendingAgentConfig(null);
         setInputValue("");
-        setSelectedFile(null);
+        removeSelectedFile();
         toast({ title: "Nova Conversa Criada", description: `"${newConv.title}" iniciada.` });
       } else {
         toast({ title: "Erro", description: "Não foi possível criar uma nova conversa.", variant: "destructive" });
@@ -735,7 +642,7 @@ export function ChatUI() {
     } finally {
       setIsLoadingConversations(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, removeSelectedFile]);
 
   const handleRenameConversation = useCallback(async (id: string, newTitle: string) => {
     try {
@@ -772,7 +679,7 @@ export function ChatUI() {
       return;
     }
     setActiveConversationId(id);
-    setPendingAgentConfig(null); // Clear pending config when switching conversations
+    setPendingAgentConfig(null);
   }, []);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -783,35 +690,38 @@ export function ChatUI() {
     setInputValue(suggestion);
   };
 
-  // Load ADK agents from localStorage (example)
   useEffect(() => {
-    const storedADKAgents = localStorage.getItem("adkAgents"); // This localStorage key might need update if structure changed
+    const storedADKAgents = localStorage.getItem("adkAgents");
     if (storedADKAgents) {
       try {
-        // Assuming the structure in "adkAgents" localStorage is compatible with SavedAgentConfigType or needs mapping
-        const parsedAgents = JSON.parse(storedADKAgents) as SavedAgentConfigType[]; // Cast to SavedAgentConfigType
+        const parsedAgents = JSON.parse(storedADKAgents) as ADKAgentConfig[];
         setAdkAgents(parsedAgents);
       } catch (e) { console.error("Failed to parse ADK agents from localStorage", e); }
     }
-    setIsADKInitializing(false); // Assuming quick load or default to false
+    setIsADKInitializing(false);
   }, []);
 
   const selectedADKAgent = useMemo(() => {
     if (!selectedADKAgentId || adkAgents.length === 0) return null;
-    // Assuming SavedAgentConfigType has an 'id' and 'name' (displayName might be 'name')
-    return adkAgents.find((agent) => (agent.id ?? agent.name) === selectedADKAgentId) || null;
+    return adkAgents.find((agent) => agent.name === selectedADKAgentId) || null;
   }, [selectedADKAgentId, adkAgents]);
 
-  const currentSelectedAgentForHeader = useMemo(() => {
+ const currentSelectedAgentForHeader = useMemo(() => {
     if (selectedGemId && selectedGemId !== "none") {
-        return initialGems.find(g => g.id === selectedGemId);
+        const gem = initialGems.find(g => g.id === selectedGemId);
+        return gem ? { id: gem.id, name: gem.name, description: gem.description } : null;
     }
-    if (selectedAgentId && selectedAgentId !== "none") {
-        return savedAgents.find(a => a.id === selectedAgentId);
+    if (selectedAgentId && selectedAgentId !== "none" && savedAgents) {
+        const agent = savedAgents.find(a => a.id === selectedAgentId);
+        return agent ? { id: agent.id, name: agent.agentName, description: agent.agentDescription } : null;
     }
-    // Add ADK agent logic here if applicable
-    return initialGems[0]; // Default
-  }, [selectedGemId, selectedAgentId, savedAgents]);
+    if (usingADKAgent && selectedADKAgentId && adkAgents) {
+        const adkAgent = adkAgents.find(a => a.name === selectedADKAgentId);
+        if (adkAgent) return { id: adkAgent.name, name: adkAgent.name, description: adkAgent.description };
+    }
+    const defaultGem = initialGems[0];
+    return defaultGem ? {id: defaultGem.id, name: defaultGem.name, description: defaultGem.description } : null;
+  }, [selectedGemId, selectedAgentId, savedAgents, usingADKAgent, selectedADKAgentId, adkAgents]);
 
 
   if (authLoading) {
@@ -832,27 +742,26 @@ export function ChatUI() {
       />
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <ChatHeader
-          activeChatTarget={activeChatTarget}
-          usingADKAgent={usingADKAgent} // Pass actual state if ADK agents are selectable
-          setUsingADKAgent={setUsingADKAgent} // Pass actual setter
+          activeChatTarget={currentSelectedAgentForHeader?.name || "Chat"}
+          usingADKAgent={usingADKAgent}
+          setUsingADKAgent={setUsingADKAgent}
           selectedADKAgentId={selectedADKAgentId}
           setSelectedADKAgentId={setSelectedADKAgentId}
-          // Assuming SavedAgentConfigType has 'id' and 'name'. Adapt if structure is different.
-          adkAgents={adkAgents.map((agent) => ({ ...agent, id: agent.id || agent.name, displayName: agent.name }))}
+          adkAgents={adkAgents.map((agent) => ({ id: agent.name, name: agent.name, displayName: agent.name, description: agent.description }))}
           isADKInitializing={isADKInitializing}
-          selectedAgentId={selectedAgentId} // For saved agents
+          selectedAgentId={selectedAgentId}
           setSelectedAgentId={setSelectedAgentId}
-          savedAgents={savedAgents.map(a => ({...a, displayName: a.name}))} // Adapt SavedAgentConfigType to AgentSelector's expected type
-          selectedGemId={selectedGemId} // For initial gems
+          savedAgents={(savedAgents || []).map(a => ({id: a.id, name: a.agentName, displayName: a.agentName, description: a.agentDescription}))}
+          selectedGemId={selectedGemId}
           setSelectedGemId={setSelectedGemId}
-          initialGems={initialGems.map(g => ({...g, displayName: g.name}))} // Adapt Gem to AgentSelector's expected type
+          initialGems={initialGems.map(g => ({...g, displayName: g.name}))}
           handleNewConversation={handleNewConversation}
           isSidebarOpen={isSidebarOpen}
           onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
           handleLogin={handleLogin}
           handleLogout={handleLogout}
         />
-        <div className="flex-1 overflow-hidden flex flex-col"> {/* Ensure this can flex */}
+        <div className="flex-1 overflow-hidden flex flex-col">
           <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 space-y-4" id="message-scroll-area">
             {!currentUser && !authLoading ? (
               <div className="flex flex-col items-center justify-center h-full">
@@ -868,7 +777,6 @@ export function ChatUI() {
             )}
           </ScrollArea>
 
-          {/* Pending Agent Configuration Review UI */}
           {pendingAgentConfig && (
             <Card className="m-4 border-primary shadow-lg">
               <CardHeader>
@@ -895,11 +803,11 @@ export function ChatUI() {
         </div>
 
         <MessageInputArea
-          formRef={useRef<HTMLFormElement>(null)} // Local ref for MessageInputArea if it needs one
+          formRef={useRef<HTMLFormElement>(null)}
           inputRef={inputRef}
           fileInputRef={fileInputRef}
           onSubmit={handleFormSubmit}
-          isPending={isPending || !!pendingAgentConfig} // Disable input while pending response or reviewing config
+          isPending={isPending || !!pendingAgentConfig}
           selectedFile={selectedFile}
           selectedFileName={selectedFileName ?? ""}
           selectedFileDataUri={selectedFileDataUri}

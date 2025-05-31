@@ -13,7 +13,7 @@ import {
   ChevronsRight,
   // Home, // Unused
 } from "lucide-react";
-// import { MainLayout } from "@/components/layout/main-layout";
+// import { MainLayout } from "@/components/layout/main-layout"; // This line was commented out in original
 import {
   Sidebar,
   SidebarHeader,
@@ -55,27 +55,13 @@ function SidebarToggle() {
   const { state, toggleSidebar, collapsible, isMobile, mounted } = useSidebar();
 
   if (!mounted || collapsible === "none") {
-    // Hide toggle if not collapsible or not mounted
     return null;
   }
 
-  // Determine if it's in icon-only collapsed mode for desktop
-  // isMobile check is important here to ensure this logic applies to desktop icon mode
   const isIconOnlyMode = !isMobile && collapsible === "icon";
   const isCollapsedInIconMode = isIconOnlyMode && state === "collapsed";
   const isExpandedInIconMode = isIconOnlyMode && state === "expanded";
 
-  // For mobile offcanvas, the toggle is usually in the MainLayout header
-  // So, this toggle is primarily for desktop icon mode or if we decide to use it for offcanvas too.
-  // Let's assume this toggle is for desktop icon mode and general collapsibility.
-  // If mobile, and collapsible is 'offcanvas', the toggle might be handled by a different button in MainLayout.
-  // For now, if it's mobile, and collapsible is 'icon' (which defaults to 'offcanvas' for mobile in provider),
-  // this specific button might not be the primary toggle.
-  // The useSidebar hook handles isMobile and sets collapsible to 'offcanvas' for mobile.
-
-  // If it's mobile, the sidebar is a sheet, and this button might not be needed here,
-  // as the sheet has its own close mechanism and is opened by a MainLayout button.
-  // Let's only render this for non-mobile scenarios where it's collapsible.
   if (isMobile) {
     return null;
   }
@@ -86,14 +72,11 @@ function SidebarToggle() {
       size="icon"
       className={cn(
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        // Positioning when sidebar is expanded (icon mode)
         isExpandedInIconMode
           ? "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-          : // Centered styling when sidebar is collapsed (icon mode)
-            isCollapsedInIconMode
+          : isCollapsedInIconMode
             ? "h-12 w-12"
-            : // Default for other collapsible modes or if not icon mode (should not happen if collapsible === 'none' is handled)
-              "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8",
+            : "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8",
       )}
       onClick={toggleSidebar}
       aria-label={
@@ -113,21 +96,22 @@ function MainLayout({ children }: { children: ReactNode }) {
   const { toggleSidebar, isMobile, mounted } = useSidebar();
 
   return (
-    <SidebarInset>
+    <SidebarInset className="flex flex-col flex-1 overflow-hidden"> {/* MODIFIED HERE */}
       {mounted && isMobile && (
-        <header className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-start border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden shrink-0"> {/* MODIFIED HERE */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
             aria-label="Toggle Sidebar"
           >
-            {/* For mobile, it's usually about opening the sheet, so ChevronsRight might be more appropriate */}
             <ChevronsRight className="h-5 w-5" />
           </Button>
         </header>
       )}
-      {children}
+      <main className="flex-1 overflow-y-auto"> {/* MODIFIED HERE */}
+        {children}
+      </main>
     </SidebarInset>
   );
 }
@@ -135,7 +119,6 @@ function MainLayout({ children }: { children: ReactNode }) {
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  // useSidebar é chamado aqui para que `isSidebarIconOnly` possa ser usado pelos filhos diretos
   const { state: sidebarState, isMobile, collapsible, mounted } = useSidebar();
 
   const isSidebarIconOnly =
@@ -156,7 +139,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             isSidebarIconOnly ? "h-14 py-2" : "h-16 p-4",
           )}
         >
-          <SidebarToggle /> {/* SidebarToggle now calculates its own needs */}
+          <SidebarToggle />
           {!isSidebarIconOnly && (
             <Link
               href="/agent-builder"
