@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 // Componente principal para criar e editar configurações de agentes.
 // Permite definir nome, tipo, comportamento, ferramentas, memória, RAG, artefatos e configurações multi-agente/A2A.
 import { CommunicationChannelItem } from "./a2a-communication-channel";
-import { MemoryServiceType } from "./memory-knowledge-tab"; // Ensure this matches the type used in RagMemoryConfig definition
+// import { MemoryServiceType } from "./memory-knowledge-tab"; // Moved to RagTab or its sub-components
 import { Textarea } from "@/components/ui/textarea";
 import { 
   AlertCircle, 
@@ -48,12 +48,16 @@ import {
   ChevronsUpDown,
   PlusCircle,
   FileText,
-  Database,
-  Waypoints,
+  // Database, // Now passed as a prop to StateMemoryTab
   Share2,
   UploadCloud,
   Binary,
   Palette
+  // Waypoints, // Moved to BehaviorTab
+  // Wand2,     // Already listed above
+  // Settings,  // Already listed above
+  // Check,     // Already listed above
+  // Info,      // Already listed above
 } from "lucide-react";
 
 import { v4 as uuidv4 } from "uuid";
@@ -77,13 +81,24 @@ import { useAgents } from "@/contexts/AgentsContext";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
+// import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+// Tooltip components are no longer directly used in this file.
+// They are used within ToolConfigModal.tsx.
+// import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
+import GeneralTab from "./GeneralTab";
+import BehaviorTab from "./BehaviorTab";
+import ToolsTab from "./ToolsTab";
+import ToolConfigModal from "./ToolConfigModal";
+import StateMemoryTab from "./StateMemoryTab";
+import RagTab from "./RagTab";
+import ArtifactsTab from "./ArtifactsTab";
+import MultiAgentTab from "./MultiAgentTab"; // Import the new MultiAgentTab component
 
 // agent-types imports:
 import {
@@ -235,22 +250,22 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   // (Removido: bloco de declarações duplicadas de useState para artifacts, selectedTools, RAG, A2A, workflow, customLogic, toolConfigurations, state/memory)
   // Modal specific states for tool configuration
   // Os estados do modal (modalGoogleApiKey, etc.) são declarados uma vez no início e mantidos.
-  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
-  const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
-  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>('');
-  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>('');
-  const [modalDbType, setModalDbType] = React.useState<string>('');
-  const [modalDbHost, setModalDbHost] = React.useState<string>('');
-  const [modalDbPort, setModalDbPort] = React.useState<number>(0);
-  const [modalDbName, setModalDbName] = React.useState<string>('');
-  const [modalDbUser, setModalDbUser] = React.useState<string>('');
-  const [modalDbPassword, setModalDbPassword] = React.useState<string>('');
-  const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>('');
-  const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
-  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
-  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
+  // const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>(''); // Duplicated
+  // const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>(''); // Duplicated
+  // const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>(''); // Duplicated
+  // const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>(''); // Duplicated
+  // const [modalDbType, setModalDbType] = React.useState<string>(''); // Duplicated
+  // const [modalDbHost, setModalDbHost] = React.useState<string>(''); // Duplicated
+  // const [modalDbPort, setModalDbPort] = React.useState<number>(0); // Duplicated
+  // const [modalDbName, setModalDbName] = React.useState<string>(''); // Duplicated
+  // const [modalDbUser, setModalDbUser] = React.useState<string>(''); // Duplicated
+  // const [modalDbPassword, setModalDbPassword] = React.useState<string>(''); // Duplicated
+  // const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>(''); // Duplicated
+  // const [modalDbDescription, setModalDbDescription] = React.useState<string>(''); // Duplicated
+  // const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>(''); // Duplicated
+  // const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>(''); // Duplicated
 
-  const { savedAgents: allSavedAgents } = useAgents(); // For SubAgentSelector
+  // const { savedAgents: allSavedAgents } = useAgents(); // For SubAgentSelector // Already declared above
 
   const availableAgentsForSubSelector = React.useMemo(() =>
     allSavedAgents.filter(agent => agent.id !== editingAgent?.id),
@@ -266,6 +281,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   // Efeito para inicializar ou resetar o estado do formulário quando o diálogo é aberto ou o agente em edição muda.
   // Popula os campos com os dados do `editingAgent` se estiver editando, ou reseta para valores padrão se for um novo agente.
+  // Este hook é responsável por carregar os dados de um agente existente no formulário
+  // ou limpar o formulário ao criar um novo agente.
   React.useEffect(() => {
     if (isOpen) {
       if (editingAgent) {
@@ -394,6 +411,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   // Manipulador para abrir o modal de configuração de uma ferramenta específica.
   // Popula os campos do modal com a configuração existente da ferramenta, se houver.
+  // Esta função prepara e exibe o modal de configuração para uma ferramenta específica,
+  // carregando quaisquer configurações previamente salvas para essa ferramenta.
   const handleToolConfigure = (tool: AvailableTool) => {
     setConfiguringTool(tool);
     const existingConfig = toolConfigurations[tool.id] || {};
@@ -619,11 +638,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      // Garante que o modal de configuração de ferramenta seja fechado se o diálogo principal for fechado.
-      if (!open && configuringTool) {
+      if (!open) {
+        // Se o diálogo principal está sendo fechado, garanta que o modal de configuração de ferramenta também seja fechado
+        // e o estado de 'ferramenta em configuração' seja limpo.
         setIsToolConfigModalOpen(false);
-        setConfiguringTool(null);
-      } else if (!open) {
         setConfiguringTool(null);
       }
       onOpenChange(open);
@@ -650,693 +668,115 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
             </TabsList>
 
             {/* Aba Geral: Contém as configurações fundamentais do agente, como nome, descrição, tipo e o framework subjacente. */}
-            <TabsContent value="general" className="space-y-6 mt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="agentName">Nome do Agente</Label>
-                  <Input id="agentName" placeholder="Ex: Agente de Pesquisa Avançada" value={agentName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentVersion">Versão</Label>
-                  <Input id="agentVersion" placeholder="Ex: 1.0.1" value={agentVersion} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentVersion(e.target.value)} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="agentDescription">Descrição do Agente</Label>
-                <Textarea id="agentDescription" placeholder="Descreva o propósito principal, capacidades e limitações do agente." value={agentDescription} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAgentDescription(e.target.value)} rows={3} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="selectedAgentType">Tipo de Agente</Label>
-                  <Select value={selectedAgentType} onValueChange={(value: "llm" | "workflow" | "custom" | "a2a") => setSelectedAgentType(value)}>
-                    <SelectTrigger id="selectedAgentType">
-                      <SelectValue placeholder="Selecione o tipo de agente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* Mapeia as opções de tipo de agente (LLM, Workflow, etc.) para seleção. */}
-                      {agentTypeOptions.map(option => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.icon && React.cloneElement(option.icon as React.ReactElement, { className: "inline-block mr-2 h-4 w-4" })}
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                   {/* Exibe a descrição correspondente ao tipo de agente selecionado. */}
-                   <p className="text-xs text-muted-foreground">{agentTypeOptions.find(opt => opt.id === selectedAgentType)?.description || "Selecione um tipo para ver a descrição detalhada."}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agentFramework">Framework do Agente</Label>
-                  <Select value={agentFramework} onValueChange={(value) => setAgentFramework(value as AgentFramework)}>
-                    <SelectTrigger id="agentFramework">
-                      <SelectValue placeholder="Selecione o framework" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agentFrameworkOptions.map(option => (
-                        <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">Define a biblioteca ou sistema base para a execução do agente.</p>
-                </div>
-              </div>
-            </TabsContent>
+            <GeneralTab
+              agentName={agentName}
+              setAgentName={setAgentName}
+              agentVersion={agentVersion}
+              setAgentVersion={setAgentVersion}
+              agentDescription={agentDescription}
+              setAgentDescription={setAgentDescription}
+              selectedAgentType={selectedAgentType}
+              setSelectedAgentType={setSelectedAgentType}
+              agentFramework={agentFramework}
+              setAgentFramework={setAgentFramework}
+              agentTypeOptions={agentTypeOptions}
+              agentFrameworkOptions={agentFrameworkOptions}
+            />
 
             {/* Aba Comportamento: Define como o agente atua, incluindo instruções globais e configurações específicas por tipo (LLM, Workflow, etc.). */}
-            <TabsContent value="behavior" className="space-y-6 mt-4">
-              {/* Instrução Global / Prompt de Sistema Primário */}
-              <div className="space-y-2">
-                <Label htmlFor="globalInstruction">Instrução Global / Prompt do Sistema Primário</Label>
-                <Textarea
-                  id="globalInstruction"
-                  placeholder="Defina o comportamento central, persona ou prompt de sistema principal para o agente. Isso se aplica a todos os tipos de agente como uma instrução de alto nível."
-                  value={globalInstruction}
-                  onChange={(e) => setGlobalInstruction(e.target.value)}
-                  rows={4}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Para agentes LLM, isso pode ser o início do prompt do sistema. Para outros tipos de agente (Workflow, Customizado), serve como uma diretriz de alto nível ou descrição do propósito geral.
-                </p>
-              </div>
-              <Separator />
-
-              {/* Campos específicos para agentes do tipo LLM. Renderizado condicionalmente se selectedAgentType === 'llm'. */}
-              {selectedAgentType === 'llm' && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="agentGoal">Objetivo do Agente (LLM)</Label>
-                      <Textarea id="agentGoal" placeholder="Descreva o objetivo principal que o agente LLM deve alcançar. Ex: 'Responder perguntas sobre o produto X com base na documentação fornecida.'" value={agentGoal} onChange={(e) => setAgentGoal(e.target.value)} rows={3}/>
-                      <p className="text-xs text-muted-foreground">Qual o propósito central deste agente LLM?</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="agentPersonality">Personalidade/Tom (LLM)</Label>
-                      <Select value={agentPersonality} onValueChange={setAgentPersonality}>
-                        <SelectTrigger id="agentPersonality">
-                          <SelectValue placeholder="Selecione a personalidade" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Mapeia as opções de tom/personalidade disponíveis. */}
-                          {agentToneOptions.map(option => (
-                            <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                       <p className="text-xs text-muted-foreground">Define o estilo de comunicação do agente (ex: formal, amigável, conciso).</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="agentTasks">Tarefas Principais (LLM)</Label>
-                    <Textarea
-                      id="agentTasks"
-                      placeholder="Liste as tarefas principais que o agente deve executar para alcançar seu objetivo. Uma tarefa por linha. Ex: 'Coletar informações sobre X.', 'Analisar Y.', 'Resumir Z.'"
-                      value={agentTasks.join("\n")}
-                      onChange={(e) => setAgentTasks(e.target.value.split("\n"))}
-                      rows={4}
-                    />
-                     <p className="text-xs text-muted-foreground">Detalhe os passos ou sub-objetivos que o agente deve completar.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="agentRestrictions">Restrições (LLM)</Label>
-                    <Textarea
-                      id="agentRestrictions"
-                      placeholder="Liste quaisquer restrições, limitações ou comportamentos que o agente deve evitar. Uma restrição por linha. Ex: 'Não fornecer aconselhamento financeiro.', 'Manter respostas concisas.'"
-                      value={agentRestrictions.join("\n")}
-                      onChange={(e) => setAgentRestrictions(e.target.value.split("\n"))}
-                      rows={3}
-                    />
-                     <p className="text-xs text-muted-foreground">Define limites e regras para o comportamento do agente.</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="agentModel">Modelo de Linguagem (LLM)</Label>
-                      <Input id="agentModel" placeholder="Ex: gemini-1.5-pro-latest, gpt-4" value={agentModel} onChange={(e) => setAgentModel(e.target.value)} />
-                       <p className="text-xs text-muted-foreground">Especifique o identificador do modelo LLM a ser usado (ex: 'gemini-1.5-flash', 'gpt-3.5-turbo').</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="agentTemperature">Temperatura (LLM) - <Badge variant="outline" className="text-xs">{agentTemperature.toFixed(1)}</Badge></Label>
-                      <Slider
-                        id="agentTemperature"
-                        min={0} max={1} step={0.1}
-                        value={[agentTemperature]}
-                        onValueChange={(value) => setAgentTemperature(value[0])}
-                      />
-                      <p className="text-xs text-muted-foreground">Controla a criatividade/aleatoriedade das respostas (0=mais determinístico, 1=mais criativo).</p>
-                      <p className="text-xs text-muted-foreground">
-                        Controla a criatividade/aleatoriedade das respostas (0=determinístico, 1=máximo).
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="systemPromptGenerated">Prompt do Sistema Gerado (LLM Preview)</Label>
-                    <Textarea
-                      id="systemPromptGenerated"
-                      readOnly
-                      value={systemPromptGenerated || "O prompt do sistema será gerado/mostrado aqui com base nas configurações acima (funcionalidade de preview pendente)."}
-                      rows={5}
-                      className="bg-muted/40"
-                    />
-                     <p className="text-xs text-muted-foreground">Este é um preview de como o prompt do sistema pode ser construído. (Funcionalidade de geração/atualização automática pendente).</p>
-                  </div>
-                </>
-              )}
-
-              {/* Campos específicos para agentes do tipo Workflow. Renderizado condicionalmente se selectedAgentType === 'workflow'. */}
-              {selectedAgentType === 'workflow' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="detailedWorkflowType">Tipo de Workflow</Label>
-                    <Select 
-                      value={detailedWorkflowType} 
-                      onValueChange={(value: "sequential" | "graph" | "stateMachine") => setDetailedWorkflowType(value)}
-                    >
-                      <SelectTrigger id="detailedWorkflowType">
-                        <SelectValue placeholder="Selecione o tipo de workflow" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sequential">Sequencial (Passos executados em ordem)</SelectItem>
-                        <SelectItem value="graph">Grafo de Tarefas (Passos com dependências complexas)</SelectItem>
-                        <SelectItem value="stateMachine">Máquina de Estados (Transições baseadas em estados)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                     <p className="text-xs text-muted-foreground">Define a estrutura de execução do workflow.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="workflowDescription">Descrição do Workflow</Label>
-                    <Textarea id="workflowDescription" placeholder="Descreva o objetivo e os passos gerais do workflow. Ex: 'Processar pedido: validar, verificar estoque, enviar email.'" value={workflowDescription} onChange={(e) => setWorkflowDescription(e.target.value)} rows={3}/>
-                     <p className="text-xs text-muted-foreground">Uma visão geral do que o workflow realiza.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="loopMaxIterations">Máximo de Iterações (para workflows com loops)</Label>
-                    <Input id="loopMaxIterations" type="number" value={loopMaxIterations === undefined ? "" : String(loopMaxIterations)} onChange={(e) => setLoopMaxIterations(e.target.value === "" ? undefined : Number(e.target.value))} placeholder="Opcional. Ex: 10"/>
-                     <p className="text-xs text-muted-foreground">Se o workflow contiver loops, defina um limite máximo de iterações para evitar loops infinitos.</p>
-                  </div>
-                  {/* TODO: Adicionar mais campos específicos para workflow aqui, como definição de passos/tarefas do workflow, condições de transição, etc. */}
-                </>
-              )}
-
-              {/* Campos específicos para agentes do tipo Customizado. Renderizado condicionalmente se selectedAgentType === 'custom'. */}
-              {selectedAgentType === 'custom' && (
-                <div className="space-y-2">
-                  <Label htmlFor="customLogicDescription">Descrição da Lógica Customizada</Label>
-                  <Textarea id="customLogicDescription" placeholder="Descreva a lógica customizada que este agente irá executar. Pode incluir referências a scripts, módulos externos ou endpoints específicos." value={customLogicDescription} onChange={(e) => setCustomLogicDescription(e.target.value)} rows={5}/>
-                   <p className="text-xs text-muted-foreground">Detalhe o comportamento específico implementado por este agente.</p>
-                </div>
-              )}
-               {/* Mensagem informativa para agentes do tipo A2A. Renderizado condicionalmente se selectedAgentType === 'a2a'. */}
-               {selectedAgentType === 'a2a' && (
-                <Alert>
-                  <Waypoints className="h-4 w-4" />
-                  <AlertTitle>Agente de Comunicação (A2A)</AlertTitle>
-                  <AlertDescription>
-                    Este tipo de agente é especializado em facilitar a comunicação e coordenação entre outros agentes ou sistemas.
-                    As configurações específicas para A2A, como canais de comunicação e protocolos, são definidas na aba 'Avançado/A2A'.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </TabsContent>
+            <BehaviorTab
+              globalInstruction={globalInstruction}
+              setGlobalInstruction={setGlobalInstruction}
+              selectedAgentType={selectedAgentType}
+              // LLM Props
+              agentGoal={agentGoal}
+              setAgentGoal={setAgentGoal}
+              agentTasks={agentTasks}
+              setAgentTasks={setAgentTasks}
+              agentPersonality={agentPersonality}
+              setAgentPersonality={setAgentPersonality}
+              agentRestrictions={agentRestrictions}
+              setAgentRestrictions={setAgentRestrictions}
+              agentModel={agentModel}
+              setAgentModel={setAgentModel}
+              agentTemperature={agentTemperature}
+              setAgentTemperature={setAgentTemperature}
+              systemPromptGenerated={systemPromptGenerated}
+              agentToneOptions={agentToneOptions}
+              // Workflow Props
+              detailedWorkflowType={detailedWorkflowType}
+              setDetailedWorkflowType={setDetailedWorkflowType}
+              workflowDescription={workflowDescription}
+              setWorkflowDescription={setWorkflowDescription}
+              loopMaxIterations={loopMaxIterations}
+              setLoopMaxIterations={setLoopMaxIterations}
+              // Custom Props
+              customLogicDescription={customLogicDescription}
+              setCustomLogicDescription={setCustomLogicDescription}
+            />
 
             {/* Aba Ferramentas: Permite ao usuário selecionar e configurar as ferramentas (capabilities) que o agente poderá utilizar. */}
-            <TabsContent value="tools" className="space-y-6 mt-4">
-              <Alert>
-                <Wand2 className="h-4 w-4" />
-                <AlertTitle>Gerenciamento de Ferramentas</AlertTitle>
-                <AlertDescription>
-                  Selecione as ferramentas que este agente poderá utilizar. Algumas ferramentas podem requerer configuração adicional clicando em 'Configurar'.
-                </AlertDescription>
-              </Alert>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Mapeia as ferramentas disponíveis (`availableTools`), permitindo seleção e configuração para cada uma. */}
-                {/* A prop `iconComponents` é um Record que mapeia o nome do ícone (string) para o componente React do ícone. */}
-                {/* Ex: iconComponents['webSearchIcon'] retornaria o componente do ícone de busca na web. */}
-                {availableTools.map((tool) => (
-                  <Card key={tool.id} className={cn("flex flex-col justify-between", selectedTools.includes(tool.id) ? "border-primary" : "")}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between text-base">
-                        {tool.name} {/* Nome da ferramenta */}
-                        <Checkbox
-                          id={`tool-${tool.id}`}
-                          checked={selectedTools.includes(tool.id)} // Controla se a ferramenta está selecionada.
-                          onCheckedChange={(checked) => { // Atualiza a lista de ferramentas selecionadas.
-                            setSelectedTools(prev: string[] =>
-                          checked={selectedTools.includes(tool.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedTools((prev: string[]) =>
-                              checked ? [...prev, tool.id] : prev.filter(id => id !== tool.id)
-                            );
-                          }}
-                        />
-                      </CardTitle>
-                      {/* Renderiza o ícone da ferramenta dinamicamente, usando o nome do ícone fornecido na `tool.icon` e o mapeamento `iconComponents`. */}
-                      {tool.icon && React.cloneElement(iconComponents[tool.icon as string] || <Wand2 className="h-5 w-5 text-muted-foreground" />, { className: "h-6 w-6 mb-2 text-primary" })}
-                      <CardDescription className="text-xs">{tool.description}</CardDescription> {/* Descrição da ferramenta. */}
-                      {tool.icon ? 
-                        (() => {
-                          const IconComponent = iconComponents[tool.icon as string] || Wand2;
-                          return <IconComponent className="h-6 w-6 mb-2 text-primary" />;
-                        })() : 
-                        <Wand2 className="h-5 w-5 text-muted-foreground" />
-                      }
-                      <CardDescription className="text-xs">{tool.description}</CardDescription>
-                    </CardHeader>
-                    <CardFooter>
-                      {/* Se a ferramenta requer configuração (`tool.hasConfig`), exibe o botão 'Configurar'. */}
-                      {tool.hasConfig ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToolConfigure(tool)} // Abre o modal de configuração para esta ferramenta.
-                          disabled={!selectedTools.includes(tool.id)} // Habilita o botão apenas se a ferramenta estiver selecionada.
-                          className="w-full"
-                        >
-                          <Settings className="mr-2 h-4 w-4" />
-                          Configurar
-                          {/* Indica visualmente com um ícone de 'check' se a ferramenta já foi configurada. */}
-                          {toolConfigurations[tool.id] && Object.keys(toolConfigurations[tool.id]).length > 0 && (
-                             <Check className="ml-2 h-4 w-4 text-green-500" />
-                          )}
-                        </Button>
-                      ) : (
-                        <p className="text-xs text-muted-foreground italic">Não requer configuração.</p> // Mensagem para ferramentas sem configuração.
-                      )}
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-              {/* Mensagem exibida se não houver ferramentas disponíveis. */}
-              {availableTools.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center">Nenhuma ferramenta disponível no momento.</p>
-              )}
-            </TabsContent>
+            <ToolsTab
+              availableTools={availableTools}
+              selectedTools={selectedTools}
+              setSelectedTools={setSelectedTools}
+              toolConfigurations={toolConfigurations}
+              handleToolConfigure={handleToolConfigure}
+              iconComponents={iconComponents}
+              Wand2Icon={Wand2}
+              SettingsIcon={Settings}
+              CheckIcon={Check}
+              AlertIcon={Wand2} // Using Wand2 for the alert icon as in the original code
+            />
 
             {/* Aba Estado & Memória: Configurações relacionadas à persistência de estado do agente e seus valores iniciais. */}
-            <TabsContent value="memory" className="space-y-6 mt-4">
-              <Alert>
-                <Database className="h-4 w-4" />
-                <AlertTitle>Estado e Memória do Agente</AlertTitle>
-                <AlertDescription>
-                  Configure como o agente deve persistir seu estado interno e gerenciar a memória de curto e longo prazo.
-                </AlertDescription>
-              </Alert>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Persistência de Estado</CardTitle>
-                  <CardDescription>Controla se e como o agente salva seu estado entre execuções ou sessões.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enableStatePersistence"
-                      checked={enableStatePersistence}
-                      onCheckedChange={setEnableStatePersistence}
-                    />
-                    <Label htmlFor="enableStatePersistence" className="text-base">Habilitar Persistência de Estado</Label>
-                  </div>
-
-                  {/* Campos de configuração de persistência de estado, renderizados se `enableStatePersistence` for true. */}
-                  {enableStatePersistence && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="statePersistenceType">Tipo de Persistência</Label>
-                        <Select value={statePersistenceType} onValueChange={setStatePersistenceType}>
-                          <SelectTrigger id="statePersistenceType">
-                            <SelectValue placeholder="Selecione o tipo de persistência" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="session">Sessão (Temporária, por aba/conexão)</SelectItem>
-                            <SelectItem value="memory">Memória (Durante a vida do processo)</SelectItem>
-                            <SelectItem value="database">Banco de Dados (Persistente)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          {statePersistenceType === 'session' && "O estado é perdido quando a sessão do usuário termina."}
-                          {statePersistenceType === 'memory' && "O estado persiste enquanto o agente/aplicação está em execução, mas é perdido ao reiniciar."}
-                          {statePersistenceType === 'database' && "Requer configuração de um banco de dados para persistência robusta entre sessões e reinícios."}
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="initialStateValues">Valores Iniciais do Estado (JSON)</Label>
-                        <Textarea
-                          id="initialStateValues"
-                          placeholder='[{"key": "exemploChave", "value": "exemploValor"}, {"key": "outraChave", "value": 123}]'
-                          value={JSON.stringify(initialStateValues, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              const val = e.target.value.trim();
-                              if (!val) { setInitialStateValues([]); return; }
-                              const parsed = JSON.parse(val);
-                              // Validação básica da estrutura do JSON.
-                              if (Array.isArray(parsed) && parsed.every(item => typeof item === 'object' && 'key' in item && 'value' in item)) {
-                                setInitialStateValues(parsed);
-                              } else {
-                                console.warn("Formato JSON inválido para valores iniciais do estado.");
-                                toast({variant: "destructive", title: "JSON Inválido", description: "O formato para Valores Iniciais deve ser um array de objetos, cada um com 'key' e 'value'."})
-                              }
-                            } catch (error) {
-                              console.error("Erro ao parsear JSON dos valores iniciais:", error);
-                               toast({variant: "destructive", title: "Erro no JSON", description: "Verifique a sintaxe do JSON para Valores Iniciais. Deve ser um array de objetos."})
-                            }
-                          }}
-                          rows={4}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Defina um array de objetos JSON, cada um com "key" (string) e "value" (qualquer valor JSON válido), para o estado inicial do agente.
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <StateMemoryTab
+              enableStatePersistence={enableStatePersistence}
+              setEnableStatePersistence={setEnableStatePersistence}
+              statePersistenceType={statePersistenceType}
+              setStatePersistenceType={setStatePersistenceType}
+              initialStateValues={initialStateValues}
+              setInitialStateValues={setInitialStateValues}
+              toast={toast}
+              DatabaseIcon={Database}
+            />
 
             {/* Aba RAG: Configurações para Retrieval Augmented Generation, permitindo ao agente consultar conhecimento externo. */}
-            <TabsContent value="rag" className="space-y-6 mt-4">
-              <Alert>
-                <FileJson className="h-4 w-4" />
-                <AlertTitle>RAG - Retrieval Augmented Generation</AlertTitle>
-                <AlertDescription>
-                  Habilite e configure o RAG para permitir que o agente consulte bases de conhecimento externas para enriquecer suas respostas.
-                </AlertDescription>
-              </Alert>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configuração do RAG</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enableRAG"
-                      checked={enableRAG}
-                      onCheckedChange={setEnableRAG}
-                    />
-                    <Label htmlFor="enableRAG" className="text-base">Habilitar RAG</Label>
-                  </div>
-
-                  {/* Campos de configuração RAG, renderizados se `enableRAG` for true. */}
-                  {enableRAG && (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="ragServiceType">Serviço de Busca/Vetorização</Label>
-                          <Select
-                            value={ragMemoryConfig.serviceType || "vertexAISearch" as MemoryServiceType}
-                            onValueChange={(value) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, serviceType: value as MemoryServiceType}))}
-                          >
-                            <SelectTrigger id="ragServiceType">
-                              <SelectValue placeholder="Selecione o serviço" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="vertexAISearch">Vertex AI Search & Conversation</SelectItem>
-                              <SelectItem value="pinecone">Pinecone</SelectItem>
-                              <SelectItem value="localFaiss">FAISS Local</SelectItem>
-                              <SelectItem value="googleSearch">Google Custom Search (para RAG simples)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground">Escolha o backend para busca e recuperação de informações.</p>
-                        </div>
-                        {/* Campos condicionais para serviços que requerem ID de projeto e localização. */}
-                        { (ragMemoryConfig.serviceType === "vertexAISearch" || ragMemoryConfig.serviceType === "pinecone") &&
-                        { (ragMemoryConfig.serviceType === "vertexAISearch") && // Condition updated to be Vertex AI Search specific
-                          <>
-                            <div className="space-y-2">
-                              <Label htmlFor="ragProjectId">ID do Projeto Cloud (Vertex AI)</Label> {/* Label updated for clarity */}
-                              <Input
-                                id="ragProjectId"
-                                placeholder="Seu ID do projeto GCP ou similar"
-                                value={ragMemoryConfig.vertexAISearchConfig?.projectId || ""}
-                                onChange={(e) => {
-                                  const newValue = e.target.value;
-                                  setRagMemoryConfig((prev) => ({
-                                    ...prev,
-                                    vertexAISearchConfig: {
-                                      ...(prev.vertexAISearchConfig || {}),
-                                      projectId: newValue,
-                                    },
-                                  }));
-                                }}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="ragLocation">Localização (Região)</Label>
-                              <Input
-                                id="ragLocation"
-                                placeholder="Ex: us-central1"
-                                value={ragMemoryConfig.vertexAISearchConfig?.location || ""}
-                                onChange={(e) => {
-                                  const newValue = e.target.value;
-                                  setRagMemoryConfig((prev) => ({
-                                    ...prev,
-                                    vertexAISearchConfig: {
-                                      ...(prev.vertexAISearchConfig || {}),
-                                      location: newValue,
-                                    },
-                                  }));
-                          <Input
-                            id="ragCorpusName"
-                            placeholder="Ex: meu-datastore-de-documentos"
-                            value={ragMemoryConfig.ragCorpusName || ""}
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, ragCorpusName: e.target.value}))}
-                            id="vertexDataStoreId"
-                            placeholder="ID do seu DataStore no Vertex AI Search"
-                            value={ragMemoryConfig.vertexAISearchConfig?.dataStoreId || ""}
-                            onChange={(e) => {
-                              const newValue = e.target.value;
-                              setRagMemoryConfig((prev) => ({
-                                ...prev,
-                                vertexAISearchConfig: { ...(prev.vertexAISearchConfig || {}), dataStoreId: newValue },
-                              }));
-                            }}
-                          />
-                          <p className="text-xs text-muted-foreground">Identificador da sua coleção de dados no serviço RAG.</p>
-                        </div>
-                         <div className="space-y-2">
-                          <Label htmlFor="ragEmbeddingModel">Modelo de Embedding</Label>
-                          <Input
-                            id="ragEmbeddingModel"
-                            placeholder="Ex: text-embedding-004 (Opcional)"
-                            value={ragMemoryConfig.embeddingModel || ""}
-                            onChange={(e) => setRagMemoryConfig(prev => ({...prev, embeddingModel: e.target.value}))}
-                          />
-                           <p className="text-xs text-muted-foreground">Modelo usado para gerar embeddings (vetores) dos seus dados. Deixe em branco para usar o padrão do serviço.</p>
-                        </div>
-                      )}
-                      {ragMemoryConfig.serviceType === 'pinecone' && (
-                        <div className="space-y-2">
-                          <Label htmlFor="pineconeIndexName">Nome do Índice (Pinecone)</Label>
-                          <Input
-                            id="pineconeIndexName"
-                            placeholder="Nome do seu índice no Pinecone"
-                            value={ragMemoryConfig.pineconeConfig?.indexName || ""}
-                            onChange={(e) => {
-                              const newValue = e.target.value;
-                              setRagMemoryConfig((prev) => ({
-                                ...prev,
-                                pineconeConfig: { ...(prev.pineconeConfig || {}), indexName: newValue },
-                              }));
-                            }}
-                            id="ragSimilarityTopK"
-                            type="number"
-                            value={String(ragMemoryConfig.similarityTopK || 5)}
-                            onChange={(e) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, similarityTopK: parseInt(e.target.value, 10) || 5}))}
-                          />
-                          <p className="text-xs text-muted-foreground">Número de resultados mais similares a serem recuperados.</p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ragVectorDistanceThreshold">Limiar de Distância Vetorial - <Badge variant="outline" className="text-xs">{(ragMemoryConfig.vectorDistanceThreshold || 0.5).toFixed(2)}</Badge></Label>
-                           <Slider
-                            id="ragVectorDistanceThreshold"
-                            min={0} max={1} step={0.05}
-                            value={[ragMemoryConfig.vectorDistanceThreshold || 0.5]}
-                            onValueChange={(value) => setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, vectorDistanceThreshold: value[0]}))}
-                          />
-                          <p className="text-xs text-muted-foreground">Distância máxima para considerar um resultado relevante (0 a 1). Menor = mais estrito.</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ragKnowledgeSources">Fontes de Conhecimento (JSON)</Label>
-                        <Textarea
-                          id="ragKnowledgeSources"
-                          placeholder='[{"type": "web_url", "content": "https://example.com/faq", "name": "FAQ Site"}, {"type": "gcs_uri", "content": "gs://bucket/doc.pdf", "name": "Documento PDF"}]'
-                          value={JSON.stringify(ragMemoryConfig.knowledgeSources || [], null, 2)}
-                          onChange={(e) => {
-                            try {
-                              const val = e.target.value.trim();
-                              if(!val) { setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, knowledgeSources: []})); return; }
-                              const parsed = JSON.parse(val);
-                              // Validação básica da estrutura do JSON para fontes de conhecimento.
-                              if(Array.isArray(parsed) && parsed.every(item => typeof item === 'object' && 'type' in item && 'content' in item && 'name' in item)) {
-                                setRagMemoryConfig(prev => ({...prev, knowledgeSources: parsed}));
-                              } else {
-                                toast({variant: "destructive", title: "JSON Inválido", description: "Fontes de Conhecimento devem ser um array de objetos com 'type', 'content' e 'name'."})
-                              }
-                              setRagMemoryConfig((prev: RagMemoryConfig) => ({...prev, knowledgeSources: parsed}));
-                            } catch (error) {
-                              console.error("Erro ao parsear JSON das fontes de conhecimento:", error);
-                              toast({variant: "destructive", title: "Erro no JSON", description: "Verifique a sintaxe do JSON para Fontes de Conhecimento."})
-                            }
-                          }}
-                          rows={5}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Array de objetos JSON, cada um com "name" (string, nome da fonte), "type" (string, ex: "web_url", "gcs_uri") e "content" (string, URL/URI).
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="ragIncludeConversationContext"
-                          checked={ragMemoryConfig.includeConversationContext === undefined ? true : ragMemoryConfig.includeConversationContext}
-                          onCheckedChange={(checked) => setRagMemoryConfig(prev => ({...prev, includeConversationContext: Boolean(checked)}))}
-                        />
-                        <Label htmlFor="ragIncludeConversationContext">Incluir Contexto da Conversa na Busca RAG</Label>
-                      </div>
-                       <p className="text-xs text-muted-foreground -mt-3 pl-6">
-                          Se marcado, o histórico da conversa atual será usado para refinar a busca RAG, tornando os resultados mais contextuais.
-                        </p>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <RagTab
+              enableRAG={enableRAG}
+              setEnableRAG={setEnableRAG}
+              ragMemoryConfig={ragMemoryConfig}
+              setRagMemoryConfig={setRagMemoryConfig}
+              initialRagMemoryConfig={initialRagMemoryConfig}
+              toast={toast}
+              FileJsonIcon={FileJson}
+            />
 
             {/* Aba Artefatos: Configuração do armazenamento e gerenciamento de arquivos e outros artefatos que o agente pode criar ou utilizar. */}
-            <TabsContent value="artifacts" className="space-y-6 mt-4">
-              <Alert>
-                <UploadCloud className="h-4 w-4" />
-                <AlertTitle>Gerenciamento de Artefatos</AlertTitle>
-                <AlertDescription>
-                  Configure como o agente irá armazenar e gerenciar arquivos e outros artefatos que ele pode criar ou utilizar durante sua execução.
-                </AlertDescription>
-              </Alert>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Armazenamento de Artefatos</CardTitle>
-                  <CardDescription>Define se e onde os artefatos gerados ou utilizados pelo agente são armazenados.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enableArtifacts"
-                      checked={enableArtifacts}
-                      onCheckedChange={setEnableArtifacts}
-                    />
-                    <Label htmlFor="enableArtifacts" className="text-base">Habilitar Armazenamento de Artefatos</Label>
-                  </div>
-
-                  {/* Campos de configuração de armazenamento de artefatos, renderizados se `enableArtifacts` for true. */}
-                  {enableArtifacts && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="artifactStorageType">Tipo de Armazenamento</Label>
-                        <Select value={artifactStorageType} onValueChange={(value: 'memory' | 'local' | 'cloud') => setArtifactStorageType(value)}>
-                          <SelectTrigger id="artifactStorageType">
-                            <SelectValue placeholder="Selecione o tipo de armazenamento" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="memory">Memória (Temporário)</SelectItem>
-                            <SelectItem value="local">Sistema de Arquivos Local</SelectItem> {/* Value changed to 'local' */}
-                            <SelectItem value="cloud">Nuvem (Ex: Google Cloud Storage)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">Define onde os artefatos serão guardados.</p>
-                      </div>
-
-                      {/* Campo para caminho local, renderizado se o tipo de armazenamento for 'local'. */}
-                      {artifactStorageType === 'local' && (
-                        <div className="space-y-2">
-                          <Label htmlFor="localStoragePath">Caminho de Armazenamento Local</Label>
-                          <Input
-                            id="localStoragePath"
-                            placeholder="./agent_artifacts"
-                            value={localStoragePath}
-                            onChange={(e) => setLocalStoragePath(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Caminho no sistema de arquivos do servidor onde os artefatos serão salvos. Ex: "./artefatos_agente_X".
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Campo para nome do bucket na nuvem, renderizado se o tipo de armazenamento for 'cloud'. */}
-                      {artifactStorageType === 'cloud' && (
-                        <div className="space-y-2">
-                          <Label htmlFor="cloudStorageBucket">Nome do Bucket de Armazenamento na Nuvem</Label>
-                          <Input
-                            id="cloudStorageBucket"
-                            placeholder="Ex: meu-bucket-de-artefatos-agente"
-                            value={cloudStorageBucket}
-                            onChange={(e) => setCloudStorageBucket(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Nome do bucket no seu provedor de nuvem (ex: GCS, S3) para armazenar os artefatos.
-                          </p>
-                        </div>
-                      )}
-                      {/* TODO: Adicionar UI para gerenciar ArtifactDefinition[] (lista de artefatos esperados/produzidos) */}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <ArtifactsTab
+              enableArtifacts={enableArtifacts}
+              setEnableArtifacts={setEnableArtifacts}
+              artifactStorageType={artifactStorageType}
+              setArtifactStorageType={setArtifactStorageType}
+              localStoragePath={localStoragePath}
+              setLocalStoragePath={setLocalStoragePath}
+              cloudStorageBucket={cloudStorageBucket}
+              setCloudStorageBucket={setCloudStorageBucket}
+              artifacts={artifacts}
+              setArtifacts={setArtifacts}
+              UploadCloudIcon={UploadCloud}
+            />
 
             {/* Aba Multi-Agente: Define o papel do agente em sistemas com múltiplos agentes e suas relações. */}
-            <TabsContent value="multiAgent" className="space-y-6 mt-4">
-              <Alert>
-                <Users className="h-4 w-4" />
-                <AlertTitle>Configurações Multi-Agente</AlertTitle>
-                <AlertDescription>
-                  Defina o papel deste agente em um sistema com múltiplos agentes (equipes de agentes) e suas relações com outros agentes.
-                </AlertDescription>
-              </Alert>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Hierarquia e Colaboração</CardTitle>
-                  <CardDescription>Configure como este agente interage e se posiciona dentro de uma arquitetura multi-agente.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isRootAgent"
-                      checked={isRootAgent}
-                      onCheckedChange={setIsRootAgent}
-                    />
-                    <Label htmlFor="isRootAgent" className="text-base">Agente Raiz / Orquestrador Principal</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Marque se este agente é o principal ponto de entrada ou o orquestrador em uma equipe de agentes.
-                    Agentes não-raiz (sub-agentes) são tipicamente especialistas invocados por um agente raiz ou por outros agentes.
-                  </p>
-                  <div className="space-y-2 pt-2">
-                    <Label htmlFor="subAgentIds">IDs dos Sub-Agentes / Colaboradores</Label>
-                    {/* Seletor de sub-agentes ou input manual se não houver outros agentes. */}
-                    { availableAgentsForSubSelector && availableAgentsForSubSelector.length > 0 ? (
-                       <SubAgentSelector
-                        availableAgents={availableAgentsForSubSelector}
-                        selectedAgents={subAgentIds}
-                        onChange={setSubAgentIds}
-                        disabled={false}
-                      />
-                    ) : (
-                      <Textarea
-                        id="subAgentIds"
-                        placeholder="Insira IDs de sub-agentes, separados por vírgula. Nenhum outro agente salvo disponível para seleção no momento."
-                        value={subAgentIds.join(",")}
-                        onChange={(e) => setSubAgentIds(e.target.value.split(",").map(id => id.trim()).filter(id => id))}
-                        rows={3}
-                        disabled={!(availableAgentsForSubSelector && availableAgentsForSubSelector.length > 0)}
-                      />
-                    )}
-                     <p className="text-xs text-muted-foreground">
-                      Liste os IDs dos agentes que este agente pode invocar, delegar tarefas ou com os quais colabora.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <MultiAgentTab
+              isRootAgent={isRootAgent}
+              setIsRootAgent={setIsRootAgent}
+              subAgentIds={subAgentIds}
+              setSubAgentIds={setSubAgentIds}
+              availableAgentsForSubSelector={availableAgentsForSubSelector}
+              UsersIcon={Users}
+              SubAgentSelectorComponent={SubAgentSelector}
+            />
 
             {/* Aba Avançado/A2A: Configurações de baixo nível, comunicação entre agentes (A2A) e outros parâmetros avançados. */}
             <TabsContent value="advanced" className="space-y-6 mt-4">
@@ -1423,163 +863,34 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           <Button onClick={handleSaveAgent}><Save className="mr-2 h-4 w-4" /> Salvar Agente</Button>
         </DialogFooter>
 
-        {/* Modal para configurar ferramentas específicas que requerem parâmetros adicionais. */}
-        {/* Renderizado condicionalmente quando `isToolConfigModalOpen` é true e `configuringTool` (a ferramenta a ser configurada) está definida. */}
-        {isToolConfigModalOpen && configuringTool && (
-           <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => { if (!open) { setIsToolConfigModalOpen(false); setConfiguringTool(null); }}}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Configurar Ferramenta: {configuringTool.name}</DialogTitle>
-                <DialogDescription>{configuringTool.description}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-                {/* Renderização condicional dos campos de configuração baseado no ID da ferramenta. */}
-                {configuringTool.id === "webSearch" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalGoogleApiKey">Chave API Google</Label>
-                    <Input id="modalGoogleApiKey" value={modalGoogleApiKey} onChange={(e) => setModalGoogleApiKey(e.target.value)} placeholder="ex: AIzaSy..."/>
-                    <p className="text-xs text-muted-foreground">Chave de API do Google (Custom Search API) para busca na web.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalGoogleCseId">ID do Mecanismo de Busca</Label>
-                    <Input id="modalGoogleCseId" value={modalGoogleCseId} onChange={(e) => setModalGoogleCseId(e.target.value)} placeholder="ex: 0123456789abcdefg"/>
-                    <p className="text-xs text-muted-foreground">ID do Mecanismo de Busca Personalizado (CSE ID) do Google.</p>
-                  </div>
-                </>
-              )}
-              {configuringTool.id === "customApiIntegration" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalOpenapiSpecUrl">URL Esquema OpenAPI (JSON/YAML)</Label>
-                    <Input id="modalOpenapiSpecUrl" value={modalOpenapiSpecUrl} onChange={(e) => setModalOpenapiSpecUrl(e.target.value)} placeholder="ex: https://petstore.swagger.io/v2/swagger.json"/>
-                    <p className="text-xs text-muted-foreground">Link para a especificação OpenAPI (v2 ou v3) da API externa.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor="modalOpenapiApiKey">Chave API Externa (Opcional)</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right">
-                            <p className="max-w-xs">Atenção: Inserir segredos diretamente na UI pode ser arriscado. Considere usar um gerenciador de segredos ou configuração de backend para produção.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <Input id="modalOpenapiApiKey" value={modalOpenapiApiKey} onChange={(e) => setModalOpenapiApiKey(e.target.value)} placeholder="Se a API requer autenticação por chave" type="password"/>
-                    <p className="text-xs text-muted-foreground">Chave de API para autenticação no serviço externo, se necessário.</p>
-                  </div>
-                </>
-              )}
-              {configuringTool.id === "databaseAccess" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="modalDbType">Tipo de Banco de Dados</Label>
-                    <Select value={modalDbType} onValueChange={setModalDbType}>
-                      <SelectTrigger id="modalDbType">
-                        <SelectValue placeholder="Selecione o tipo de banco" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="postgresql">PostgreSQL</SelectItem>
-                        <SelectItem value="mysql">MySQL</SelectItem>
-                        <SelectItem value="sqlserver">SQL Server</SelectItem>
-                        <SelectItem value="sqlite">SQLite</SelectItem>
-                        <SelectItem value="other">Outro (usar string de conexão)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Campos condicionais para tipos de banco que usam host, porta, etc. */}
-                  {(modalDbType && modalDbType !== 'other' && modalDbType !== 'sqlite') && (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="modalDbHost">Host</Label>
-                          <Input id="modalDbHost" value={modalDbHost} onChange={(e) => setModalDbHost(e.target.value)} placeholder="ex: localhost"/>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="modalDbPort">Porta</Label>
-                          <Input id="modalDbPort" type="number" value={String(modalDbPort)} onChange={(e) => setModalDbPort(Number(e.target.value))} placeholder="ex: 5432"/>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="modalDbName">Nome do Banco</Label>
-                        <Input id="modalDbName" value={modalDbName} onChange={(e) => setModalDbName(e.target.value)} placeholder="ex: meu_banco_de_dados"/>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="modalDbUser">Usuário</Label>
-                          <Input id="modalDbUser" value={modalDbUser} onChange={(e) => setModalDbUser(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <Label htmlFor="modalDbPassword">Senha</Label>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent side="right">
-                                  <p className="max-w-xs">Atenção: Inserir segredos diretamente na UI pode ser arriscado. Considere usar um gerenciador de segredos ou configuração de backend para produção.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                          <Input id="modalDbPassword" type="password" value={modalDbPassword} onChange={(e) => setModalDbPassword(e.target.value)} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  {/* Campo para string de conexão, para SQLite ou 'Outro'. */}
-                  {(modalDbType === 'other' || modalDbType === 'sqlite') && (
-                    <div className="space-y-2">
-                      <Label htmlFor="modalDbConnectionString">String de Conexão / Caminho do Arquivo</Label>
-                      <Input id="modalDbConnectionString" value={modalDbConnectionString} onChange={(e) => setModalDbConnectionString(e.target.value)} placeholder={modalDbType === 'sqlite' ? "ex: /caminho/para/seu/banco.sqlite" : "driver://usuario:senha@host:porta/banco"}/>
-                      <p className="text-xs text-muted-foreground">{modalDbType === 'sqlite' ? 'Caminho completo para o arquivo do banco de dados SQLite.' : 'String de conexão JDBC/ODBC completa.'}</p>
-                    </div>
-                  )}
-                   <div className="space-y-2">
-                    <Label htmlFor="modalDbDescription">Descrição do Banco/Tabelas (Opcional)</Label>
-                    <Textarea id="modalDbDescription" value={modalDbDescription} onChange={(e) => setModalDbDescription(e.target.value)} placeholder="Ex: Tabela 'usuarios' (id, nome, email), Tabela 'pedidos' (id, usuario_id, produto, qtd, data)" rows={3}/>
-                    <p className="text-xs text-muted-foreground">Ajuda o agente a entender o esquema do banco de dados e a formular queries SQL mais precisas.</p>
-                  </div>
-                </>
-              )}
-              {configuringTool.id === "knowledgeBase" && (
-                <div className="space-y-2">
-                  <Label htmlFor="modalKnowledgeBaseId">ID/Nome da Base de Conhecimento</Label>
-                  <Input id="modalKnowledgeBaseId" value={modalKnowledgeBaseId} onChange={(e) => setModalKnowledgeBaseId(e.target.value)} placeholder="ex: documentos_produto_v2"/>
-                  <p className="text-xs text-muted-foreground">Identificador único para a base de conhecimento que será utilizada (geralmente associado a um sistema RAG).</p>
-                </div>
-              )}
-              {configuringTool.id === "calendarAccess" && (
-                <div className="space-y-2">
-                  <Label htmlFor="modalCalendarApiEndpoint">Endpoint da API de Calendário / ID do Fluxo Genkit</Label>
-                  <Input id="modalCalendarApiEndpoint" value={modalCalendarApiEndpoint} onChange={(e) => setModalCalendarApiEndpoint(e.target.value)} placeholder="ex: https://api.example.com/calendar ou meuFluxoGenkitCalendario"/>
-                  <p className="text-xs text-muted-foreground">URL do endpoint da API de calendário ou o identificador de um fluxo Genkit que encapsula o acesso à agenda.</p>
-                </div>
-              )}
-              </div>
-              <DialogFooter>
-                 <Button variant="outline" onClick={() => { setIsToolConfigModalOpen(false); setConfiguringTool(null);}}>Cancelar</Button>
-                {/* ATENÇÃO: Os valores modalDbPassword e modalOpenapiApiKey são manipulados aqui.
-                    Estes são segredos e armazená-los diretamente na configuração do agente que é salva
-                    em um local potencialmente inseguro (como localStorage ou um banco de dados não criptografado)
-                    é um risco de segurança.
-                    Para ambientes de produção, é fortemente recomendado que segredos sejam gerenciados
-                    por um sistema de gerenciamento de segredos dedicado (ex: HashiCorp Vault, Google Secret Manager)
-                    ou configurados de forma segura no backend, e não expostos ou armazenados na UI.
-                    As ferramentas que utilizam estas chaves no backend devem carregá-las de variáveis de ambiente
-                    ou de um serviço de configuração seguro.
-                */}
-                 <Button onClick={handleSaveToolConfiguration}>Salvar Configuração da Ferramenta</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* O Modal de Configuração de Ferramenta foi movido para seu próprio componente: ToolConfigModal */}
       </DialogContent>
+      <ToolConfigModal
+        isOpen={isToolConfigModalOpen}
+        onOpenChange={(open) => {
+          setIsToolConfigModalOpen(open);
+          if (!open) {
+            setConfiguringTool(null); // Limpa a ferramenta em configuração se o modal for fechado
+          }
+        }}
+        configuringTool={configuringTool}
+        onSave={handleSaveToolConfiguration}
+        modalGoogleApiKey={modalGoogleApiKey} setModalGoogleApiKey={setModalGoogleApiKey}
+        modalGoogleCseId={modalGoogleCseId} setModalGoogleCseId={setModalGoogleCseId}
+        modalOpenapiSpecUrl={modalOpenapiSpecUrl} setModalOpenapiSpecUrl={setModalOpenapiSpecUrl}
+        modalOpenapiApiKey={modalOpenapiApiKey} setModalOpenapiApiKey={setModalOpenapiApiKey}
+        modalDbType={modalDbType} setModalDbType={setModalDbType}
+        modalDbHost={modalDbHost} setModalDbHost={setModalDbHost}
+        modalDbPort={modalDbPort} setModalDbPort={setModalDbPort}
+        modalDbName={modalDbName} setModalDbName={setModalDbName}
+        modalDbUser={modalDbUser} setModalDbUser={setModalDbUser}
+        modalDbPassword={modalDbPassword} setModalDbPassword={setModalDbPassword}
+        modalDbConnectionString={modalDbConnectionString} setModalDbConnectionString={setModalDbConnectionString}
+        modalDbDescription={modalDbDescription} setModalDbDescription={setModalDbDescription}
+        modalKnowledgeBaseId={modalKnowledgeBaseId} setModalKnowledgeBaseId={setModalKnowledgeBaseId}
+        modalCalendarApiEndpoint={modalCalendarApiEndpoint} setModalCalendarApiEndpoint={setModalCalendarApiEndpoint}
+        InfoIcon={Info}
+      />
     </Dialog>
   );
 };
