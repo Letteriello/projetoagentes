@@ -3,7 +3,6 @@
 
 import * as React from "react";
 import { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,7 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
-import { AgentBuilderDialog } from "@/components/features/agent-builder/agent-builder-dialog";
+import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -60,7 +59,7 @@ export interface AvailableTool {
   label: string;
   name: string;
   type: "genkit_native";
-  icon: LucideIcon | undefined;
+  icon: React.FC<React.SVGProps<SVGSVGElement>> | undefined;
   description: string;
   hasConfig?: boolean; // Changed from needsConfiguration
   genkitToolName?: string;
@@ -720,7 +719,7 @@ export default function AgentBuilderPage() {
 
       <AgentBuilderDialog
         isOpen={isBuilderModalOpen}
-        onOpenChange={(isOpen) => {
+        onOpenChange={(isOpen: boolean) => {
           setIsBuilderModalOpen(isOpen);
           if (!isOpen) {
             setEditingAgent(null); // Garante que o estado de edição seja limpo ao fechar
