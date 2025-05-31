@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { A2AConfig as A2AConfigType, CommunicationChannel } from "@/types/a2a-types"; // Renamed A2AConfig to A2AConfigType
+// Removido import duplicado de tipos já definidos localmente ou importados abaixo para evitar conflito
+// Import removido para evitar conflito de tipos já definidos localmente ou importados abaixo.
 import { CommunicationChannelItem } from "./a2a-communication-channel";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -60,69 +61,31 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
-// import { MultiAgentTab } from "@/components/features/agent-builder/multi-agent-tab"; // Assuming this was for the removed tab or integrated elsewhere
-import { ArtifactManagementTab, ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
-import { RagMemoryTab } from "@/components/features/agent-builder/rag-memory-tab";
-import { RagMemoryConfig, KnowledgeSource, MemoryServiceType } from "@/components/features/agent-builder/memory-knowledge-tab"; // Added MemoryServiceType
-import { A2AConfig as A2AConfigComponent } from "@/components/features/agent-builder/a2a-config";
-import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
-// import type { A2AConfig as A2AConfigType } from "@/types/a2a-types"; // Already imported and aliased
-import { convertToGoogleADKConfig } from "@/lib/google-adk-utils"; // Assuming this is used or will be
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils"; // Was previously removed, adding back as it's very common
-import type { ClassValue } from 'clsx';
-
-import type {
-  SavedAgentConfiguration as PageSavedAgentConfiguration, // Aliased to avoid conflict if used directly
-  AgentConfig as PageAgentConfig, // Aliased
-  LLMAgentConfig as PageLLMAgentConfig, // Aliased
-  WorkflowAgentConfig as PageWorkflowAgentConfig, // Aliased
-  CustomAgentConfig as PageCustomAgentConfig, // Aliased
-  ToolConfigData as PageToolConfigData,
-  AgentConfigBase as PageAgentConfigBase,
-  AgentFramework, // Added from page.tsx fixes
-} from '@/app/agent-builder/page';
-
-import type {
-  AvailableTool, // This should come from agent-types now, which re-exports from tool-types
-  A2AAgentConfig, // This is a specific config type, ensure it matches or is properly used
-  // AgentConfig, // Defined in page.tsx, using aliased PageAgentConfig above
-  // LLMAgentConfig, // Defined in page.tsx
-  // WorkflowAgentConfig, // Defined in page.tsx
-  // CustomAgentConfig, // Defined in page.tsx
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { useAgents } from '@/contexts/AgentsContext';
 import { cn } from "@/lib/utils";
 import type { ClassValue } from 'clsx';
 
-// Import page-specific types
-import type { 
-  SavedAgentConfiguration as ImportedPageSavedAgentConfiguration,
-  AvailableTool as ImportedPageAvailableTool,
-  AgentConfigBase,
-  LLMAgentConfig,
-  WorkflowAgentConfig,
-  CustomAgentConfig,
+// Types from @/app/agent-builder/page needed for this component
+import type {
+  SavedAgentConfiguration as PageSavedAgentConfiguration,
   AgentConfig as PageAgentConfig,
-  ToolConfigData as PageToolConfigData
+  LLMAgentConfig as PageLLMAgentConfig,
+  WorkflowAgentConfig as PageWorkflowAgentConfig,
+  CustomAgentConfig as PageCustomAgentConfig,
+  ToolConfigData as PageToolConfigData,
+  AgentConfigBase as PageAgentConfigBase,
+  AgentFramework,
+  agentTypeOptions,
+  agentToneOptions,
+  AvailableTool as PageAvailableTool,
+  iconComponents
 } from '@/app/agent-builder/page';
+// import { MultiAgentTab } from "@/components/features/agent-builder/multi-agent-tab"; // Assuming this was for the removed tab or integrated elsewhere
+import { ArtifactManagementTab, ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
+import { RagMemoryTab } from "@/components/features/agent-builder/rag-memory-tab";
+import { A2AConfig as A2AConfigComponent } from "@/components/features/agent-builder/a2a-config";
+import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
+import { convertToGoogleADKConfig } from "@/lib/google-adk-utils"; 
+import { RagMemoryConfig, KnowledgeSource, MemoryServiceType } from "@/components/features/agent-builder/memory-knowledge-tab"; 
 
 // Import shared types
 import type { 
@@ -132,9 +95,8 @@ import type {
   ToolConfigData as SharedToolConfigData
 } from '@/types/agent-types';
 
-
 // Type conversion helper
-const mapToPageAgentConfig = (agent: SavedAgentConfiguration): PageSavedAgentConfiguration => {
+const mapToPageAgentConfig = (agent: SavedAgentConfiguration): SavedAgentConfiguration => {
   return {
     ...agent,
     toolsDetails: (agent.toolsDetails || []).map(tool => {
@@ -157,22 +119,26 @@ const mapToPageAgentConfig = (agent: SavedAgentConfiguration): PageSavedAgentCon
 interface AgentBuilderDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  editingAgent: PageSavedAgentConfiguration | null; // Use aliased type
-  onSave: (agentConfig: PageSavedAgentConfiguration) => void; // Use aliased type
-  availableTools: AvailableTool[]; // This should use the type from agent-types
-  agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string; }>;
+  editingAgent: SavedAgentConfiguration | null;
+  onSave: (agentConfig: SavedAgentConfiguration) => void;
+  availableTools: AvailableTool[];
+  agentTypeOptions: Array<{
+    id: "llm" | "workflow" | "custom" | "a2a";
+    label: string;
+    icon?: React.ReactNode;
+    description: string;
+  }>;
   agentToneOptions: { id: string; label: string; }[];
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
 }
 
 type BaseAgentType = "llm" | "workflow" | "custom";
 // Extended AgentType to include more specific workflow/task types if dialog needs to handle them
-type DialogAgentType = PageAgentConfig['agentType'] | "a2a" | "task" | "sequential" | "parallel" | "loop" ;
+type DialogAgentType = AgentType | 'a2a' | 'task' | 'sequential' | 'parallel' | 'loop';
 type TerminationConditionType = "none" | "subagent_signal" | "tool" | "state";
 
-
 function safeToReactNode(value: unknown): React.ReactNode {
-  if (value === null || value === undefined) return '';
+  if (value === null || value === undefined) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (React.isValidElement(value)) return value;
   return String(value);
@@ -183,13 +149,14 @@ const toBaseAgentTypeUI = (type: DialogAgentType): BaseAgentType => {
   return type as BaseAgentType;
 };
 
-const getToolDisplayName = (tool: AvailableTool): React.ReactNode => safeToReactNode(tool.name || tool.id);
-const getToolDescription = (tool: AvailableTool): React.ReactNode => safeToReactNode(tool.description || '');
-const getNeedsConfiguration = (tool: AvailableTool): boolean => tool?.hasConfig || false; // Standardized
-const getToolGenkitName = (tool: AvailableTool): string | undefined => tool.genkitToolName;
+// Garantia de retorno seguro para exibição de nome de ferramenta
+// Helpers únicos para exibição e configuração de ferramentas
+const getToolDisplayName = (tool: PageAvailableTool): React.ReactNode => tool?.name || tool?.label || tool?.id || 'Unknown Tool';
+const getToolDescription = (tool: PageAvailableTool): React.ReactNode => tool?.description || 'No description available';
+const getNeedsConfiguration = (tool: PageAvailableTool): boolean => tool?.needsConfiguration || tool?.hasConfig || false;
+const getToolGenkitName = (tool: PageAvailableTool): string | undefined => tool?.genkitToolName;
 
-
-const defaultLLMConfigValues: Omit<PageLLMAgentConfig, keyof PageAgentConfigBase | 'agentType'> = {
+const defaultLLMConfigValues: Partial<PageLLMAgentConfig> = {
     agentGoal: "", agentTasks: "", agentPersonality: "", agentRestrictions: "",
     agentModel: "googleai/gemini-2.0-flash", agentTemperature: 0.7,
 };
@@ -200,34 +167,64 @@ const defaultWorkflowConfigValues: Partial<PageWorkflowAgentConfig> = {
 
 const defaultCustomConfigValues: Partial<PageCustomAgentConfig> = { customLogicDescription: "" };
 
+
+// Interface removida, usar a importada do tipo correto se necessário.
+
+interface A2AConfigType {
+  enabled: boolean;
+  communicationChannels: CommunicationChannel[];
+  defaultResponseFormat: 'json' | 'xml' | 'text' | 'binary';
+  maxMessageSize: number;
+  loggingEnabled: boolean;
+}
+
 const defaultA2AConfigValues: Partial<A2AAgentConfig> = {
-    customLogicDescription: "Este agente é projetado para interagir e coordenar com outros agentes.", // A2A can also have custom logic description
+    customLogicDescription: "Este agente é projetado para interagir e coordenar com outros agentes.",
     a2aConfig: {
-        enabled: true, communicationChannels: [], defaultResponseFormat: 'json',
-        maxMessageSize: 1024 * 1024, loggingEnabled: true,
+        enabled: true, 
+        communicationChannels: [], 
+        defaultResponseFormat: 'json' as const,
+        maxMessageSize: 1024 * 1024, 
+        loggingEnabled: true,
     }
 };
 
-export function AgentBuilderDialog({
-  isOpen, onOpenChange, editingAgent, onSave, availableTools,
-  agentTypeOptions: propAgentTypeOptions, // Renamed prop to avoid conflict
-  agentToneOptions, iconComponents,
-}: AgentBuilderDialogProps) {
+const defaultRagConfigValues: Partial<RagMemoryConfig> = {
+    enabled: true,
+    serviceType: 'in-memory' as const,
+    projectId: "",
+    location: "",
+    ragCorpusName: "",
+    similarityTopK: 5,
+    vectorDistanceThreshold: 0.7,
+    embeddingModel: "",
+    knowledgeSources: [],
+    includeConversationContext: true,
+    persistentMemory: false
+};
+
+// [REMOVIDO BLOCO DUPLICADO] - Consolidado na implementação padrão export default function AgentBuilderDialog.
 
   const { toast } = useToast();
   const { savedAgents } = useAgents();
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // Consolidate ALL useState calls here
-  const [agentName, setAgentName] = React.useState(editingAgent?.agentName || "");
-  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || "");
+  const [agentName, setAgentName] = React.useState(editingAgent?.agentName || ""); // Estado único consolidado
+  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || ""); // Estado único consolidado
   const [agentVersion, setAgentVersion] = React.useState(editingAgent?.agentVersion || "1.0.0");
-  const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(editingAgent?.agentTools || []);
+  const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(editingAgent?.toolsDetails?.map(tool => tool.id) || []);
 
-  // Use propAgentTypeOptions for initialization
   const initialAgentType = editingAgent?.agentType || (propAgentTypeOptions.length > 0 ? propAgentTypeOptions[0].id : 'llm');
-  const [agentType, setAgentType] = React.useState<DialogAgentType>(initialAgentType as DialogAgentType);
-  const [selectedAgentTypeUI, setSelectedAgentTypeUI] = React.useState<BaseAgentType>(toBaseAgentTypeUI(initialAgentType as DialogAgentType));
+  // === ESTADOS CONSOLIDADOS ===
+const [selectedAgentType, setSelectedAgentType] = React.useState<DialogAgentType>(initialAgentType); // Estado único consolidado
+const [selectedTone, setSelectedTone] = React.useState(editingAgent?.agentPersonality || (agentToneOptions.length > 0 ? agentToneOptions[0].label : "")); // Estado único consolidado
+const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false); // Estado único consolidado
+const [configuringTool, setConfiguringTool] = React.useState<PageAvailableTool | null>(null); // Estado único consolidado
+// [REMOVIDO BLOCO DUPLICADO - manter apenas nos ESTADOS CONSOLIDADOS acima]
+// const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // Estado único consolidado
+// === FIM DOS ESTADOS CONSOLIDADOS ===
+
+// Remover todas as duplicatas destes estados abaixo deste bloco.
 
   const [agentGoal, setAgentGoal] = React.useState(editingAgent?.agentGoal || defaultLLMConfigValues.agentGoal);
   const [agentTasks, setAgentTasks] = React.useState(editingAgent?.agentTasks || defaultLLMConfigValues.agentTasks);
@@ -237,7 +234,6 @@ export function AgentBuilderDialog({
   const [agentTemperature, setAgentTemperature] = React.useState([editingAgent?.agentTemperature === undefined ? defaultLLMConfigValues.agentTemperature : editingAgent.agentTemperature]);
 
   const [agentFramework, setAgentFramework] = React.useState<AgentFramework>(editingAgent?.agentFramework || 'custom');
-
 
   const [isRootAgent, setIsRootAgent] = React.useState(editingAgent?.isRootAgent || false);
   const [subAgents, setSubAgents] = React.useState<string[]>(editingAgent?.subAgents || []);
@@ -251,11 +247,7 @@ export function AgentBuilderDialog({
 
   const [enableRAG, setEnableRAG] = React.useState<boolean>(editingAgent?.enableRAG || false);
   const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(
-    editingAgent?.ragMemoryConfig || {
-      enabled: false, serviceType: 'in-memory' as MemoryServiceType, projectId: "", location: "", ragCorpusName: "",
-      similarityTopK: 5, vectorDistanceThreshold: 0.7, embeddingModel: "", knowledgeSources: [],
-      includeConversationContext: true, persistentMemory: false,
-    }
+    editingAgent?.ragMemoryConfig || defaultRagConfigValues
   );
 
   const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(editingAgent?.enableArtifacts || false);
@@ -265,10 +257,7 @@ export function AgentBuilderDialog({
   const [localStoragePath, setLocalStoragePath] = React.useState<string>(editingAgent?.localStoragePath || '');
 
   const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(
-    editingAgent?.a2aConfig || {
-      enabled: false, communicationChannels: [], defaultResponseFormat: 'json',
-      maxMessageSize: 1024 * 1024, loggingEnabled: false,
-    }
+    editingAgent?.a2aConfig || defaultA2AConfigValues.a2aConfig!
   );
 
   const [workflowDescription, setWorkflowDescription] = React.useState(editingAgent?.workflowDescription || defaultWorkflowConfigValues.workflowDescription || "");
@@ -281,9 +270,12 @@ export function AgentBuilderDialog({
   
   const [customLogicDescription, setCustomLogicDescription] = React.useState(editingAgent?.customLogicDescription || defaultCustomConfigValues.customLogicDescription || "");
 
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, PageToolConfigData>>(editingAgent?.toolConfigsApplied || {});
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
+  // [REMOVIDO BLOCO DUPLICADO - manter apenas nos ESTADOS CONSOLIDADOS acima]
+// const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, PageToolConfigData>>(editingAgent?.toolConfigsApplied || {}); // Estado único consolidado
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
 
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState("");
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState("");
@@ -302,15 +294,9 @@ export function AgentBuilderDialog({
 
   const [activeTab, setActiveTab] = React.useState("configPrincipal");
 
-
-  // Initialize default personalities if not set by editingAgent
   if (agentToneOptions.length > 0 && !defaultLLMConfigValues.agentPersonality) {
     defaultLLMConfigValues.agentPersonality = agentToneOptions[0].label;
   }
-  // This was for defaultTaskAgentConfigValues, which is not used directly for state
-  // if (agentToneOptions.length > 0 && !defaultTaskAgentConfigValues.agentPersonality) {
-  //   defaultTaskAgentConfigValues.agentPersonality = agentToneOptions.find(opt => opt.id === "concise")?.label || agentToneOptions[0].label;
-  // }
 
   const resetLLMFields = (config: Partial<PageLLMAgentConfig> = {}) => {
     setAgentGoal(config.agentGoal || defaultLLMConfigValues.agentGoal);
@@ -335,15 +321,15 @@ export function AgentBuilderDialog({
     setCustomLogicDescription(config.customLogicDescription || defaultCustomConfigValues.customLogicDescription || "");
     if ('a2aConfig' in config && config.a2aConfig) {
         setA2AConfig(config.a2aConfig);
-    } else if (agentType === 'a2a' && !config.a2aConfig) { // Ensure A2A defaults if switching to A2A
-        setA2AConfig(defaultA2AAgentConfigValues.a2aConfig!);
+    } else if (selectedAgentType === 'a2a' && !config.a2aConfig) { 
+        setA2AConfig(defaultA2AConfigValues.a2aConfig!);
     }
   };
   
   const resetFormFields = (selectedType: DialogAgentType) => {
     const typeOption = propAgentTypeOptions.find(opt => opt.id === selectedType);
     const isEditingCurrentType = editingAgent?.agentType === selectedType;
-    const baseEditingAgent = editingAgent as PageSavedAgentConfiguration | null; // Cast for easier access
+    const baseEditingAgent = editingAgent as PageSavedAgentConfiguration | null; 
 
     setAgentName(isEditingCurrentType ? baseEditingAgent!.agentName : "");
     setAgentDescription(isEditingCurrentType ? baseEditingAgent!.agentDescription : (typeOption?.description || ""));
@@ -375,22 +361,22 @@ export function AgentBuilderDialog({
 
     if (selectedType === 'llm') {
       resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : defaultLLMConfigValues);
-      resetWorkflowFields(); // Clear other type fields
+      resetWorkflowFields(); 
       resetCustomLogicFields();
     } else if (selectedType === 'workflow' || selectedType === 'sequential' || selectedType === 'parallel' || selectedType === 'loop') {
       resetWorkflowFields(isEditingCurrentType ? baseEditingAgent as PageWorkflowAgentConfig : defaultWorkflowConfigValues);
-      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {}); // Allow optional LLM fields
+      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {}); 
       resetCustomLogicFields();
     } else if (selectedType === 'custom' ) {
       resetCustomLogicFields(isEditingCurrentType ? baseEditingAgent as PageCustomAgentConfig : defaultCustomConfigValues);
       resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {});
       resetWorkflowFields();
     } else if (selectedType === 'a2a') {
-        resetCustomLogicFields(isEditingCurrentType ? baseEditingAgent as A2AAgentConfig : defaultA2AConfigValues); // A2A uses customLogicDescription and its own a2aConfig
+        resetCustomLogicFields(isEditingCurrentType ? baseEditingAgent as A2AAgentConfig : defaultA2AConfigValues); 
         resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {});
         resetWorkflowFields();
-    } else { // task or other unhandled - treat as simple LLM for now or clear all
-      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : defaultLLMConfigValues); // Sensible default
+    } else { 
+      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : defaultLLMConfigValues); 
       resetWorkflowFields();
       resetCustomLogicFields();
     }
@@ -403,43 +389,25 @@ export function AgentBuilderDialog({
       setSelectedAgentTypeUI(toBaseAgentTypeUI(currentType));
       resetFormFields(currentType);
     } else {
-      // For new agent, reset to the initially selected type (or the first in the list)
       const typeToReset = agentType || (propAgentTypeOptions.length > 0 ? propAgentTypeOptions[0].id : 'llm');
       resetFormFields(typeToReset as DialogAgentType);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingAgent]); // Removed agentType from dependency array to avoid loop with setAgentType in handleAgentTypeChange
+  }, [editingAgent]); 
 
   const handleAgentTypeChange = (newAgentTypeValue: string) => {
     const newAgentType = newAgentTypeValue as DialogAgentType;
     setAgentType(newAgentType);
     setSelectedAgentTypeUI(toBaseAgentTypeUI(newAgentType));
-    // When type changes for a new agent or even during editing, reset fields according to the new type
     resetFormFields(newAgentType);
   };
 
-  // ... (constructSystemPrompt, handleInternalSave, handleToolSelectionChange, resetModalInputs, openToolConfigModal, handleSaveToolConfiguration remain largely the same for now)
-  // But handleInternalSave will need careful type alignment for finalConfig
-  // And handleFieldChange calls need to be implemented or removed
-
-  // Placeholder for handleFieldChange - this needs proper implementation based on how state is structured
-  const handleFieldChange = (field: string, value: any) => {
-    console.warn(`handleFieldChange called for ${field} with value ${value} - needs implementation.`);
-    // Example: if (field === 'agentFramework') setAgentFramework(value as AgentFramework);
-    if (field === 'agentFramework') {
-        setAgentFramework(value as AgentFramework);
-    }
-  };
-
-
   const constructSystemPrompt = () => {
-    // This function's logic seems mostly okay, ensure variables used are correctly scoped and available
     let prompt = `Você é um agente de IA. Seu nome é "${agentName || 'Agente'}".\n`;
     if (agentDescription) {
       prompt += `Sua descrição geral é: "${agentDescription}".\n`;
     }
   
-    const agentTypeDetail = propAgentTypeOptions.find(opt => opt.id === agentType); // Use propAgentTypeOptions
+    const agentTypeDetail = propAgentTypeOptions.find(opt => opt.id === agentType); 
     if(agentTypeDetail){
       prompt += `Seu tipo principal é ${agentTypeDetail.label.split(' (')[0].trim()}. ${agentTypeDetail.description}\n`;
     }
@@ -456,7 +424,7 @@ export function AgentBuilderDialog({
     }
     
     const isLLMRelevant = ['llm', 'task', 'a2a'].includes(agentType) || 
-                         ( ['workflow', 'custom'].includes(agentType) && // Adjusted this condition
+                         ( ['workflow', 'custom'].includes(agentType) && 
                            (agentGoal || agentTasks || agentPersonality || agentRestrictions || agentModel) );
 
     if (isLLMRelevant) {
@@ -483,139 +451,16 @@ export function AgentBuilderDialog({
   iconComponents: Record<string, React.ComponentType<any>>;
 }
 
-// Define local types for compatibility
-type BaseAgentType = 'llm' | 'workflow' | 'custom' | 'a2a';
-type AgentType = 'llm' | 'workflow' | 'sequential' | 'parallel' | 'loop' | 'custom' | 'a2a';
-
-// Define LoopTerminationCondition as a type to avoid duplicates
-type LoopTerminationCondition = 'tool' | 'state' | 'none'; // Simplified to only include valid values
-
-// Define RAG configuration type
-interface RagMemoryConfig {
-  enabled: boolean;
-  serviceType: 'in-memory' | 'vector-db' | 'hybrid';
-  similarityTopK: number;
-  vectorDistanceThreshold: number;
-  embeddingModel: string;
-  knowledgeSources: Array<{
-    type: 'text' | 'url' | 'file' | 'database';
-    content: string;
-    metadata?: Record<string, any>;
-  }>;
-  includeConversationContext: boolean;
-  persistentMemory: boolean;
-}
-
-// Define Artifact type
-interface ArtifactDefinition {
-  id: string;
-  name: string;
-  type: 'file' | 'data' | 'image' | 'document';
-  description: string;
-  storagePath: string;
-  metadata?: Record<string, any>;
-}
-
-// Define A2A Configuration type
-interface A2AConfigType {
-  enabled: boolean;
-  communicationChannels: Array<{
-    id: string;
-    type: 'http' | 'websocket' | 'grpc' | 'message-queue';
-    endpoint: string;
-    config: Record<string, any>;
-  }>;
-  defaultResponseFormat: 'json' | 'xml' | 'text' | 'binary';
-  maxMessageSize: number;
-  loggingEnabled: boolean;
-}
-
-// Define Tool Configuration type
-interface ToolConfigData {
-  [key: string]: any;
-  apiKey?: string;
-  apiEndpoint?: string;
-  isConfigured?: boolean;
-  // Add other tool-specific configuration properties as needed
-}
-
-// Helper type to map between agent types and their configs
-type AgentConfigMap = {
-  llm: LLMAgentConfig;
-  workflow: WorkflowAgentConfig;
-  sequential: WorkflowAgentConfig;
-  parallel: WorkflowAgentConfig;
-  loop: WorkflowAgentConfig;
-  custom: CustomAgentConfig;
-  a2a: A2AAgentConfig;
-};
-
-// Type for the page-specific AvailableTool
-type PageAvailableTool = ImportedPageAvailableTool;
-
-// Type for the saved agent configuration in the page component
-type PageSavedAgentConfiguration = ImportedPageSavedAgentConfiguration;
-
-// Type guard to check if a string is a valid AgentType
-const isAgentType = (type: string): type is AgentType => {
-  return ['llm', 'workflow', 'sequential', 'parallel', 'loop', 'custom', 'a2a'].includes(type);
-};
-
-// Helper functions for tool configuration
-// Helper function to safely get tool property
-const getToolProperty = <T,>(tool: PageAvailableTool | undefined, prop: keyof PageAvailableTool, defaultValue: T): T => {
-  return tool ? (tool[prop] as T) ?? defaultValue : defaultValue;
-};
-
-// Helper function to safely convert unknown values to ReactNode
-const safeToReactNode = (value: unknown): React.ReactNode => {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (React.isValidElement(value)) {
-    return value;
-  }
-  // For objects and arrays, convert to string representation
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (e) {
-    return String(value);
-  }
-};
-
-// Helper function to convert AgentType to BaseAgentType
 const toBaseAgentType = (type: AgentType): 'llm' | 'workflow' | 'custom' => {
-  // Map workflow types to 'workflow'
   if (['sequential', 'parallel', 'loop', 'workflow'].includes(type)) {
     return 'workflow';
   }
-  // Map 'a2a' to 'custom' for compatibility
   if (type === 'a2a') {
     return 'custom';
   }
-  // Default to 'llm' if the type is not recognized
   return type === 'llm' || type === 'custom' ? type : 'llm';
 };
 
-// Utility function to safely access tool properties and return ReactNode
-const getToolDisplayName = (tool: PageAvailableTool): React.ReactNode => {
-  return tool?.name || tool?.label || tool?.id || 'Unknown Tool';
-};
-
-const getToolDescription = (tool: PageAvailableTool): React.ReactNode => {
-  return tool?.description || 'No description available';
-};
-
-const getNeedsConfiguration = (tool: PageAvailableTool): boolean => {
-  return tool?.needsConfiguration || tool?.hasConfig || false;
-};
-
-const getToolGenkitName = (tool: PageAvailableTool): string | undefined => {
-  return tool?.genkitToolName;
-};
 
 const getToolIconName = (tool: PageAvailableTool): string | undefined => {
   if (!tool?.icon) return undefined;
@@ -637,14 +482,19 @@ export default function AgentBuilderDialog({
   const { toast } = useToast();
   const { saveAgent } = useAgents();
 
-  // Agent configuration state
-  const [agentName, setAgentName] = React.useState(editingAgent?.agentName || "");
-  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || "");
-  const [selectedAgentType, setSelectedAgentType] = React.useState<AgentType>('llm');
-  const [selectedTone, setSelectedTone] = React.useState('professional');
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  const [configuringTool, setConfiguringTool] = React.useState<string[]>(editingAgent?.agentTools || []);
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, any>>({});
+  const [agentName, setAgentName] = React.useState(editingAgent?.agentName || ""); // Estado único consolidado
+  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || ""); // Estado único consolidado
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [selectedAgentType, setSelectedAgentType] = React.useState<AgentType>('llm');
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [selectedTone, setSelectedTone] = React.useState('professional');
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [configuringTool, setConfiguringTool] = React.useState<string[]>(editingAgent?.agentTools || []);
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+// [REMOVIDO BLOCO DUPLICADO - manter apenas nos ESTADOS CONSOLIDADOS acima]
+// const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, any>>({});
   const [llmConfig, setLlmConfig] = React.useState({
     model: 'gpt-4',
     temperature: 0.7,
@@ -657,29 +507,31 @@ export default function AgentBuilderDialog({
     maxResults: 5,
     minRelevanceScore: 0.7,
   });
-  const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>(editingAgent?.a2aConfig || { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', loggingEnabled: false, maxMessageSize: 1024 * 1024 });
+  const [a2aConfig, setA2AConfig] = React.useState<A2AConfigType>({
+    enabled: false,
+    communicationChannels: [],
+    defaultResponseFormat: 'json',
+    loggingEnabled: false,
+    maxMessageSize: 1024 * 1024
+  });
   const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]);
   const [activeTab, setActiveTab] = React.useState('general');
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Derived state
   const currentAgentTools = React.useMemo(() => {
     return availableTools.filter(tool => 
       editingAgent?.tools?.some(t => t.toolId === tool.id)
     );
   }, [availableTools, editingAgent?.tools]);
 
-  // Update state when editingAgent changes
   React.useEffect(() => {
     if (editingAgent) {
       setAgentName(editingAgent.agentName || "");
       setAgentDescription(editingAgent.agentDescription || "");
       setSelectedAgentType(editingAgent.agentType as AgentType);
-      // Update other states based on editingAgent
     }
   }, [editingAgent]);
 
-  // Handle tool configuration
   const handleToolConfigure = (tool: PageAvailableTool) => {
     setConfiguringTool(tool);
     setIsToolConfigModalOpen(true);
@@ -701,7 +553,6 @@ export default function AgentBuilderDialog({
     }
   };
 
-  // Handle form submission
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -742,31 +593,29 @@ export default function AgentBuilderDialog({
     }
   };
 
-  // Form state
-  const [agentName, setAgentName] = React.useState(editingAgent?.agentName || '');
-  const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || '');
-  const [selectedAgentType, setSelectedAgentType] = React.useState<AgentType>(editingAgent?.agentType || 'llm');
-  const [selectedTone, setSelectedTone] = React.useState(editingAgent?.agentPersonality || (agentToneOptions.length > 0 ? agentToneOptions[0].label : ""));
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [agentName, setAgentName] = React.useState(editingAgent?.agentName || '');
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [agentDescription, setAgentDescription] = React.useState(editingAgent?.agentDescription || '');
+  const [selectedAgentType, setSelectedAgentType] = React.useState<DialogAgentType>(editingAgent?.agentType || 'llm'); // Estado único consolidado
+  const [selectedTone, setSelectedTone] = React.useState(editingAgent?.agentPersonality || (agentToneOptions.length > 0 ? agentToneOptions[0].label : "")); // Estado único consolidado
   
-  // Tool configuration state
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  // Agent configuration state
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false); // Estado único consolidado
+const [configuringTool, setConfiguringTool] = React.useState<PageAvailableTool | null>(null); // Estado único consolidado // Estado único consolidado
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+// [REMOVIDO BLOCO DUPLICADO - manter apenas nos ESTADOS CONSOLIDADOS acima]
+// const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, PageToolConfigData>>({});
+
   const [llmConfig, setLlmConfig] = React.useState<LLMAgentConfig>(
     editingAgent?.agentType === 'llm' ? { ...defaultLLMConfigValues, ...editingAgent } : defaultLLMConfigValues
   );
   
-  // Workflow state
   const [workflowDescription, setWorkflowDescription] = React.useState(
     editingAgent?.agentType === 'workflow' ? editingAgent.workflowDescription : ''
   );
   
-  // RAG configuration state
-  const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(editingAgent?.ragMemoryConfig || { enabled: false, serviceType: 'in-memory', similarityTopK: 5, vectorDistanceThreshold: 0.7, embeddingModel: "", knowledgeSources: [], includeConversationContext: true, persistentMemory: false });
+  const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(editingAgent?.ragMemoryConfig || defaultRagConfigValues);
   
-    if (selectedToolObjects.length > 0) {
-        prompt += `FERRAMENTAS DISPONÍVEIS PARA USO (Você deve decidir quando e como usá-las):\n`;
-        selectedToolObjects.forEach(tool => {
-            const currentToolConfig = toolConfigurations[tool.id];
             let statusMessage = "";
             if (getNeedsConfiguration(tool)) { // Use helper
                 const isConfigured = 
@@ -821,7 +670,8 @@ export default function AgentBuilderDialog({
   const [currentAgentTools, setCurrentAgentTools] = React.useState<string[]>(
     editingAgent?.agentTools || []
   );
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, PageToolConfigData>>(editingAgent?.toolConfigsApplied || {});
+  // [REMOVIDO BLOCO DUPLICADO - manter apenas nos ESTADOS CONSOLIDADOS acima]
+// const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, PageToolConfigData>>(editingAgent?.toolConfigsApplied || {}); // Estado único consolidado
   
   // State persistence
   const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false);
@@ -829,7 +679,7 @@ export default function AgentBuilderDialog({
   const [initialStateValues, setInitialStateValues] = React.useState<Record<string, string>>({});
   
   // State sharing
-  const [enableStateSharing, setEnableStateSharing] = React.useState<boolean>(false);
+  const [enableStateSharing, setEnableStateSharing] = React.useState(false);
   const [stateSharingStrategy, setStateSharingStrategy] = React.useState<"broadcast" | "selective">("selective");
   
   // RAG
@@ -846,7 +696,7 @@ export default function AgentBuilderDialog({
   });
   
   // Artifacts
-  const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(false);
+  const [enableArtifacts, setEnableArtifacts] = React.useState(false);
   const [artifactStorageType, setArtifactStorageType] = React.useState<"local" | "cloud">("local");
   const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]);
   const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>("");
@@ -862,8 +712,9 @@ export default function AgentBuilderDialog({
   });
   
   // Tool configuration modal
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState<boolean>(false);
-  const [configuringTool, setConfiguringTool] = React.useState<PageAvailableTool | null>(null);
+  // Mantém esta declaração. Remover todas as outras duplicadas abaixo.
+const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState<boolean>(false);
+  const [configuringTool, setConfiguringTool] = React.useState<PageAvailableTool | null>(null); // Estado único consolidado
   
   // Modal form state for tool configurations
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>("");
@@ -896,8 +747,6 @@ export default function AgentBuilderDialog({
   };
   
   // Handle saving tool configuration from the modal
-<<<<<<< HEAD
-=======
   // handleSaveToolConfiguration is defined later in the file, so we'll remove this duplicate
 
   const handleInternalSave = () => {
@@ -1121,7 +970,7 @@ export default function AgentBuilderDialog({
     setIsToolConfigModalOpen(false); setConfiguringTool(null);
     // Use configuringTool.name if it's a string, otherwise fallback to id or a generic name
     const toolDisplayName = typeof configuringTool.name === 'string' ? configuringTool.name : configuringTool.id;
-    toast({ title: `Configuração salva para ${toolDisplayName}`});
+    toast({ title: `Configuração salva para ${safeToReactNode(toolDisplayName)}`});
   };
 
   const selectedAgentTypeOption = propAgentTypeOptions.find(opt => opt.id === agentType); // Use propAgentTypeOptions
@@ -1712,22 +1561,12 @@ const prepareWorkflowConfig = () => {
         </DialogFooter>
 
         {isToolConfigModalOpen && configuringTool && (
-            <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => { if (!open) setConfiguringTool(null); setIsToolConfigModalOpen(open); }}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader> <DialogTitle>Configurar: {getToolDisplayName(configuringTool)}</DialogTitle> <DialogDescription>{getToolDescription(configuringTool)} Forneça os detalhes abaixo.</DialogDescription></DialogHeader>
-            <Dialog 
-                open={isToolConfigModalOpen} 
-                onOpenChange={(open) => {
-                    if (!open) setConfiguringTool(null);
-                    setIsToolConfigModalOpen(open);
-                }}
-            >
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Configurar: {configuringTool.name}
-                        </DialogTitle>
-                        <DialogDescription>
+  <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => { if (!open) setConfiguringTool(null); setIsToolConfigModalOpen(open); }}>
+    <DialogContent className="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Configurar: {getToolDisplayName(configuringTool)}</DialogTitle>
+        <DialogDescription>{getToolDescription(configuringTool)} Forneça os detalhes abaixo.</DialogDescription>
+      </DialogHeader>
                             {configuringTool.description} Forneça os detalhes de configuração abaixo.
                         </DialogDescription>
                     </DialogHeader>
