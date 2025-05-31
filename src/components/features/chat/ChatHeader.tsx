@@ -1,3 +1,5 @@
+// ChatHeader: Responsivo com título truncado (max-w-xs md:max-w-md), itens da direita com flex-wrap, e ocultação de elementos (ex: nome do usuário em md:inline).
+// O seletor de agente ADK também possui classes de largura (min-w, max-w) para melhor adaptação.
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -99,7 +101,8 @@ export default function ChatHeader({
         </h1>
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Adicionado flex-wrap para melhor responsividade em telas pequenas, permitindo que os itens quebrem linha se necessário. */}
+      <div className="flex items-center gap-3 flex-wrap">
         {/* Auth Status and Buttons */}
         {authLoading ? (
           <span className="text-sm text-muted-foreground">Loading user...</span>
@@ -165,24 +168,21 @@ export default function ChatHeader({
             </Select>
           </div>
         ) : (
+          // Componente AgentSelector para selecionar um "Gem" (agente configurado).
+          // A versão "Updated upstream" foi escolhida por:
+          // 1. Manter a propriedade `model: ''` em `savedAgents` para compatibilidade de tipo com SavedAgentConfiguration.
+          // 2. Preferir `showLabel={false}` e `triggerClassName=""` para uma interface mais compacta no header.
           <AgentSelector
-<<<<<<< Updated upstream
             onAgentSelected={handleGemSelect}
             selectedAgentId={selectedGemId ?? undefined}
             savedAgents={initialGems.map((gem) => ({
               id: gem.id,
               displayName: gem.name,
               description: gem.prompt,
-              model: '', // ajuste conforme necessário
+              model: '', // Mantido para compatibilidade de tipo.
             }))}
             showLabel={false}
             triggerClassName=""
-=======
-            savedAgents={initialGems.map(gem => ({ id: gem.id, displayName: gem.name, description: gem.prompt }))}
-            selectedAgentId={selectedGemId ?? undefined}
-            onAgentSelected={(id) => handleGemSelect(id)}
-            showLabel={true}
->>>>>>> Stashed changes
           />
         )}
 
@@ -199,5 +199,3 @@ export default function ChatHeader({
     </div>
   );
 }
-
-
