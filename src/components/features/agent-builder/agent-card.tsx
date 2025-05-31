@@ -40,12 +40,16 @@ import {
   EyeOff as EyeOffIcon,
   Save as SaveIcon,
 } from "lucide-react";
+// Update type imports to use centralized definitions
 import type {
   SavedAgentConfiguration,
-  AvailableTool,
-  ToolConfigData,
-  AgentConfig,
-} from "@/app/agent-builder/page"; // Importando tipos da página principal
+  AgentConfig, // General union type
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig, // For casting agent.config
+  // ToolConfigData is not directly used in props but good for context if needed later
+} from "@/types/agent-configs";
+import type { AvailableTool } from "@/types/tool-types"; // Assuming this is the correct path
 
 // Definindo iconComponents aqui, para mapear os nomes de string para os componentes de ícone importados
 const iconComponents: Record<
@@ -154,10 +158,10 @@ export function AgentCard({
   agentTypeOptions,
 }: AgentCardProps) {
   const agentTypeDetails = agentTypeOptions.find(
-    (opt) => opt.id === agent.agentType,
+    (opt) => opt.id === agent.config.type, // Access via agent.config.type
   );
   const agentTypeLabel =
-    agentTypeDetails?.label.split("(")[0].trim() || agent.agentType;
+    agentTypeDetails?.label.split("(")[0].trim() || agent.config.type; // Access via agent.config.type
 
   let AgentIconComponent: React.ReactNode;
   let specificIconType: keyof typeof iconComponents | undefined = undefined;
@@ -218,62 +222,62 @@ export function AgentCard({
               </Badge>
             </div>
             <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
-              {agent.agentDescription || "Sem descrição."}
+              {agent.description || "Sem descrição."} {/* Use agent.description */}
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 flex-grow pt-0">
-        {agent.agentType === "llm" && (agent as any).agentGoal && (
+        {agent.config.type === "llm" && (agent.config as LLMAgentConfig).agentGoal && (
           <div>
             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">
               Objetivo:
             </h4>
             <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-              {(agent as any).agentGoal}
+              {(agent.config as LLMAgentConfig).agentGoal}
             </p>
           </div>
         )}
-        {(agent.agentType === "llm" ||
-          (agent.agentType === "workflow" && (agent as any).agentModel) ||
-          (agent.agentType === "custom" && (agent as any).agentModel)) && (
+        {(agent.config.type === "llm" ||
+          agent.config.type === "workflow" || // Workflow can also have a model
+          agent.config.type === "custom") && (agent.config as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel && ( // More specific cast
           <div>
             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">
               Modelo de IA:
             </h4>
             <p className="text-xs text-muted-foreground">
-              {(agent as any).agentModel}
+              {(agent.config as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel}
             </p>
           </div>
         )}
-        {agent.agentType === "workflow" &&
-          (agent as any).workflowDescription && (
+        {agent.config.type === "workflow" &&
+          (agent.config as WorkflowAgentConfig).workflowDescription && (
             <div>
               <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">
                 Descrição do Fluxo:
               </h4>
               <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                {(agent as any).workflowDescription}
-                {(agent as any).detailedWorkflowType && (
+                {(agent.config as WorkflowAgentConfig).workflowDescription}
+                {(agent.config as WorkflowAgentConfig).detailedWorkflowType && (
                   <span className="block text-xs text-primary/70">
-                    Tipo: {(agent as any).detailedWorkflowType}
+                    Tipo: {(agent.config as WorkflowAgentConfig).detailedWorkflowType}
                   </span>
                 )}
               </p>
             </div>
           )}
-        {agent.agentType === "custom" &&
-          (agent as any).customLogicDescription && (
+        {agent.config.type === "custom" &&
+          (agent.config as CustomAgentConfig).customLogicDescription && (
             <div>
               <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">
                 Lógica Personalizada:
               </h4>
               <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                {(agent as any).customLogicDescription}
+                {(agent.config as CustomAgentConfig).customLogicDescription}
               </p>
             </div>
           )}
-        {agent.toolsDetails.length > 0 && (
+        {agent.toolsDetails && agent.toolsDetails.length > 0 && ( // Check if toolsDetails exists
           <div className="pt-2">
             <h4 className="text-sm font-semibold mb-1 text-foreground/80">
               Ferramentas:

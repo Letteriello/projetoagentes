@@ -1,11 +1,8 @@
 "use client";
 
 import * as React from "react";
-// ReactNode might be needed if agentTypeOptions icons are directly used here,
-// but they are passed to AgentCard and AgentBuilderDialog which would get it from agentBuilderConfig.ts
-// For safety, keeping ReactNode if it was in original top-level imports.
-import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+// Card components are used, keep them.
 import {
   Card,
   CardHeader,
@@ -21,7 +18,7 @@ import {
   Info,
   // Icons below are now part of iconComponents in agentBuilderConfig.ts,
   // so they are not directly needed here UNLESS AgentBuilderPage itself uses them.
-  // Search, Calculator, FileText, CalendarDays, Network, Database, Code2,
+  // Search, Calculator, FileText, CalendarDays, Network, Database, Code2, // Removed these direct icon imports
   // Workflow, Brain, FileJson, Settings2 as ConfigureIcon,
   // GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon,
   // Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon,
@@ -38,154 +35,156 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AvailableTool } from "@/types/tool-types";
+// import { AvailableTool } from "@/types/tool-types"; // Removed, will use from agentBuilderConfig
 
-// Interface já importada de @/types/tool-types
+// Comment related to AvailableTool import removed as the import itself is removed.
 
-export const availableTools: AvailableTool[] = [
-  {
-    id: "webSearch",
-    label: "Busca na Web (Google)",
-    name: "webSearch",
-    type: "genkit_native",
-    icon: Search,
-    description:
-      "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.",
-    hasConfig: true,
-    genkitToolName: "performWebSearch",
-  },
-  {
-    id: "calculator",
-    label: "Calculadora",
-    name: "calculator",
-    type: "genkit_native",
-    icon: Calculator,
-    description: "Permite realizar cálculos matemáticos (via função Genkit).",
-    genkitToolName: "calculator",
-  }, // Fixed escaped quote
-  {
-    id: "knowledgeBase",
-    label: "Consulta à Base de Conhecimento (RAG)",
-    name: "knowledgeBase",
-    type: "genkit_native",
-    icon: FileText,
-    description:
-      "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.",
-    hasConfig: true,
-    genkitToolName: "queryKnowledgeBase",
-  }, // Fixed escaped quote
-  {
-    id: "calendarAccess",
-    label: "Acesso à Agenda/Calendário",
-    name: "calendarAccess",
-    type: "genkit_native",
-    icon: CalendarDays,
-    description:
-      "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.",
-    hasConfig: true,
-    genkitToolName: "accessCalendar",
-  }, // Fixed escaped quote
-  {
-    id: "customApiIntegration",
-    label: "Integração com API Externa (OpenAPI)",
-    name: "customApiIntegration",
-    type: "genkit_native",
-    icon: Network,
-    description:
-      "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.",
-    hasConfig: true,
-    genkitToolName: "invokeOpenAPI",
-  }, // Fixed escaped quote
-  {
-    id: "databaseAccess",
-    label: "Acesso a Banco de Dados (SQL)",
-    name: "databaseAccess",
-    type: "genkit_native",
-    icon: Database,
-    description:
-      "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.",
-    hasConfig: true,
-    genkitToolName: "queryDatabase",
-  }, // Fixed escaped quote
-  {
-    id: "codeExecutor",
-    label: "Execução de Código (Python Sandbox)",
-    name: "codeExecutor",
-    type: "genkit_native",
-    icon: Code2,
-    description:
-      "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.",
-    hasConfig: true,
-    genkitToolName: "executeCode",
-  }, // Última ferramenta da lista
-]; // Fechamento do array de ferramentas
+// export const availableTools: AvailableTool[] = [ // Removed local definition
+//   {
+//     id: "webSearch",
+//     label: "Busca na Web (Google)",
+//     name: "webSearch",
+//     type: "genkit_native",
+//     icon: Search, // This would cause an error as Search is removed
+//     description:
+//       "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.",
+//     hasConfig: true,
+//     genkitToolName: "performWebSearch",
+//   },
+//   {
+//     id: "calculator",
+//     label: "Calculadora",
+//     name: "calculator",
+//     type: "genkit_native",
+//     icon: Calculator, // This would cause an error
+//     description: "Permite realizar cálculos matemáticos (via função Genkit).",
+//     genkitToolName: "calculator",
+//   },
+//   {
+//     id: "knowledgeBase",
+//     label: "Consulta à Base de Conhecimento (RAG)",
+//     name: "knowledgeBase",
+//     type: "genkit_native",
+//     icon: FileText, // This would cause an error
+//     description:
+//       "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.",
+//     hasConfig: true,
+//     genkitToolName: "queryKnowledgeBase",
+//   },
+//   {
+//     id: "calendarAccess",
+//     label: "Acesso à Agenda/Calendário",
+//     name: "calendarAccess",
+//     type: "genkit_native",
+//     icon: CalendarDays, // This would cause an error
+//     description:
+//       "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.",
+//     hasConfig: true,
+//     genkitToolName: "accessCalendar",
+//   },
+//   {
+//     id: "customApiIntegration",
+//     label: "Integração com API Externa (OpenAPI)",
+//     name: "customApiIntegration",
+//     type: "genkit_native",
+//     icon: Network, // This would cause an error
+//     description:
+//       "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.",
+//     hasConfig: true,
+//     genkitToolName: "invokeOpenAPI",
+//   },
+//   {
+//     id: "databaseAccess",
+//     label: "Acesso a Banco de Dados (SQL)",
+//     name: "databaseAccess",
+//     type: "genkit_native",
+//     icon: Database, // This would cause an error
+//     description:
+//       "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.",
+//     hasConfig: true,
+//     genkitToolName: "queryDatabase",
+//   },
+//   {
+//     id: "codeExecutor",
+//     label: "Execução de Código (Python Sandbox)",
+//     name: "codeExecutor",
+//     type: "genkit_native",
+//     icon: Code2, // This would cause an error
+//     description:
+//       "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.",
+//     hasConfig: true,
+//     genkitToolName: "executeCode",
+//   },
+// ];
 
-// Interface já importada de @/types/tool-types
+// Comment related to AvailableTool import removed as the import itself is removed.
 
-// A lista de ferramentas já foi definida acima.
+// A lista de ferramentas já foi definida acima. // This comment is now misleading
 // Se precisar adicionar mais ferramentas, adicione-as ao array existente acima.
 
-export const agentToneOptions = [
-  { id: "friendly", label: "Amigável e Prestativo" },
-  { id: "professional", label: "Profissional e Direto" },
-  { id: "formal", label: "Formal e Educado" },
-  { id: "casual", label: "Casual e Descontraído" },
-  { id: "funny", label: "Engraçado e Divertido" },
-  { id: "analytical", label: "Analítico e Detalhista" },
-  { id: "concise", label: "Conciso e Objetivo" },
-  { id: "empathetic", label: "Empático e Compreensivo" },
-  { id: "creative", label: "Criativo e Inspirador" },
-];
+// export const agentToneOptions = [ // Removed local definition
+//   { id: "friendly", label: "Amigável e Prestativo" },
+//   { id: "professional", label: "Profissional e Direto" },
+//   { id: "formal", label: "Formal e Educado" },
+//   { id: "casual", label: "Casual e Descontraído" },
+//   { id: "funny", label: "Engraçado e Divertido" },
+//   { id: "analytical", label: "Analítico e Detalhista" },
+//   { id: "concise", label: "Conciso e Objetivo" },
+//   { id: "empathetic", label: "Empático e Compreensivo" },
+//   { id: "creative", label: "Criativo e Inspirador" },
+// ];
 
-export const agentTypeOptions = [
-  {
-    id: "custom" as const,
-    label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)",
-    icon: FileJson as ReactNode,
-    description:
-      "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl).",
-  },
-  {
-    id: "a2a" as const,
-    label: "Agente-para-Agente (A2A)",
-    icon: Network as ReactNode,
-    description:
-      "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas.",
-  },
-];
+// export const agentTypeOptions = [ // Removed local definition
+//   {
+//     id: "custom" as const,
+//     label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)",
+//     icon: FileJson as ReactNode, // This would cause an error
+//     description:
+//       "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl).",
+//   },
+//   {
+//     id: "a2a" as const,
+//     label: "Agente-para-Agente (A2A)",
+//     icon: Network as ReactNode, // This would cause an error
+//     description:
+//       "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas.",
+//   },
+// ];
 
-export type AgentFramework =
-  | "genkit"
-  | "crewai"
-  | "langchain"
-  | "custom"
-  | "none"; // Added AgentFramework type
+// export type AgentFramework = // Removed local definition
+//   | "genkit"
+//   | "crewai"
+//   | "langchain"
+//   | "custom"
+//   | "none";
 
-export interface AgentConfigBase {
-  agentName: string;
-  agentDescription: string;
-  agentVersion: string;
-  agentIcon?: string; // Ícone do agente (nome do componente do ícone)
-  agentTools: string[];
-  isRootAgent?: boolean; // Indica se este é um agente raiz em um sistema multi-agente
-  subAgents?: string[]; // Lista de IDs de agentes que podem ser delegados
-  globalInstruction?: string; // Instrução global que se aplica a todos os agentes na árvore
-  agentFramework?: AgentFramework; // Added agentFramework
-}
+// export interface AgentConfigBase { // Removed local definition
+//   agentName: string;
+//   agentDescription: string;
+//   agentVersion: string;
+//   agentIcon?: string;
+//   agentTools: string[];
+//   isRootAgent?: boolean;
+//   subAgents?: string[];
+//   globalInstruction?: string;
+//   agentFramework?: AgentFramework;
+// }
 
 // Imports from the new data file
 import {
-  AvailableTool, // This specific type might be needed if AgentCard or AgentBuilderDialog expect it directly via props from this page.
+  // AvailableTool, // This specific type might be needed if AgentCard or AgentBuilderDialog expect it directly via props from this page.
                  // However, the constant availableTools (which is a list of AvailableTool) is what's passed.
                  // The type for the prop in AgentCard/AgentBuilderDialog should ideally also point to the new file.
                  // For now, assuming page.tsx doesn't need to destructure or type local vars with AvailableTool itself.
-  availableTools,
-  agentToneOptions,
-  agentTypeOptions,
-  SavedAgentConfiguration, // Used for useState<SavedAgentConfiguration | null>(null);
-  iconComponents,
+  // No longer importing AvailableTool type directly here, relying on type inference or types in consumed components.
+  availableTools, // This is the data
+  agentToneOptions, // This is the data
+  agentTypeOptions, // This is the data
+  // SavedAgentConfiguration is now imported from agent-configs.ts
+  iconComponents, // This is the data for icons
   agentTemplates // Used by AgentBuilderDialog
 } from "@/data/agentBuilderConfig";
+import type { SavedAgentConfiguration } from "@/types/agent-configs"; // Import the new type
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();

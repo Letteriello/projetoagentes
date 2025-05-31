@@ -70,69 +70,32 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Tipos de fontes de conhecimento para RAG
-export type KnowledgeSourceType =
-  | "document"
-  | "website"
-  | "api"
-  | "database"
-  | "custom";
-
-// Interface para uma fonte de conhecimento RAG
-export interface KnowledgeSource {
-  id: string;
-  name: string;
-  type: KnowledgeSourceType;
-  description: string;
-  location: string;
-  credentials?: string;
-  format?: string;
-  updateFrequency?: "static" | "daily" | "weekly" | "monthly" | "custom";
-  enabled: boolean;
-}
-
-// Tipos de serviços de memória/RAG suportados
-export type MemoryServiceType = "in-memory" | "vertex-ai-rag" | "custom";
-
-// Configuração do serviço de memória/RAG
-export interface RagMemoryConfig {
-  enabled: boolean;
-  serviceType: MemoryServiceType;
-  projectId?: string;
-  location?: string;
-  ragCorpusName?: string;
-  similarityTopK: number;
-  vectorDistanceThreshold: number;
-  embeddingModel?: string;
-  knowledgeSources: KnowledgeSource[];
-  includeConversationContext: boolean;
-  persistentMemory: boolean;
-}
+// Import centralized types
+import type {
+  RagMemoryConfig,
+  KnowledgeSource,
+  KnowledgeSourceType,
+  MemoryServiceType, // Assuming MemoryServiceType is also part of agent-types.ts or a similar central place.
+                     // If not, it might need to be added there or kept local if truly specific.
+                     // For now, let's assume it's available from agent-types.ts or should be.
+  InitialStateValue // Define or import this if it's the new structure for initialStateValues
+} from "@/types/agent-types"; // Adjust path if RagMemoryConfig and others are elsewhere (e.g. agent-configs re-exporting them)
 
 // Interface para o componente
 interface MemoryKnowledgeTabProps {
   // Configuração principal de RAG
-  ragMemoryConfig: RagMemoryConfig;
-  setRagMemoryConfig: React.Dispatch<React.SetStateAction<RagMemoryConfig>>;
+  ragMemoryConfig: RagMemoryConfig; // Uses imported RagMemoryConfig
+  setRagMemoryConfig: React.Dispatch<React.SetStateAction<RagMemoryConfig>>; // Uses imported RagMemoryConfig
 
   // Estado e persistência
   enableStatePersistence: boolean;
   setEnableStatePersistence: (enabled: boolean) => void;
   statePersistenceType: "session" | "memory" | "database";
   setStatePersistenceType: (type: "session" | "memory" | "database") => void;
-  initialStateValues: Array<{
-    key: string;
-    value: string;
-    scope: "global" | "agent" | "temporary";
-    description: string;
-  }>;
+  // Align with centralized initialState type: Array<{ key: string; value: any; }>
+  initialStateValues: Array<{ key: string; value: any; }>;
   setInitialStateValues: (
-    values: Array<{
-      key: string;
-      value: string;
-      scope: "global" | "agent" | "temporary";
-      description: string;
-    }>,
+    values: Array<{ key: string; value: any; }>,
   ) => void;
 
   // Compartilhamento de estado
@@ -163,23 +126,6 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
   stateSharingStrategy,
   setStateSharingStrategy,
   enableRAG,
-<<<<<<< Updated upstream
-  setEnableRAG,
-}: MemoryKnowledgeTabProps) {
-  const [activeMemoryTab, setActiveMemoryTab] = React.useState("estado"); // Aba padrão
-
-  return (
-    <div className="space-y-6">
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>
-          Nota sobre Configurações de Memória e Conhecimento
-        </AlertTitle>
-        <AlertDescription>
-          Esta seção permite configurar como o agente gerencia sua memória de
-          curto e longo prazo, e como ele acessa fontes de conhecimento para
-          enriquecer suas respostas (RAG).
-=======
   setEnableRAG
 }) => {
   // Estado para controlar a aba ativa
@@ -197,16 +143,17 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
   
   // Estado para adição de novos valores iniciais
   const [showNewStateForm, setShowNewStateForm] = React.useState(false);
+  // Simplified newStateValue to align with centralized initialState type
   const [newStateValue, setNewStateValue] = React.useState<{
     key: string;
     value: string;
-    scope: 'global' | 'agent' | 'temporary';
-    description: string;
+    // scope and description are removed as they are not in the centralized type
+    // If they are needed, the centralized type must be updated first.
   }>({
     key: '',
     value: '',
-    scope: 'agent',
-    description: ''
+    // scope: 'agent', // Removed
+    // description: '' // Removed
   });
 
   // O estado para seleção de aba já foi definido na linha 140
@@ -284,20 +231,18 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
 
   // Adicionar novo valor de estado inicial
   const handleAddStateValue = () => {
-    if (!newStateValue.key) return;
+    if (!newStateValue.key) return; // Simple validation
     
+    // Adapt to the new structure for initialStateValues
     setInitialStateValues([...initialStateValues, { 
       key: newStateValue.key,
-      value: newStateValue.value,
-      scope: newStateValue.scope,
-      description: newStateValue.description
+      value: newStateValue.value, // Value is stored directly
+      // scope and description are not part of the new structure
     }]);
     
-    setNewStateValue({
+    setNewStateValue({ // Reset to the simplified structure
       key: '',
       value: '',
-      scope: 'agent',
-      description: ''
     });
     
     setShowNewStateForm(false);
@@ -320,7 +265,6 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
         <AlertDescription className="text-xs">
           Configure como o agente gerencia seu estado, memória e acessa conhecimento externo.
           Isso permite que o agente mantenha contexto entre interações e responda com base em dados específicos.
->>>>>>> Stashed changes
         </AlertDescription>
       </Alert>
 
@@ -362,35 +306,6 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                 </Label>
               </div>
               {enableStatePersistence && (
-<<<<<<< Updated upstream
-                <div className="space-y-2">
-                  <Label htmlFor="state-persistence-type">
-                    Tipo de Persistência
-                  </Label>
-                  <Select
-                    value={statePersistenceType}
-                    onValueChange={
-                      setStatePersistenceType as (
-                        value: "session" | "memory" | "database",
-                      ) => void
-                    }
-                  >
-                    <SelectTrigger id="state-persistence-type">
-                      <SelectValue placeholder="Selecione o tipo de persistência" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="session">
-                        Sessão do Navegador (Temporário)
-                      </SelectItem>
-                      <SelectItem value="memory">
-                        Memória Interna do Agente
-                      </SelectItem>
-                      <SelectItem value="database">
-                        Banco de Dados (Ex: Firestore)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-=======
                 <div className="mt-4 space-y-4 pl-6">
                   <div className="grid grid-cols-[200px_1fr] items-center gap-x-4">
                     <Label htmlFor="statePersistenceType" className="flex items-center">
@@ -438,20 +353,7 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                                         <TooltipContent><p>O valor inicial para esta variável de estado. Deve ser um valor JSON válido (ex: "algum texto", 123, true, {"{"}"subChave":"subValor"{"}"},  [1,2,3]).</p></TooltipContent>
                                     </Tooltip>
                                 </TableHead>
-                                <TableHead>Escopo
-                                    <Tooltip>
-                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                            <p>Define a visibilidade e o ciclo de vida da variável de estado no contexto ADK:</p>
-                                            <ul className="list-disc pl-4 mt-1 text-xs">
-                                                <li><strong>Global:</strong> O estado é compartilhado por todas as instâncias de todos os agentes no sistema.</li>
-                                                <li><strong>Agente:</strong> O estado é específico para esta configuração de agente. Diferentes instâncias deste agente podem ter seus próprios valores se não usarem um ID de persistência compartilhado.</li>
-                                                <li><strong>Temporário:</strong> O estado tem uma vida útil curta, tipicamente associado a uma interação ou sessão específica, gerenciado pelos escopos do ADK.</li>
-                                            </ul>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TableHead>
-                                <TableHead>Descrição</TableHead>
+                                {/* Scope and Description columns removed from table as they are not in centralized type */}
                                 <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -459,15 +361,19 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                             {initialStateValues.map((item, index) => (
                                 <TableRow key={index}>
                                     <TableCell>{item.key}</TableCell>
-                                    <TableCell><Badge variant="outline" className="font-mono">{item.value}</Badge></TableCell>
-                                    <TableCell>{item.scope}</TableCell>
-                                    <TableCell className="text-xs">{item.description}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className="font-mono">
+                                            {typeof item.value === 'string' ? item.value : JSON.stringify(item.value)}
+                                        </Badge>
+                                    </TableCell>
+                                    {/* <TableCell>{item.scope}</TableCell> */} {/* Removed */}
+                                    {/* <TableCell className="text-xs">{item.description}</TableCell> */} {/* Removed */}
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon" onClick={() => handleRemoveStateValue(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {initialStateValues.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum valor inicial definido.</TableCell></TableRow>}
+                            {initialStateValues.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Nenhum valor inicial definido.</TableCell></TableRow>} {/* Adjusted colSpan */}
                         </TableBody>
                     </Table>
                     <Button variant="outline" size="sm" onClick={() => setShowNewStateForm(true)} className="mt-2"><Plus className="mr-2 h-4 w-4" /> Adicionar Valor de Estado</Button>
@@ -475,6 +381,8 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                         <Card className="mt-2 p-4 space-y-3 bg-muted/50">
                             <Input placeholder="Chave (ex: userRole)" value={newStateValue.key} onChange={(e) => setNewStateValue(prev => ({...prev, key: e.target.value}))} />
                             <Textarea placeholder='Valor (JSON válido, ex: "admin" ou {"theme":"dark"})' value={newStateValue.value} onChange={(e) => setNewStateValue(prev => ({...prev, value: e.target.value}))} rows={2}/>
+                            {/* UI for scope and description removed */}
+                            {/*
                             <Select value={newStateValue.scope} onValueChange={(v) => setNewStateValue(prev => ({...prev, scope: v as any}))}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -484,6 +392,7 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                                 </SelectContent>
                             </Select>
                             <Input placeholder="Descrição (opcional)" value={newStateValue.description} onChange={(e) => setNewStateValue(prev => ({...prev, description: e.target.value}))} />
+                            */}
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => setShowNewStateForm(false)}>Cancelar</Button>
                                 <Button size="sm" onClick={handleAddStateValue}>Adicionar</Button>
@@ -491,7 +400,6 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                         </Card>
                     )}
                   </div>
->>>>>>> Stashed changes
                 </div>
               )}
               {/* TODO: Adicionar controles para initialStateValues e stateSharing */}
@@ -587,16 +495,6 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-<<<<<<< Updated upstream
-              {/* TODO: Implementar UI para gerenciar ragMemoryConfig.knowledgeSources */}
-              <p>
-                Lista de fontes de conhecimento e opções para
-                adicionar/remover/configurar cada uma.
-              </p>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> Adicionar Fonte
-              </Button>
-=======
               <div className="flex items-center space-x-2">
                 <Switch
                     id="enableStateSharing"
@@ -637,7 +535,6 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                     </Select>
                 </div>
               )}
->>>>>>> Stashed changes
             </CardContent>
           </Card>
         </TabsContent>

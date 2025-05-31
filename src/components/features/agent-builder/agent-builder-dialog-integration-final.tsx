@@ -54,6 +54,7 @@ import { cn } from "@/lib/utils";
 import { ToolsTab } from "./tools-tab";
 import { allTools } from "@/app/agent-builder/available-tools";
 import { AvailableTool } from "@/types/tool-types";
+import type { ToolConfigData } from "@/types/agent-configs"; // Import the new type
 
 /**
  * Componente que integra a nova Tab de Ferramentas ao AgentBuilderDialog
@@ -65,9 +66,9 @@ export const ToolsTabIntegrationFinal: React.FC<{
   availableTools: AvailableTool[];
   currentAgentTools: string[];
   setCurrentAgentTools: React.Dispatch<React.SetStateAction<string[]>>;
-  toolConfigurations: Record<string, any>;
+  toolConfigurations: Record<string, ToolConfigData>; // Use ToolConfigData
   setToolConfigurations: React.Dispatch<
-    React.SetStateAction<Record<string, any>>
+    React.SetStateAction<Record<string, ToolConfigData>> // Use ToolConfigData
   >;
   openToolConfigModal: (tool: AvailableTool) => void;
 }> = ({
