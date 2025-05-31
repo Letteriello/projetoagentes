@@ -31,6 +31,15 @@ const nextConfig = {
   
   // Melhorias para chunks e cache
   webpack: (config, { isServer, dev }) => {
+    // Adicionar loader para Handlebars
+    config.module.rules.push({
+      test: /\.hbs$/,
+      use: 'handlebars-loader',
+    });
+
+    // Configuração para ignorar avisos de require.extensions
+    config.module.noParse = /(node_modules\/|\\.hbs$)/;
+    
     // Melhoria cruzada para TODOS os chunks para evitar ChunkLoadError
     config.optimization = {
       ...config.optimization,

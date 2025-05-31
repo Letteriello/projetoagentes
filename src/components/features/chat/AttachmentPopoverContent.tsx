@@ -1,13 +1,20 @@
 // Componente AttachmentPopoverContent
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { X, FileText, FileType as FileIcon, FileJson, FileBadge, FileCode2 } from 'lucide-react'; 
-import { cn } from '@/lib/utils';
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import {
+  X,
+  FileText,
+  FileType as FileIcon,
+  FileJson,
+  FileBadge,
+  FileCode2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AttachmentPopoverContentProps {
   fileName: string;
-  fileDataUri: string | null; 
-  fileType?: string; 
+  fileDataUri: string | null;
+  fileType?: string;
   onRemoveAttachment: () => void;
 }
 
@@ -17,7 +24,7 @@ export default function AttachmentPopoverContent({
   fileType,
   onRemoveAttachment,
 }: AttachmentPopoverContentProps) {
-  const isImage = fileType?.startsWith('image/');
+  const isImage = fileType?.startsWith("image/");
 
   const renderFilePreview = () => {
     if (isImage && fileDataUri) {
@@ -30,22 +37,30 @@ export default function AttachmentPopoverContent({
         />
       );
     }
-    if (fileType === 'application/pdf') {
-      return <FileIcon className="w-16 h-16 text-muted-foreground/70" />; 
+    if (fileType === "application/pdf") {
+      return <FileIcon className="w-16 h-16 text-muted-foreground/70" />;
     }
-    if (fileType === 'text/plain') {
+    if (fileType === "text/plain") {
       return <FileText className="w-16 h-16 text-muted-foreground/70" />;
     }
-    if (fileType === 'application/json') {
+    if (fileType === "application/json") {
       return <FileJson className="w-16 h-16 text-muted-foreground/70" />;
     }
-    if (fileType?.includes('csv') || fileType?.includes('excel') || fileType?.includes('spreadsheet')) {
-        return <FileBadge className="w-16 h-16 text-muted-foreground/70" />; 
+    if (
+      fileType?.includes("csv") ||
+      fileType?.includes("excel") ||
+      fileType?.includes("spreadsheet")
+    ) {
+      return <FileBadge className="w-16 h-16 text-muted-foreground/70" />;
     }
-    if (fileType?.startsWith('text/') || fileType?.includes('script') || fileType?.includes('code')) {
-        return <FileCode2 className="w-16 h-16 text-muted-foreground/70" />;
+    if (
+      fileType?.startsWith("text/") ||
+      fileType?.includes("script") ||
+      fileType?.includes("code")
+    ) {
+      return <FileCode2 className="w-16 h-16 text-muted-foreground/70" />;
     }
-    return <FileIcon className="w-16 h-16 text-muted-foreground/70" />; 
+    return <FileIcon className="w-16 h-16 text-muted-foreground/70" />;
   };
 
   return (
@@ -54,7 +69,12 @@ export default function AttachmentPopoverContent({
         <span className="text-sm font-medium truncate" title={fileName}>
           {fileName}
         </span>
-        <Button variant="ghost" size="icon" onClick={onRemoveAttachment} className="h-7 w-7 p-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onRemoveAttachment}
+          className="h-7 w-7 p-1"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>

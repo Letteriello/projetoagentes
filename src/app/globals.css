@@ -1,40 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
 @layer base {
   :root {
+    --font-inter: 'Inter var', sans-serif;
     /* Light Theme - Default */
-    --background: 0 0% 100%; /* White */
-    --foreground: 222.2 84% 4.9%; /* Dark Gray/Almost Black */
-
-    --card: 0 0% 100%; /* White */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 200 100% 45%; /* Blue */
-    --primary-foreground: 210 40% 98%; /* Almost white for contrast */
-
-    --secondary: 210 40% 96.1%; /* Light Gray */
+    --primary: 200 100% 45%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 180 90% 45%; /* Teal/Turquoise */
+    --accent: 180 90% 45%;
     --accent-foreground: 222.2 47.4% 11.2%;
-
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 200 100% 45%;
-
     --radius: 0.5rem;
-
-    /* Sidebar - Light Theme */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 84% 4.9%;
     --sidebar-primary: 200 100% 45%;
@@ -43,63 +38,47 @@
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 200 100% 45%;
-
-    /* Chat UI específico - Light Theme */
-    --chat-bubble-user: 217 100% 96%; /* Azul claro vibrante */
-    --chat-bubble-agent: 264 100% 98%; /* Roxo claro */
-    --chat-input-bg: 0 0% 100%; /* Branco */
+    --chat-bubble-user: 217 100% 96%;
+    --chat-bubble-agent: 264 100% 98%;
+    --chat-input-bg: 0 0% 100%;
     --feature-button-bg: 217 100% 97%;
     --feature-button-hover: 264 100% 96%;
     --feature-button-icon: 256 100% 60%;
     --suggestion-card-bg: 0 0% 100%;
     --suggestion-card-border: 217 100% 90%;
     --suggestion-card-hover: 217 100% 98%;
-    /* Gradiente para header/chat */
     --brand-gradient: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
     --brand-gradient-dark: linear-gradient(90deg, #1e40af 0%, #6d28d9 100%);
     --brand-accent: #2563eb;
     --brand-accent-dark: #7c3aed;
-
     --chart-1: 200 80% 45%;
     --chart-2: 170 70% 40%;
     --chart-3: 280 70% 55%;
     --chart-4: 40 90% 50%;
     --chart-5: 0 80% 55%;
-    
-    /* Transição de tema */
     --theme-transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
 
   .dark {
-    /* Dark Tech Theme */
-    --background: 220 20% 12%; /* Very Dark Blue/Charcoal */
-    --foreground: 210 40% 95%; /* Light Gray/Off-white */
-
-    --card: 220 20% 16%; /* Slightly Lighter Dark Blue */
+    --background: 220 20% 12%;
+    --foreground: 210 40% 95%;
+    --card: 220 20% 16%;
     --card-foreground: 210 40% 95%;
-
     --popover: 220 20% 14%;
     --popover-foreground: 210 40% 95%;
-
-    --primary: 200 100% 55%; /* Electric Blue/Cyan */
-    --primary-foreground: 220 20% 10%; /* Dark text for contrast on primary */
-
-    --secondary: 210 15% 30%; /* Muted Dark Blue/Gray */
+    --primary: 200 100% 55%;
+    --primary-foreground: 220 20% 10%;
+    --secondary: 210 15% 30%;
     --secondary-foreground: 210 30% 85%;
-
-    --muted: 220 15% 22%; /* Darker Muted Blue/Gray */
-    --muted-foreground: 210 25% 65%; /* Muted Gray Text */
-
-    --accent: 180 90% 45%; /* Vibrant Teal/Turquoise */
-    --accent-foreground: 220 20% 10%; /* Dark text for contrast on accent */
-
+    --muted: 220 15% 22%;
+    --muted-foreground: 210 25% 65%;
+    --accent: 180 90% 45%;
+    --accent-foreground: 220 20% 10%;
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 220 15% 25%; /* Subtle Dark Border */
-    --input: 220 15% 25%; /* Same as border for inputs */
-    --ring: 200 100% 60%; /* Brighter Primary for rings */
-    
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 200 100% 60%;
     --sidebar-background: 220 20% 14%;
     --sidebar-foreground: 210 35% 88%;
     --sidebar-primary: 200 100% 55%;
@@ -108,8 +87,6 @@
     --sidebar-accent-foreground: 220 20% 10%;
     --sidebar-border: 220 15% 20%;
     --sidebar-ring: 200 100% 60%;
-    
-    /* Chat UI específico - Dark Theme */
     --chat-bubble-user: 200 100% 15%;
     --chat-bubble-agent: 220 20% 18%;
     --chat-input-bg: 220 20% 16%;
@@ -119,7 +96,6 @@
     --suggestion-card-bg: 220 20% 16%;
     --suggestion-card-border: 220 15% 25%;
     --suggestion-card-hover: 220 20% 20%;
-
     --chart-1: 200 80% 60%;
     --chart-2: 170 70% 50%;
     --chart-3: 280 70% 65%;
@@ -129,16 +105,20 @@
 }
 
 @layer base {
+  :root {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+  
   * {
     @apply border-border;
     transition: var(--theme-transition);
   }
+  
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }
 
-/* Utilitários para o tema */
 @layer utilities {
   .chat-bubble-user {
     @apply bg-[hsl(var(--chat-bubble-user))];
@@ -177,7 +157,6 @@
   }
 }
 
-/* Custom animation for blinking cursor */
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -190,7 +169,6 @@
 @layer components {
   .sidebar-item-active-glow {
     position: relative;
-    /* overflow: hidden; is already on the button via Tailwind class */
   }
 
   .sidebar-item-active-glow::before {
@@ -198,26 +176,25 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 250%; /* Adjust size for desired glow spread */
+    width: 250%;
     height: 250%;
     transform-origin: center center;
     transform: translate(-50%, -50%) rotate(0deg);
     background: conic-gradient(
       from 0deg at 50% 50%,
       transparent 0%,
-      transparent 70%, /* Majority transparent */
-      hsl(var(--primary) / 0.0) 80%, /* Start of soft transparent edge of glow */
-      hsl(var(--primary) / 0.7) 85%, /* Visible glow part 1 */
-      hsl(var(--primary)) 90%,       /* Peak of glow */
-      hsl(var(--primary) / 0.7) 95%, /* Visible glow part 2 */
-      hsl(var(--primary) / 0.0) 100% /* End of soft transparent edge of glow */
+      transparent 70%,
+      hsl(var(--primary) / 0.0) 80%,
+      hsl(var(--primary) / 0.7) 85%,
+      hsl(var(--primary)) 90%,
+      hsl(var(--primary) / 0.7) 95%,
+      hsl(var(--primary) / 0.0) 100%
     );
     animation: rotateGlow 4s linear infinite;
-    z-index: 0; /* Behind the button's actual background but above its container's bg */
-    border-radius: inherit; /* Inherit border-radius from parent button */
+    z-index: 0;
+    border-radius: inherit;
   }
 
-  /* Ensure button content (icon, text) is above the glow pseudo-element */
   .sidebar-item-active-glow > * {
     position: relative;
     z-index: 1;
@@ -232,13 +209,12 @@
     }
   }
 
-  /* Estilos para o logo "Aida" */
   .aida-logo-text {
-    font-weight: 600; /* semibold, mais suave que bold */
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em; 
     position: relative; 
-    animation: pulse-glow-text 4s ease-in-out infinite; /* Duração maior para pulso mais lento */
+    animation: pulse-glow-text 4s ease-in-out infinite;
     font-size: 1.75rem; 
     line-height: 1; 
     color: hsl(var(--sidebar-primary)); 
@@ -247,21 +223,18 @@
   @keyframes pulse-glow-text {
     0%, 100% {
       text-shadow: 
-        0 0 3px hsl(var(--sidebar-primary) / 0.4), /* Mais sutil: menor raio, menor opacidade */
-        0 0 6px hsl(var(--sidebar-primary) / 0.2); /* Camada de brilho ainda mais suave */
+        0 0 3px hsl(var(--sidebar-primary) / 0.4),
+        0 0 6px hsl(var(--sidebar-primary) / 0.2);
     }
     50% {
       text-shadow: 
-        0 0 5px hsl(var(--sidebar-primary) / 0.6), /* Pico de brilho mais contido */
-        0 0 10px hsl(var(--sidebar-primary) / 0.35); /* Segunda camada mais contida */
+        0 0 5px hsl(var(--sidebar-primary) / 0.6),
+        0 0 10px hsl(var(--sidebar-primary) / 0.35);
     }
   }
 
-  /* Efeito de brilho pulsante para botões de ação */
   .button-live-glow {
     animation: pulse-button-glow 3s ease-in-out infinite;
-    /* Garante que o brilho não aumente o tamanho do botão */
-    /* O brilho será um box-shadow, então não afeta o layout */
   }
 
   @keyframes pulse-button-glow {

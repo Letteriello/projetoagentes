@@ -3,14 +3,9 @@
 import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
 import { Cpu, Wand2, Info, AlertCircle, ChevronLeft } from "lucide-react";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { 
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -58,10 +53,10 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
     configurable: false,
     requiresAuth: false,
   });
-  
+
   // Estado para visualização detalhada de ferramenta
   const [detailViewToolId, setDetailViewToolId] = useState<string | null>(null);
-  
+
   // Estado para servidores MCP
   const [mcpServers, setMcpServers] = useState<MCPServerConfig[]>([
     {
@@ -69,146 +64,182 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
       name: "Servidor Local MCP",
       url: "http://localhost:8000",
       description: "Servidor MCP local para desenvolvimento e testes",
-      status: "connected"
-    }
+      status: "connected",
+    },
   ]);
-  
+
   // Separar as ferramentas em regulares e MCP
   const { regularTools, mcpTools } = useMemo(() => {
     return {
-      regularTools: availableTools.filter(tool => !tool.isMCPTool),
-      mcpTools: availableTools.filter(tool => tool.isMCPTool)
+      regularTools: availableTools.filter((tool) => !tool.isMCPTool),
+      mcpTools: availableTools.filter((tool) => tool.isMCPTool),
     };
   }, [availableTools]);
-  
+
   // Filtrar e pesquisar ferramentas
   const getFilteredTools = (tools: AvailableTool[]) => {
-    return tools.filter(tool => {
+    return tools.filter((tool) => {
       // Filtro de pesquisa
-      if (searchQuery && !tool.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !tool.description.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (
+        searchQuery &&
+        !tool.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !tool.description.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
         return false;
       }
-      
+
       // Filtro de configurável
       if (filters.configurable && !tool.hasConfig) {
         return false;
       }
-      
+
       // Filtro de autenticação
       if (filters.requiresAuth && !tool.requiresAuth) {
         return false;
       }
-      
+
       return true;
     });
   };
-  
-  const filteredRegularTools = useMemo(() => getFilteredTools(regularTools), 
-    [regularTools, searchQuery, filters]);
-  
-  const filteredMcpTools = useMemo(() => getFilteredTools(mcpTools), 
-    [mcpTools, searchQuery, filters]);
-  
+
+  const filteredRegularTools = useMemo(
+    () => getFilteredTools(regularTools),
+    [regularTools, searchQuery, filters],
+  );
+
+  const filteredMcpTools = useMemo(
+    () => getFilteredTools(mcpTools),
+    [mcpTools, searchQuery, filters],
+  );
+
   // Manipuladores de eventos
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
-  
-  const handleFilterChange = (filterKey: keyof ToolFilters | 'reset', value?: boolean) => {
-    if (filterKey === 'reset') {
+
+  const handleFilterChange = (
+    filterKey: keyof ToolFilters | "reset",
+    value?: boolean,
+  ) => {
+    if (filterKey === "reset") {
       setFilters({
         configurable: false,
         requiresAuth: false,
       });
     } else {
-      setFilters(prev => ({
+      setFilters((prev) => ({
         ...prev,
-        [filterKey]: value
+        [filterKey]: value,
       }));
     }
   };
-  
+
   const handleToolSelection = (toolId: string) => {
     onToolSelectionChange(toolId, !selectedToolIds.includes(toolId));
   };
-  
+
   const handleAddMcpServer = (server: MCPServerConfig) => {
-    setMcpServers(prev => [...prev, server]);
+    setMcpServers((prev) => [...prev, server]);
   };
-  
+
   const handleRemoveMcpServer = (serverId: string) => {
-    setMcpServers(prev => prev.filter(server => server.id !== serverId));
+    setMcpServers((prev) => prev.filter((server) => server.id !== serverId));
   };
-  
+
   const handleUpdateMcpServer = (server: MCPServerConfig) => {
-    setMcpServers(prev => prev.map(s => s.id === server.id ? server : s));
+    setMcpServers((prev) => prev.map((s) => (s.id === server.id ? server : s)));
   };
-  
+
   // Ferramenta para visualização detalhada
   const detailViewTool = useMemo(() => {
     if (!detailViewToolId) return null;
-    return availableTools.find(tool => tool.id === detailViewToolId) || null;
+    return availableTools.find((tool) => tool.id === detailViewToolId) || null;
   }, [detailViewToolId, availableTools]);
-  
+
   // Renderizar visualização detalhada da ferramenta
   const renderDetailView = () => {
     if (!detailViewTool) return null;
-    
+
     return (
       <div className="space-y-4">
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           className="mb-2"
           onClick={() => setDetailViewToolId(null)}
         >
           <ChevronLeft size={16} className="mr-1" />
           Voltar para Lista
         </Button>
-        
+
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              "p-2 rounded-md", 
-              detailViewTool.isMCPTool 
-                ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20" 
-                : "bg-primary/10"
-            )}>
-              {detailViewTool.icon && <detailViewTool.icon width={32} height={32} className="text-primary" />}
+            <div
+              className={cn(
+                "p-2 rounded-md",
+                detailViewTool.isMCPTool
+                  ? "bg-gradient-to-br from-blue-500/20 to-purple-500/20"
+                  : "bg-primary/10",
+              )}
+            >
+              {detailViewTool.icon && (
+                <detailViewTool.icon
+                  width={32}
+                  height={32}
+                  className="text-primary"
+                />
+              )}
             </div>
             <div>
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 {detailViewTool.name}
                 {detailViewTool.isMCPTool && (
-                  <Badge variant="outline" className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-xs border-blue-400/30">
+                  <Badge
+                    variant="outline"
+                    className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-xs border-blue-400/30"
+                  >
                     MCP
                   </Badge>
                 )}
               </h2>
-              <p className="text-sm text-muted-foreground">{detailViewTool.description}</p>
+              <p className="text-sm text-muted-foreground">
+                {detailViewTool.description}
+              </p>
             </div>
           </div>
-          
+
           <Button
-            variant={selectedToolIds.includes(detailViewTool.id) ? "default" : "outline"}
+            variant={
+              selectedToolIds.includes(detailViewTool.id)
+                ? "default"
+                : "outline"
+            }
             onClick={() => handleToolSelection(detailViewTool.id)}
-            className={selectedToolIds.includes(detailViewTool.id) ? "button-live-glow" : ""}
+            className={
+              selectedToolIds.includes(detailViewTool.id)
+                ? "button-live-glow"
+                : ""
+            }
           >
-            {selectedToolIds.includes(detailViewTool.id) ? "Selecionada" : "Selecionar"}
+            {selectedToolIds.includes(detailViewTool.id)
+              ? "Selecionada"
+              : "Selecionar"}
           </Button>
         </div>
-        
+
         {detailViewTool.isMCPTool && detailViewTool.mcpServerName && (
           <Alert className="bg-blue-500/5 border-blue-400/30">
             <Cpu size={16} className="text-blue-500" />
             <AlertTitle>Ferramenta MCP</AlertTitle>
             <AlertDescription className="text-sm">
-              Conectada ao servidor MCP: <span className="font-medium">{detailViewTool.mcpServerName}</span>
+              Conectada ao servidor MCP:{" "}
+              <span className="font-medium">
+                {detailViewTool.mcpServerName}
+              </span>
             </AlertDescription>
           </Alert>
         )}
-        
+
         {detailViewTool.parameters && detailViewTool.parameters.length > 0 && (
           <div className="mt-6">
             <h3 className="text-lg font-medium mb-3">Parâmetros</h3>
@@ -216,21 +247,35 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
               <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/4">Nome</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/6">Tipo</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/6">Obrigatório</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Descrição</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/4">
+                      Nome
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/6">
+                      Tipo
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-1/6">
+                      Obrigatório
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Descrição
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {detailViewTool.parameters.map(param => (
+                  {detailViewTool.parameters.map((param) => (
                     <tr key={param.name}>
-                      <td className="px-4 py-2 whitespace-nowrap font-mono text-xs">{param.name}</td>
+                      <td className="px-4 py-2 whitespace-nowrap font-mono text-xs">
+                        {param.name}
+                      </td>
                       <td className="px-4 py-2 whitespace-nowrap">
                         <Badge variant="outline">{param.type}</Badge>
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">{param.required ? "Sim" : "Não"}</td>
-                      <td className="px-4 py-2 text-sm">{param.description || "-"}</td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {param.required ? "Sim" : "Não"}
+                      </td>
+                      <td className="px-4 py-2 text-sm">
+                        {param.description || "-"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -238,26 +283,33 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
             </div>
           </div>
         )}
-        
+
         {detailViewTool.examples && detailViewTool.examples.length > 0 && (
           <div className="mt-6">
             <h3 className="text-lg font-medium mb-3">Exemplos de Uso</h3>
             <div className="space-y-4">
               {detailViewTool.examples.map((example, idx) => (
-                <div key={idx} className="rounded-md border border-border overflow-hidden">
+                <div
+                  key={idx}
+                  className="rounded-md border border-border overflow-hidden"
+                >
                   <div className="bg-muted p-3">
                     <h4 className="font-medium">{example.title}</h4>
-                    <p className="text-sm text-muted-foreground">{example.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {example.description}
+                    </p>
                   </div>
                   <div className="p-3 bg-black text-white overflow-x-auto">
-                    <pre><code>{example.code}</code></pre>
+                    <pre>
+                      <code>{example.code}</code>
+                    </pre>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-        
+
         {detailViewTool.documentation && (
           <div className="mt-6">
             <h3 className="text-lg font-medium mb-3">Documentação</h3>
@@ -266,10 +318,10 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
             </div>
           </div>
         )}
-        
+
         {detailViewTool.hasConfig && (
           <div className="mt-6 flex justify-end">
-            <Button 
+            <Button
               variant="outline"
               onClick={() => onConfigureTool(detailViewTool)}
               className="flex items-center gap-2"
@@ -282,22 +334,22 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
       </div>
     );
   };
-  
+
   // Renderizar lista de ferramentas (regular ou MCP)
   const renderToolList = (tools: AvailableTool[], emptyMessage: string) => {
     if (detailViewToolId) return null;
-    
+
     return (
       <>
-        <ToolSearch 
+        <ToolSearch
           onSearch={handleSearch}
           onFilterChange={handleFilterChange}
           filters={filters}
         />
-        
+
         {tools.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {tools.map(tool => (
+            {tools.map((tool) => (
               <ToolCard
                 key={tool.id}
                 tool={tool}
@@ -315,15 +367,30 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
       </>
     );
   };
-  
+
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-medium mb-1 flex items-center gap-2">
         <Wand2 className="w-5 h-5 text-primary/80" />
         Ferramentas do Agente
         <Tooltip>
-            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-0 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-            <TooltipContent className="max-w-xs"><p>Ferramentas são capacidades (implementadas como fluxos Genkit) que permitem ao agente interagir com sistemas externos, APIs, bancos de dados ou executar ações específicas (ex: busca na web, acesso a calendário).</p></TooltipContent>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 ml-0 p-0 text-muted-foreground hover:text-foreground"
+            >
+              <Info size={14} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p>
+              Ferramentas são capacidades (implementadas como fluxos Genkit) que
+              permitem ao agente interagir com sistemas externos, APIs, bancos
+              de dados ou executar ações específicas (ex: busca na web, acesso a
+              calendário).
+            </p>
+          </TooltipContent>
         </Tooltip>
       </h3>
       {!detailViewToolId ? (
@@ -331,64 +398,71 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="regular-tools" className="py-2 px-4">
               <span>Ferramentas Padrão</span>
-              {selectedToolIds.filter(id => 
-                regularTools.some(tool => tool.id === id)
+              {selectedToolIds.filter((id) =>
+                regularTools.some((tool) => tool.id === id),
               ).length > 0 && (
                 <Badge variant="secondary" className="ml-1">
-                  {selectedToolIds.filter(id => 
-                    regularTools.some(tool => tool.id === id)
-                  ).length}
+                  {
+                    selectedToolIds.filter((id) =>
+                      regularTools.some((tool) => tool.id === id),
+                    ).length
+                  }
                 </Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="mcp-tools" className="py-2 px-4">
               <span>MCP Tools</span>
-              {selectedToolIds.filter(id => 
-                mcpTools.some(tool => tool.id === id)
+              {selectedToolIds.filter((id) =>
+                mcpTools.some((tool) => tool.id === id),
               ).length > 0 && (
                 <Badge variant="secondary" className="ml-1">
-                  {selectedToolIds.filter(id => 
-                    mcpTools.some(tool => tool.id === id)
-                  ).length}
+                  {
+                    selectedToolIds.filter((id) =>
+                      mcpTools.some((tool) => tool.id === id),
+                    ).length
+                  }
                 </Badge>
               )}
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="regular-tools" className="pt-4">
             {renderToolList(
-              filteredRegularTools, 
+              filteredRegularTools,
               searchQuery || filters.configurable || filters.requiresAuth
                 ? "Nenhuma ferramenta padrão encontrada com os filtros atuais"
-                : "Nenhuma ferramenta padrão disponível"
+                : "Nenhuma ferramenta padrão disponível",
             )}
           </TabsContent>
-          
+
           <TabsContent value="mcp-tools" className="pt-4 space-y-6">
             {renderToolList(
               filteredMcpTools,
               searchQuery || filters.configurable || filters.requiresAuth
                 ? "Nenhuma MCP Tool encontrada com os filtros atuais"
-                : "Nenhuma MCP Tool disponível"
+                : "Nenhuma MCP Tool disponível",
             )}
-            
-            <MCPServerManager 
+
+            <MCPServerManager
               servers={mcpServers}
               onAdd={handleAddMcpServer}
               onRemove={handleRemoveMcpServer}
               onUpdate={handleUpdateMcpServer}
             />
-            
+
             <Alert className="bg-blue-500/5 border-blue-400/30">
               <AlertCircle size={16} className="text-blue-500" />
               <AlertTitle>Sobre MCP Tools</AlertTitle>
               <AlertDescription>
                 <p className="text-sm">
-                  Model Context Protocol (MCP) é um padrão que conecta sistemas de IA com ferramentas e fontes de dados externas.
-                  MCP Tools permitem que seu agente tenha acesso a funcionalidades avançadas e integrações com serviços externos.
+                  Model Context Protocol (MCP) é um padrão que conecta sistemas
+                  de IA com ferramentas e fontes de dados externas. MCP Tools
+                  permitem que seu agente tenha acesso a funcionalidades
+                  avançadas e integrações com serviços externos.
                 </p>
                 <p className="text-sm mt-2">
-                  Para usar MCP Tools, você precisa configurar um servidor MCP que forneça as ferramentas desejadas.
+                  Para usar MCP Tools, você precisa configurar um servidor MCP
+                  que forneça as ferramentas desejadas.
                 </p>
               </AlertDescription>
             </Alert>

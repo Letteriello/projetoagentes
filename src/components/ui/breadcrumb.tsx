@@ -37,24 +37,41 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
   }
 
   return (
-    <nav aria-label="Breadcrumb" className={cn("flex items-center text-sm", className)} {...props}>
+    <nav
+      aria-label="Breadcrumb"
+      className={cn("flex items-center text-sm", className)}
+      {...props}
+    >
       <ol className="flex items-center space-x-0">
         {items.map((item, index) => {
           const isLastItem = index === items.length - 1;
           const isCurrentPage = item.isCurrent || (isLastItem && !item.href);
 
           return (
-            <li key={index} className={cn("flex items-center", itemClassName, item.className)}>
+            <li
+              key={index}
+              className={cn("flex items-center", itemClassName, item.className)}
+            >
               {item.icon && <span className="mr-1.5">{item.icon}</span>}
               {isCurrentPage ? (
-                <span className={cn("font-medium text-foreground", currentClassName)} aria-current="page">
+                <span
+                  className={cn(
+                    "font-medium text-foreground",
+                    currentClassName,
+                  )}
+                  aria-current="page"
+                >
                   {item.label}
                 </span>
               ) : item.href ? (
-                <Link href={item.href} legacyBehavior>
-                  <a className={cn("text-muted-foreground hover:text-foreground hover:underline", linkClassName)}>
-                    {item.label}
-                  </a>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "text-muted-foreground hover:text-foreground hover:underline",
+                    linkClassName,
+                  )}
+                >
+                  {item.label}
                 </Link>
               ) : (
                 <span className={cn("text-muted-foreground", linkClassName)}>
@@ -62,7 +79,10 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                 </span>
               )}
               {!isLastItem && (
-                <span className={cn("select-none", separatorClassName)} aria-hidden="true">
+                <span
+                  className={cn("select-none", separatorClassName)}
+                  aria-hidden="true"
+                >
                   {separator}
                 </span>
               )}
