@@ -6,8 +6,7 @@ import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
 import { allTools } from "./available-tools"; // Assuming this exports AvailableTool[]
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { AvailableTool } from "@/types/tool-types"; // Import AvailableTool
-import type { ToolConfigData } from "@/types/agent-configs"; // Import ToolConfigData
+import type { AvailableTool, ToolConfigData } from "@/types/agent-configs"; // Import AvailableTool and ToolConfigData
 import { Cpu } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
