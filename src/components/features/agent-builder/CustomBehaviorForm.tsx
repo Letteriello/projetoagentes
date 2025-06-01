@@ -2,36 +2,37 @@
 // Inclui um campo para a descrição da lógica customizada.
 
 import * as React from "react";
+import { useFormContext, Controller } from "react-hook-form"; // MODIFIED
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 
-// Props para o componente CustomBehaviorForm.
-interface CustomBehaviorFormProps {
-  customLogicDescription: string;
-  setCustomLogicDescription: (description: string) => void;
-}
+// MODIFIED: No props needed
+interface CustomBehaviorFormProps {}
 
-const CustomBehaviorForm: React.FC<CustomBehaviorFormProps> = ({
-  customLogicDescription,
-  setCustomLogicDescription,
-}) => {
+const CustomBehaviorForm: React.FC<CustomBehaviorFormProps> = () => {
+  const { control, formState: { errors } } = useFormContext<SavedAgentConfiguration>(); // MODIFIED
+
   return (
-    <div className="space-y-2">
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Label htmlFor="customLogicDescription" className="cursor-help">Descrição da Lógica Customizada</Label>
-          </TooltipTrigger>
-          <TooltipContent className="w-80">
-            <p>Descreva a funcionalidade principal. Se este agente invoca um fluxo Genkit específico, mencione o nome do fluxo. Detalhe como ele orquestra outros agentes ou ferramentas, se aplicável.</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <Textarea id="customLogicDescription" placeholder="Descreva a lógica customizada que este agente irá executar. Pode incluir referências a scripts, módulos externos ou endpoints específicos." value={customLogicDescription} onChange={(e) => setCustomLogicDescription(e.target.value)} rows={5}/>
-       <p className="text-xs text-muted-foreground">Detalhe o comportamento específico implementado por este agente.</p>
-    </div>
+    <FormField
+      control={control}
+      name="config.customLogicDescription"
+      render={({ field }) => (
+        <FormItem className="space-y-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild><FormLabel htmlFor="config.customLogicDescription" className="cursor-help">Descrição da Lógica Customizada</FormLabel></TooltipTrigger>
+              <TooltipContent className="w-80"><p>Descreva a funcionalidade principal. Se este agente invoca um fluxo Genkit específico, mencione o nome do fluxo. Detalhe como ele orquestra outros agentes ou ferramentas, se aplicável.</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <FormControl><Textarea id="config.customLogicDescription" placeholder="Descreva a lógica customizada..." {...field} rows={5}/></FormControl>
+          <FormDescription>Detalhe o comportamento específico implementado.</FormDescription>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
   );
 };
-
 export default CustomBehaviorForm;

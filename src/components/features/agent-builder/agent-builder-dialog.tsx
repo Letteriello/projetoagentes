@@ -3,46 +3,53 @@
 // e overflow-y-auto para garantir a usabilidade em diferentes tamanhos de tela, apesar da densidade de informações.
 // O conteúdo das abas é rolável, e o diálogo em si pode ter altura máxima controlada (max-h-[90vh]).
 
+// At the top of src/components/features/agent-builder/agent-builder-dialog.tsx
+
+// ADD THESE IMPORTS
+import { useForm, FormProvider, SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { savedAgentConfigurationSchema } from "@/lib/zod-schemas"; // Assuming this path is correct based on previous steps
+
+// ... other existing imports
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input"; // No longer directly used here, but in child tabs
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // No longer directly used here
 import { Switch } from "@/components/ui/switch";
 // Componente principal para criar e editar configurações de agentes.
 // Permite definir nome, tipo, comportamento, ferramentas, memória, RAG, artefatos e configurações multi-agente/A2A.
-import { CommunicationChannelItem } from "./a2a-communication-channel";
-// import { MemoryServiceType } from "./memory-knowledge-tab"; // Moved to RagTab or its sub-components
+// import { CommunicationChannelItem } from "./a2a-communication-channel"; // No longer directly used here
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  AlertCircle, 
-  Ban, 
-  Brain, 
-  Check, 
-  ChevronDown, 
-  ChevronRight, 
-  ChevronUp, 
-  Cpu, 
-  FileJson, 
-  Info, 
-  Layers, 
-  ListChecks, 
-  Loader2, 
-  Network, 
-  Plus, 
-  Save, 
-  Search, 
-  Settings, 
-  Settings2, 
-  Smile, 
-  Target, 
-  Trash2, 
-  Users, 
-  Wand2, 
-  Workflow, 
+import {
+  AlertCircle,
+  Ban,
+  Brain,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Cpu,
+  FileJson,
+  Info,
+  Layers,
+  ListChecks,
+  Loader2,
+  Network,
+  Plus,
+  Save,
+  Search,
+  Settings,
+  Settings2,
+  Smile,
+  Target,
+  Trash2,
+  Users,
+  Wand2,
+  Workflow,
   X,
   Copy,
   ChevronsUpDown,
@@ -61,28 +68,28 @@ import {
 } from "lucide-react";
 
 import { v4 as uuidv4 } from "uuid";
-import { zodResolver } from "@hookform/resolvers/zod";
+// import { zodResolver } from "@hookform/resolvers/zod"; // Already imported above
 // Consolidated imports:
 import {
-  AgentFramework,
-  AgentConfig,
-  SavedAgentConfiguration,
-  A2AConfig,
-  RagMemoryConfig,
-  ArtifactDefinition,
-  ToolConfigData,
-  LLMAgentConfig,
-  WorkflowAgentConfig,
-  WorkflowDetailedType,
-  CustomAgentConfig,
-  AvailableTool, // Added AvailableTool
-  TerminationConditionType, // Added TerminationConditionType
-  InitialStateValue, // Added InitialStateValue for the state
-  StatePersistenceType, // For statePersistenceType state
-  ArtifactStorageType // For artifactStorageType state
-} from "@/types/agent-configs";
-import type { KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab"; // Correct import for KnowledgeSource
-import { availableTools as availableToolsList } from "@/data/available-tools";
+  AgentFramework, // Will be part of SavedAgentConfiguration
+  AgentConfig, // Will be part of SavedAgentConfiguration
+  SavedAgentConfiguration, // Already imported from zod-schemas
+  A2AConfig, // Will be part of SavedAgentConfiguration
+  RagMemoryConfig, // Will be part of SavedAgentConfiguration
+  ArtifactDefinition, // Will be part of SavedAgentConfiguration
+  ToolConfigData, // Will be part of SavedAgentConfiguration
+  LLMAgentConfig, // Will be part of SavedAgentConfiguration
+  WorkflowAgentConfig, // Will be part of SavedAgentConfiguration
+  WorkflowDetailedType, // Will be part of SavedAgentConfiguration
+  CustomAgentConfig, // Will be part of SavedAgentConfiguration
+  AvailableTool,
+  TerminationConditionType,
+  InitialStateValue,
+  StatePersistenceType,
+  ArtifactStorageType
+} from "@/types/agent-configs"; // These might be needed for defaultValues or internal logic, but schema is king
+// import type { KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab"; // This will be part of SavedAgentConfiguration
+// import { availableTools as availableToolsList } from "@/data/available-tools"; // availableTools is a prop
 import { useAgents } from "@/contexts/AgentsContext";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -131,295 +138,222 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   agentTypeOptions,
   agentToneOptions,
   iconComponents,
+  // agentTemplates, // No longer used directly, defaultValues logic handles template-like setup
 }) => {
-  // --- Estados para Propriedades Gerais do Agente ---
-  const [agentName, setAgentName] = React.useState<string>(""); // Nome do agente.
-  const [agentDescription, setAgentDescription] = React.useState<string>(""); // Descrição do agente.
-  const [agentVersion, setAgentVersion] = React.useState<string>("1.0.0"); // Versão do agente.
-  const [agentFramework, setAgentFramework] = React.useState<AgentFramework>("genkit"); // Framework utilizado pelo agente (ex: Genkit, CrewAI).
-  const [selectedAgentType, setSelectedAgentType] = React.useState<"llm" | "workflow" | "custom" | "a2a">("llm"); // Tipo do agente (LLM, Workflow, Customizado, A2A).
+  // REMOVE OR COMMENT OUT ALL React.useState hooks that manage form data.
+  // For example:
+  // const [agentName, setAgentName] = React.useState<string>("");
+  // ... and all others related to agent configuration fields.
 
-  // --- Estados para Propriedades Multi-Agente ---
-  const [isRootAgent, setIsRootAgent] = React.useState<boolean>(true); // Indica se o agente é o agente raiz/orquestrador.
-  const [subAgentIds, setSubAgentIds] = React.useState<string[]>([]); // Lista de IDs de sub-agentes ou colaboradores.
+  // --- Estados para Configuração de Ferramentas e Modal de Configuração (Mantidos por enquanto, pois o modal é separado) ---
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
+  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // This will be part of RHF's form state via `config.toolConfigsApplied`
 
-  // --- Estados para Comportamento e Prompting (Comum a todos os tipos) ---
-  const [globalInstruction, setGlobalInstruction] = React.useState<string>(""); // Instrução global ou prompt de sistema primário.
-  const [systemPromptGenerated, setSystemPromptGenerated] = React.useState<string>(""); // Preview do prompt de sistema gerado (para agentes LLM).
+  // --- Estados para Campos do Modal de Configuração de Ferramentas (Mantidos) ---
+  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
+  const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
+  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>('');
+  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>('');
+  const [modalDbType, setModalDbType] = React.useState<string>('');
+  const [modalDbHost, setModalDbHost] = React.useState<string>('');
+  const [modalDbPort, setModalDbPort] = React.useState<number>(0);
+  const [modalDbName, setModalDbName] = React.useState<string>('');
+  const [modalDbUser, setModalDbUser] = React.useState<string>('');
+  const [modalDbPassword, setModalDbPassword] = React.useState<string>('');
+  const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>('');
+  const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
+  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
+  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
 
-  // --- Estados para Comportamento e Prompting (Específico para LLM) ---
-  const [agentGoal, setAgentGoal] = React.useState<string>(""); // Objetivo principal do agente LLM.
-  const [agentTasks, setAgentTasks] = React.useState<string[]>([]); // Lista de tarefas principais do agente LLM.
-  const [agentPersonality, setAgentPersonality] = React.useState<string>(agentToneOptions[0]?.id || ""); // Personalidade ou tom do agente LLM.
-  const [agentRestrictions, setAgentRestrictions] = React.useState<string[]>([]); // Lista de restrições ou comportamentos a evitar.
-  const [agentModel, setAgentModel] = React.useState<string>("gemini-1.5-flash"); // Modelo de linguagem a ser usado.
-  const [agentTemperature, setAgentTemperature] = React.useState<number>(0.7); // Temperatura para controlar a criatividade do LLM.
-
-  // --- Estados para Comportamento e Prompting (Específico para Workflow) ---
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<WorkflowDetailedType>("sequential"); // Tipo detalhado de workflow (sequencial, grafo, máquina de estados).
-  const [workflowDescription, setWorkflowDescription] = React.useState<string>(""); // Descrição do workflow.
-  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(undefined); // Número máximo de iterações para workflows com loops.
-
-  // --- Estados para Gerenciamento de Artefatos ---
-  const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(false); // Controla se o armazenamento de artefatos está habilitado.
-  const [artifactStorageType, setArtifactStorageType] = React.useState<ArtifactStorageType>('memory'); // Tipo de armazenamento para artefatos (memória, sistema de arquivos local, nuvem). Aligned with AgentConfig type.
-  const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]); // Lista de definições de artefatos que o agente pode produzir ou consumir.
-  const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(""); // Nome do bucket na nuvem para armazenamento de artefatos.
-  const [localStoragePath, setLocalStoragePath] = React.useState<string>(""); // Caminho no sistema de arquivos local para armazenamento de artefatos, usado se `artifactStorageType` for 'filesystem'.
-
-  // --- Estado para Ferramentas Selecionadas ---
-  const [selectedTools, setSelectedTools] = React.useState<string[]>([]); // Lista de IDs das ferramentas que o agente está configurado para usar.
-
-  // --- Estados para RAG (Retrieval Augmented Generation) ---
-  const initialRagMemoryConfig: RagMemoryConfig = {
-    enabled: false,
-    serviceType: "in-memory", // Default to in-memory
-    knowledgeSources: [], // Added to satisfy RagMemoryConfig requirements
-    persistentMemory: {
-      enabled: false,
-      // Outras configurações de memória persistente podem ser adicionadas aqui se necessário
-    },
-  };
-  const [ragMemoryConfig, setRagMemoryConfig] = React.useState<RagMemoryConfig>(initialRagMemoryConfig); // Objeto que armazena a configuração detalhada do RAG.
-  const [enableRAG, setEnableRAG] = React.useState<boolean>(false); // Chave booleana geral para habilitar/desabilitar a seção RAG na UI.
-
-  // --- Estado para Configuração A2A (Agent-to-Agent Communication) ---
-  const initialA2AConfig: A2AConfig = { // Configuração inicial/padrão para A2A using imported A2AConfig type.
-      enabled: false, // Indica se a comunicação A2A está habilitada para o agente.
-      communicationChannels: [], // Lista de canais de comunicação (ex: direct, message_queue) configurados para A2A.
-      defaultResponseFormat: 'text', // Formato padrão das respostas nas comunicações A2A.
-      maxMessageSize: 1024 * 1024, // Tamanho máximo (em bytes) para mensagens trocadas via A2A.
-      loggingEnabled: false, // Se o logging detalhado deve ser habilitado para a comunicação A2A.
-  };
-  const [a2aConfig, setA2aConfig] = React.useState<A2AConfig>(initialA2AConfig); // Objeto que armazena a configuração detalhada para comunicação A2A.
-
-  // --- Estados para Campos de Workflow (relevante se `selectedAgentType` for 'workflow') ---
-  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<TerminationConditionType>("none"); // Define como um loop em um workflow pode ser terminado (ex: 'none', 'tool_success', 'state_change').
-  const [loopExitToolName, setLoopExitToolName] = React.useState<string | undefined>(undefined); // Nome da ferramenta cuja execução bem-sucedida pode indicar a saída de um loop.
-  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string | undefined>(undefined); // Chave no estado do agente que, ao mudar para `loopExitStateValue`, pode indicar a saída de um loop.
-  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string | undefined>(undefined); // Valor específico da `loopExitStateKey` que indica a saída de um loop.
-
-  // --- Estado para Descrição de Lógica Customizada (relevante se `selectedAgentType` for 'custom') ---
-  const [customLogicDescription, setCustomLogicDescription] = React.useState<string>(""); // Descrição textual da lógica customizada que o agente deve executar.
-
-  // --- Estados para Configuração de Ferramentas e Modal de Configuração ---
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // Mapeamento (dicionário) de ID de ferramenta para sua configuração de dados específica.
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false); // Controla a visibilidade do modal de configuração de ferramenta.
-  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null); // Armazena o objeto da ferramenta que está sendo configurada no modal.
-
-  // --- Estados para Persistência de Estado e Memória ---
-  const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false); // Chave booleana para habilitar/desabilitar a persistência de estado do agente.
-  const [statePersistenceType, setStatePersistenceType] = React.useState<StatePersistenceType>("session"); // Define o tipo de persistência de estado (ex: 'session' para temporário, 'memory' para vida do processo, 'database' para persistente).
-  const [initialStateValues, setInitialStateValues] = React.useState<InitialStateValue[]>([]); // Lista de pares chave-valor que definem o estado inicial do agente.
-
-  // --- Estados para Campos do Modal de Configuração de Ferramentas ---
-  // Estes estados armazenam temporariamente os valores dos campos de configuração de uma ferramenta específica enquanto o usuário os edita no modal.
-  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>(''); // Chave API Google para a ferramenta WebSearch.
-  const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>(''); // ID do Mecanismo de Busca Personalizado Google para WebSearch.
-  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>(''); // URL da especificação OpenAPI para a ferramenta Custom API Integration.
-  // Chave de API para a integração de API customizada.
-  // ATENÇÃO: Armazenar segredos diretamente na configuração do agente na UI é arriscado.
-  // Considere o uso de um gerenciador de segredos ou configuração via backend para produção.
-  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>(''); // Chave de API (opcional) para a ferramenta Custom API Integration.
-  const [modalDbType, setModalDbType] = React.useState<string>(''); // Tipo de banco de dados para a ferramenta Database Access (ex: 'postgresql', 'mysql').
-  const [modalDbHost, setModalDbHost] = React.useState<string>(''); // Host do banco de dados.
-  const [modalDbPort, setModalDbPort] = React.useState<number>(0); // Porta do banco de dados.
-  const [modalDbName, setModalDbName] = React.useState<string>(''); // Nome do banco de dados.
-  const [modalDbUser, setModalDbUser] = React.useState<string>(''); // Nome de usuário para acesso ao banco de dados.
-  // Senha para acesso ao banco de dados.
-  // ATENÇÃO: Armazenar segredos diretamente na configuração do agente na UI é arriscado.
-  // Considere o uso de um gerenciador de segredos ou configuração via backend para produção.
-  const [modalDbPassword, setModalDbPassword] = React.useState<string>(''); // Senha para acesso ao banco de dados.
-  const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>(''); // String de conexão completa para o banco de dados (alternativa aos campos individuais).
-  const [modalDbDescription, setModalDbDescription] = React.useState<string>(''); // Descrição do esquema do banco ou tabelas relevantes, para ajudar o agente a formular queries.
-  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>(''); // ID da base de conhecimento para a ferramenta Knowledge Base (RAG).
-  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>(''); // Endpoint da API de Calendário ou ID de fluxo Genkit para a ferramenta Calendar Access.
-
-  const { toast } = useToast(); // Hook para exibir notificações (toasts).
-  const { savedAgents: allSavedAgents } = useAgents(); // Para popular o seletor de sub-agentes.
-
-  // Memoiza a lista de agentes disponíveis para seleção como sub-agentes, excluindo o agente atualmente em edição.
-  // (Removido: bloco de declarações duplicadas de useState)
-  // (Removido: Função handleFieldChange que não estava sendo utilizada consistentemente e causava problemas com estados duplicados)
-  // (Removido: duplicidades de estados para gerenciamento de estado, memória e RAG)
-  // (Removido: bloco de declarações duplicadas de useState para artifacts, selectedTools, RAG, A2A, workflow, customLogic, toolConfigurations, state/memory)
-  // Modal specific states for tool configuration
-  // Os estados do modal (modalGoogleApiKey, etc.) são declarados uma vez no início e mantidos.
-  // const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>(''); // Duplicated
-  // const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>(''); // Duplicated
-  // const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>(''); // Duplicated
-  // const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>(''); // Duplicated
-  // const [modalDbType, setModalDbType] = React.useState<string>(''); // Duplicated
-  // const [modalDbHost, setModalDbHost] = React.useState<string>(''); // Duplicated
-  // const [modalDbPort, setModalDbPort] = React.useState<number>(0); // Duplicated
-  // const [modalDbName, setModalDbName] = React.useState<string>(''); // Duplicated
-  // const [modalDbUser, setModalDbUser] = React.useState<string>(''); // Duplicated
-  // const [modalDbPassword, setModalDbPassword] = React.useState<string>(''); // Duplicated
-  // const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>(''); // Duplicated
-  // const [modalDbDescription, setModalDbDescription] = React.useState<string>(''); // Duplicated
-  // const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>(''); // Duplicated
-  // const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>(''); // Duplicated
-
-  // const { savedAgents: allSavedAgents } = useAgents(); // For SubAgentSelector // Already declared above
+  const { toast } = useToast();
+  const { savedAgents: allSavedAgents } = useAgents();
 
   const availableAgentsForSubSelector = React.useMemo(() =>
     allSavedAgents.filter(agent => agent.id !== editingAgent?.id),
     [allSavedAgents, editingAgent?.id]
   );
 
-  // Opções fixas para o seletor de framework do agente.
-  const agentFrameworkOptions = [
+  // Opções fixas para o seletor de framework do agente (poderia vir de props ou config)
+  const agentFrameworkOptions = [ // This could also be derived from schema or props
     { id: "genkit", label: "Genkit" },
     { id: "crewai", label: "CrewAI" },
     { id: "custom", label: "Custom Framework" },
+    { id: "none", label: "None (Manual/External)" },
   ];
 
-  // Efeito para inicializar ou resetar o estado do formulário quando o diálogo é aberto ou o agente em edição muda.
-  // Popula os campos com os dados do `editingAgent` se estiver editando, ou reseta para valores padrão se for um novo agente.
-  // Este hook é responsável por carregar os dados de um agente existente no formulário
-  // ou limpar o formulário ao criar um novo agente.
+  // ADD THIS useForm HOOK
+  const methods = useForm<SavedAgentConfiguration>({
+    resolver: zodResolver(savedAgentConfigurationSchema),
+    mode: "onChange", // Or "onSubmit"
+    defaultValues: React.useMemo(() => {
+      if (editingAgent) {
+        // Ensure all nested structures are defined, even if empty, to match Zod schema
+        const config = editingAgent.config || {};
+        const statePersistence = config.statePersistence || { enabled: false, type: "session", initialStateValues: [] };
+        const rag = config.rag || { enabled: false, serviceType: "in-memory", knowledgeSources: [] };
+        const artifacts = config.artifacts || { enabled: false, storageType: "memory", definitions: [] };
+        const a2a = config.a2a || { enabled: false, communicationChannels: [], defaultResponseFormat: "text", maxMessageSize: 1024*1024, loggingEnabled: false };
+
+        let specificConfigPart = {};
+        if (config.type === "llm") {
+          specificConfigPart = {
+            agentGoal: (config as LLMAgentConfig).agentGoal || "",
+            agentTasks: (config as LLMAgentConfig).agentTasks || [],
+            agentPersonality: (config as LLMAgentConfig).agentPersonality || "",
+            agentRestrictions: (config as LLMAgentConfig).agentRestrictions || [],
+            agentModel: (config as LLMAgentConfig).agentModel || "gemini-1.5-flash",
+            agentTemperature: (config as LLMAgentConfig).agentTemperature !== undefined ? (config as LLMAgentConfig).agentTemperature : 0.7,
+            systemPromptGenerated: (config as LLMAgentConfig).systemPromptGenerated || "",
+          };
+        } else if (config.type === "workflow") {
+          specificConfigPart = {
+            detailedWorkflowType: (config as WorkflowAgentConfig).detailedWorkflowType || "sequential",
+            workflowDescription: (config as WorkflowAgentConfig).workflowDescription || "",
+            loopMaxIterations: (config as WorkflowAgentConfig).loopMaxIterations,
+            loopTerminationConditionType: (config as WorkflowAgentConfig).loopTerminationConditionType || "none",
+            loopExitToolName: (config as WorkflowAgentConfig).loopExitToolName,
+            loopExitStateKey: (config as WorkflowAgentConfig).loopExitStateKey,
+            loopExitStateValue: (config as WorkflowAgentConfig).loopExitStateValue,
+          };
+        } else if (config.type === "custom") {
+          specificConfigPart = {
+            customLogicDescription: (config as CustomAgentConfig).customLogicDescription || "",
+            genkitFlowName: (config as CustomAgentConfig).genkitFlowName || "",
+          };
+        } else if (config.type === "a2a") {
+          // No extra fields beyond base for a2a specialist type in current types
+        }
+
+        return {
+          id: editingAgent.id || uuidv4(),
+          agentName: editingAgent.agentName || "",
+          agentDescription: editingAgent.agentDescription || "",
+          agentVersion: editingAgent.agentVersion || "1.0.0",
+          icon: editingAgent.icon || "",
+          templateId: editingAgent.templateId || 'custom_manual_dialog',
+          isFavorite: editingAgent.isFavorite || false,
+          tags: editingAgent.tags || [],
+          // createdAt and updatedAt are usually handled by backend or on save
+          config: {
+            type: config.type || "llm",
+            framework: config.framework || "genkit",
+            isRootAgent: config.isRootAgent !== undefined ? config.isRootAgent : true,
+            subAgentIds: config.subAgentIds || [],
+            globalInstruction: config.globalInstruction || "",
+            statePersistence: {
+              enabled: statePersistence.enabled,
+              type: statePersistence.type || "session",
+              defaultScope: statePersistence.defaultScope,
+              timeToLiveSeconds: statePersistence.timeToLiveSeconds,
+              initialStateValues: statePersistence.initialStateValues || [],
+              validationRules: statePersistence.validationRules || [],
+            },
+            rag: {
+              enabled: rag.enabled,
+              serviceType: rag.serviceType || "in-memory",
+              knowledgeSources: rag.knowledgeSources || [],
+              persistentMemory: rag.persistentMemory || { enabled: false },
+              retrievalParameters: rag.retrievalParameters,
+              embeddingModel: rag.embeddingModel,
+              includeConversationContext: rag.includeConversationContext,
+            },
+            artifacts: {
+              enabled: artifacts.enabled,
+              storageType: artifacts.storageType || "memory",
+              cloudStorageBucket: artifacts.cloudStorageBucket,
+              localStoragePath: artifacts.localStoragePath,
+              definitions: artifacts.definitions || [],
+            },
+            a2a: {
+              enabled: a2a.enabled,
+              communicationChannels: a2a.communicationChannels || [],
+              defaultResponseFormat: a2a.defaultResponseFormat || "text",
+              maxMessageSize: a2a.maxMessageSize || 1024 * 1024,
+              loggingEnabled: a2a.loggingEnabled || false,
+              securityPolicy: a2a.securityPolicy,
+              apiKeyHeaderName: a2a.apiKeyHeaderName,
+            },
+            ...specificConfigPart, // Spread the type-specific config parts
+          },
+          tools: editingAgent.tools || [],
+          toolConfigsApplied: editingAgent.toolConfigsApplied || {}, // This replaces the local toolConfigurations state
+          toolsDetails: editingAgent.toolsDetails || [],
+        };
+      }
+      // Default values for a new agent
+      return {
+        id: uuidv4(),
+        agentName: "",
+        agentDescription: "",
+        agentVersion: "1.0.0",
+        icon: "llm-agent-icon.svg", // Default icon
+        templateId: 'custom_manual_dialog',
+        isFavorite: false,
+        tags: [],
+        config: {
+          type: "llm", // Default type
+          framework: "genkit", // Default framework
+          isRootAgent: true,
+          subAgentIds: [],
+          globalInstruction: "",
+          statePersistence: { enabled: false, type: "session", initialStateValues: [], validationRules: [] },
+          rag: { enabled: false, serviceType: "in-memory", knowledgeSources: [], persistentMemory: {enabled: false} },
+          artifacts: { enabled: false, storageType: "memory", definitions: [] },
+          a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: "text", maxMessageSize: 1024*1024, loggingEnabled: false },
+          // LLM specific defaults
+          agentGoal: "",
+          agentTasks: [],
+          agentPersonality: agentToneOptions?.[0]?.id || "",
+          agentRestrictions: [],
+          agentModel: "gemini-1.5-flash",
+          agentTemperature: 0.7,
+          systemPromptGenerated: "",
+        },
+        tools: [],
+        toolConfigsApplied: {}, // Initialize as empty object
+        toolsDetails: [],
+      };
+    }, [editingAgent, agentToneOptions]),
+    resetOptions: {
+      keepDirtyValues: false,
+    },
+  });
+
+  // UPDATE THE useEffect that populates form state
   React.useEffect(() => {
     if (isOpen) {
-      if (editingAgent) {
-        // Preenche o formulário com os dados de um agente existente.
-        // Populate with editingAgent data
-        setAgentName(editingAgent.agentName || "Novo Agente");
-        // setAgentDescription(editingAgent.description || ""); // Uses editingAgent.description
-        // setAgentVersion(editingAgent.version || "1.0.0"); // Uses editingAgent.version
+      // `reset` will update the form values and also update the component state
+      // if `defaultValues` object identity changes or `reset` is called.
+      // The defaultValues memoization above handles the identity change based on editingAgent.
+      const defaultVals = methods.defaultValues; // Access the memoized default values
+      methods.reset(defaultVals);
+      // Sync the separate toolConfigurations state with RHF state on open/edit
+      setToolConfigurations(defaultVals?.toolConfigsApplied || {});
 
-        const agentConfig = editingAgent.config; // Acessa a configuração central do agente.
-
-        setSelectedAgentType(agentConfig.type || "llm");
-        setAgentFramework(agentConfig.framework || "genkit");
-        setIsRootAgent(agentConfig.isRootAgent !== undefined ? agentConfig.isRootAgent : true);
-        setSubAgentIds(agentConfig.subAgentIds || []);
-        setGlobalInstruction(agentConfig.globalInstruction || "");
-
-        // Preenche campos específicos do tipo LLM.
-        if (agentConfig.type === "llm") {
-          const llmConfig = agentConfig as LLMAgentConfig;
-          setAgentGoal(llmConfig.agentGoal || "");
-          setAgentTasks(llmConfig.agentTasks || []);
-          setAgentPersonality(llmConfig.agentPersonality || agentToneOptions[0]?.id || "");
-          setAgentRestrictions(llmConfig.agentRestrictions || []);
-          setAgentModel(llmConfig.agentModel || "gemini-1.5-flash");
-          setAgentTemperature(llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : 0.7);
-          setSystemPromptGenerated(llmConfig.systemPromptGenerated || "");
-        } else { // Reseta campos LLM se o tipo não for LLM.
-          setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]);
-          setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7); setSystemPromptGenerated("");
-        }
-
-        // Preenche campos específicos do tipo Workflow.
-        if (agentConfig.type === "workflow") {
-          const workflowConfig = agentConfig as WorkflowAgentConfig;
-          setDetailedWorkflowType(workflowConfig.detailedWorkflowType || "sequential");
-          setWorkflowDescription(workflowConfig.workflowDescription || "");
-          setLoopMaxIterations(workflowConfig.loopMaxIterations);
-          setLoopTerminationConditionType(workflowConfig.loopTerminationConditionType || "none");
-          setLoopExitToolName(workflowConfig.loopExitToolName);
-          setLoopExitStateKey(workflowConfig.loopExitStateKey);
-          setLoopExitStateValue(workflowConfig.loopExitStateValue);
-        } else { // Reseta campos de Workflow.
-            setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined);
-            setLoopTerminationConditionType("none"); setLoopExitToolName(undefined);
-            setLoopExitStateKey(undefined); setLoopExitStateValue(undefined);
-        }
-
-        // Preenche campos específicos do tipo Custom.
-        if (agentConfig.type === "custom") {
-            const customConfig = agentConfig as CustomAgentConfig;
-            setCustomLogicDescription(customConfig.customLogicDescription || "");
-        } else { // Reseta campos Custom.
-            setCustomLogicDescription("");
-        }
-
-        setSelectedTools(editingAgent.tools || []);
-        setToolConfigurations(editingAgent.toolConfigsApplied || {});
-
-        // Configurações de persistência de estado.
-        setEnableStatePersistence(agentConfig.statePersistence?.enabled || false);
-        setStatePersistenceType(agentConfig.statePersistence?.type || "session");
-        setInitialStateValues(agentConfig.statePersistence?.initialStateValues || []); // Changed from initialState to initialStateValues
-
-        // Configurações de RAG.
-        setEnableRAG(agentConfig.rag?.enabled || false);
-        // Usa initialRagMemoryConfig definido no topo do componente
-        setRagMemoryConfig(agentConfig.rag ? {...initialRagMemoryConfig, ...agentConfig.rag} : initialRagMemoryConfig);
-
-        // Configurações de Artefatos.
-        setEnableArtifacts(agentConfig.artifacts?.enabled || false);
-        const artifactStorageTypeValue = agentConfig.artifacts?.storageType;
-        // Ensures artifactStorageType is one of the valid literals from AgentConfig.
-        let validArtifactStorageType: 'memory' | 'local' | 'cloud' = 'memory';
-        if (artifactStorageTypeValue === 'memory' || artifactStorageTypeValue === 'local' || artifactStorageTypeValue === 'cloud') {
-            validArtifactStorageType = artifactStorageTypeValue;
-        } else if (artifactStorageTypeValue === 'filesystem') { // Handle UI 'filesystem' as 'local' for config
-            validArtifactStorageType = 'local';
-        }
-        setArtifactStorageType(validArtifactStorageType);
-        setCloudStorageBucket(agentConfig.artifacts?.cloudStorageBucket || "");
-        setLocalStoragePath(agentConfig.artifacts?.localStoragePath || "./artifacts"); // Default to ./artifacts
-        setArtifacts(agentConfig.artifacts?.definitions || []);
-
-        // Configurações A2A.
-        // Usa initialA2AConfig (agora tipado com A2AConfig importado)
-        setA2aConfig(agentConfig.a2a ? {
-            ...initialA2AConfig, // Começa com valores padrão para garantir todas as chaves estejam presentes
-            ...agentConfig.a2a, // Sobrescreve com dados salvos
-            maxMessageSize: agentConfig.a2a.maxMessageSize ?? initialA2AConfig.maxMessageSize,
-            defaultResponseFormat: agentConfig.a2a.defaultResponseFormat || initialA2AConfig.defaultResponseFormat,
-            communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels)
-                ? agentConfig.a2a.communicationChannels
-                : initialA2AConfig.communicationChannels,
-        } : initialA2AConfig);
-
-      } else {
-        // Reseta todos os campos para valores padrão ao criar um novo agente.
-        // agentName, agentDescription, agentVersion são resetados usando seus setters
-        setAgentName(""); setAgentDescription(""); setAgentVersion("1.0.0"); // Padrões
-        setSelectedAgentType("llm"); setAgentFramework("genkit"); // Padrões
-        setIsRootAgent(true); setSubAgentIds([]); // Padrões
-        setGlobalInstruction(""); setSystemPromptGenerated(""); // Padrões
-        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]); // Padrões LLM
-        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7); // Padrões LLM
-
-        setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined); // Padrões Workflow
-        setLoopTerminationConditionType("none"); setLoopExitToolName(undefined); // Padrões Workflow
-        setLoopExitStateKey(undefined); setLoopExitStateValue(undefined); // Padrões Workflow
-
-        setCustomLogicDescription(""); // Padrão Custom
-        setSelectedTools([]); setToolConfigurations({}); // Padrões Ferramenta
-        setEnableStatePersistence(false); setStatePersistenceType("session"); setInitialStateValues([]); // Padrões Persistência de Estado
-        setEnableRAG(false); // Padrão RAG
-        setRagMemoryConfig(initialRagMemoryConfig); // Reseta para initialRagMemoryConfig
-        setEnableArtifacts(false); setArtifactStorageType('memory'); setCloudStorageBucket(""); setLocalStoragePath("./artifacts"); setArtifacts([]); // Padrões Artefato, tipo de armazenamento é 'memory'
-        setA2aConfig(initialA2AConfig); // Reseta para initialA2AConfig
-      }
     }
     // Limpa o estado do modal de configuração de ferramenta se o diálogo principal for fechado.
     if (!isOpen) {
         setIsToolConfigModalOpen(false);
         setConfiguringTool(null);
     }
-  }, [isOpen, editingAgent, agentToneOptions]); // Dependências do efeito.
+  }, [isOpen, editingAgent, methods, agentToneOptions]); // Add methods and agentToneOptions to dependency array
+
 
   // Manipulador para abrir o modal de configuração de uma ferramenta específica.
   // Popula os campos do modal com a configuração existente da ferramenta, se houver.
-  // Esta função prepara e exibe o modal de configuração para uma ferramenta específica,
-  // carregando quaisquer configurações previamente salvas para essa ferramenta.
   const handleToolConfigure = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    const existingConfig = toolConfigurations[tool.id] || {};
+    // Get current tool configs from RHF state
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+    const existingConfig = currentToolConfigs[tool.id] || {};
 
-    // Reseta todos os estados do modal para garantir que não haja dados de configurações anteriores.
     setModalGoogleApiKey(''); setModalGoogleCseId('');
     setModalOpenapiSpecUrl(''); setModalOpenapiApiKey('');
     setModalDbType(''); setModalDbHost(''); setModalDbPort(0); setModalDbName('');
     setModalDbUser(''); setModalDbPassword(''); setModalDbConnectionString(''); setModalDbDescription('');
     setModalKnowledgeBaseId(''); setModalCalendarApiEndpoint('');
 
-    // Preenche os estados do modal com base na configuração existente da ferramenta selecionada.
     if (tool.id === "webSearch") {
       setModalGoogleApiKey(existingConfig.googleApiKey || '');
       setModalGoogleCseId(existingConfig.googleCseId || '');
@@ -440,16 +374,19 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     } else if (tool.id === "calendarAccess") {
       setModalCalendarApiEndpoint(existingConfig.calendarApiEndpoint || '');
     }
-    setIsToolConfigModalOpen(true); // Abre o modal.
+    setIsToolConfigModalOpen(true);
   };
 
-  // Manipulador para salvar a configuração de uma ferramenta a partir do modal.
-  // Atualiza o estado `toolConfigurations` com os novos dados e fecha o modal.
   const handleSaveToolConfiguration = (toolId: string, configData: ToolConfigData) => {
-    setToolConfigurations(prev => ({
-      ...prev,
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+    const updatedToolConfigs = {
+      ...currentToolConfigs,
       [toolId]: configData,
-    }));
+    };
+    methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
+    // Also update the local state if still needed for modal re-opening, though RHF should be the source of truth.
+    setToolConfigurations(updatedToolConfigs);
+
     setIsToolConfigModalOpen(false);
     setConfiguringTool(null);
     toast({
@@ -459,497 +396,326 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     });
   };
 
-const handleSaveAgent = () => {
-  if (!agentName.trim()) {
+// MODIFY handleSaveAgent
+const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = (data) => {
+  // Data is now the validated form data from react-hook-form
+  // The logic to construct coreConfig based on selectedAgentType (data.config.type)
+  // needs to be done using the `data` object.
+
+  // Basic validation example (though Zod handles most of it)
+  if (!data.agentName.trim()) {
     toast({ title: "Erro de Validação", description: "O nome do agente é obrigatório.", variant: "destructive" });
     return;
   }
-    let coreConfig: AgentConfig;
 
-    if (selectedAgentType === "llm") {
-      coreConfig = {
-        type: "llm",
-        framework: agentFramework, // No need to cast if state type is already AgentFramework
-        isRootAgent,
-        subAgentIds,
-        globalInstruction,
-        statePersistence: {
-          enabled: enableStatePersistence,
-          type: statePersistenceType,
-          initialStateValues: initialStateValues // Changed from initialState
-        },
-        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
-        artifacts: {
-          enabled: enableArtifacts,
-          storageType: artifactStorageType,
-          cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
-          definitions: artifacts
-        },
-        a2a: a2aConfig,
-        agentGoal,
-        agentTasks,
-        agentPersonality,
-        agentRestrictions,
-        agentModel,
-        agentTemperature,
-        systemPromptGenerated,
-      };
-    } else if (selectedAgentType === "workflow") {
-      coreConfig = {
-        type: "workflow",
-        framework: agentFramework, // No need to cast
-        isRootAgent,
-        subAgentIds,
-        globalInstruction,
-        statePersistence: {
-          enabled: enableStatePersistence,
-          type: statePersistenceType,
-          initialStateValues: initialStateValues // Changed from initialState
-        },
-        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
-        artifacts: {
-          enabled: enableArtifacts,
-          storageType: artifactStorageType,
-          cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
-          definitions: artifacts
-        },
-        a2a: a2aConfig,
-        detailedWorkflowType: detailedWorkflowType ?? 'sequential',
-        workflowDescription,
-        loopMaxIterations,
-        loopTerminationConditionType,
-        loopExitToolName,
-        loopExitStateKey,
-        loopExitStateValue,
-      };
-    } else if (selectedAgentType === "custom") {
-      coreConfig = {
-        type: "custom",
-        framework: agentFramework, // No need to cast
-        isRootAgent,
-        subAgentIds,
-        globalInstruction,
-        statePersistence: {
-          enabled: enableStatePersistence,
-          type: statePersistenceType,
-          initialStateValues: initialStateValues // Changed from initialState
-        },
-        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
-        artifacts: {
-          enabled: enableArtifacts,
-          storageType: artifactStorageType,
-          cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
-          definitions: artifacts
-        },
-        a2a: a2aConfig,
-        customLogicDescription,
-      };
-    } else if (selectedAgentType === "a2a") {
-      coreConfig = {
-        type: "a2a",
-        framework: agentFramework, // No need to cast
-        isRootAgent,
-        subAgentIds,
-        globalInstruction,
-        statePersistence: {
-          enabled: enableStatePersistence,
-          type: statePersistenceType,
-          initialStateValues: initialStateValues // Changed from initialState
-        },
-        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
-        artifacts: {
-          enabled: enableArtifacts,
-          storageType: artifactStorageType,
-          cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-          localStoragePath: artifactStorageType === 'local' ? localStoragePath : undefined,
-          definitions: artifacts
-        },
-        a2a: a2aConfig,
-      };
-    } else {
-      toast({ title: "Erro Interno", description: "Tipo de agente desconhecido ao salvar.", variant: "destructive" });
-      return;
-    }
+  // The rest of the handleSaveAgent logic will largely remain the same,
+  // but it will use `data.config.type`, `data.agentName`, etc., instead of state variables.
+  // For example:
+  // let coreConfig: AgentConfig;
+  // if (data.config.type === "llm") { coreConfig = { type: "llm", framework: data.config.framework, ... } }
+  // ... and so on.
 
-    const agentDataToSave: SavedAgentConfiguration = {
-      id: editingAgent?.id || uuidv4(),
-      templateId: editingAgent?.templateId || 'custom_manual_dialog',
-      agentName: agentName,
-      agentDescription: agentDescription,
-      agentVersion: agentVersion,
-      icon: editingAgent?.icon || `${selectedAgentType}-agent-icon.svg`,
-      config: coreConfig,
-      tools: selectedTools,
-      toolConfigsApplied: toolConfigurations,
-      toolsDetails: selectedTools
-        .map(toolId => {
-          const toolDetail = availableTools.find(t => t.id === toolId);
-          return toolDetail ? {
-            id: toolDetail.id,
-            name: toolDetail.name,
-            description: toolDetail.description,
-            iconName: typeof toolDetail.icon === 'string' && iconComponents[toolDetail.icon]
-              ? toolDetail.icon
-              : (typeof toolDetail.icon === 'string' ? toolDetail.icon : "Settings"),
-            hasConfig: toolDetail.hasConfig,
-            genkitToolName: toolDetail.genkitToolName
-          } : null;
-        })
-        .filter(Boolean) as SavedAgentConfiguration['toolsDetails'],
-      createdAt: editingAgent?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // console.log("Agent data to save:", JSON.stringify(agentDataToSave, null, 2)); // For debugging
-    // Database.insert('agents', agentDataToSave); // Commented out as Database is not defined
-    onSave(agentDataToSave);
-    toast({ title: "Agente Salvo", description: `${agentName} foi salvo com sucesso.`, variant: "default" });
-    onOpenChange(false);
+  // Construct the final agentDataToSave using the `data` object
+  const agentDataToSave: SavedAgentConfiguration = {
+    ...data, // Spread most of the validated data
+    id: data.id || editingAgent?.id || uuidv4(), // Ensure ID is correctly handled
+    templateId: data.templateId || editingAgent?.templateId || 'custom_manual_dialog',
+    icon: data.icon || `${data.config.type}-agent-icon.svg`, // Ensure icon is set
+    // Ensure toolsDetails are correctly populated if not directly part of the form schema in this way
+    toolsDetails: data.tools
+      .map(toolId => {
+        const toolDetail = availableTools.find(t => t.id === toolId);
+        return toolDetail ? {
+          id: toolDetail.id,
+          name: toolDetail.name,
+          label: toolDetail.label || toolDetail.name, // Ensure label is present
+          description: toolDetail.description,
+          iconName: typeof toolDetail.icon === 'string' ? toolDetail.icon : "Settings", // Simplified
+          hasConfig: toolDetail.hasConfig,
+          genkitToolName: toolDetail.genkitToolName
+        } : null;
+      })
+      .filter(Boolean) as SavedAgentConfiguration['toolsDetails'], // Type assertion
+    createdAt: editingAgent?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    // Ensure toolConfigsApplied from RHF is used
+    toolConfigsApplied: data.toolConfigsApplied || {},
   };
 
+  // console.log("Agent data to save (from RHF):", JSON.stringify(agentDataToSave, null, 2));
+  onSave(agentDataToSave);
+  toast({ title: "Agente Salvo", description: `${data.agentName} foi salvo com sucesso.`, variant: "default" });
+  onOpenChange(false);
+};
+
 return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-    <DialogContent className="max-w-4xl p-0"> {/* Using p-0 on DialogContent and adding padding to an inner div for Tabs */}
-      <DialogHeader className="p-6 pb-4 border-b">
-        <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
-        <DialogDescription>
-          {editingAgent ? `Modifique as configurações do agente "${editingAgent.agentName}".` : "Configure um novo agente inteligente para suas tarefas."}
-        </DialogDescription>
-      </DialogHeader>
-      <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-6"> {/* Adjusted for 6 tabs */}
-            <TabsTrigger value="general">Geral</TabsTrigger>
-            <TabsTrigger value="tools">Ferramentas</TabsTrigger>
-            <TabsTrigger value="memory_knowledge">Memória & Conhecimento</TabsTrigger>
-            <TabsTrigger value="artifacts">Artefatos</TabsTrigger>
-            <TabsTrigger value="a2a">Comunicação A2A</TabsTrigger>
-            <TabsTrigger value="multi_agent_advanced">Multi-Agente & Avançado</TabsTrigger>
-          </TabsList>
+  <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <DialogContent className="max-w-4xl p-0">
+      <FormProvider {...methods}>
+        <form onSubmit={methods.handleSubmit(handleSaveAgent)}>
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
+            <DialogDescription>
+              {editingAgent ? `Modifique as configurações do agente "${editingAgent.agentName}".` : "Configure um novo agente inteligente para suas tarefas."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
+            <Tabs defaultValue="general" className="w-full">
+              <TabsList className="grid w-full grid-cols-6 mb-6"> {/* Adjusted for 6 tabs */}
+                <TabsTrigger value="general">Geral</TabsTrigger>
+                <TabsTrigger value="tools">Ferramentas</TabsTrigger>
+                <TabsTrigger value="memory_knowledge">Memória & Conhecimento</TabsTrigger>
+                <TabsTrigger value="artifacts">Artefatos</TabsTrigger>
+                <TabsTrigger value="a2a">Comunicação A2A</TabsTrigger>
+                <TabsTrigger value="multi_agent_advanced">Multi-Agente & Avançado</TabsTrigger>
+              </TabsList>
 
-          {/* General Tab */}
-          <TabsContent value="general">
-            <GeneralTab
-              agentName={agentName}
-              setAgentName={setAgentName}
-              agentDescription={agentDescription}
-              setAgentDescription={setAgentDescription}
-              agentVersion={agentVersion}
-              setAgentVersion={setAgentVersion}
-              selectedAgentType={selectedAgentType}
-              setSelectedAgentType={setSelectedAgentType}
-              agentTypeOptions={agentTypeOptions}
-              agentFramework={agentFramework}
-              setAgentFramework={setAgentFramework}
-              agentFrameworkOptions={agentFrameworkOptions}
-              // Props for AI suggestions (and also used by specific behavior forms)
-              agentGoal={agentGoal}
-              availableTools={availableTools} // Pass the availableTools prop from AgentBuilderDialog
-              selectedTools={selectedTools} // Pass the selectedTools state from AgentBuilderDialog
-              SparklesIcon={Wand2} // Pass the Wand2 icon for the suggestion button
-              // LLM-specific (agentGoal is listed above)
-              setAgentGoal={setAgentGoal}
-              agentTasks={agentTasks}
-              setAgentTasks={setAgentTasks}
-              agentPersonality={agentPersonality}
-              setAgentPersonality={setAgentPersonality}
-              agentToneOptions={agentToneOptions}
-              agentRestrictions={agentRestrictions}
-              setAgentRestrictions={setAgentRestrictions}
-              agentModel={agentModel}
-              setAgentModel={setAgentModel}
-              agentTemperature={agentTemperature}
-              setAgentTemperature={setAgentTemperature}
-              systemPromptGenerated={systemPromptGenerated} // Assuming GeneralTab might show this (read-only) or it's handled internally
-              // Workflow-specific
-              detailedWorkflowType={detailedWorkflowType}
-              setDetailedWorkflowType={setDetailedWorkflowType}
-              workflowDescription={workflowDescription}
-              setWorkflowDescription={setWorkflowDescription}
-              loopMaxIterations={loopMaxIterations}
-              setLoopMaxIterations={setLoopMaxIterations}
-              loopTerminationConditionType={loopTerminationConditionType}
-              setLoopTerminationConditionType={setLoopTerminationConditionType}
-              loopExitToolName={loopExitToolName}
-              setLoopExitToolName={setLoopExitToolName}
-              loopExitStateKey={loopExitStateKey}
-              setLoopExitStateKey={setLoopExitStateKey}
-              loopExitStateValue={loopExitStateValue}
-              setLoopExitStateValue={setLoopExitStateValue}
-              selectedTools={selectedTools} // For loopExitToolName selector if needed in GeneralTab
-              initialStateValues={initialStateValues} // For loopExitStateKey selector if needed in GeneralTab
-              // Custom-specific
-              customLogicDescription={customLogicDescription}
-              setCustomLogicDescription={setCustomLogicDescription}
-              // Icons
-              InfoIcon={Info}
-              BrainIcon={Brain}
-              WorkflowIcon={Workflow}
-              CpuIcon={Cpu}
-              ChevronsUpDownIcon={ChevronsUpDown}
-            />
-          </TabsContent>
+              {/* General Tab */}
+              <TabsContent value="general">
+                <GeneralTab
+                  agentTypeOptions={agentTypeOptions}
+                  agentFrameworkOptions={agentFrameworkOptions}
+                  availableTools={availableTools} // For AI suggestions
+                  SparklesIcon={Wand2}
+                  // agentToneOptions might still be needed if it populates a selector in GeneralTab directly.
+                  // If agentPersonality is a selector in GeneralTab, pass agentToneOptions.
+                  // Otherwise, if it's handled in BehaviorTab, it's not needed here.
+                  // For now, assuming it's NOT for GeneralTab directly, but for BehaviorTab later.
+                />
+              </TabsContent>
 
-          {/* Tools Tab */}
-          <TabsContent value="tools">
-            <ToolsTab
-              availableTools={availableTools}
-              selectedTools={selectedTools}
-              setSelectedTools={setSelectedTools}
-              toolConfigurations={toolConfigurations}
-              onToolConfigure={handleToolConfigure}
-              iconComponents={iconComponents}
-              InfoIcon={Info}
-              SettingsIcon={Settings}
-              CheckIcon={Check}
-              PlusCircleIcon={PlusCircle}
-              Trash2Icon={Trash2}
-            />
-          </TabsContent>
-
-          {/* Memory & Knowledge Tab */}
-          <TabsContent value="memory_knowledge" className="space-y-6 mt-4">
-            <Alert>
-              <Brain className="h-4 w-4" />
-              <AlertTitle>Memória & Conhecimento</AlertTitle>
-              <AlertDescription>
-                Configure a persistência de estado do agente e a capacidade de usar RAG (Retrieval Augmented Generation) para acesso a conhecimento externo.
-              </AlertDescription>
-            </Alert>
-            <StateMemoryTab
-              enableStatePersistence={enableStatePersistence}
-              setEnableStatePersistence={setEnableStatePersistence}
-              statePersistenceType={statePersistenceType}
-              setStatePersistenceType={setStatePersistenceType}
-              initialStateValues={initialStateValues}
-              setInitialStateValues={setInitialStateValues}
-              // Icons that might be used by StateMemoryTab
-              SaveIcon={Save}
-              ListChecksIcon={ListChecks}
-              PlusIcon={Plus}
-              Trash2Icon={Trash2}
-              InfoIcon={Info}
-              // DatabaseIcon={Database} // Pass Database icon if needed by StateMemoryTab
-            />
-            <Separator className="my-6" />
-            <RagTab
-              enableRAG={enableRAG}
-              setEnableRAG={setEnableRAG}
-              ragMemoryConfig={ragMemoryConfig}
-              setRagMemoryConfig={setRagMemoryConfig}
-              // Icons that might be used by RagTab
-              SearchIcon={Search}
-              UploadCloudIcon={UploadCloud}
-              FileTextIcon={FileText}
-              PlusIcon={Plus}
-              Trash2Icon={Trash2}
-              InfoIcon={Info}
-              // availableTools={availableTools} // If RAG needs to select from tools, e.g. a knowledge base tool
-            />
-          </TabsContent>
-
-          {/* Artifacts Tab */}
-          <TabsContent value="artifacts">
-            <ArtifactsTab
-              enableArtifacts={enableArtifacts}
-              setEnableArtifacts={setEnableArtifacts}
-              artifactStorageType={artifactStorageType}
-              setArtifactStorageType={setArtifactStorageType}
-              artifacts={artifacts}
-              setArtifacts={setArtifacts}
-              cloudStorageBucket={cloudStorageBucket}
-              setCloudStorageBucket={setCloudStorageBucket}
-              localStoragePath={localStoragePath}
-              setLocalStoragePath={setLocalStoragePath}
-              // Icons
-              FileJsonIcon={FileJson}
-              UploadCloudIcon={UploadCloud}
-              BinaryIcon={Binary} // Assuming local storage might be represented by a generic binary/file icon
-              PlusIcon={Plus}
-              Trash2Icon={Trash2}
-              InfoIcon={Info}
-            />
-          </TabsContent>
-
-          {/* A2A Communication Tab */}
-          <TabsContent value="a2a" className="space-y-6 mt-4">
-            <Alert>
-              <Share2 className="h-4 w-4" /> {/* Changed Icon from Network to Share2 for A2A */}
-              <AlertTitle>Comunicação Agente-Agente (A2A)</AlertTitle>
-              <AlertDescription>
-                Configure como este agente se comunica com outros agentes no sistema, incluindo canais e protocolos.
-              </AlertDescription>
-            </Alert>
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações de Comunicação A2A</CardTitle>
-                <CardDescription>Define como este agente se comunica com outros agentes no sistema.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="a2aEnabledSwitch" // Changed id to avoid conflict if A2ATab component is used later with same id
-                    checked={a2aConfig.enabled || false}
-                          onCheckedChange={(checked) => setA2aConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
-                  />
-                  <Label htmlFor="a2aEnabledSwitch" className="text-base">Habilitar Comunicação A2A</Label>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Permite que este agente envie e receba mensagens de outros agentes diretamente, usando os canais configurados.
-                </p>
-
-                {/* Campos de configuração A2A, renderizados se `a2aConfig.enabled` for true. */}
-                {a2aConfig.enabled && (
-                  <div className="space-y-2 pt-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Label htmlFor="a2aCommunicationChannelsTextarea" className="cursor-help">Canais de Comunicação A2A (JSON)</Label>
-                        </TooltipTrigger>
-                        <TooltipContent className="w-[500px]"> {/* Increased width */}
-                          <p>Forneça um array JSON de objetos. Cada objeto representa um canal e deve incluir:</p>
-                          <ul className="list-disc space-y-1 pl-4 my-1">
-                            <li><strong>name:</strong> (string) Nome único para o canal.</li>
-                            <li><strong>direction:</strong> (string) 'input' (para receber) ou 'output' (para enviar).</li>
-                            <li><strong>targetAgentId:</strong> (string) ID do agente alvo (relevante para 'output').</li>
-                            <li><strong>format:</strong> (string) Formato da mensagem (ex: 'json', 'text', 'xml').</li>
-                            <li><strong>mode:</strong> (string) Modo de comunicação ('synchronous' ou 'asynchronous').</li>
-                          </ul>
-                          <p>Opcionalmente, inclua:</p>
-                          <ul className="list-disc space-y-1 pl-4 my-1">
-                            <li><strong>schema:</strong> (object) JSON Schema para validar mensagens.</li>
-                            <li><strong>protocolConfig:</strong> (object) Configurações específicas do protocolo (ex: 'endpoint' para HTTP, 'topic' para Kafka).</li>
-                          </ul>
-                           <p className="mt-1"><strong>Exemplo:</strong></p
-                           ><pre className="text-xs bg-muted p-1 rounded-sm mt-1"><code>{`[
-  {"name": "user_query_http", "direction": "input", "format": "json", "mode": "synchronous", "protocolConfig": {"http": {"endpoint": "/query"}}},
-  {"name": "notify_manager_kafka", "direction": "output", "targetAgentId": "managerAgent001", "format": "json", "mode": "asynchronous", "protocolConfig": {"kafka": {"topic": "agent_notifications"}}}
-]`}</code></pre>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <Textarea
-                      id="a2aCommunicationChannelsTextarea" // Changed id to avoid conflict
-                      placeholder={`Exemplo de formato JSON:
-[
-  {"type": "direct", "targetAgentId": "agente_destino_1", "protocol": "http", "endpoint": "https://api.exemplo.com/agente1"},
-  {"type": "message_queue", "topic": "fila_de_tarefas_comum", "brokerUrl": "amqp://usuario:senha@host:porta/vhost"}
-]`}
-                      value={JSON.stringify(a2aConfig.communicationChannels || [], null, 2)}
-                      onChange={(e) => {
-                        try {
-                          const val = e.target.value.trim();
-                          if(!val) { setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
-                          const parsedChannels = JSON.parse(val);
-                          setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
-                        } catch (error) {
-                          console.error("Erro ao parsear JSON dos canais A2A:", error);
-                          toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A."})
-                        }
-                      }}
-                      rows={6}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Defina os canais, protocolos e configurações para comunicação com outros agentes (formato JSON).
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Multi-Agent & Advanced Tab */}
-          <TabsContent value="multi_agent_advanced" className="space-y-6 mt-4">
-            <Alert>
-              <Users className="h-4 w-4" /> {/* Changed Icon to Users for Multi-Agent */}
-              <AlertTitle>Multi-Agente & Configurações Avançadas</AlertTitle>
-              <AlertDescription>
-                Defina o papel deste agente em uma colaboração (raiz ou sub-agente), configure sub-agentes e outras configurações avançadas do sistema.
-              </AlertDescription>
-            </Alert>
-            <Card> {/* Added Card wrapper for consistent styling with other tabs */}
-              <CardHeader>
-                <CardTitle>Configurações de Hierarquia e Colaboração Multi-Agente</CardTitle>
-                <CardDescription>
-                  Defina o papel do agente (raiz ou sub-agente) e gerencie seus colaboradores.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <MultiAgentTab
-                  isRootAgent={isRootAgent}
-                  setIsRootAgent={setIsRootAgent}
-                  subAgentIds={subAgentIds}
-                  setSubAgentIds={setSubAgentIds}
-                  availableAgentsForSubSelector={availableAgentsForSubSelector}
-                  // Pass SubAgentSelector directly as a component
-                  SubAgentSelectorComponent={SubAgentSelector}
-                  UsersIcon={Users}
-                  LayersIcon={Layers}
+              {/* Tools Tab */}
+              <TabsContent value="tools">
+                <ToolsTab
+                  availableTools={availableTools}
+                  selectedTools={methods.watch("tools") || []} // RHF state
+                  setSelectedTools={(tools) => methods.setValue("tools", tools, {shouldValidate: true, shouldDirty: true})} // RHF action
+                  toolConfigurations={methods.watch("toolConfigsApplied") || {}} // RHF state
+                  onToolConfigure={handleToolConfigure} // Still uses local modal state management for now
+                  iconComponents={iconComponents}
                   InfoIcon={Info}
-                  ChevronsUpDownIcon={ChevronsUpDown}
+                  SettingsIcon={Settings}
+                  CheckIcon={Check}
                   PlusCircleIcon={PlusCircle}
                   Trash2Icon={Trash2}
                 />
-                {/* Global Instruction for Sub-Agents - Moved here from MultiAgentTab props for direct rendering control and tooltip */}
-                <div className="space-y-2 pt-4">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Label htmlFor="globalSubAgentInstruction" className="cursor-help">Instrução Global para Sub-Agentes</Label>
-                      </TooltipTrigger>
-                      <TooltipContent className="w-80">
-                        <p>Esta instrução será pré-anexada ao prompt de cada sub-agente invocado por este agente. Útil para definir contexto, regras ou diretrizes gerais que todos os sub-agentes devem seguir.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <Textarea
-                    id="globalSubAgentInstruction"
-                    placeholder="Ex: 'Você é um assistente especialista. Responda de forma concisa e foque na tarefa atribuída.'"
-                    value={globalInstruction}
-                    onChange={(e) => setGlobalInstruction(e.target.value)}
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Uma diretiva geral que se aplica a todos os sub-agentes orquestrados por este agente.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-            {/* Placeholder for any other genuinely advanced settings not fitting elsewhere */}
-            <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
-              {/* Icons are passed to MultiAgentTab directly, no need to list them here if MultiAgentTab handles them */}
-            </Card>
-            {/* Placeholder for any other genuinely advanced settings not fitting elsewhere */}
-            <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Configurações adicionais como timeouts específicos para ferramentas, políticas de retry para chamadas externas,
-                    ou configurações de logging detalhado poderão ser adicionadas aqui em futuras versões.
-                  </p>
-                </CardContent>
-              </Card>
+              </TabsContent>
 
-            </TabsContent>
-          </Tabs>
-        </div>
+              {/* Behavior Tab - Now uses RHF context */}
+              <TabsContent value="behavior">
+                <BehaviorTab
+                  agentToneOptions={agentToneOptions} // Pass only necessary static options
+                />
+              </TabsContent>
 
-        <DialogFooter className="p-6 pt-4 border-t">
-          <DialogClose asChild>
-            <Button variant="outline">Cancelar</Button>
-          </DialogClose>
-          <Button onClick={handleSaveAgent}><Save className="mr-2 h-4 w-4" /> Salvar Agente</Button>
-        </DialogFooter>
+              {/* Memory & Knowledge Tab */}
+              <TabsContent value="memory_knowledge" className="space-y-6 mt-4">
+                <Alert>
+                  <Brain className="h-4 w-4" />
+                  <AlertTitle>Memória & Conhecimento</AlertTitle>
+                  <AlertDescription>
+                    Configure a persistência de estado do agente e a capacidade de usar RAG (Retrieval Augmented Generation) para acesso a conhecimento externo.
+                  </AlertDescription>
+                </Alert>
+                <StateMemoryTab
+                  // Props will be replaced by useFormContext in StateMemoryTab
+                  enableStatePersistence={methods.watch("config.statePersistence.enabled") || false}
+                  setEnableStatePersistence={(val) => methods.setValue("config.statePersistence.enabled", val)}
+                  statePersistenceType={methods.watch("config.statePersistence.type") || "session"}
+                  setStatePersistenceType={(val) => methods.setValue("config.statePersistence.type", val as StatePersistenceType)}
+                  initialStateValues={methods.watch("config.statePersistence.initialStateValues") || []}
+                  setInitialStateValues={(val) => methods.setValue("config.statePersistence.initialStateValues", val)}
+                  SaveIcon={Save}
+                  ListChecksIcon={ListChecks}
+                  PlusIcon={Plus}
+                  Trash2Icon={Trash2}
+                  InfoIcon={Info}
+                />
+                <Separator className="my-6" />
+                <RagTab
+                  // Props will be replaced by useFormContext in RagTab
+                  enableRAG={methods.watch("config.rag.enabled") || false}
+                  setEnableRAG={(val) => methods.setValue("config.rag.enabled", val)}
+                  ragMemoryConfig={methods.watch("config.rag") as RagMemoryConfig || methods.defaultValues?.config?.rag!}
+                  setRagMemoryConfig={(config) => methods.setValue("config.rag", config)}
+                  SearchIcon={Search}
+                  UploadCloudIcon={UploadCloud}
+                  FileTextIcon={FileText}
+                  PlusIcon={Plus}
+                  Trash2Icon={Trash2}
+                  InfoIcon={Info}
+                />
+              </TabsContent>
 
-        {/* O Modal de Configuração de Ferramenta foi movido para seu próprio componente: ToolConfigModal */}
-      </DialogContent>
+              {/* Artifacts Tab */}
+              <TabsContent value="artifacts">
+                <ArtifactsTab
+                  // Props will be replaced by useFormContext in ArtifactsTab
+                  enableArtifacts={methods.watch("config.artifacts.enabled") || false}
+                  setEnableArtifacts={(val) => methods.setValue("config.artifacts.enabled", val)}
+                  artifactStorageType={methods.watch("config.artifacts.storageType") || "memory"}
+                  setArtifactStorageType={(val) => methods.setValue("config.artifacts.storageType", val as ArtifactStorageType)}
+                  artifacts={methods.watch("config.artifacts.definitions") || []}
+                  setArtifacts={(val) => methods.setValue("config.artifacts.definitions", val)}
+                  cloudStorageBucket={methods.watch("config.artifacts.cloudStorageBucket") || ""}
+                  setCloudStorageBucket={(val) => methods.setValue("config.artifacts.cloudStorageBucket", val)}
+                  localStoragePath={methods.watch("config.artifacts.localStoragePath") || ""}
+                  setLocalStoragePath={(val) => methods.setValue("config.artifacts.localStoragePath", val)}
+                  FileJsonIcon={FileJson}
+                  UploadCloudIcon={UploadCloud}
+                  BinaryIcon={Binary}
+                  PlusIcon={Plus}
+                  Trash2Icon={Trash2}
+                  InfoIcon={Info}
+                />
+              </TabsContent>
+
+              {/* A2A Communication Tab */}
+              <TabsContent value="a2a" className="space-y-6 mt-4">
+                <Alert>
+                  <Share2 className="h-4 w-4" />
+                  <AlertTitle>Comunicação Agente-Agente (A2A)</AlertTitle>
+                  <AlertDescription>
+                    Configure como este agente se comunica com outros agentes no sistema, incluindo canais e protocolos.
+                  </AlertDescription>
+                </Alert>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configurações de Comunicação A2A</CardTitle>
+                    <CardDescription>Define como este agente se comunica com outros agentes no sistema.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Controller
+                        name="config.a2a.enabled"
+                        control={methods.control}
+                        render={({ field }) => (
+                          <Switch
+                            id="a2aEnabledSwitchRHF"
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        )}
+                      />
+                      <Label htmlFor="a2aEnabledSwitchRHF" className="text-base">Habilitar Comunicação A2A</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Permite que este agente envie e receba mensagens de outros agentes diretamente, usando os canais configurados.
+                    </p>
+                    {methods.watch("config.a2a.enabled") && (
+                       <div className="space-y-2 pt-2">
+                        <TooltipProvider>
+                          {/* ... Tooltip for A2A channels ... */}
+                        </TooltipProvider>
+                        <Controller
+                          name="config.a2a.communicationChannels"
+                          control={methods.control}
+                          render={({ field }) => (
+                            <Textarea
+                              id="a2aCommunicationChannelsTextareaRHF"
+                              placeholder={`Exemplo de formato JSON...`}
+                              value={field.value ? JSON.stringify(field.value, null, 2) : "[]"}
+                              onChange={(e) => {
+                                try {
+                                  const val = e.target.value.trim();
+                                  if (!val) { field.onChange([]); return; }
+                                  const parsedChannels = JSON.parse(val);
+                                  field.onChange(parsedChannels);
+                                } catch (error) {
+                                  console.error("Erro ao parsear JSON dos canais A2A:", error);
+                                  toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A."})
+                                }
+                              }}
+                              rows={6}
+                            />
+                          )}
+                        />
+                         <p className="text-xs text-muted-foreground">
+                           Defina os canais, protocolos e configurações para comunicação com outros agentes (formato JSON).
+                         </p>
+                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Multi-Agent & Advanced Tab */}
+              <TabsContent value="multi_agent_advanced" className="space-y-6 mt-4">
+                <Alert>
+                  <Users className="h-4 w-4" />
+                  <AlertTitle>Multi-Agente & Configurações Avançadas</AlertTitle>
+                  <AlertDescription>
+                    Defina o papel deste agente em uma colaboração (raiz ou sub-agente), configure sub-agentes e outras configurações avançadas do sistema.
+                  </AlertDescription>
+                </Alert>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configurações de Hierarquia e Colaboração Multi-Agente</CardTitle>
+                    <CardDescription>
+                      Defina o papel do agente (raiz ou sub-agente) e gerencie seus colaboradores.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <MultiAgentTab
+                      // Props will be replaced by useFormContext in MultiAgentTab
+                      isRootAgent={methods.watch("config.isRootAgent") || false}
+                      setIsRootAgent={(val) => methods.setValue("config.isRootAgent", val)}
+                      subAgentIds={methods.watch("config.subAgentIds") || []}
+                      setSubAgentIds={(val) => methods.setValue("config.subAgentIds", val)}
+                      availableAgentsForSubSelector={availableAgentsForSubSelector}
+                      SubAgentSelectorComponent={SubAgentSelector} // Keep passing component
+                      UsersIcon={Users}
+                      LayersIcon={Layers}
+                      InfoIcon={Info}
+                      ChevronsUpDownIcon={ChevronsUpDown}
+                      PlusCircleIcon={PlusCircle}
+                      Trash2Icon={Trash2}
+                    />
+                    <div className="space-y-2 pt-4">
+                      <TooltipProvider>
+                        {/* ... Tooltip for global instruction ... */}
+                      </TooltipProvider>
+                      <Controller
+                        name="config.globalInstruction"
+                        control={methods.control}
+                        render={({ field }) => (
+                          <Textarea
+                            id="globalSubAgentInstructionRHF"
+                            placeholder="Ex: 'Você é um assistente especialista...'"
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            rows={3}
+                          />
+                        )}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Uma diretiva geral que se aplica a todos os sub-agentes orquestrados por este agente.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Configurações adicionais...
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <DialogFooter className="p-6 pt-4 border-t">
+            <DialogClose asChild>
+              <Button variant="outline" type="button">Cancelar</Button> {/* Add type="button" */}
+            </DialogClose>
+            <Button type="submit"><Save className="mr-2 h-4 w-4" /> Salvar Agente</Button> {/* Changed to type="submit" */}
+          </DialogFooter>
+        </form>
+      </FormProvider>
       <ToolConfigModal
         isOpen={isToolConfigModalOpen}
         onOpenChange={(open) => {
