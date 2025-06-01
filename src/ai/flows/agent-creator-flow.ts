@@ -141,9 +141,9 @@ export const agentCreatorFlow = defineFlow(
           const config = JSON.parse(extracted) as SavedAgentConfiguration;
           // USER ACTION: Verify that 'name' and 'description' exist and are required on SavedAgentConfiguration type.
           // If they are optional or named differently, this check will need adjustment.
-          if (config && config.name && config.description) { 
-            logger.info('[tryParseFinalJson] Successfully parsed JSON config.');
-            await chunkCallback({ suggestedConfig: config, agentResponseChunk: isStreamingContext ? undefined : "Final configuration extracted." });
+          if (config && config.agentName && config.agentDescription) { 
+            logger.info(`[tryParseFinalJson] Successfully parsed JSON config for agent: ${config.agentName}`);
+            await chunkCallback({ suggestedConfig: { ...config, agentName: config.agentName || 'Unnamed Agent' }, agentResponseChunk: isStreamingContext ? undefined : "Final configuration extracted." });
             return config;
           }
         }
@@ -166,33 +166,60 @@ export const agentCreatorFlow = defineFlow(
       if (!currentStreamSetting) {
         logger.info('[AgentCreatorFlow] Using non-streaming generate.');
         // Switched to multi-argument generate, as per Genkit documentation patterns
-        const llmResponse = await generate(
-          gemini15Pro, // model
-          { // options
-            messages: inputMessages, // Ensure this uses the destructured alias
-            config: { temperature: 0.5 },
-            tools: inputTools, // Pass if defined in schema and available
-            toolChoice: inputToolChoice, // Pass if defined in schema and available
-          }
-        );
-        accumulatedText = llmResponse.text ?? ""; // Use .text property (no parentheses)
+        const finalModelResponse = await generate({
+          model: gemini15Pro,
+          messages: inputMessages,
+          config: {
+            temperature: 0.5,
+          },
+          tools: inputTools,
+          toolChoice: inputToolChoice,
+        });
+        accumulatedText = finalModelResponse.text ?? "";
         logger.info(`[AgentCreatorFlow] Non-streaming generation complete. Accumulated text length: ${accumulatedText.length}`);
       } else {
         logger.info('[AgentCreatorFlow] Using streaming generateStream.');
         // Switched to multi-argument generateStream, as per Genkit documentation patterns
-        const { stream: modelStream, response: modelResponsePromise } = await generateStream(
-          gemini15Pro, // model
-          { // options
-            messages: inputMessages, // Ensure this uses the destructured alias
-            config: { temperature: 0.5 },
-            tools: inputTools, // Pass if defined in schema and available
-            toolChoice: inputToolChoice, // Pass if defined in schema and available
-          }
-        );
+        const currentModel = gemini15Pro; // Or determine from context if applicable
+        const genkitMessages = inputMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content.map(part => ({ text: part.text || '' })),
+        }));
 
-        for await (const part of modelStream) {
-          if (part.text) { // Use .text property (no parentheses)
-            const textContent = part.text ?? "";
+        const { stream: conversationModelStream, response: conversationModelResponsePromise } = await generateStream({
+          model: currentModel,
+          messages: genkitMessages,
+          prompt: SYSTEM_PROMPT_AGENT_CREATOR, // System prompt is still relevant for context
+          config: {
+            temperature: 0.6, // Or use a dynamic temperature if needed
+          },
+          streamingCallback: async (chunk: Part) => {
+            if (chunk.content && typeof chunk.content === 'string') {
+              accumulatedText += chunk.content;
+              await sendChunk({ agentResponseChunk: chunk.content });
+              // Attempt to parse JSON mid-stream if a complete block is detected
+              if (accumulatedText.includes('```json') && accumulatedText.trim().endsWith('```')) {
+                const extracted = extractJsonFromMarkdown(accumulatedText);
+                if (extracted) {
+                  try {
+                    const parsedConfig = JSON.parse(extracted) as SavedAgentConfiguration;
+                    if (parsedConfig && parsedConfig.agentName) { 
+                      await sendChunk({ suggestedConfig: parsedConfig });
+                      jsonProcessedMidStream = true;
+                      logger.info('[AgentCreatorFlow] Successfully parsed and sent config mid-stream.');
+                    }
+                  } catch (e) {
+                    logger.debug('[AgentCreatorFlow] Mid-stream JSON block detected but failed to parse, continuing stream.', e);
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        for await (const part of conversationModelStream) {
+          if (part.text) {
+            const textContent = part.text;
             accumulatedText += textContent;
             await sendChunk({ agentResponseChunk: textContent });
 
@@ -202,9 +229,7 @@ export const agentCreatorFlow = defineFlow(
               if (extracted) {
                 try {
                   const config = JSON.parse(extracted) as SavedAgentConfiguration;
-                  // USER ACTION: Verify that 'name' exists on SavedAgentConfiguration type.
-                  // This is a common check for a valid config object.
-                  if (config && config.name) { 
+                  if (config && config.agentName) { 
                     await sendChunk({ suggestedConfig: config });
                     jsonProcessedMidStream = true;
                     logger.info('[AgentCreatorFlow] Successfully parsed and sent config mid-stream.');
@@ -221,13 +246,13 @@ export const agentCreatorFlow = defineFlow(
         }
         logger.info(`[AgentCreatorFlow] Streaming generation complete. Accumulated text length: ${accumulatedText.length}`);
         
-        const finalModelResponse = await modelResponsePromise;
+        const finalModelResponse = await conversationModelResponsePromise;
         // .candidates() access removed as it was causing errors and its utility here was minor.
         // logger.info(`[AgentCreatorFlow] Stream finished. Finish reason: ${finalModelResponse.candidates()?.[0]?.finishReason}`);
         
         // If no text was accumulated during streaming but the final response has text (e.g., non-streaming part of a stream)
-        if (!accumulatedText && finalModelResponse.text) { // Use .text property
-            accumulatedText = finalModelResponse.text ?? "";
+        if (!accumulatedText && finalModelResponse.text) {
+            accumulatedText = finalModelResponse.text;
             if (accumulatedText) {
               await sendChunk({ agentResponseChunk: accumulatedText });
             }
@@ -236,8 +261,6 @@ export const agentCreatorFlow = defineFlow(
 
       // Final attempt to parse JSON from the full accumulated text if not done mid-stream
       if (!jsonProcessedMidStream && accumulatedText.trim()) {
-        logger.info('[AgentCreatorFlow] Attempting to parse final JSON from accumulated text.');
-        // Pass currentStreamSetting to tryParseFinalJson to indicate context
         await tryParseFinalJson(accumulatedText, currentStreamSetting, sendChunk);
       } else if (jsonProcessedMidStream) {
         logger.info('[AgentCreatorFlow] JSON was processed and sent mid-stream.');

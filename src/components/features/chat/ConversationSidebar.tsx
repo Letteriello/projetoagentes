@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from "@/types/chat";
 import { cn } from "@/lib/utils";
+import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
+
+// TODO: Move AgentSelectItem to a shared types file
+interface AgentSelectItem {
+  id: string;
+  displayName: string;
+}
 
 // Basic SVG Icons (Heroicons outlines)
 const PlusIcon = () => (
@@ -72,14 +79,23 @@ const ChevronLeftIcon = () => (
 );
 
 export interface ConversationSidebarProps {
+  isOpen: boolean;
   conversations: Conversation[];
   activeConversationId: string | null;
-  onSelectConversation: (id: string) => void;
-  onNewConversation: () => void;
+  isLoading: boolean;
+  currentUserId?: string; // Optional as it might not always be available initially
+
+  onSelectConversation: (conversationId: string) => void;
+  onNewConversation: () => Promise<Conversation | null>;
+  onDeleteConversation: (conversation: Conversation) => Promise<void>;
   onRenameConversation: (id: string, newTitle: string) => void;
-  onDeleteConversation: (conversation: Conversation) => void; // Updated prop type
-  isOpen: boolean;
-  onToggleSidebar: () => void;
+  onToggleSidebar?: () => void; // Optional, for internal close button
+
+  // Agent selection related
+  gems: Gem[];
+  savedAgents: SavedAgentConfigType[]; 
+  adkAgents: AgentSelectItem[]; 
+  onSelectAgent: (agent: AgentSelectItem | Gem | SavedAgentConfigType) => void;
 }
 
 export function ConversationSidebar({

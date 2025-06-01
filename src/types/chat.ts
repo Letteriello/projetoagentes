@@ -25,6 +25,7 @@ export interface ChatMessageUI {
   fileName?: string;
   fileDataUri?: string;
   isStreaming?: boolean; // Added for streaming
+  status?: 'pending' | 'completed' | 'error'; // Added status for UI
 }
 
 // You might also want a type for the overall chat state if you use a reducer or context

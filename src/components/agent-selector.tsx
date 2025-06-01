@@ -41,13 +41,26 @@ interface AgentData {
 }
 
 import type { SavedAgentConfiguration } from "@/types/agent-configs";
+import type { Gem } from "@/data/agentBuilderConfig"; // Added Gem import
+
+// TODO: Move AgentSelectItem to a shared types file
+interface AgentSelectItem {
+  id: string;
+  displayName: string;
+}
 
 interface AgentSelectorProps {
   onAgentSelected: (agentId: string) => void;
   selectedAgentId?: string;
   savedAgents: SavedAgentConfiguration[]; 
+  gems?: Gem[];
+  adkAgents?: AgentSelectItem[];
   showLabel?: boolean;
   triggerClassName?: string;
+  selectedGemId?: string;
+  onSelectGem?: (id: string) => void;
+  selectedADKAgentId?: string; 
+onSelectADKAgent?: (id: string) => void;
 }
 
 export function AgentSelector({
