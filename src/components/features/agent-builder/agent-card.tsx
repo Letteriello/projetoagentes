@@ -39,7 +39,14 @@ import {
   Eye as EyeIcon,
   EyeOff as EyeOffIcon,
   Save as SaveIcon,
+  Crown,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 // Update type imports to use centralized definitions
 import type {
   SavedAgentConfiguration,
@@ -157,6 +164,21 @@ export function AgentCard({
   availableTools,
   agentTypeOptions,
 }: AgentCardProps) {
+  /**
+   * Determines if the agent has any tools that require configuration but are not yet configured.
+   * A tool is considered unconfigured if it has `hasConfig: true` and its corresponding entry
+   * in `agent.toolConfigsApplied` is missing or is an empty object.
+   */
+  const hasUnconfiguredTools = agent.toolsDetails?.some(
+    (toolDetail) => {
+      if (!toolDetail.hasConfig) {
+        return false; // Does not require configuration
+      }
+      const config = agent.toolConfigsApplied?.[toolDetail.id];
+      return !config || Object.keys(config).length === 0;
+    }
+  ) ?? false;
+
   const agentTypeDetails = agentTypeOptions.find(
     (opt) => opt.id === agent.config.type, // Access via agent.config.type
   );
@@ -214,15 +236,51 @@ export function AgentCard({
           {AgentIconComponent}
           <div className="flex-1">
             <div className="flex justify-between items-start mb-1">
-              <CardTitle className="text-lg font-semibold text-foreground">
-                {agent.agentName || "Agente Sem Nome"}
-              </CardTitle>
+              {/* Wrapper for title and new icons */}
+              <div className="flex items-center">
+                <CardTitle className="text-lg font-semibold text-foreground">
+                  {agent.agentName || "Agente Sem Nome"}
+                </CardTitle>
+                {/**
+                 * Renders a Crown icon with a tooltip if the agent is designated as a root agent.
+                 * This visually indicates the agent's special status in a hierarchy.
+                 */}
+                {agent.config.isRootAgent && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Crown className="w-4 h-4 ml-2 text-yellow-500" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Agente Raiz</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {/**
+                 * Renders an AlertCircle icon with a tooltip if the agent has one or more tools
+                 * that require configuration but have not yet been configured by the user.
+                 * This serves as a visual warning to prompt the user to complete necessary setups.
+                 */}
+                {hasUnconfiguredTools && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle className="w-4 h-4 ml-1 text-amber-500" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Este agente possui ferramentas que requerem configuração adicional.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               <Badge variant="secondary" className="text-xs h-6">
                 {agentTypeLabel}
               </Badge>
             </div>
             <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
-              {agent.description || "Sem descrição."} {/* Use agent.description */}
+              {agent.description || "Sem descrição."}
             </CardDescription>
           </div>
         </div>
