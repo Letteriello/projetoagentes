@@ -888,51 +888,91 @@ export function ArtifactManagementTab({
                       <div className="space-y-2">
                         <Label className="text-xs">Permissões de Acesso</Label>
                         <div className="flex space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="user-access"
-                              checked={newArtifact.accessRoles?.includes(
-                                "user",
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleAccessRoleChange("user", !!checked)
-                              }
-                            />
-                            <Label htmlFor="user-access" className="text-xs">
-                              Usuário
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="agent-access"
-                              checked={newArtifact.accessRoles?.includes(
-                                "agent",
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleAccessRoleChange("agent", !!checked)
-                              }
-                            />
-                            <Label htmlFor="agent-access" className="text-xs">
-                              Agente
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="sub-agent-access"
-                              checked={newArtifact.accessRoles?.includes(
-                                "sub-agent",
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleAccessRoleChange("sub-agent", !!checked)
-                              }
-                            />
-                            <Label
-                              htmlFor="sub-agent-access"
-                              className="text-xs"
-                            >
-                              Sub-Agentes
-                            </Label>
-                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="user-access"
+                                    checked={newArtifact.accessRoles?.includes(
+                                      "user",
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAccessRoleChange("user", !!checked)
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor="user-access"
+                                    className="text-xs"
+                                  >
+                                    Usuário
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  O usuário final interagindo com o agente.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="agent-access"
+                                    checked={newArtifact.accessRoles?.includes(
+                                      "agent",
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAccessRoleChange("agent", !!checked)
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor="agent-access"
+                                    className="text-xs"
+                                  >
+                                    Agente
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>O próprio agente.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="sub-agent-access"
+                                    checked={newArtifact.accessRoles?.includes(
+                                      "sub-agent",
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAccessRoleChange(
+                                        "sub-agent",
+                                        !!checked,
+                                      )
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor="sub-agent-access"
+                                    className="text-xs"
+                                  >
+                                    Sub-Agentes
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  Outros agentes que são subordinados a este.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
 
@@ -975,7 +1015,7 @@ export function ArtifactManagementTab({
                       {newArtifact.type === "reference" && (
                         <div className="space-y-2">
                           <Label htmlFor="allowed-patterns" className="text-xs">
-                            Padrões de URI/Caminhos Permitidos (opcional)
+                            Padrões de URI/Caminhos Permitidos para Referências
                           </Label>
                           <Textarea
                             id="allowed-patterns"
@@ -991,14 +1031,34 @@ export function ArtifactManagementTab({
                                   .filter(Boolean),
                               })
                             }
-                            placeholder="gs://bucket/**/*.pdf
-https://exemplo.com/**/*.docx
-/data/local/**/*.csv"
+                            placeholder={`gs://bucket-name/path/**.pdf
+https://meusite.com/documentos/**
+/diretorio/local/dados/*.csv`}
                             className="h-20 resize-none font-mono text-xs"
                           />
                           <p className="text-xs text-muted-foreground">
-                            Um padrão por linha. Use ** para diretórios
-                            recursivos.
+                            Especifique os padrões de URI ou caminhos de sistema
+                            de arquivos permitidos para artefatos do tipo 'referência'. <br />
+                            Use um padrão por linha. <br />
+                            - <code>*</code> corresponde a qualquer caractere
+                            exceto <code>/</code> em um segmento de caminho. <br />
+                            - <code>**</code> corresponde a qualquer caractere,
+                            incluindo <code>/</code>, abrangendo múltiplos
+                            diretórios. <br />
+                            Exemplos: <br />
+                            -{" "}
+                            <code>
+                              gs://meu-bucket/objetos/*
+                            </code>: Permite qualquer objeto direto dentro de
+                            'objetos' no bucket 'meu-bucket'. <br />
+                            -{" "}
+                            <code>
+                              https://exemplo.com/arquivos/**.docx
+                            </code>: Permite qualquer arquivo .docx em qualquer
+                            subdiretório de 'arquivos'. <br />
+                            - <code>/dados/relatorios/*.csv</code>: Permite
+                            qualquer arquivo .csv diretamente dentro de
+                            '/dados/relatorios/'.
                           </p>
                         </div>
                       )}
