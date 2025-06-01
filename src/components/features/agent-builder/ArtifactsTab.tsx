@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
 import type { ArtifactDefinition } from "@/types/agent-configs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Props para o componente ArtifactsTab.
 interface ArtifactsTabProps {
@@ -137,17 +138,36 @@ const ArtifactsTab: React.FC<ArtifactsTabProps> = ({
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="artifactsDefinitions">Definições de Artefatos (JSON)</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="artifactsDefinitions" className="cursor-help">Definições de Artefatos (JSON)</Label>
+                    </TooltipTrigger>
+                    <TooltipContent className="w-[450px]"> {/* Increased width */}
+                      <p>Forneça um array JSON de objetos. Cada objeto deve ter:</p>
+                      <ul className="list-disc space-y-1 pl-4 my-1">
+                        <li><strong>name:</strong> (string) Nome do artefato (ex: 'relatorio.pdf').</li>
+                        <li><strong>description:</strong> (string) Breve descrição do artefato.</li>
+                        <li><strong>type:</strong> (string) Tipo do artefato (ex: 'file', 'url', 'text_snippet', 'image', 'json_data').</li>
+                      </ul>
+                      <p>Chaves opcionais podem incluir 'mimeType', 'permissions', 'persisted', 'schema' (para json_data).</p>
+                      <p className="mt-1"><strong>Exemplo:</strong></p>
+                      <pre className="text-xs bg-muted p-1 rounded-sm mt-1"><code>{`[
+  {"name": "relatorio_final.pdf", "description": "Relatório detalhado da análise.", "type": "file", "mimeType": "application/pdf"},
+  {"name": "dados_processados.json", "description": "Resultado do processamento em JSON.", "type": "json_data"}
+]`}</code></pre>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Textarea
                   id="artifactsDefinitions"
-                  placeholder='[{"name": "output.txt", "description": "Arquivo de saída principal", "type": "file"}]'
+                  placeholder='[{"name": "relatorio.pdf", "description": "Relatório final", "type": "file"}, ...]'
                   value={JSON.stringify(artifacts, null, 2)}
                   onChange={handleArtifactsChange}
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Defina os artefatos que o agente pode produzir ou consumir (TODO: Melhorar UI para isto).
-                  Cada artefato deve ter 'name' (string), 'description' (string), e 'type' (string, ex: 'file', 'url', 'text_snippet').
+                  Defina os artefatos que o agente pode produzir ou consumir. A UI para gerenciamento individual de artefatos será melhorada futuramente.
                 </p>
               </div>
             </>

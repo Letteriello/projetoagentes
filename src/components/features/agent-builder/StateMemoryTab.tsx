@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Props para o componente StateMemoryTab.
 interface StateMemoryTabProps {
@@ -99,7 +100,22 @@ const StateMemoryTab: React.FC<StateMemoryTabProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="initialStateValues">Valores Iniciais do Estado (JSON)</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="initialStateValues" className="cursor-help">Valores Iniciais do Estado (JSON)</Label>
+                    </TooltipTrigger>
+                    <TooltipContent className="w-96"> {/* Adjusted width for better fit */}
+                      <p>Forneça um array JSON de objetos, onde cada objeto tem uma chave 'key' (string) e uma chave 'value' (qualquer valor JSON válido).</p>
+                      <p className="mt-1"><strong>Exemplo:</strong></p>
+                      <pre className="text-xs bg-muted p-1 rounded-sm mt-1"><code>{`[
+  {"key": "cidade", "value": "Recife"},
+  {"key": "totalItens", "value": 0},
+  {"key": "ativo", "value": true}
+]`}</code></pre>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Textarea
                   id="initialStateValues"
                   placeholder='[{"key": "exemploChave", "value": "exemploValor"}, {"key": "outraChave", "value": 123}]'

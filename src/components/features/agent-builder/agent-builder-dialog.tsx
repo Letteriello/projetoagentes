@@ -621,86 +621,313 @@ return (
       </DialogHeader>
       <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-6"> {/* Assuming 5 tabs eventually */}
+          <TabsList className="grid w-full grid-cols-6 mb-6"> {/* Adjusted for 6 tabs */}
             <TabsTrigger value="general">Geral</TabsTrigger>
             <TabsTrigger value="tools">Ferramentas</TabsTrigger>
-            <TabsTrigger value="memory_rag">Memória/RAG</TabsTrigger>
-            <TabsTrigger value="artifacts_a2a">Artefatos & A2A</TabsTrigger>
-            <TabsTrigger value="advanced">Avançado</TabsTrigger>
+            <TabsTrigger value="memory_knowledge">Memória & Conhecimento</TabsTrigger>
+            <TabsTrigger value="artifacts">Artefatos</TabsTrigger>
+            <TabsTrigger value="a2a">Comunicação A2A</TabsTrigger>
+            <TabsTrigger value="multi_agent_advanced">Multi-Agente & Avançado</TabsTrigger>
           </TabsList>
 
-          {/* TODO: Implement TabsContent for 'general', 'tools', 'memory_rag', 'artifacts_a2a' */}
-          {/* Example for general tab:
+          {/* General Tab */}
           <TabsContent value="general">
-            <p>Configurações gerais do agente aqui...</p>
-          </TabsContent> 
-          */}
+            <GeneralTab
+              agentName={agentName}
+              setAgentName={setAgentName}
+              agentDescription={agentDescription}
+              setAgentDescription={setAgentDescription}
+              agentVersion={agentVersion}
+              setAgentVersion={setAgentVersion}
+              selectedAgentType={selectedAgentType}
+              setSelectedAgentType={setSelectedAgentType}
+              agentTypeOptions={agentTypeOptions}
+              agentFramework={agentFramework}
+              setAgentFramework={setAgentFramework}
+              agentFrameworkOptions={agentFrameworkOptions}
+              // Props for AI suggestions (and also used by specific behavior forms)
+              agentGoal={agentGoal}
+              availableTools={availableTools} // Pass the availableTools prop from AgentBuilderDialog
+              selectedTools={selectedTools} // Pass the selectedTools state from AgentBuilderDialog
+              SparklesIcon={Wand2} // Pass the Wand2 icon for the suggestion button
+              // LLM-specific (agentGoal is listed above)
+              setAgentGoal={setAgentGoal}
+              agentTasks={agentTasks}
+              setAgentTasks={setAgentTasks}
+              agentPersonality={agentPersonality}
+              setAgentPersonality={setAgentPersonality}
+              agentToneOptions={agentToneOptions}
+              agentRestrictions={agentRestrictions}
+              setAgentRestrictions={setAgentRestrictions}
+              agentModel={agentModel}
+              setAgentModel={setAgentModel}
+              agentTemperature={agentTemperature}
+              setAgentTemperature={setAgentTemperature}
+              systemPromptGenerated={systemPromptGenerated} // Assuming GeneralTab might show this (read-only) or it's handled internally
+              // Workflow-specific
+              detailedWorkflowType={detailedWorkflowType}
+              setDetailedWorkflowType={setDetailedWorkflowType}
+              workflowDescription={workflowDescription}
+              setWorkflowDescription={setWorkflowDescription}
+              loopMaxIterations={loopMaxIterations}
+              setLoopMaxIterations={setLoopMaxIterations}
+              loopTerminationConditionType={loopTerminationConditionType}
+              setLoopTerminationConditionType={setLoopTerminationConditionType}
+              loopExitToolName={loopExitToolName}
+              setLoopExitToolName={setLoopExitToolName}
+              loopExitStateKey={loopExitStateKey}
+              setLoopExitStateKey={setLoopExitStateKey}
+              loopExitStateValue={loopExitStateValue}
+              setLoopExitStateValue={setLoopExitStateValue}
+              selectedTools={selectedTools} // For loopExitToolName selector if needed in GeneralTab
+              initialStateValues={initialStateValues} // For loopExitStateKey selector if needed in GeneralTab
+              // Custom-specific
+              customLogicDescription={customLogicDescription}
+              setCustomLogicDescription={setCustomLogicDescription}
+              // Icons
+              InfoIcon={Info}
+              BrainIcon={Brain}
+              WorkflowIcon={Workflow}
+              CpuIcon={Cpu}
+              ChevronsUpDownIcon={ChevronsUpDown}
+            />
+          </TabsContent>
 
-          {/* Existing "advanced" tab content starts here */}
-          <TabsContent value="advanced" className="space-y-6 mt-4">
-    <Alert>
-      <Settings2 className="h-4 w-4" />
-      <AlertTitle>Configurações Avançadas e A2A</AlertTitle>
-      <AlertDescription>
-        Defina configurações de baixo nível, como comunicação entre agentes (A2A), e outros parâmetros avançados do sistema.
-      </AlertDescription>
-    </Alert>
+          {/* Tools Tab */}
+          <TabsContent value="tools">
+            <ToolsTab
+              availableTools={availableTools}
+              selectedTools={selectedTools}
+              setSelectedTools={setSelectedTools}
+              toolConfigurations={toolConfigurations}
+              onToolConfigure={handleToolConfigure}
+              iconComponents={iconComponents}
+              InfoIcon={Info}
+              SettingsIcon={Settings}
+              CheckIcon={Check}
+              PlusCircleIcon={PlusCircle}
+              Trash2Icon={Trash2}
+            />
+          </TabsContent>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>Comunicação Agente-Agente (A2A)</CardTitle>
-        <CardDescription>Define como este agente se comunica com outros agentes no sistema.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="a2aEnabled"
-            checked={a2aConfig.enabled || false}
-                  onCheckedChange={(checked) => setA2aConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
-          />
-          <Label htmlFor="a2aEnabled" className="text-base">Habilitar Comunicação A2A</Label>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Permite que este agente envie e receba mensagens de outros agentes diretamente, usando os canais configurados.
-        </p>
+          {/* Memory & Knowledge Tab */}
+          <TabsContent value="memory_knowledge" className="space-y-6 mt-4">
+            <Alert>
+              <Brain className="h-4 w-4" />
+              <AlertTitle>Memória & Conhecimento</AlertTitle>
+              <AlertDescription>
+                Configure a persistência de estado do agente e a capacidade de usar RAG (Retrieval Augmented Generation) para acesso a conhecimento externo.
+              </AlertDescription>
+            </Alert>
+            <StateMemoryTab
+              enableStatePersistence={enableStatePersistence}
+              setEnableStatePersistence={setEnableStatePersistence}
+              statePersistenceType={statePersistenceType}
+              setStatePersistenceType={setStatePersistenceType}
+              initialStateValues={initialStateValues}
+              setInitialStateValues={setInitialStateValues}
+              // Icons that might be used by StateMemoryTab
+              SaveIcon={Save}
+              ListChecksIcon={ListChecks}
+              PlusIcon={Plus}
+              Trash2Icon={Trash2}
+              InfoIcon={Info}
+              // DatabaseIcon={Database} // Pass Database icon if needed by StateMemoryTab
+            />
+            <Separator className="my-6" />
+            <RagTab
+              enableRAG={enableRAG}
+              setEnableRAG={setEnableRAG}
+              ragMemoryConfig={ragMemoryConfig}
+              setRagMemoryConfig={setRagMemoryConfig}
+              // Icons that might be used by RagTab
+              SearchIcon={Search}
+              UploadCloudIcon={UploadCloud}
+              FileTextIcon={FileText}
+              PlusIcon={Plus}
+              Trash2Icon={Trash2}
+              InfoIcon={Info}
+              // availableTools={availableTools} // If RAG needs to select from tools, e.g. a knowledge base tool
+            />
+          </TabsContent>
 
-        {/* Campos de configuração A2A, renderizados se `a2aConfig.enabled` for true. */}
-        {a2aConfig.enabled && (
-          <div className="space-y-2 pt-2">
-            <Label htmlFor="a2aCommunicationChannels">Canais de Comunicação A2A (JSON)</Label>
-            <Textarea
-              id="a2aCommunicationChannels"
-              placeholder={`Exemplo de formato JSON:
+          {/* Artifacts Tab */}
+          <TabsContent value="artifacts">
+            <ArtifactsTab
+              enableArtifacts={enableArtifacts}
+              setEnableArtifacts={setEnableArtifacts}
+              artifactStorageType={artifactStorageType}
+              setArtifactStorageType={setArtifactStorageType}
+              artifacts={artifacts}
+              setArtifacts={setArtifacts}
+              cloudStorageBucket={cloudStorageBucket}
+              setCloudStorageBucket={setCloudStorageBucket}
+              localStoragePath={localStoragePath}
+              setLocalStoragePath={setLocalStoragePath}
+              // Icons
+              FileJsonIcon={FileJson}
+              UploadCloudIcon={UploadCloud}
+              BinaryIcon={Binary} // Assuming local storage might be represented by a generic binary/file icon
+              PlusIcon={Plus}
+              Trash2Icon={Trash2}
+              InfoIcon={Info}
+            />
+          </TabsContent>
+
+          {/* A2A Communication Tab */}
+          <TabsContent value="a2a" className="space-y-6 mt-4">
+            <Alert>
+              <Share2 className="h-4 w-4" /> {/* Changed Icon from Network to Share2 for A2A */}
+              <AlertTitle>Comunicação Agente-Agente (A2A)</AlertTitle>
+              <AlertDescription>
+                Configure como este agente se comunica com outros agentes no sistema, incluindo canais e protocolos.
+              </AlertDescription>
+            </Alert>
+            <Card>
+              <CardHeader>
+                <CardTitle>Configurações de Comunicação A2A</CardTitle>
+                <CardDescription>Define como este agente se comunica com outros agentes no sistema.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="a2aEnabledSwitch" // Changed id to avoid conflict if A2ATab component is used later with same id
+                    checked={a2aConfig.enabled || false}
+                          onCheckedChange={(checked) => setA2aConfig((prev: A2AConfig) => ({...prev, enabled: !!checked}))}
+                  />
+                  <Label htmlFor="a2aEnabledSwitch" className="text-base">Habilitar Comunicação A2A</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Permite que este agente envie e receba mensagens de outros agentes diretamente, usando os canais configurados.
+                </p>
+
+                {/* Campos de configuração A2A, renderizados se `a2aConfig.enabled` for true. */}
+                {a2aConfig.enabled && (
+                  <div className="space-y-2 pt-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Label htmlFor="a2aCommunicationChannelsTextarea" className="cursor-help">Canais de Comunicação A2A (JSON)</Label>
+                        </TooltipTrigger>
+                        <TooltipContent className="w-[500px]"> {/* Increased width */}
+                          <p>Forneça um array JSON de objetos. Cada objeto representa um canal e deve incluir:</p>
+                          <ul className="list-disc space-y-1 pl-4 my-1">
+                            <li><strong>name:</strong> (string) Nome único para o canal.</li>
+                            <li><strong>direction:</strong> (string) 'input' (para receber) ou 'output' (para enviar).</li>
+                            <li><strong>targetAgentId:</strong> (string) ID do agente alvo (relevante para 'output').</li>
+                            <li><strong>format:</strong> (string) Formato da mensagem (ex: 'json', 'text', 'xml').</li>
+                            <li><strong>mode:</strong> (string) Modo de comunicação ('synchronous' ou 'asynchronous').</li>
+                          </ul>
+                          <p>Opcionalmente, inclua:</p>
+                          <ul className="list-disc space-y-1 pl-4 my-1">
+                            <li><strong>schema:</strong> (object) JSON Schema para validar mensagens.</li>
+                            <li><strong>protocolConfig:</strong> (object) Configurações específicas do protocolo (ex: 'endpoint' para HTTP, 'topic' para Kafka).</li>
+                          </ul>
+                           <p className="mt-1"><strong>Exemplo:</strong></p
+                           ><pre className="text-xs bg-muted p-1 rounded-sm mt-1"><code>{`[
+  {"name": "user_query_http", "direction": "input", "format": "json", "mode": "synchronous", "protocolConfig": {"http": {"endpoint": "/query"}}},
+  {"name": "notify_manager_kafka", "direction": "output", "targetAgentId": "managerAgent001", "format": "json", "mode": "asynchronous", "protocolConfig": {"kafka": {"topic": "agent_notifications"}}}
+]`}</code></pre>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Textarea
+                      id="a2aCommunicationChannelsTextarea" // Changed id to avoid conflict
+                      placeholder={`Exemplo de formato JSON:
 [
   {"type": "direct", "targetAgentId": "agente_destino_1", "protocol": "http", "endpoint": "https://api.exemplo.com/agente1"},
   {"type": "message_queue", "topic": "fila_de_tarefas_comum", "brokerUrl": "amqp://usuario:senha@host:porta/vhost"}
 ]`}
-              value={JSON.stringify(a2aConfig.communicationChannels || [], null, 2)}
-              onChange={(e) => {
-                try {
-                  const val = e.target.value.trim();
-                  if(!val) { setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
-                  const parsedChannels = JSON.parse(val);
-                  // Adicionar validação mais robusta da estrutura `CommunicationChannelItem` se necessário.
-                  setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
-                } catch (error) {
-                  console.error("Erro ao parsear JSON dos canais A2A:", error);
-                  toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A. Verifique o console para mais detalhes."})
-                }
-              }}
-              rows={6}
-            />
-            <p className="text-xs text-muted-foreground">
-              Defina os canais, protocolos e configurações para comunicação com outros agentes (formato JSON). Cada objeto no array deve representar um canal.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                      value={JSON.stringify(a2aConfig.communicationChannels || [], null, 2)}
+                      onChange={(e) => {
+                        try {
+                          const val = e.target.value.trim();
+                          if(!val) { setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: []})); return; }
+                          const parsedChannels = JSON.parse(val);
+                          setA2aConfig((prev: A2AConfig) => ({...prev, communicationChannels: parsedChannels}));
+                        } catch (error) {
+                          console.error("Erro ao parsear JSON dos canais A2A:", error);
+                          toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A."})
+                        }
+                      }}
+                      rows={6}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Defina os canais, protocolos e configurações para comunicação com outros agentes (formato JSON).
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-              <Card className="mt-6">
+          {/* Multi-Agent & Advanced Tab */}
+          <TabsContent value="multi_agent_advanced" className="space-y-6 mt-4">
+            <Alert>
+              <Users className="h-4 w-4" /> {/* Changed Icon to Users for Multi-Agent */}
+              <AlertTitle>Multi-Agente & Configurações Avançadas</AlertTitle>
+              <AlertDescription>
+                Defina o papel deste agente em uma colaboração (raiz ou sub-agente), configure sub-agentes e outras configurações avançadas do sistema.
+              </AlertDescription>
+            </Alert>
+            <Card> {/* Added Card wrapper for consistent styling with other tabs */}
+              <CardHeader>
+                <CardTitle>Configurações de Hierarquia e Colaboração Multi-Agente</CardTitle>
+                <CardDescription>
+                  Defina o papel do agente (raiz ou sub-agente) e gerencie seus colaboradores.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <MultiAgentTab
+                  isRootAgent={isRootAgent}
+                  setIsRootAgent={setIsRootAgent}
+                  subAgentIds={subAgentIds}
+                  setSubAgentIds={setSubAgentIds}
+                  availableAgentsForSubSelector={availableAgentsForSubSelector}
+                  // Pass SubAgentSelector directly as a component
+                  SubAgentSelectorComponent={SubAgentSelector}
+                  UsersIcon={Users}
+                  LayersIcon={Layers}
+                  InfoIcon={Info}
+                  ChevronsUpDownIcon={ChevronsUpDown}
+                  PlusCircleIcon={PlusCircle}
+                  Trash2Icon={Trash2}
+                />
+                {/* Global Instruction for Sub-Agents - Moved here from MultiAgentTab props for direct rendering control and tooltip */}
+                <div className="space-y-2 pt-4">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label htmlFor="globalSubAgentInstruction" className="cursor-help">Instrução Global para Sub-Agentes</Label>
+                      </TooltipTrigger>
+                      <TooltipContent className="w-80">
+                        <p>Esta instrução será pré-anexada ao prompt de cada sub-agente invocado por este agente. Útil para definir contexto, regras ou diretrizes gerais que todos os sub-agentes devem seguir.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Textarea
+                    id="globalSubAgentInstruction"
+                    placeholder="Ex: 'Você é um assistente especialista. Responda de forma concisa e foque na tarefa atribuída.'"
+                    value={globalInstruction}
+                    onChange={(e) => setGlobalInstruction(e.target.value)}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Uma diretiva geral que se aplica a todos os sub-agentes orquestrados por este agente.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            {/* Placeholder for any other genuinely advanced settings not fitting elsewhere */}
+            <Card className="mt-6">
                 <CardHeader>
-                  <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas</CardTitle>
+                  <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
+              {/* Icons are passed to MultiAgentTab directly, no need to list them here if MultiAgentTab handles them */}
+            </Card>
+            {/* Placeholder for any other genuinely advanced settings not fitting elsewhere */}
+            <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">

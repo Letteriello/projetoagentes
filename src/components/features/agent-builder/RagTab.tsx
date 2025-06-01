@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
 import type { RagMemoryConfig } from "@/types/agent-configs";
 import type { MemoryServiceType } from "./memory-knowledge-tab"; // Local type, or import from actual source
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Props para o componente RagTab.
 interface RagTabProps {
@@ -259,16 +260,36 @@ const RagTab: React.FC<RagTabProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ragKnowledgeSources">Fontes de Conhecimento (JSON)</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="ragKnowledgeSources" className="cursor-help">Fontes de Conhecimento (JSON)</Label>
+                    </TooltipTrigger>
+                    <TooltipContent className="w-[450px]"> {/* Increased width for better readability */}
+                      <p>Forneça um array JSON de objetos. Cada objeto deve ter:</p>
+                      <ul className="list-disc space-y-1 pl-4 my-1">
+                        <li><strong>name:</strong> (string) Um nome descritivo para a fonte.</li>
+                        <li><strong>type:</strong> (string) O tipo da fonte (ex: 'web_url', 'gcs_uri', 'text', 'file_upload').</li>
+                        <li><strong>content:</strong> (string) A URL, URI do GCS, o texto direto, ou o nome do arquivo (para 'file_upload').</li>
+                      </ul>
+                      <p className="mt-1"><strong>Exemplo:</strong></p>
+                      <pre className="text-xs bg-muted p-1 rounded-sm mt-1"><code>{`[
+  {"name": "FAQ Site", "type": "web_url", "content": "https://example.com/faq"},
+  {"name": "Documento PDF", "type": "gcs_uri", "content": "gs://meu-bucket/documento.pdf"},
+  {"name": "Nota Rápida", "type": "text", "content": "Lembrar de verificar as configurações X."}
+]`}</code></pre>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Textarea
                   id="ragKnowledgeSources"
-                  placeholder='[{"type": "web_url", "content": "https://example.com/faq", "name": "FAQ Site"}, {"type": "gcs_uri", "content": "gs://bucket/doc.pdf", "name": "Documento PDF"}]'
+                  placeholder='[{"name": "FAQ Site", "type": "web_url", "content": "https://example.com/faq"}, ...]'
                   value={JSON.stringify(ragMemoryConfig.knowledgeSources || [], null, 2)}
                   onChange={handleKnowledgeSourcesChange}
                   rows={5}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Array de objetos JSON, cada um com "name" (string, nome da fonte), "type" (string, ex: "web_url", "gcs_uri") e "content" (string, URL/URI).
+                  Defina as fontes de dados para o RAG. A UI para upload direto e gerenciamento individual será melhorada.
                 </p>
               </div>
               <div className="flex items-center space-x-2">
