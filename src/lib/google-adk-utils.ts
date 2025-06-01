@@ -98,7 +98,14 @@ export interface GoogleADKAgentConfig {
       [key: string]: any;
     }>;
   };
-}/**
+}
+
+/**
+ * @deprecated This function's original purpose was likely to consolidate various agent instructional fields
+ * into a single string for a previous system or agent framework. For current Genkit agent flows,
+ * similar system prompt construction logic is handled by `constructSystemPromptForGenkit`
+ * in `src/lib/agent-genkit-utils.ts`.
+ *
  * Gera uma instrução consolidada a partir dos campos separados de um agente
  */
 export function generateInstructionFromFields(agent: AgentConfig): string {
@@ -132,7 +139,9 @@ export function generateInstructionFromFields(agent: AgentConfig): string {
   }
   
   return instruction.trim();
-}/**
+}
+
+/**
  * Converte as configurações de ferramentas para o formato esperado pelo Google ADK
  */
 export function generateToolsConfig(toolIds: string[], availableTools: AvailableTool[], toolsConfig: Record<string, ToolConfigData>): any[] {
@@ -151,6 +160,10 @@ export function generateToolsConfig(toolIds: string[], availableTools: Available
 }
 
 /**
+ * @deprecated This function is not used for the current Genkit agent flows.
+ * System prompt logic for Genkit agents is now primarily handled by
+ * the `constructSystemPromptForGenkit` function in `src/lib/agent-genkit-utils.ts`.
+ *
  * Converte uma configuração de agente interna para o formato do Google ADK
  */
 export function convertToGoogleADKConfig(
