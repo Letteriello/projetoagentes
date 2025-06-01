@@ -1,72 +1,60 @@
 // src/app/api/agents/route.ts
-import { NextResponse } from 'next/server';
-import { firestore } from '@/lib/firebaseAdmin';
-import { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs'; // Usar os tipos unificados
-import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { NextResponse } from "next/server";
+import { createAgent, listAgents } from "@/app/agent-builder/actions";
+import { SavedAgentConfiguration } from "@/types/agent-configs";
 
-const PLACEHOLDER_USER_ID = "defaultUser"; // Substituir por autenticação real
+// TODO: Replace with actual authentication mechanism to get userId
+const PLACEHOLDER_USER_ID = "test-user-id";
 
 export async function POST(request: Request) {
   try {
-    const agentData = await request.json() as Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>;
+    const agentConfigData = (await request.json()) as Omit<
+      SavedAgentConfiguration,
+      "id" | "createdAt" | "updatedAt" | "userId"
+    >;
 
-    if (!agentData.agentName || !agentData.config) {
-      return NextResponse.json({ error: 'Nome do agente e configuração são obrigatórios.' }, { status: 400 });
+    // Input validation (basic example)
+    if (!agentConfigData || !agentConfigData.name) {
+      return NextResponse.json(
+        { error: "Invalid agent data provided. Name is required." },
+        { status: 400 }
+      );
     }
 
-    const newAgent: Omit<SavedAgentConfiguration, 'id'> = {
-      ...agentData,
-      userId: PLACEHOLDER_USER_ID, // Associar ao usuário (placeholder)
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const result = await createAgent(agentConfigData, PLACEHOLDER_USER_ID);
 
-    const docRef = await firestore.collection('agents').add(newAgent);
-    const savedAgent = { ...newAgent, id: docRef.id };
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
 
-    return NextResponse.json(savedAgent, { status: 201 });
-  } catch (error) {
-    console.error('Error creating agent:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
-    return NextResponse.json({ error: 'Falha ao criar agente.', details: errorMessage }, { status: 500 });
+    return NextResponse.json(result, { status: 201 }); // 201 Created
+  } catch (e: any) {
+    console.error("Error in POST /api/agents:", e);
+    // Check for specific error types if needed, e.g., JSON parsing errors
+    if (e instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
+    return NextResponse.json(
+      { error: e.message || "Failed to create agent." },
+      { status: 500 }
+    );
   }
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // TODO: Implementar filtro por usuário quando a autenticação estiver pronta
-    const snapshot = await firestore.collection('agents')
-                                     .where('userId', '==', PLACEHOLDER_USER_ID) // Filtrar por userId
-                                     .orderBy('updatedAt', 'desc')
-                                     .get();
-    if (snapshot.empty) {
-      return NextResponse.json([], { status: 200 });
+    const result = await listAgents(PLACEHOLDER_USER_ID);
+
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
-    const agents: SavedAgentConfiguration[] = snapshot.docs.map((doc: QueryDocumentSnapshot) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        // Mapear todos os campos de SavedAgentConfiguration
-        agentName: data.agentName,
-        agentDescription: data.agentDescription,
-        agentVersion: data.agentVersion,
-        icon: data.icon,
-        templateId: data.templateId,
-        isFavorite: data.isFavorite,
-        tags: data.tags,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-        userId: data.userId,
-        config: data.config as AgentConfig, // Fazer type assertion aqui
-        tools: data.tools,
-        toolConfigsApplied: data.toolConfigsApplied,
-        toolsDetails: data.toolsDetails,
-      } as SavedAgentConfiguration;
-    });
-    return NextResponse.json(agents, { status: 200 });
-  } catch (error) {
-    console.error('Error fetching agents:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
-    return NextResponse.json({ error: 'Falha ao buscar agentes.', details: errorMessage }, { status: 500 });
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (e: any) {
+    console.error("Error in GET /api/agents:", e);
+    return NextResponse.json(
+      { error: e.message || "Failed to list agents." },
+      { status: 500 }
+    );
   }
 }

@@ -7,6 +7,19 @@ import { SavedAgentConfiguration } from "@/types/agent-configs";
 import { runFlow } from '@genkit-ai/flow';
 import { agentNameDescriptionSuggesterFlow, AgentNameDescriptionSuggesterInputSchema, AgentNameDescriptionSuggesterOutputSchema } from '@/ai/flows/agentNameDescriptionSuggesterFlow';
 import { z } from 'zod';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  query,
+  where,
+} from "firebase/firestore";
+import { firestore } from "@/lib/firebaseClient";
 
 interface CreatorChatActionInput {
   userNaturalLanguageInput: string;
@@ -56,6 +69,117 @@ export async function suggestAgentNameAndDescriptionAction(
       success: false,
       error: e.message || 'Failed to get suggestions from AI.',
     };
+  }
+}
+
+// Firestore collection reference
+const agentsCollection = collection(firestore, "agents");
+
+// CRUD actions for agent configurations
+
+export async function createAgent(
+  agentConfigData: Omit<SavedAgentConfiguration, "id" | "createdAt" | "updatedAt">,
+  userId: string
+): Promise<SavedAgentConfiguration | { error: string }> {
+  try {
+    const newAgentDoc = await addDoc(agentsCollection, {
+      ...agentConfigData,
+      userId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    const agentSnapshot = await getDoc(newAgentDoc);
+    const agentData = agentSnapshot.data();
+    return {
+      id: agentSnapshot.id,
+      ...agentData,
+    } as SavedAgentConfiguration;
+  } catch (e: any) {
+    console.error("Error creating agent:", e);
+    return { error: e.message || "Failed to create agent." };
+  }
+}
+
+export async function updateAgent(
+  agentId: string,
+  agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, "id" | "createdAt" | "updatedAt" | "userId">>
+): Promise<SavedAgentConfiguration | { error: string }> {
+  try {
+    const agentRef = doc(firestore, "agents", agentId);
+    // TODO: Add check to ensure user owns the agent before updating
+    await updateDoc(agentRef, {
+      ...agentConfigUpdate,
+      updatedAt: serverTimestamp(),
+    });
+    const updatedAgentSnapshot = await getDoc(agentRef);
+    const updatedAgentData = updatedAgentSnapshot.data();
+    return {
+      id: updatedAgentSnapshot.id,
+      ...updatedAgentData,
+    } as SavedAgentConfiguration;
+  } catch (e: any) {
+    console.error("Error updating agent:", e);
+    return { error: e.message || "Failed to update agent." };
+  }
+}
+
+export async function deleteAgent(
+  agentId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const agentRef = doc(firestore, "agents", agentId);
+    // TODO: Add check to ensure user owns the agent before deleting
+    await deleteDoc(agentRef);
+    return { success: true };
+  } catch (e: any) {
+    console.error("Error deleting agent:", e);
+    return { success: false, error: e.message || "Failed to delete agent." };
+  }
+}
+
+export async function listAgents(
+  userId: string
+): Promise<SavedAgentConfiguration[] | { error: string }> {
+  try {
+    const q = query(agentsCollection, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    const agents: SavedAgentConfiguration[] = [];
+    querySnapshot.forEach((doc) => {
+      agents.push({ id: doc.id, ...doc.data() } as SavedAgentConfiguration);
+    });
+    return agents;
+  } catch (e: any) {
+    console.error("Error listing agents:", e);
+    return { error: e.message || "Failed to list agents." };
+  }
+}
+
+export async function getAgentById(
+  agentId: string,
+  userId: string
+): Promise<SavedAgentConfiguration | { error: string; status?: number }> {
+  try {
+    const agentRef = doc(firestore, "agents", agentId);
+    const agentSnapshot = await getDoc(agentRef);
+
+    if (!agentSnapshot.exists()) {
+      return { error: "Agent not found.", status: 404 };
+    }
+
+    const agentData = agentSnapshot.data();
+
+    // Verify ownership
+    if (agentData.userId !== userId) {
+      return { error: "Forbidden. User does not own this agent.", status: 403 };
+    }
+
+    return {
+      id: agentSnapshot.id,
+      ...agentData,
+    } as SavedAgentConfiguration;
+  } catch (e: any) {
+    console.error("Error getting agent by ID:", e);
+    return { error: e.message || "Failed to get agent.", status: 500 };
   }
 }
 

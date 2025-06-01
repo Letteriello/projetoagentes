@@ -111,12 +111,8 @@ export class GoogleADK {
     // Por enquanto, retornamos um ID simulado
     const agentId = config.agentId || `agent-${uuidv4()}`;
     
-    // Armazenar configuração do agente no localStorage para persistência
-    if (typeof window !== 'undefined') {
-      const savedAgents = JSON.parse(localStorage.getItem('ADK_AGENTS') || '{}');
-      savedAgents[agentId] = config;
-      localStorage.setItem('ADK_AGENTS', JSON.stringify(savedAgents));
-    }
+    // localStorage persistence for agent configuration has been removed.
+    // This mock ADK will no longer persist agents.
     
     return agentId;
   }
@@ -227,37 +223,9 @@ export class GoogleADK {
    */
   public async listAgents(): Promise<ADKAgentConfig[]> {
     console.log("[GoogleADK Mock] listAgents called");
-    // Simula a obtenção de agentes do localStorage ou de uma lista mockada
-    if (typeof window !== 'undefined') {
-      try {
-        const savedAgentsString = localStorage.getItem('ADK_AGENTS');
-        if (savedAgentsString) {
-          const savedAgents = JSON.parse(savedAgentsString);
-          // Transforma o objeto de agentes em um array
-          return Object.values(savedAgents) as ADKAgentConfig[];
-        }
-      } catch (error) {
-        console.error("[GoogleADK Mock] Error parsing ADK_AGENTS from localStorage:", error);
-        return []; // Retorna vazio em caso de erro
-      }
-    }
-    // Retorna uma lista mockada se não estiver no browser ou não houver nada no localStorage
-    return [
-      {
-        agentId: 'agent-1-mock', 
-        displayName: 'Agente de Viagens Mock',
-        description: 'Ajuda a planejar suas viagens.',
-        model: 'gemini-1.5-pro',
-        tools: [{ name: 'search_flights' }, { name: 'book_hotel' }],
-      },
-      {
-        agentId: 'agent-2-mock',
-        displayName: 'Assistente de Código Mock',
-        description: 'Ajuda com programação e desenvolvimento.',
-        model: 'gemini-1.5-pro-code',
-        tools: [{ name: 'code_interpreter' }],
-      }
-    ];
+    // localStorage persistence for agent configuration has been removed.
+    // Returning an empty array as this mock ADK no longer persists agents.
+    return [];
   }
 
   /**
