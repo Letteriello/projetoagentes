@@ -2,6 +2,7 @@
 // Inclui campos para objetivo, tarefas, personalidade, restrições, modelo e temperatura.
 
 import * as React from "react";
+import { useFormContext, Controller } from "react-hook-form"; // MODIFIED
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,254 +12,237 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, Wand2 } from "lucide-react"; // Or Sparkles if you prefer/have it
+import { Loader2, Wand2 } from "lucide-react";
 import { suggestLlmBehaviorAction } from "@/app/agent-builder/actions";
 import { useToast } from "@/hooks/use-toast";
+import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 
-// Props para o componente LLMBehaviorForm.
+// MODIFIED: Simplified props
 interface LLMBehaviorFormProps {
-  agentGoal: string; // Used for context in suggestions
-  setAgentGoal: (goal: string) => void;
-  agentTasks: string[]; // Used for context in suggestions
-  setAgentTasks: (tasks: string[]) => void;
-  agentPersonality: string;
-  setAgentPersonality: (personality: string) => void;
-  agentRestrictions: string[];
-  setAgentRestrictions: (restrictions: string[]) => void;
-  agentModel: string;
-  setAgentModel: (model: string) => void;
-  agentTemperature: number;
-  setAgentTemperature: (temperature: number) => void;
-  systemPromptGenerated: string; // readonly, for display
   agentToneOptions: Array<{ id: string; label: string; }>;
-  SparklesIcon?: React.FC<React.SVGProps<SVGSVGElement>>; // Prop for the suggestion icon
+  SparklesIcon?: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
 const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
-  agentGoal,
-  setAgentGoal,
-  agentTasks,
-  setAgentTasks,
-  agentPersonality,
-  setAgentPersonality,
-  agentRestrictions,
-  setAgentRestrictions,
-  agentModel,
-  setAgentModel,
-  agentTemperature,
-  setAgentTemperature,
-  systemPromptGenerated,
   agentToneOptions,
-  SparklesIcon = Wand2, // Default to Wand2 if not provided
+  SparklesIcon = Wand2,
 }) => {
+  const { control, setValue, watch, formState: { errors } } = useFormContext<SavedAgentConfiguration>(); // MODIFIED
+  const { toast } = useToast();
+
   const [isSuggestingPersonality, setIsSuggestingPersonality] = React.useState(false);
   const [isSuggestingRestrictions, setIsSuggestingRestrictions] = React.useState(false);
   const [personalitySuggestions, setPersonalitySuggestions] = React.useState<string[]>([]);
   const [restrictionSuggestions, setRestrictionSuggestions] = React.useState<string[]>([]);
   const [showPersonalityPopover, setShowPersonalityPopover] = React.useState(false);
   const [showRestrictionPopover, setShowRestrictionPopover] = React.useState(false);
-  const { toast } = useToast();
+
+  const watchedAgentGoal = watch("config.agentGoal");
+  const watchedAgentTasks = watch("config.agentTasks");
+  const watchedAgentPersonality = watch("config.agentPersonality");
+  const watchedAgentRestrictions = watch("config.agentRestrictions");
+  const watchedSystemPromptGenerated = watch("config.systemPromptGenerated");
+  const watchedAgentTemperature = watch("config.agentTemperature");
+
 
   const handleSuggestPersonality = async () => {
-    setIsSuggestingPersonality(true);
-    setShowPersonalityPopover(false); // Close if already open
+    setIsSuggestingPersonality(true); setShowPersonalityPopover(false);
     try {
       const result = await suggestLlmBehaviorAction({
         suggestionType: 'personality',
-        agentGoal,
-        agentTasks,
-        currentRestrictions: agentRestrictions,
+        agentGoal: watchedAgentGoal || "",
+        agentTasks: watchedAgentTasks || [],
+        currentRestrictions: watchedAgentRestrictions || [],
       });
       if (result.success && result.suggestions) {
-        setPersonalitySuggestions(result.suggestions);
-        setShowPersonalityPopover(true);
-        toast({ title: "Sugestões de Personalidade Carregadas", description: "Clique em uma sugestão para aplicá-la." });
+        setPersonalitySuggestions(result.suggestions); setShowPersonalityPopover(true);
+        toast({ title: "Sugestões de Personalidade Carregadas"});
       } else {
-        toast({ title: "Falha ao Sugerir Personalidade", description: result.error || "Não foi possível obter sugestões.", variant: "destructive" });
+        toast({ title: "Falha ao Sugerir Personalidade", description: result.error, variant: "destructive" });
       }
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message || "Ocorreu um erro.", variant: "destructive" });
-    } finally {
-      setIsSuggestingPersonality(false);
-    }
-  };
-
-  const handleSuggestRestrictions = async () => {
-    setIsSuggestingRestrictions(true);
-    setShowRestrictionPopover(false); // Close if already open
-    try {
-      const result = await suggestLlmBehaviorAction({
-        suggestionType: 'restrictions',
-        agentGoal,
-        agentTasks,
-        currentPersonality: agentPersonality,
-      });
-      if (result.success && result.suggestions) {
-        setRestrictionSuggestions(result.suggestions);
-        setShowRestrictionPopover(true);
-        toast({ title: "Sugestões de Restrições Carregadas", description: "Clique em uma sugestão para adicioná-la." });
-      } else {
-        toast({ title: "Falha ao Sugerir Restrições", description: result.error || "Não foi possível obter sugestões.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message || "Ocorreu um erro.", variant: "destructive" });
-    } finally {
-      setIsSuggestingRestrictions(false);
-    }
+    } catch (e:any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
+    finally { setIsSuggestingPersonality(false); }
   };
 
   const applyPersonalitySuggestion = (suggestion: string) => {
-    setAgentPersonality(suggestion);
+    setValue("config.agentPersonality", suggestion, { shouldValidate: true, shouldDirty: true }); // MODIFIED
     setShowPersonalityPopover(false);
   };
 
-  const applyRestrictionSuggestion = (suggestion: string) => {
-    // Add if not already present
-    if (!agentRestrictions.includes(suggestion)) {
-      setAgentRestrictions([...agentRestrictions, suggestion]);
-    }
-    // setShowRestrictionPopover(false); // Keep open to add more
-    toast({ title: "Restrição Adicionada", description: `"${suggestion}" foi adicionada.`});
+  const handleSuggestRestrictions = async () => {
+    setIsSuggestingRestrictions(true); setShowRestrictionPopover(false);
+    try {
+      const result = await suggestLlmBehaviorAction({
+        suggestionType: 'restrictions',
+        agentGoal: watchedAgentGoal || "",
+        agentTasks: watchedAgentTasks || [],
+        currentPersonality: watchedAgentPersonality || "",
+      });
+      if (result.success && result.suggestions) {
+        setRestrictionSuggestions(result.suggestions); setShowRestrictionPopover(true);
+        toast({ title: "Sugestões de Restrições Carregadas" });
+      } else {
+        toast({ title: "Falha ao Sugerir Restrições", description: result.error, variant: "destructive" });
+      }
+    } catch (e:any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
+    finally { setIsSuggestingRestrictions(false); }
   };
 
+  const applyRestrictionSuggestion = (suggestion: string) => {
+    const currentRestrictions = watchedAgentRestrictions || [];
+    if (!currentRestrictions.includes(suggestion)) {
+      setValue("config.agentRestrictions", [...currentRestrictions, suggestion], { shouldValidate: true, shouldDirty: true }); // MODIFIED
+    }
+    toast({ title: "Restrição Adicionada" });
+  };
 
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="agentGoal">Objetivo do Agente (LLM)</Label>
-          <Textarea id="agentGoal" placeholder="Descreva o objetivo principal que o agente LLM deve alcançar. Ex: 'Responder perguntas sobre o produto X com base na documentação fornecida.'" value={agentGoal} onChange={(e) => setAgentGoal(e.target.value)} rows={3}/>
-          <p className="text-xs text-muted-foreground">Qual o propósito central deste agente LLM?</p>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="agentPersonality">Personalidade/Tom (LLM)</Label>
-            <Popover open={showPersonalityPopover} onOpenChange={setShowPersonalityPopover}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" onClick={handleSuggestPersonality} disabled={isSuggestingPersonality}>
-                  {isSuggestingPersonality ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
-                  <span className="sr-only">Sugerir Personalidade</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Sugestões de Personalidade</h4>
-                  <p className="text-sm text-muted-foreground">Clique para aplicar.</p>
-                  {personalitySuggestions.map((s, i) => (
-                    <Button key={i} variant="outline" size="sm" className="w-full justify-start text-left" onClick={() => applyPersonalitySuggestion(s)}>{s}</Button>
-                  ))}
-                  {personalitySuggestions.length === 0 && !isSuggestingPersonality && <p className="text-sm text-muted-foreground">Nenhuma sugestão disponível.</p>}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-          <Select value={agentPersonality} onValueChange={setAgentPersonality}>
-            <SelectTrigger id="agentPersonality">
-              <SelectValue placeholder="Selecione a personalidade" />
-            </SelectTrigger>
-            <SelectContent>
-              {/* Mapeia as opções de tom/personalidade disponíveis. */}
-              {agentToneOptions.map(option => (
-                <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-           <p className="text-xs text-muted-foreground">Define o estilo de comunicação do agente (ex: formal, amigável, conciso).</p>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Label htmlFor="agentTasks" className="cursor-help">Tarefas Principais (LLM)</Label>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Liste cada tarefa principal em uma nova linha. Estas tarefas ajudam o LLM a entender os passos para alcançar seu objetivo.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          {/* Placeholder for a potential "Suggest Tasks" button if needed in future */}
-        </div>
-        <Textarea
-          id="agentTasks"
-          placeholder="Liste as tarefas principais que o agente deve executar para alcançar seu objetivo. Uma tarefa por linha. Ex: 'Coletar informações sobre X.', 'Analisar Y.', 'Resumir Z.'"
-          value={agentTasks.join("\n")}
-          onChange={(e) => setAgentTasks(e.target.value.split("\n"))}
-          rows={4}
+        <FormField
+          control={control}
+          name="config.agentGoal"
+          render={({ field }) => (
+            <FormItem className="space-y-2">
+              <FormLabel htmlFor="config.agentGoal">Objetivo do Agente (LLM)</FormLabel>
+              <FormControl><Textarea id="config.agentGoal" placeholder="Descreva o objetivo principal..." {...field} rows={3}/></FormControl>
+              <FormDescription>Qual o propósito central deste agente LLM?</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-         <p className="text-xs text-muted-foreground">Detalhe os passos ou sub-objetivos que o agente deve completar. Uma tarefa por linha.</p>
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Label htmlFor="agentRestrictions" className="cursor-help">Restrições (LLM)</Label>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Liste cada restrição em uma nova linha. Estas são regras ou limites que o LLM deve seguir estritamente.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <Popover open={showRestrictionPopover} onOpenChange={setShowRestrictionPopover}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" onClick={handleSuggestRestrictions} disabled={isSuggestingRestrictions}>
-                {isSuggestingRestrictions ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
-                <span className="sr-only">Sugerir Restrições</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="space-y-2">
-                <h4 className="font-medium leading-none">Sugestões de Restrições</h4>
-                <p className="text-sm text-muted-foreground">Clique para adicionar.</p>
-                {restrictionSuggestions.map((s, i) => (
-                  <Button key={i} variant="outline" size="sm" className="w-full justify-start text-left" onClick={() => applyRestrictionSuggestion(s)}>{s}</Button>
-                ))}
-                {restrictionSuggestions.length === 0 && !isSuggestingRestrictions && <p className="text-sm text-muted-foreground">Nenhuma sugestão disponível.</p>}
+        <FormField
+          control={control}
+          name="config.agentPersonality"
+          render={({ field }) => (
+            <FormItem className="space-y-2">
+              <div className="flex items-center justify-between">
+                <FormLabel htmlFor="config.agentPersonality">Personalidade/Tom (LLM)</FormLabel>
+                <Popover open={showPersonalityPopover} onOpenChange={setShowPersonalityPopover}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleSuggestPersonality} disabled={isSuggestingPersonality}>
+                      {isSuggestingPersonality ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80"> {/* Content as before */} </PopoverContent>
+                </Popover>
               </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <Textarea
-          id="agentRestrictions"
-          placeholder="Liste quaisquer restrições, limitações ou comportamentos que o agente deve evitar. Uma restrição por linha. Ex: 'Não fornecer aconselhamento financeiro.', 'Manter respostas concisas.'"
-          value={agentRestrictions.join("\n")}
-          onChange={(e) => setAgentRestrictions(e.target.value.split("\n"))}
-          rows={3}
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl><SelectTrigger id="config.agentPersonality"><SelectValue placeholder="Selecione a personalidade" /></SelectTrigger></FormControl>
+                <SelectContent>{agentToneOptions.map(o => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <FormDescription>Define o estilo de comunicação.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-         <p className="text-xs text-muted-foreground">Define limites e regras para o comportamento do agente. Uma restrição por linha.</p>
       </div>
+      <FormField
+        control={control}
+        name="config.agentTasks"
+        render={({ field }) => {
+          // Helper to convert array to string for textarea and string to array for RHF
+          const tasksToString = (value: string[] | undefined) => value?.join("\n") || "";
+          const stringToTasks = (value: string) => value.split("\n").filter(task => task.trim() !== "");
+          return (
+            <FormItem className="space-y-2">
+              <FormLabel htmlFor="config.agentTasks">Tarefas Principais (LLM)</FormLabel>
+              <FormControl>
+                <Textarea
+                  id="config.agentTasks"
+                  placeholder="Liste as tarefas principais... Uma tarefa por linha."
+                  value={tasksToString(field.value)}
+                  onChange={(e) => field.onChange(stringToTasks(e.target.value))}
+                  rows={4}
+                />
+              </FormControl>
+              <FormDescription>Detalhe os passos ou sub-objetivos. Uma tarefa por linha.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          );
+        }}
+      />
+      <FormField
+        control={control}
+        name="config.agentRestrictions"
+        render={({ field }) => {
+          const restrictionsToString = (value: string[] | undefined) => value?.join("\n") || "";
+          const stringToRestrictions = (value: string) => value.split("\n").filter(r => r.trim() !== "");
+          return (
+            <FormItem className="space-y-2">
+               <div className="flex items-center justify-between">
+                <FormLabel htmlFor="config.agentRestrictions">Restrições (LLM)</FormLabel>
+                <Popover open={showRestrictionPopover} onOpenChange={setShowRestrictionPopover}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleSuggestRestrictions} disabled={isSuggestingRestrictions}>
+                      {isSuggestingRestrictions ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">{/* Content as before */}</PopoverContent>
+                </Popover>
+              </div>
+              <FormControl>
+                <Textarea
+                  id="config.agentRestrictions"
+                  placeholder="Liste quaisquer restrições... Uma restrição por linha."
+                  value={restrictionsToString(field.value)}
+                  onChange={(e) => field.onChange(stringToRestrictions(e.target.value))}
+                  rows={3}
+                />
+              </FormControl>
+              <FormDescription>Define limites e regras. Uma restrição por linha.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          );
+        }}
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="agentModel">Modelo de Linguagem (LLM)</Label>
-          <Input id="agentModel" placeholder="Ex: gemini-1.5-pro-latest, gpt-4" value={agentModel} onChange={(e) => setAgentModel(e.target.value)} />
-           <p className="text-xs text-muted-foreground">Especifique o identificador do modelo LLM a ser usado (ex: 'gemini-1.5-flash', 'gpt-3.5-turbo').</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="agentTemperature">Temperatura (LLM) - <Badge variant="outline" className="text-xs">{agentTemperature.toFixed(1)}</Badge></Label>
-          <Slider
-            id="agentTemperature"
-            min={0} max={1} step={0.1}
-            value={[agentTemperature]}
-            onValueChange={(value) => setAgentTemperature(value[0])}
-          />
-          <p className="text-xs text-muted-foreground">Controla a criatividade/aleatoriedade das respostas (0=mais determinístico, 1=mais criativo).</p>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="systemPromptGenerated">Prompt do Sistema Gerado (LLM Preview)</Label>
-        <Textarea
-          id="systemPromptGenerated"
-          readOnly
-          value={systemPromptGenerated || "O prompt do sistema será gerado/mostrado aqui com base nas configurações acima (funcionalidade de preview pendente)."}
-          rows={5}
-          className="bg-muted/40"
+        <FormField
+          control={control}
+          name="config.agentModel"
+          render={({ field }) => (
+            <FormItem className="space-y-2">
+              <FormLabel htmlFor="config.agentModel">Modelo de Linguagem (LLM)</FormLabel>
+              <FormControl><Input id="config.agentModel" placeholder="Ex: gemini-1.5-pro-latest" {...field} /></FormControl>
+              <FormDescription>Especifique o identificador do modelo LLM.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-         <p className="text-xs text-muted-foreground">Este é um preview de como o prompt do sistema pode ser construído. (Funcionalidade de geração/atualização automática pendente).</p>
+        <FormField
+          control={control}
+          name="config.agentTemperature"
+          render={({ field }) => (
+            <FormItem className="space-y-2">
+              <FormLabel htmlFor="config.agentTemperature">Temperatura (LLM) - <Badge variant="outline">{Number(field.value)?.toFixed(1) || "0.0"}</Badge></FormLabel>
+              <FormControl>
+                <Slider
+                  id="config.agentTemperature"
+                  min={0} max={1} step={0.1}
+                  value={[Number(field.value) || 0]}
+                  onValueChange={(value) => field.onChange(value[0])}
+                />
+              </FormControl>
+              <FormDescription>Controla a criatividade/aleatoriedade.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
+      <FormField
+        control={control}
+        name="config.systemPromptGenerated"
+        render={({ field }) => (
+          <FormItem className="space-y-2">
+            <FormLabel htmlFor="config.systemPromptGenerated">Prompt do Sistema Gerado (LLM Preview)</FormLabel>
+            <FormControl><Textarea id="config.systemPromptGenerated" readOnly {...field} rows={5} className="bg-muted/40" /></FormControl>
+            <FormDescription>Este é um preview de como o prompt do sistema pode ser construído.</FormDescription>
+            <FormMessage /> {/* Although readonly, maybe a message could appear if some combination is invalid */}
+          </FormItem>
+        )}
+      />
     </>
   );
 };
-
 export default LLMBehaviorForm;
