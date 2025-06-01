@@ -1,57 +1,158 @@
-import {
-  AgentFramework,
-  ArtifactDefinition,
-  RagMemoryConfig,
-  TerminationConditionType,
-  A2AConfig,
-  AvailableTool,
-  ToolConfigData,
-  type ToolConfigData as ImportedToolConfigData, // Alias for re-export
-} from './agent-types';
+// src/types/agent-configs.ts
+import type { ReactNode } from 'react';
 
-// Base configuration for any agent
+export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
+export type AgentType = "llm" | "workflow" | "custom" | "a2a";
+export type WorkflowDetailedType = "sequential" | "parallel" | "loop" | "graph" | "stateMachine";
+export type TerminationConditionType = "tool_success" | "state_change" | "max_iterations" | "none";
+export type StatePersistenceType = "session" | "memory" | "database";
+export type ArtifactStorageType = "local" | "cloud" | "memory" | "filesystem";
+export type StateScope = 'GLOBAL' | 'AGENT' | 'TEMPORARY';
+
+export interface ToolConfigField {
+  id: string;
+  label: string;
+  type: "text" | "password" | "select" | "number" | "textarea";
+  options?: Array<{ label:string; value: string | number }>;
+  placeholder?: string;
+  description?: string;
+  required?: boolean;
+  defaultValue?: string | number | boolean;
+}
+
+export interface AvailableTool {
+  id: string;
+  label: string;
+  name: string;
+  type: "genkit_native" | "openapi" | "mcp" | "custom_script";
+  icon?: ReactNode | string;
+  description: string;
+  hasConfig?: boolean;
+  genkitToolName?: string;
+  configFields?: ToolConfigField[];
+  category?: string;
+}
+
+export interface ToolConfigData {
+  [key: string]: any;
+}
+
+export interface CommunicationChannel {
+  id: string;
+  type: "direct_http" | "message_queue" | "custom";
+  targetAgentId?: string;
+  protocol?: "http" | "https";
+  endpoint?: string;
+  topic?: string;
+  brokerUrl?: string;
+  customConfig?: Record<string, any>;
+  description?: string;
+}
+
+export interface A2AConfig {
+  enabled: boolean;
+  communicationChannels: CommunicationChannel[];
+  defaultResponseFormat: "json" | "text" | "xml";
+  maxMessageSize: number;
+  loggingEnabled: boolean;
+  securityPolicy?: "none" | "jwt" | "api_key";
+  apiKeyHeaderName?: string;
+}
+
+export interface ArtifactDefinition {
+  id: string;
+  name: string;
+  description: string;
+  mimeType: string;
+  required: boolean;
+  accessPermissions?: "read" | "write" | "read_write";
+  versioningEnabled?: boolean;
+}
+
+export interface ArtifactsConfig {
+  enabled: boolean;
+  storageType: ArtifactStorageType;
+  cloudStorageBucket?: string;
+  localStoragePath?: string;
+  definitions: ArtifactDefinition[];
+}
+
+export interface InitialStateValue {
+  key: string;
+  value: string;
+  scope?: StateScope;
+  description?: string;
+}
+
+export interface StateValidationRule {
+  id: string;
+  name: string;
+  type: 'JSON_SCHEMA' | 'REGEX';
+  rule: string;
+}
+
+export interface StatePersistenceConfig {
+  enabled: boolean;
+  type: StatePersistenceType;
+  defaultScope?: StateScope;
+  timeToLiveSeconds?: number;
+  initialStateValues?: InitialStateValue[];
+  validationRules?: StateValidationRule[];
+}
+
+export interface KnowledgeSource {
+  id: string;
+  type: "file" | "url" | "text_chunk" | "google_drive";
+  name: string;
+  path?: string;
+  content?: string;
+  status?: "pending" | "processing" | "ready" | "error";
+  metadata?: Record<string, any>;
+}
+
+export interface RagMemoryConfig {
+  enabled: boolean;
+  serviceType: "in-memory" | "vertex_ai_rag" | "custom_vector_db";
+  knowledgeSources: KnowledgeSource[];
+  persistentMemory?: {
+    enabled: boolean;
+    storagePath?: string;
+  };
+  retrievalParameters?: {
+    topK?: number;
+    similarityThreshold?: number;
+  };
+  embeddingModel?: string;
+  includeConversationContext?: boolean;
+}
+
 export interface AgentConfigBase {
-  type: "llm" | "workflow" | "custom" | "a2a";
+  type: AgentType;
   framework: AgentFramework;
   isRootAgent?: boolean;
   subAgentIds?: string[];
   globalInstruction?: string;
-  statePersistence?: {
-    enabled: boolean;
-    type: string; // "session", "memory", "database"
-    initialState?: Array<{ key: string; value: any }>;
-  };
-  rag?: {
-    enabled: boolean;
-    config?: RagMemoryConfig;
-  };
-  artifacts?: {
-    enabled: boolean;
-    storageType?: "local" | "cloud" | "memory" | "filesystem";
-    cloudStorageBucket?: string;
-    localStoragePath?: string;
-    definitions?: ArtifactDefinition[];
-  };
+  statePersistence?: StatePersistenceConfig;
+  rag?: RagMemoryConfig;
+  artifacts?: ArtifactsConfig;
   a2a?: A2AConfig;
 }
 
-// Configuration for LLM-based agents
 export interface LLMAgentConfig extends AgentConfigBase {
   type: "llm";
-  agentGoal?: string;
-  agentTasks?: string[];
-  agentPersonality?: string;
-  agentRestrictions?: string[];
-  agentModel?: string;
-  agentTemperature?: number;
+  agentGoal: string;
+  agentTasks: string[];
+  agentPersonality: string;
+  agentRestrictions: string[];
+  agentModel: string;
+  agentTemperature: number;
   systemPromptGenerated?: string;
 }
 
-// Configuration for Workflow-based agents
 export interface WorkflowAgentConfig extends AgentConfigBase {
   type: "workflow";
-  detailedWorkflowType?: "sequential" | "graph" | "stateMachine";
-  workflowDescription?: string;
+  detailedWorkflowType: WorkflowDetailedType;
+  workflowDescription: string;
   loopMaxIterations?: number;
   loopTerminationConditionType?: TerminationConditionType;
   loopExitToolName?: string;
@@ -59,31 +160,34 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   loopExitStateValue?: string;
 }
 
-// Configuration for Custom logic agents
 export interface CustomAgentConfig extends AgentConfigBase {
   type: "custom";
-  customLogicDescription?: string;
+  customLogicDescription: string;
+  genkitFlowName?: string;
 }
 
-// Configuration for A2A Specialist Agents
 export interface A2AAgentSpecialistConfig extends AgentConfigBase {
   type: "a2a";
 }
 
-// Union type for any agent configuration
-export type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig | A2AAgentSpecialistConfig;
+export type AgentConfig =
+  | LLMAgentConfig
+  | WorkflowAgentConfig
+  | CustomAgentConfig
+  | A2AAgentSpecialistConfig;
 
-// Represents the full saved configuration for an agent in storage/DB
 export interface SavedAgentConfiguration {
   id: string;
   agentName: string;
-  agentDescription: string; // Metadata field
-  agentVersion: string;     // Metadata field
-  enableArtifacts?: boolean; // Added based on lint error
+  agentDescription: string;
+  agentVersion: string;
+  icon?: string;
   templateId?: string;
   isFavorite?: boolean;
   tags?: string[];
-  icon?: string;
+  createdAt: string;
+  updatedAt: string;
+  userId?: string;
   config: AgentConfig;
   tools: string[];
   toolConfigsApplied?: Record<string, ToolConfigData>;
@@ -92,14 +196,8 @@ export interface SavedAgentConfiguration {
     name: string;
     label: string;
     description: string;
-    iconName: string;
+    iconName?: string;
     hasConfig?: boolean;
     genkitToolName?: string;
   }>;
-  createdAt?: string;
-  updatedAt?: string;
 }
-
-// Re-export types that might be imported via this file
-export type { ImportedToolConfigData as ToolConfigData };
-export type { AgentFramework, ArtifactDefinition, RagMemoryConfig, TerminationConditionType, A2AConfig, AvailableTool };

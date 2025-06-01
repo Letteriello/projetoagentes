@@ -73,10 +73,15 @@ import {
   ToolConfigData,
   LLMAgentConfig,
   WorkflowAgentConfig,
-  CustomAgentConfig
+  CustomAgentConfig,
+  AvailableTool, // Added AvailableTool
+  TerminationConditionType, // Added TerminationConditionType
+  InitialStateValue, // Added InitialStateValue for the state
+  StatePersistenceType, // For statePersistenceType state
+  ArtifactStorageType // For artifactStorageType state
 } from "@/types/agent-configs";
 import type { KnowledgeSource } from "@/components/features/agent-builder/memory-knowledge-tab"; // Correct import for KnowledgeSource
-import { availableTools as availableToolsList } from "@/data/available-tools"; 
+import { availableTools as availableToolsList } from "@/data/available-tools";
 import { useAgents } from "@/contexts/AgentsContext";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
@@ -100,13 +105,6 @@ import RagTab from "./RagTab";
 import ArtifactsTab from "./ArtifactsTab";
 import MultiAgentTab from "./MultiAgentTab"; // Import the new MultiAgentTab component
 
-// agent-types imports:
-import {
-  AvailableTool,
-  TerminationConditionType
-  // A2AConfigType is removed in favor of A2AConfig from agent-configs
-  // ArtifactDefinition and RagMemoryConfig are taken from agent-configs
-} from "@/types/agent-types";
 // Removed redundant local type definitions for TerminationConditionType and A2AConfigType
 
 import { AgentTemplate } from "@/data/agentBuilderConfig";
@@ -163,7 +161,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   // --- Estados para Gerenciamento de Artefatos ---
   const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(false); // Controla se o armazenamento de artefatos está habilitado.
-  const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'local' | 'cloud'>('memory'); // Tipo de armazenamento para artefatos (memória, sistema de arquivos local, nuvem). Aligned with AgentConfig type.
+  const [artifactStorageType, setArtifactStorageType] = React.useState<ArtifactStorageType>('memory'); // Tipo de armazenamento para artefatos (memória, sistema de arquivos local, nuvem). Aligned with AgentConfig type.
   const [artifacts, setArtifacts] = React.useState<ArtifactDefinition[]>([]); // Lista de definições de artefatos que o agente pode produzir ou consumir.
   const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(""); // Nome do bucket na nuvem para armazenamento de artefatos.
   const [localStoragePath, setLocalStoragePath] = React.useState<string>(""); // Caminho no sistema de arquivos local para armazenamento de artefatos, usado se `artifactStorageType` for 'filesystem'.
@@ -210,8 +208,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   // --- Estados para Persistência de Estado e Memória ---
   const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(false); // Chave booleana para habilitar/desabilitar a persistência de estado do agente.
-  const [statePersistenceType, setStatePersistenceType] = React.useState<string>("session"); // Define o tipo de persistência de estado (ex: 'session' para temporário, 'memory' para vida do processo, 'database' para persistente).
-  const [initialStateValues, setInitialStateValues] = React.useState<Array<{key: string, value: string}>>([]); // Lista de pares chave-valor que definem o estado inicial do agente.
+  const [statePersistenceType, setStatePersistenceType] = React.useState<StatePersistenceType>("session"); // Define o tipo de persistência de estado (ex: 'session' para temporário, 'memory' para vida do processo, 'database' para persistente).
+  const [initialStateValues, setInitialStateValues] = React.useState<InitialStateValue[]>([]); // Lista de pares chave-valor que definem o estado inicial do agente.
 
   // --- Estados para Campos do Modal de Configuração de Ferramentas ---
   // Estes estados armazenam temporariamente os valores dos campos de configuração de uma ferramenta específica enquanto o usuário os edita no modal.
@@ -341,7 +339,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         // Configurações de persistência de estado.
         setEnableStatePersistence(agentConfig.statePersistence?.enabled || false);
         setStatePersistenceType(agentConfig.statePersistence?.type || "session");
-        setInitialStateValues(agentConfig.statePersistence?.initialState || []);
+        setInitialStateValues(agentConfig.statePersistence?.initialStateValues || []); // Changed from initialState to initialStateValues
 
         // Configurações de RAG.
         setEnableRAG(agentConfig.rag?.enabled || false);
@@ -470,11 +468,15 @@ const handleSaveAgent = () => {
     if (selectedAgentType === "llm") {
       coreConfig = {
         type: "llm",
-        framework: agentFramework as AgentFramework,
+        framework: agentFramework, // No need to cast if state type is already AgentFramework
         isRootAgent,
         subAgentIds,
         globalInstruction,
-        statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
+        statePersistence: {
+          enabled: enableStatePersistence,
+          type: statePersistenceType,
+          initialStateValues: initialStateValues // Changed from initialState
+        },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts,
@@ -495,11 +497,15 @@ const handleSaveAgent = () => {
     } else if (selectedAgentType === "workflow") {
       coreConfig = {
         type: "workflow",
-        framework: agentFramework as AgentFramework,
+        framework: agentFramework, // No need to cast
         isRootAgent,
         subAgentIds,
         globalInstruction,
-        statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
+        statePersistence: {
+          enabled: enableStatePersistence,
+          type: statePersistenceType,
+          initialStateValues: initialStateValues // Changed from initialState
+        },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts,
@@ -520,11 +526,15 @@ const handleSaveAgent = () => {
     } else if (selectedAgentType === "custom") {
       coreConfig = {
         type: "custom",
-        framework: agentFramework as AgentFramework,
+        framework: agentFramework, // No need to cast
         isRootAgent,
         subAgentIds,
         globalInstruction,
-        statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
+        statePersistence: {
+          enabled: enableStatePersistence,
+          type: statePersistenceType,
+          initialStateValues: initialStateValues // Changed from initialState
+        },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts,
@@ -539,11 +549,15 @@ const handleSaveAgent = () => {
     } else if (selectedAgentType === "a2a") {
       coreConfig = {
         type: "a2a",
-        framework: agentFramework as AgentFramework,
+        framework: agentFramework, // No need to cast
         isRootAgent,
         subAgentIds,
         globalInstruction,
-        statePersistence: { enabled: enableStatePersistence, type: statePersistenceType, initialState: initialStateValues },
+        statePersistence: {
+          enabled: enableStatePersistence,
+          type: statePersistenceType,
+          initialStateValues: initialStateValues // Changed from initialState
+        },
         rag: { enabled: enableRAG, config: ragMemoryConfig },
         artifacts: {
           enabled: enableArtifacts,
