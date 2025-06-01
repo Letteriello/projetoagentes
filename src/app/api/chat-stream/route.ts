@@ -1,157 +1,179 @@
-import { NextRequest, NextResponse } from "next/server";
+import { StreamingTextResponse, streamToResponse } from 'ai';
+import { NextRequest, NextResponse } from 'next/server';
+import { basicChatFlow, BasicChatInput } from '@/ai/flows/chat-flow';
+import { constructSystemPromptForGenkit, AgentConfigForPrompt } from '@/lib/agent-genkit-utils';
+import { ReadableStream } from 'node:stream/web';
 
-// Importando BasicChatInput para garantir compatibilidade de tipos
-import { basicChatFlow, BasicChatInput } from "@/ai/flows/chat-flow";
-
-// Interface estendida para uso interno no endpoint
-interface ChatInput extends Partial<BasicChatInput> {
-  conversationId?: string;
-  messageId?: string;
-  agentId?: string;
-  [key: string]: any; // Para outras propriedades que possam existir
+// Define the structure for AgentToolDetail, mirroring what BasicChatInput might expect
+interface AgentToolDetail {
+  id: string; // Corresponds to the key in allAvailableTools and toolConfigsApplied
+  name: string;
+  description: string;
+  enabled: boolean;
 }
 
-// Simple in-memory rate limiter instead of using @upstash/ratelimit and @vercel/kv
-// This avoids TypeScript errors when these packages aren't installed
-class SimpleRateLimiter {
-  private requests: Record<string, { count: number; resetTime: number }> = {};
-  private windowMs: number;
-  private maxRequests: number;
+// Define the structure of the configuration stored for an agent
+// This is a simplified version for this mock. A real one might come from a DB.
+interface SavedAgentConfiguration {
+  id: string;
+  name: string;
+  config: AgentConfigForPrompt; // Using the imported type for the 'config' part
+  toolConfigsApplied: Record<string, any>; // Configurations for each enabled tool
+  tools: AgentToolDetail[]; // List of tools associated with the agent and their enabled status
+}
 
-  constructor(windowMs: number, maxRequests: number) {
-    this.windowMs = windowMs;
-    this.maxRequests = maxRequests;
-  }
+// Define the expected structure of the incoming request body
+interface ChatInput {
+  agentId: string; // ID of the agent to use
+  userMessage: string;
+  history?: Array<{role: string; content: any}>;
+  fileDataUri?: string;
+  modelName?: string;
+  temperature?: number;
+  // agentToolsDetails from the chatInput will be overridden by the fetched agent's tools configuration
+}
 
-  async limit(key: string) {
-    const now = Date.now();
-    
-    if (!this.requests[key] || now > this.requests[key].resetTime) {
-      this.requests[key] = {
-        count: 1,
-        resetTime: now + this.windowMs
-      };
-      return { 
-        success: true, 
-        limit: this.maxRequests, 
-        remaining: this.maxRequests - 1,
-        reset: this.requests[key].resetTime
-      };
-    }
-
-    if (this.requests[key].count >= this.maxRequests) {
-      return { 
-        success: false, 
-        limit: this.maxRequests, 
-        remaining: 0,
-        reset: this.requests[key].resetTime
-      };
-    }
-
-    this.requests[key].count += 1;
-    return { 
-      success: true, 
-      limit: this.maxRequests, 
-      remaining: this.maxRequests - this.requests[key].count,
-      reset: this.requests[key].resetTime
+// Mock function to simulate fetching agent configuration
+// In a real application, this would query a database or configuration service.
+async function fetchAgentConfiguration(agentId: string): Promise<SavedAgentConfiguration | null> {
+  console.log(`Fetching configuration for agentId: ${agentId}`);
+  // Simulate fetching for a specific agentId
+  if (agentId === 'agent_123_llm_tool_user') {
+    return {
+      id: 'agent_123_llm_tool_user',
+      name: 'Helpful LLM Assistant with Tools',
+      config: {
+        type: 'llm',
+        globalInstruction: 'You are an advanced AI assistant. Be helpful and concise.',
+        agentGoal: 'Assist the user with their tasks by providing information and using available tools effectively.',
+        agentTasks: [
+          'Understand user queries.',
+          'Utilize configured tools to gather information or perform actions.',
+          'Format responses clearly.',
+          'Maintain a friendly and professional tone.'
+        ],
+        agentPersonality: 'A helpful and slightly witty AI assistant that aims to be efficient.',
+        agentRestrictions: [
+          'Do not provide financial advice.',
+          'Do not generate harmful or offensive content.',
+          'Always disclose when you are using a tool for a simulated action.'
+        ],
+      },
+      toolConfigsApplied: {
+        performWebSearch: { apiKey: 'mock_search_api_key_from_agent_config' }, // Example config for web search
+        knowledgeBase: { knowledgeBaseId: 'kb_finance_agent_123', defaultSimilarityTopK: 5 },
+        calendarAccess: { defaultCalendarId: 'user_primary_calendar_from_agent_config' }
+        // Other tools might have empty {} if no specific config is needed beyond defaults in their factories
+      },
+      tools: [ // These are the tools enabled for this agent
+        { id: 'performWebSearch', name: 'Web Search', description: 'Searches the web.', enabled: true },
+        { id: 'calculator', name: 'Calculator', description: 'Calculates math expressions.', enabled: true },
+        { id: 'knowledgeBase', name: 'Knowledge Base', description: 'Queries a knowledge base.', enabled: true },
+        { id: 'calendarAccess', name: 'Calendar Access', description: 'Accesses calendar.', enabled: true },
+        // customApiTool, databaseAccessTool, codeExecutorTool could be added here too
+      ],
+    };
+  } else if (agentId === 'agent_simple_llm') {
+     return {
+      id: 'agent_simple_llm',
+      name: 'Simple LLM Assistant (No Tools)',
+      config: {
+        type: 'llm',
+        globalInstruction: 'You are a basic AI assistant. Answer questions directly.',
+        agentGoal: 'Provide answers based on your general knowledge.',
+        agentPersonality: 'A very straightforward and factual AI.',
+      },
+      toolConfigsApplied: {},
+      tools: [], // No tools enabled for this agent
     };
   }
+  return null; // Agent not found
 }
 
-// Initialize simple rate limiter - 5 requests per 10 seconds
-const ratelimit = new SimpleRateLimiter(10000, 5);
 
 export async function POST(req: NextRequest) {
-  // Extract IP from headers (X-Forwarded-For) or use a default
-  const forwardedFor = req.headers.get('x-forwarded-for');
-  const ip = forwardedFor ? forwardedFor.split(',')[0] : '127.0.0.1';
-  
-  const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+  try {
+    const chatInput: ChatInput = await req.json();
 
-  if (!success) {
-    return new Response("Muitas solicitações. Por favor, tente novamente mais tarde.", {
-      status: 429,
-      headers: {
-        "X-RateLimit-Limit": limit.toString(),
-        "X-RateLimit-Remaining": remaining.toString(),
-        "X-RateLimit-Reset": reset.toString(),
+    if (!chatInput.agentId) {
+      return NextResponse.json({ error: "agentId is required" }, { status: 400 });
+    }
+
+    const agentConfig = await fetchAgentConfiguration(chatInput.agentId);
+
+    if (!agentConfig) {
+      return NextResponse.json({ error: `Agent configuration not found for agentId: ${chatInput.agentId}` }, { status: 404 });
+    }
+
+    // Construct system prompt using the agent's specific configuration
+    const systemPrompt = constructSystemPromptForGenkit(agentConfig.config);
+
+    // Prepare the input for basicChatFlow
+    const actualBasicChatInput: BasicChatInput = {
+      userMessage: chatInput.userMessage,
+      history: chatInput.history,
+      fileDataUri: chatInput.fileDataUri,
+      modelName: chatInput.modelName, // User can still override model per request if desired
+      temperature: chatInput.temperature, // User can still override temp per request
+      systemPrompt: systemPrompt, // Generated system prompt
+      agentToolsDetails: agentConfig.tools, // Tools are taken from the fetched agent config
+      toolConfigsApplied: agentConfig.toolConfigsApplied, // Tool configurations from fetched agent config
+    };
+
+    console.log("Prepared BasicChatInput for flow:", {
+        userMessage: actualBasicChatInput.userMessage,
+        modelName: actualBasicChatInput.modelName,
+        systemPromptLength: actualBasicChatInput.systemPrompt?.length,
+        numAgentTools: actualBasicChatInput.agentToolsDetails?.length,
+        toolConfigsKeys: Object.keys(actualBasicChatInput.toolConfigsApplied || {}),
+    });
+
+
+    // Streaming callback for handling chunks
+    let accumulatedResponse = "";
+    const genkitStream = new ReadableStream({
+      async start(controller) {
+        await basicChatFlow(actualBasicChatInput, (chunk) => {
+          // Assuming chunk is directly the string content or can be processed to string
+          // This part might need adjustment based on the actual chunk structure from basicChatFlow
+          let content = '';
+          if (typeof chunk === 'string') {
+            content = chunk;
+          } else if (chunk?.outputMessage) { // If basicChatFlow stream returns objects with outputMessage
+            content = chunk.outputMessage;
+          } else if (chunk?.response?.text) { // Adapting to potential genkit stream structure
+             content = chunk.response.text();
+          } else if (chunk?.text) { // Adapting to potential genkit stream structure for candidate
+             content = chunk.text();
+          }
+
+
+          if (content) {
+            accumulatedResponse += content;
+            controller.enqueue(content);
+          }
+        });
+        controller.close();
       },
     });
-  }
-
-  try {
-    const chatInput = (await req.json()) as ChatInput;
-
-    // A validação foi movida para antes da chamada do basicChatFlow
-
-    // Verificamos se userMessage existe para satisfazer o tipo BasicChatInput
-    if (!chatInput.userMessage && chatInput.fileDataUri) {
-      // Se temos um arquivo mas não uma mensagem, usamos uma mensagem padrão
-      chatInput.userMessage = "Analisar este arquivo";
-    } else if (!chatInput.userMessage && !chatInput.fileDataUri) {
-      return NextResponse.json(
-        { error: "Mensagem do usuário ou arquivo é obrigatório." },
-        { status: 400 },
-      );
-    }
     
-    const result = await basicChatFlow(chatInput as BasicChatInput);
-    
-    // Processamos o resultado para lidar com diferentes formatos de resposta
-    if (typeof result === 'string') {
-      // Se o resultado for uma string direta
-      return new Response(result, {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-        },
-      });
-    } 
-    // Se o resultado for um objeto com stream ou outras propriedades
-    else if (typeof result === 'object') {
-      if (result.stream) {
-        // Converter o ReadableStream para texto
-        let completeText = '';
-        try {
-          const reader = result.stream.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            // Assumindo que value é um chunk de texto
-            completeText += typeof value === 'string' ? value : new TextDecoder().decode(value);
-          }
-          return new Response(completeText, {
-            headers: {
-              'Content-Type': 'text/plain; charset=utf-8',
-            },
-          });
-        } catch (e) {
-          console.error('Erro ao ler stream:', e);
-          return NextResponse.json({ error: 'Erro ao processar o stream' }, { status: 500 });
-        }
-      } 
-      else if (result.error) {
-        // Retornar o erro
-        return NextResponse.json({ error: result.error }, { status: 500 });
-      } 
-      else if (result.outputMessage) {
-        // Retornar a mensagem de saída como resposta de texto simples
-        return new Response(result.outputMessage, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-          },
-        });
-      }
-    }
-    
-    // Fallback para casos inesperados
-    return NextResponse.json({ error: 'Nenhum conteúdo de resposta disponível' }, { status: 500 });
+    // Convert the Genkit stream to a Vercel AI SDK compatible stream
+    return streamToResponse(genkitStream, new Headers({
+        'Content-Type': 'text/plain; charset=utf-8',
+    }));
 
   } catch (error: any) {
-    console.error("[API Chat Stream] Erro:", error);
-    // Ensure a Response object is returned for errors as well
+    console.error('[Chat API Error]', error);
     return NextResponse.json(
-      { error: error.message || "Ocorreu um erro inesperado." },
-      { status: 500 },
+      { error: error.message || 'An unexpected error occurred in chat API.' },
+      { status: 500 }
     );
   }
 }
+
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+// This is required to enable streaming
+export const dynamicParams = true;
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;

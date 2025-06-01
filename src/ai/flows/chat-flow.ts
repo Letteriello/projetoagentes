@@ -7,43 +7,46 @@
  */
 
 import { ai } from '@/ai/genkit'; 
-// Adjusted import path assuming tools/index.ts exports all tools from the tools directory
-// If performWebSearchTool and calculatorTool are directly exported from their files:
-import { performWebSearchTool } from '@/ai/tools/web-search-tool';
+// Import factory functions for refactored tools
+import { createPerformWebSearchTool } from '@/ai/tools/web-search-tool';
+import { createKnowledgeBaseTool } from '@/ai/tools/knowledge-base-tool';
+import { createCustomApiTool } from '@/ai/tools/custom-api-tool';
+import { createCalendarAccessTool } from '@/ai/tools/calendar-access-tool';
+import { createDatabaseAccessTool } from '@/ai/tools/database-access-tool';
+// Import static tools
 import { calculatorTool } from '@/ai/tools/calculator-tool';
-import { knowledgeBaseTool } from '@/ai/tools/knowledge-base-tool';
-import { customApiTool } from '@/ai/tools/custom-api-tool';
-import { calendarAccessTool } from '@/ai/tools/calendar-access-tool';
-import { databaseAccessTool } from '@/ai/tools/database-access-tool';
-import { codeExecutorTool } from '@/ai/tools/code-executor-tool'; // Added import
+import { codeExecutorTool } from '@/ai/tools/code-executor-tool';
 
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
+import { Tool } from '@genkit-ai/sdk'; // Import Tool type for casting
 
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
-const allAvailableTools = {
-  performWebSearch: performWebSearchTool,
-  calculator: calculatorTool,
-  knowledgeBase: knowledgeBaseTool,
-  customApiIntegration: customApiTool,
-  calendarAccess: calendarAccessTool,
-  databaseAccess: databaseAccessTool,
-  codeExecutor: codeExecutorTool, // Added codeExecutor tool
+// Stores factory functions for configurable tools and direct tool objects for static ones.
+const allAvailableTools: Record<string, (() => Tool) | Tool | any> = { // Added 'any' for factory signatures
+  performWebSearch: createPerformWebSearchTool,
+  calculator: calculatorTool, // Static tool
+  knowledgeBase: createKnowledgeBaseTool,
+  customApiIntegration: createCustomApiTool,
+  calendarAccess: createCalendarAccessTool,
+  databaseAccess: createDatabaseAccessTool,
+  codeExecutor: codeExecutorTool, // Static tool
 };
 
 export interface BasicChatInput {
   userMessage: string;
-  history?: Array<{role: string; content: any}>;  // Simplified message data type
+  history?: Array<{role: string; content: any}>;
   fileDataUri?: string;
   modelName?: string;
   systemPrompt?: string;
   temperature?: number;
   agentToolsDetails?: { id: string; name: string; description: string; enabled: boolean }[];
+  toolConfigsApplied?: Record<string, any>; // Added for dynamic tool configuration
 }
 
 export interface BasicChatOutput {
   outputMessage?: string;
-  stream?: ReadableStream<any>; // Generic stream type
+  stream?: ReadableStream<any>;
   error?: string;
   toolRequests?: any[]; 
   toolResults?: any[];
@@ -52,46 +55,86 @@ export interface BasicChatOutput {
 // Configure the model and tools for the request
 function configureModel(input: BasicChatInput) {
   const modelId = input.modelName || process.env.GENKIT_MODEL_NAME || 'googleai/gemini-1.5-flash-latest';
+  const activeTools: Tool[] = [];
 
-  const activeTools = input.agentToolsDetails
-    ?.filter(tool => tool.enabled && allAvailableTools[tool.id as keyof typeof allAvailableTools])
-    .map(tool => allAvailableTools[tool.id as keyof typeof allAvailableTools]);
+  if (input.agentToolsDetails && input.toolConfigsApplied) {
+    input.agentToolsDetails.forEach(toolDetail => {
+      if (toolDetail.enabled) {
+        const toolProvider = allAvailableTools[toolDetail.id as keyof typeof allAvailableTools];
+        if (toolProvider) {
+          if (typeof toolProvider === 'function') {
+            // It's a factory function, call it with config
+            const toolConfig = input.toolConfigsApplied![toolDetail.id] || {};
+            try {
+              activeTools.push(toolProvider(toolConfig));
+            } catch (e: any) {
+              console.error(`Error instantiating tool '${toolDetail.id}' with factory:`, e);
+            }
+          } else {
+            // It's a static tool object
+            activeTools.push(toolProvider as Tool);
+          }
+        } else {
+          console.warn(`Tool ID '${toolDetail.id}' not found in allAvailableTools map.`);
+        }
+      }
+    });
+  }
 
   return {
     modelId,
-    tools: activeTools && activeTools.length > 0 ? activeTools : undefined,
+    tools: activeTools.length > 0 ? activeTools : undefined,
     config: input.temperature ? { temperature: input.temperature } : undefined,
-    systemPrompt: input.systemPrompt,
+    systemPrompt: input.systemPrompt, // Directly use the systemPrompt from input
   };
 }
 
 // Main chat function - simplified without flow definitions
 export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (chunk: any) => void): Promise<BasicChatOutput> {
   try {
-    const { modelId, tools, config, systemPrompt } = configureModel(input);
+    // Ensure toolConfigsApplied is initialized if not provided, for configureModel
+    const fullInput = {
+      ...input,
+      toolConfigsApplied: input.toolConfigsApplied || {},
+    };
+    const { modelId, tools, config, systemPrompt } = configureModel(fullInput);
 
     const history = input.history ? [...input.history] : [];
     
     // Add system prompt if provided
     if (systemPrompt) {
+      // Check if the last system message is already the one we want to set.
+      // Avoids adding duplicate system prompts if history is re-sent.
       const lastSystemMessageIndex = history.findLastIndex(m => m.role === 'system');
-      if (lastSystemMessageIndex === -1 || !history[lastSystemMessageIndex].content[0]?.text || 
-          history[lastSystemMessageIndex].content[0].text !== systemPrompt) {
-        history.push({ role: 'system', content: [{text: systemPrompt}] });
+      if (lastSystemMessageIndex !== -1 && history[lastSystemMessageIndex].content &&
+          typeof history[lastSystemMessageIndex].content[0]?.text === 'string' &&
+          history[lastSystemMessageIndex].content[0].text === systemPrompt) {
+        // System prompt is already correctly set as the last system message.
+      } else {
+         // Remove any previous system message to ensure the new one is the definitive one.
+         const filteredHistory = history.filter(m => m.role !== 'system');
+         history.length = 0; // Clear original history
+         history.push(...filteredHistory); // Push back non-system messages
+         history.unshift({ role: 'system', content: [{text: systemPrompt}] }); // Add new system prompt at the beginning
       }
     }
+
 
     // Prepare user message with any attachments
     let userMessageContent: any[] = [{ text: input.userMessage }];
     if (input.fileDataUri) {
+      // This parsing logic might need adjustment based on actual DataURI format from frontend
       const [header, base64Data] = input.fileDataUri.split(',');
-      const mimeType = header.match(/:(.*?);/)?.[1];
+      const mimeTypeMatch = header?.match(/:(.*?);/);
+      const mimeType = mimeTypeMatch?.[1];
       if (mimeType && base64Data) {
-        // Use a estrutura correta para mídia conforme esperado pela API
         userMessageContent = [
           { text: input.userMessage },
-          { data: { mimeType, data: input.fileDataUri } }
+          // Genkit expects inlineData: { mimeType, data } for file inputs.
+          { inlineData: { mimeType, data: base64Data } }
         ];
+      } else {
+        console.warn("Could not parse fileDataUri correctly. Sending only text message.");
       }
     }
     history.push({ role: 'user', content: userMessageContent });
@@ -101,33 +144,32 @@ export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (
     // Call the AI generation
     const parts = history.map(msg => {
       return {
-        role: msg.role,
+        role: msg.role as 'user' | 'model' | 'system' | 'tool', // Cast role to expected types
         parts: Array.isArray(msg.content) 
-          ? msg.content.map(c => c.text ? { text: c.text } : c) 
-          : [{ text: msg.content }]
+          ? msg.content.map(c => (c.text ? { text: c.text } : c.inlineData ? {inlineData: c.inlineData} : c )) // Handle text and inlineData
+          : (typeof msg.content === 'string' ? [{ text: msg.content }] : []) // Handle simple string content
       };
     });
     
-    // Configuração para gerar conteúdo
     const generateOptions = {
       model: modelId,
-      parts,
+      prompt: { messages: parts }, // Use the new prompt structure with messages
       tools: tools,
-      generationConfig: config,
-      streamMode: !!streamingCallback ? 'streaming' : 'standard',
+      config: config, // Renamed from generationConfig to config
+      stream: !!streamingCallback, // Simplified stream boolean
     };
     
-    const response = await ai.generateContent(generateOptions);
+    const response = await ai.generate(generateOptions); // ai.generate instead of ai.generateContent
 
     // Handle streaming response if callback provided
-    if (streamingCallback && generateOptions.streamMode === 'streaming') {
+    if (streamingCallback && generateOptions.stream) {
       const outputStream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of response.stream) {
+            for await (const chunk of response.stream()) { // Call stream() method
               if (chunk) {
                 streamingCallback(chunk);
-                controller.enqueue(chunk);
+                controller.enqueue(chunk); // Enqueue the raw chunk
               }
             }
           } catch (e: any) {
@@ -138,27 +180,26 @@ export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (
           }
         },
       });
-
       return { stream: outputStream };
     } 
     
     // Handle non-streaming response
-    // Extrair o texto da resposta
-    const responseText = response.response?.text?.toString() || '';
+    const responseText = response.text() ?? ''; // Use text() method
     
-    // Extrair informações de ferramentas, se disponíveis
-    const toolCalls = response.response?.candidates?.[0]?.content?.parts
-      ?.filter(part => part.functionCall)
-      .map(part => part.functionCall) || [];
-      
-    const toolResults = response.response?.candidates?.[0]?.content?.parts
-      ?.filter(part => part.functionResponse)
-      .map(part => part.functionResponse) || [];
-    
+    const toolCalls = response.toolCalls() ?? []; // Use toolCalls() method
+    const toolResults = response.toolResults() ?? []; // Not directly available, toolCalls implies requests
+                                                      // toolResults are usually built from subsequent calls
+
     return {
       outputMessage: responseText,
-      toolRequests: toolCalls,
-      toolResults: toolResults,
+      toolRequests: toolCalls.map(tc => ({ // Adapt to expected structure if necessary
+        name: tc.name,
+        args: tc.args
+      })),
+      // toolResults might need to be sourced differently if they represent executed tool responses
+      // For now, assuming toolResults from input might be more relevant if this flow manages tool execution.
+      // Or, if the model itself can return tool results (less common for initial request).
+      toolResults: [], // Placeholder, as toolResults() is not standard on initial response
     };
   } catch (e: any) {
     console.error("Error in basicChatFlow:", e);

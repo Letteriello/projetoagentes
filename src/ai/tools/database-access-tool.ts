@@ -1,155 +1,200 @@
 /**
- * @fileOverview Defines a Genkit tool for executing SQL queries against a database.
- * This tool simulates database interaction, primarily supporting SELECT queries on
- * predefined tables ('users', 'products') for safety in this conceptual phase.
- * It takes an SQL query, an optional database ID, and query parameters.
- * Includes detailed comments on security considerations (SQL injection) and how
- * a real database connection and pre-configured details would be handled.
+ * @fileOverview Defines a Genkit tool for executing queries against a database.
+ * This tool is created using a factory function to allow for dynamic configuration
+ * of database connection parameters (type, host, port, credentials, etc.).
+ * It simulates database interaction, primarily supporting SELECT queries on
+ * predefined tables for safety in this conceptual phase.
  */
-import { defineTool } from 'genkit/tool';
+import { defineTool, Tool } from 'genkit/tool';
 import { z } from 'zod';
 
-// 1. Define Input Schema
+// Define supported database types (can be extended)
+export const SupportedDbTypesSchema = z.enum([
+  'postgresql',
+  'mysql',
+  'sqlite',
+  'mongodb',
+  'sqlserver',
+  'oracle',
+  'other',
+]);
+export type SupportedDbType = z.infer<typeof SupportedDbTypesSchema>;
+
+// 1. Define Configuration Interface for the tool
+export interface DatabaseAccessToolConfig {
+  name?: string; // Optional: to allow multiple instances with different names (e.g., 'userDbQuery', 'inventoryDbQuery')
+  description?: string; // Optional: to allow custom description per instance
+  dbType: SupportedDbType;
+  dbHost?: string; // Optional if connectionString is used or for embedded DBs like SQLite
+  dbPort?: number; // Optional, defaults vary by dbType
+  dbName?: string; // Database name
+  dbUser?: string; // Username for authentication
+  dbPassword?: string; // Password for authentication - consider secure storage/retrieval for real scenarios
+  dbConnectionString?: string; // Full connection string (can override individual params)
+}
+
+// 2. Define Input Schema for the tool's handler
+// dbId is removed as the tool instance itself is configured for a specific DB
 export const DatabaseAccessInputSchema = z.object({
-  dbId: z.string().optional()
-    .describe("Identifier for the pre-configured database (e.g., 'main_db', 'analytics_db'). If not provided, a default connection might be attempted based on agent configuration."),
-  sqlQuery: z.string()
-    .describe("The SQL query to execute. IMPORTANT: This simulation primarily supports SELECT queries for safety reasons. Avoid DML/DDL."),
+  query: z.string()
+    .describe("The query to execute (e.g., SQL for RDBMS, or a specific command/filter for NoSQL). IMPORTANT: This simulation primarily supports SELECT SQL queries for safety reasons."),
   parameters: z.record(z.any()).optional()
-    .describe("Key-value pairs for parameterized queries (e.g., { \"userId\": 123, \"status\": \"active\" }). These help prevent SQL injection."),
+    .describe("Key-value pairs for parameterized queries (e.g., { \"userId\": 123, \"status\": \"active\" }). These help prevent injection attacks."),
+  options: z.record(z.any()).optional()
+    .describe("Additional options for query execution (e.g., read preference for NoSQL, transaction control - highly dependent on DB type and client library).")
 });
 
-// 2. Define Output Schema
+// 3. Define Output Schema for the tool's handler
 export const DatabaseAccessOutputSchema = z.object({
   success: z.boolean().describe("Indicates whether the database query execution was successful."),
   rowCount: z.number().optional().describe("Number of rows affected or returned. For SELECT, it's the number of rows in the 'rows' array."),
   rows: z.array(z.record(z.any())).optional()
-    .describe("An array of objects, where each object represents a row returned by a SELECT query."),
+    .describe("An array of objects, where each object represents a row/document returned by a read query."),
   columns: z.array(z.object({
-    name: z.string().describe("Name of the column."),
-    type: z.string().optional().describe("Data type of the column (e.g., 'integer', 'varchar', 'decimal').")
-  })).optional().describe("Information about the columns returned by a SELECT query."),
+    name: z.string().describe("Name of the column/field."),
+    type: z.string().optional().describe("Data type of the column/field (e.g., 'integer', 'varchar', 'decimal', 'array', 'object').")
+  })).optional().describe("Information about the columns/fields returned by a read query."),
   error: z.string().optional().describe("Error message if the query execution failed."),
+  executionTimeMs: z.number().optional().describe("Time taken to execute the query in milliseconds.")
 });
 
-// 3. Create databaseAccessTool using defineTool
-export const databaseAccessTool = defineTool(
-  {
-    name: 'databaseAccess',
-    description:
-      "Executes a SQL query against a pre-configured database. " +
-      "This simulation primarily supports SELECT queries on predefined tables ('users', 'products'). " +
-      "Specify the SQL query and optionally a database ID and query parameters for parameterized queries.",
-    inputSchema: DatabaseAccessInputSchema,
-    outputSchema: DatabaseAccessOutputSchema,
-  },
-  async ({ dbId, sqlQuery, parameters }) => {
-    console.log('[DatabaseAccessTool] Received input:', { dbId, sqlQuery, parameters });
+// 4. Factory function to create the databaseAccessTool
+export function createDatabaseAccessTool(
+  config: DatabaseAccessToolConfig
+): Tool<typeof DatabaseAccessInputSchema, typeof DatabaseAccessOutputSchema> {
+  const toolName = config.name || 'databaseAccess';
+  const toolDescription = config.description ||
+    `Executes a query against a configured ${config.dbType} database. ` +
+    (config.dbName ? `(DB: ${config.dbName}) ` : '') +
+    "This simulation primarily supports SELECT SQL-like queries.";
 
-    // TODO: Implement actual database interaction here.
-    // This would involve:
-    // 1. Connection Management:
-    //    - Retrieve database connection details (host, port, user, password, database name, type)
-    //      based on `dbId` or a default configuration from the agent's setup
-    //      (e.g., `agent.toolConfigsApplied['databaseAccess']`).
-    //    - Use a database client library (e.g., 'pg' for PostgreSQL, 'mysql2' for MySQL, 'sqlite3' for SQLite).
-    //    - Establish a connection to the database.
-    //
-    // 2. Security - SQL Injection Prevention:
-    //    - **Crucially important:** Never directly concatenate user input or LLM-generated SQL parts into queries.
-    //    - Use parameterized queries (prepared statements) provided by the database client library.
-    //    - The `parameters` object from the input should be used to safely pass values to the query.
-    //    - Example (conceptual with 'pg' library):
-    //      // const queryText = "SELECT * FROM users WHERE id = $1 AND status = $2";
-    //      // const queryValues = [parameters?.userId, parameters?.status];
-    //      // const result = await pool.query(queryText, queryValues);
-    //
-    // 3. Query Execution:
-    //    - Execute the sanitized and parameterized SQL query.
-    //    - Handle different types of queries (SELECT, INSERT, UPDATE, DELETE) appropriately if expanding beyond SELECT.
-    //
-    // 4. Result Formatting:
-    //    - For SELECT queries, map the database rows and column information to the
-    //      `rows` and `columns` fields in `DatabaseAccessOutputSchema`.
-    //    - For other queries, set `rowCount` to the number of affected rows.
-    //
-    // 5. Error Handling:
-    //    - Catch database errors (connection issues, query syntax errors, constraint violations)
-    //      and return them in the `error` field.
-    //
-    // 6. Connection Pooling:
-    //    - Use connection pooling for better performance and resource management in production environments.
+  // Log configuration on tool creation (excluding sensitive parts like password in a real scenario)
+  console.log(`[${toolName}] Initialized with config:`, {
+    dbType: config.dbType,
+    dbHost: config.dbHost,
+    dbPort: config.dbPort,
+    dbName: config.dbName,
+    dbUser: config.dbUser,
+    hasPassword: !!config.dbPassword, // Log presence, not the password itself
+    hasConnectionString: !!config.dbConnectionString,
+  });
 
-    const lowerCaseQuery = sqlQuery.toLowerCase().trim();
+  return defineTool(
+    {
+      name: toolName,
+      description: toolDescription,
+      inputSchema: DatabaseAccessInputSchema,
+      outputSchema: DatabaseAccessOutputSchema,
+    },
+    async ({ query, parameters /*, options */ }) => {
+      const startTime = Date.now();
+      console.log(`[${toolName}] Received query:`, { query, parameters });
+      console.log(`[${toolName}] Tool using DB config: ${config.dbType} on ${config.dbHost || (config.dbConnectionString ? 'connection string' : 'N/A')}${config.dbName ? '/' + config.dbName : ''}`);
 
-    // Basic check for query type - only allowing SELECT in simulation
-    if (!lowerCaseQuery.startsWith("select")) {
-      console.warn(`[DatabaseAccessTool] Non-SELECT query attempted in simulation: ${sqlQuery}`);
+      // TODO: Implement actual database interaction here based on config.dbType.
+      // This would involve:
+      // 1. Connection Management using config (dbType, dbHost, dbPort, dbUser, dbPassword, dbConnectionString):
+      //    - Choose client library (e.g., 'pg' for PostgreSQL, 'mysql2', 'mongodb driver', 'sqlite3').
+      //    - Establish connection (ideally from a pool).
+      //
+      // 2. Security - Injection Prevention:
+      //    - **Crucially important:** Use parameterized queries with `parameters` input.
+      //    - For NoSQL, ensure proper sanitization or use of library-specific query builders.
+      //
+      // 3. Query Execution & Result Formatting:
+      //    - Adapt based on `config.dbType`. The simulation below is SQL-centric.
+      //
+      // 4. Error Handling & Connection Closing/Releasing.
+
+      // --- Simulation Logic (SQL-centric for now) ---
+      if (config.dbType !== "mongodb" && config.dbType !== "other") { // Assuming SQL-like for these
+        const lowerCaseQuery = query.toLowerCase().trim();
+        if (!lowerCaseQuery.startsWith("select")) {
+          console.warn(`[${toolName}] Non-SELECT query attempted: ${query}`);
+          return {
+            success: false,
+            error: "This simulation primarily supports SELECT SQL queries. Other query types are not allowed.",
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+        // Simplified security check (from original tool)
+        if (lowerCaseQuery.includes("drop ") || lowerCaseQuery.includes("delete ") || lowerCaseQuery.includes("update ") || lowerCaseQuery.includes("insert ") || lowerCaseQuery.includes("alter ") || lowerCaseQuery.includes("truncate ")) {
+            if (!lowerCaseQuery.startsWith("select") || (lowerCaseQuery.startsWith("select") && (lowerCaseQuery.includes(" from information_schema") || lowerCaseQuery.includes(" from pg_catalog")))){
+                return {
+                    success: false,
+                    error: "Harmful DML/DDL operations or access to system tables are not allowed in this simulation.",
+                    executionTimeMs: Date.now() - startTime,
+                };
+            }
+        }
+
+        // Simulated responses based on table names (from original tool)
+        if (lowerCaseQuery.includes("from users")) {
+          const userIdParam = parameters?.userId || parameters?.id || 1;
+          const simulatedUser = {
+            id: Number(userIdParam),
+            name: `Simulated User ${userIdParam} from ${config.dbName || config.dbHost || 'DB'}`,
+            email: `user${userIdParam}@example.com`,
+            status: parameters?.status || "active"
+          };
+          return {
+            success: true,
+            rowCount: 1,
+            rows: [simulatedUser],
+            columns: [ /* ... as before ... */ ],
+            executionTimeMs: Date.now() - startTime,
+          };
+        } else if (lowerCaseQuery.includes("from products")) {
+          const simulatedProducts = [ /* ... as before, potentially add config info ... */ ];
+          return {
+            success: true,
+            rowCount: simulatedProducts.length,
+            rows: simulatedProducts,
+            columns: [ /* ... as before ... */ ],
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+      } else if (config.dbType === "mongodb") {
+        // Crude simulation for MongoDB
+        // Example: query might be '{"collection": "users", "filter": {"status": "active"}}'
+        // Parameters could be merged into the filter or used for other options.
+        try {
+          const mongoQuery = JSON.parse(query);
+          if (mongoQuery.collection === 'users') {
+             const filterId = parameters?.id || 1;
+             return {
+                success: true,
+                rowCount: 1,
+                rows: [{ _id: filterId, name: `Mongo User ${filterId}`, db: config.dbName }],
+                executionTimeMs: Date.now() - startTime,
+             };
+          }
+        } catch (e) {
+          return { success: false, error: "Invalid JSON query for MongoDB simulation.", executionTimeMs: Date.now() - startTime };
+        }
+      }
+
+      // Default response if no simulation rule matched
       return {
-        success: false,
-        error: "This simulation primarily supports SELECT queries for safety reasons. Other query types (INSERT, UPDATE, DELETE, etc.) are not allowed.",
-      };
-    }
-
-    // Further basic security check for simulation (very naive, real implementation needs robust parsing/validation)
-    if (lowerCaseQuery.includes("drop ") || lowerCaseQuery.includes("delete ") || lowerCaseQuery.includes("update ") || lowerCaseQuery.includes("insert ") || lowerCaseQuery.includes("alter ") || lowerCaseQuery.includes("truncate ")) {
-         if (!lowerCaseQuery.startsWith("select") || (lowerCaseQuery.startsWith("select") && (lowerCaseQuery.includes(" from information_schema") || lowerCaseQuery.includes(" from pg_catalog")))){
-            console.warn(`[DatabaseAccessTool] Potentially harmful DML/DDL or system table access attempted in SELECT query: ${sqlQuery}`);
-            return {
-                success: false,
-                error: "Harmful DML/DDL operations or access to system tables are not allowed in this simulation, even within SELECT.",
-            };
-         }
-    }
-
-
-    // Simulated query responses:
-    if (lowerCaseQuery.includes("from users")) {
-      console.log(`[DatabaseAccessTool] Simulating SELECT query on 'users' table.`);
-      const userIdParam = parameters?.userId || parameters?.id || 1; // Example of using a parameter
-      const simulatedUser = {
-        id: Number(userIdParam),
-        name: "Simulated User " + userIdParam,
-        email: `user${userIdParam}@example.com`,
-        status: parameters?.status || "active"
-      };
-      return {
-        success: true,
-        rowCount: 1,
-        rows: [simulatedUser],
-        columns: [
-          { name: 'id', type: 'integer' },
-          { name: 'name', type: 'varchar' },
-          { name: 'email', type: 'varchar' },
-          { name: 'status', type: 'varchar'},
-        ],
-      };
-    } else if (lowerCaseQuery.includes("from products")) {
-      console.log(`[DatabaseAccessTool] Simulating SELECT query on 'products' table.`);
-      const simulatedProducts = [
-        { productId: 1001, productName: "Widget A", price: 19.99, category: parameters?.category || "electronics" },
-        { productId: 1002, productName: "Gadget B", price: 125.00, category: parameters?.category || "gadgets" },
-      ];
-      return {
-        success: true,
-        rowCount: simulatedProducts.length,
-        rows: simulatedProducts,
-        columns: [
-          { name: 'productId', type: 'integer' },
-          { name: 'productName', type: 'varchar' },
-          { name: 'price', type: 'decimal' },
-          { name: 'category', type: 'varchar'},
-        ],
-      };
-    } else {
-      console.log(`[DatabaseAccessTool] Simulated SELECT query matched no predefined tables ('users', 'products'). Query: ${sqlQuery}`);
-      return {
-        success: true,
+        success: true, // Or false, depending on desired behavior for unknown queries
         rowCount: 0,
         rows: [],
-        columns: [], // Could try to parse columns from SELECT if feeling ambitious for simulation
-        error: "Simulated query did not match predefined tables ('users' or 'products'). No data returned.",
+        columns: [],
+        error: `Simulated query for ${config.dbType} ('${query}') matched no predefined rules for this tool.`,
+        executionTimeMs: Date.now() - startTime,
       };
     }
-  }
-);
+  );
+}
+
+// Example of how to export a pre-configured instance (optional)
+// export const myAnalyticsDbQueryTool = createDatabaseAccessTool({
+//   name: "analyticsDbQuery",
+//   description: "Query tool for the main analytics PostgreSQL database.",
+//   dbType: "postgresql",
+//   dbHost: "analytics.example.com",
+//   dbPort: 5432,
+//   dbName: "prod_analytics",
+//   dbUser: "readonly_user",
+//   // dbPassword: process.env.ANALYTICS_DB_PASSWORD, // From a secure source
+// });
