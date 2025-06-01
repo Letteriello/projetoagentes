@@ -31,26 +31,36 @@ import {
   Info,
 } from "lucide-react";
 
-// From Updated Upstream (Chosen version)
-export interface AvailableTool {
-  id: string;
-  label: string;
-  name: string;
-  type: "genkit_native";
-  icon: React.FC<React.SVGProps<SVGSVGElement>> | undefined;
-  description: string;
-  hasConfig?: boolean;
-  genkitToolName?: string;
-  configFields?: Array<{
-    id: string;
-    label: string;
-    type: "text" | "password" | "select";
-    options?: Array<{ label: string; value: string }>;
-    placeholder?: string;
-    description?: string;
-  }>;
-}
+import {
+    AgentFramework,
+    AgentType,
+    WorkflowDetailedType,
+    TerminationConditionType,
+    StatePersistenceType,
+    ArtifactStorageType,
+    StateScope,
+    ToolConfigField,
+    AvailableTool,
+    ToolConfigData,
+    CommunicationChannel,
+    A2AConfig,
+    ArtifactDefinition,
+    ArtifactsConfig,
+    InitialStateValue,
+    StateValidationRule,
+    StatePersistenceConfig,
+    KnowledgeSource,
+    RagMemoryConfig,
+    AgentConfigBase,
+    LLMAgentConfig,
+    WorkflowAgentConfig,
+    CustomAgentConfig,
+    A2AAgentSpecialistConfig,
+    AgentConfig,
+    SavedAgentConfiguration
+} from "@/types/agent-configs";
 
+// From Updated Upstream (Chosen version)
 // From Updated Upstream (Chosen version, matching above interface)
 export const availableTools: AvailableTool[] = [
   {
@@ -150,91 +160,11 @@ export const agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"
   { id: "a2a", label: "Agente de Comunicação (A2A)", icon: <Layers size={16} />, description: "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas." },
 ];
 
-export type AgentFramework =
-  | "genkit"
-  | "crewai"
-  | "langchain"
-  | "custom"
-  | "none";
-
-export interface AgentConfigBase {
-  agentName: string;
-  agentDescription: string;
-  agentVersion: string;
-  agentIcon?: string;
-  agentTools: string[];
-  isRootAgent?: boolean;
-  subAgents?: string[];
-  globalInstruction?: string;
-  agentFramework?: AgentFramework;
-}
-
-export interface LLMAgentConfig extends AgentConfigBase {
-  agentType: "llm";
-  agentGoal: string;
-  agentTasks: string;
-  agentPersonality: string;
-  agentRestrictions: string;
-  agentModel: string;
-  agentTemperature: number;
-}
-
-export interface WorkflowAgentConfig extends AgentConfigBase {
-  agentType: "workflow";
-  detailedWorkflowType?: "sequential" | "parallel" | "loop";
-  workflowDescription: string;
-  loopMaxIterations?: number;
-  loopTerminationConditionType?: "none" | "subagent_signal";
-  loopExitToolName?: string;
-  loopExitStateKey?: string;
-  loopExitStateValue?: string;
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-}
-
-export interface CustomAgentConfig extends AgentConfigBase {
-  agentType: "custom";
-  customLogicDescription: string;
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-}
-
-export type AgentConfig =
-  | LLMAgentConfig
-  | WorkflowAgentConfig
-  | CustomAgentConfig;
-
 export interface AgentTemplate {
   id: string;
   name: string;
   config: AgentConfig;
 }
-
-export interface ToolConfigData {
-  googleApiKey?: string;
-  googleCseId?: string;
-  openapiSpecUrl?: string;
-  openapiApiKey?: string;
-  dbType?: string;
-  dbConnectionString?: string;
-  dbUser?: string;
-  dbPassword?: string;
-  dbName?: string;
-  dbHost?: string;
-  dbPort?: string;
-  dbDescription?: string;
-  knowledgeBaseId?: string;
-  calendarApiEndpoint?: string;
-}
-
 
 export interface ADKTool {
   id: string;
@@ -278,15 +208,7 @@ export interface SavedAgentConfiguration extends AgentConfigBase {
     genkitToolName?: string;
   }>;
   toolConfigsApplied?: Record<string, ToolConfigData>;
-  agentType:
-    | "llm"
-    | "workflow"
-    | "custom"
-    | "a2a"
-    | "sequential"
-    | "parallel"
-    | "loop"
-    | "task";
+  agentType: AgentType; // Updated to use AgentType from agent-configs
   agentGoal?: string;
   agentTasks?: string;
   agentPersonality?: string;
@@ -294,49 +216,26 @@ export interface SavedAgentConfiguration extends AgentConfigBase {
   agentModel?: string;
   agentTemperature?: number;
   workflowDescription?: string;
-  detailedWorkflowType?: "sequential" | "parallel" | "loop";
+  detailedWorkflowType?: WorkflowDetailedType; // Updated
   loopMaxIterations?: number;
-  loopTerminationConditionType?: "none" | "subagent_signal";
+  loopTerminationConditionType?: TerminationConditionType; // Updated
   loopExitToolName?: string;
   loopExitStateKey?: string;
   loopExitStateValue?: string;
   customLogicDescription?: string;
   enableStatePersistence?: boolean;
-  statePersistenceType?: "session" | "memory" | "database";
-  initialStateValues?: Array<{
-    key: string;
-    value: string;
-    scope: "global" | "agent" | "temporary";
-    description: string;
-  }>;
+  statePersistenceType?: StatePersistenceType; // Updated
+  initialStateValues?: InitialStateValue[]; // Updated
   enableStateSharing?: boolean;
   stateSharingStrategy?: "all" | "explicit" | "none";
   enableRAG?: boolean;
   enableArtifacts?: boolean;
-  artifactStorageType?: "memory" | "filesystem" | "cloud";
-  artifacts?: any[];
+  artifactStorageType?: ArtifactStorageType; // Updated
+  artifacts?: ArtifactDefinition[]; // Updated
   cloudStorageBucket?: string;
   localStoragePath?: string;
-  ragMemoryConfig?: {
-    enabled: boolean;
-    serviceType: string;
-    projectId: string;
-    location: string;
-    ragCorpusName: string;
-    similarityTopK: number;
-    vectorDistanceThreshold: number;
-    embeddingModel: string;
-    knowledgeSources: any[];
-    includeConversationContext: boolean;
-    persistentMemory: boolean;
-  };
-  a2aConfig?: {
-    enabled: boolean;
-    communicationChannels: any[];
-    defaultResponseFormat: string;
-    maxMessageSize: number;
-    loggingEnabled: boolean;
-  };
+  ragMemoryConfig?: RagMemoryConfig; // Updated
+  a2aConfig?: A2AConfig; // Updated
 }
 
 export const iconComponents: Record<

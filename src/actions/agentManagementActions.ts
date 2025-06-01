@@ -3,21 +3,7 @@
 // If `@/app/agent-builder/page` is client-component heavy, direct import might be problematic for server actions.
 // For now, we'll assume the type can be imported or is redefined/simplified here for the action's purpose.
 
-// Placeholder for SavedAgentConfiguration if direct import is an issue.
-// In a real app, share this type definition (e.g., in a 'src/types/agent.ts')
-interface SavedAgentConfiguration {
-  id: string;
-  name: string;
-  description?: string;
-  version?: string;
-  icon?: string;
-  config: any; // AgentConfig (LLMAgentConfig, WorkflowAgentConfig, etc.)
-  tools?: string[]; // Array of tool IDs
-  toolConfigsApplied?: Record<string, any>; // Tool specific configurations
-  toolsDetails?: any[]; // Full tool details, might be redundant if IDs are enough
-  createdAt?: string;
-  updatedAt?: string;
-}
+import type { SavedAgentConfiguration } from '@/types/agent-configs';
 
 export async function saveAgentConfigurationAction(
   agentConfig: SavedAgentConfiguration

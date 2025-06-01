@@ -1,19 +1,23 @@
-
+// src/ai/dev.ts
 import { config } from 'dotenv';
 config();
 
-// O fluxo ai-configuration-assistant.ts foi removido, então a importação abaixo também é removida.
-// import '@/ai/flows/ai-configuration-assistant.ts';
+import { runDevServer } from '@genkit-ai/flow/dev';
+import { agentCreatorChatFlow } from './flows/agent-creator-flow'; // Adicionar import
+import { basicChatFlow } from './flows/chat-flow'; // Assuming basicChatFlow is exported from here
+// Import other tools or plugins if needed for the dev server
+import './tools/web-search-tool.ts'; // Example if this registers a tool globally for dev
 
-// Importa o fluxo de chat e a nova ferramenta de busca
-import '@/ai/flows/chat-flow.ts';
-import '@/ai/tools/web-search-tool.ts';
-
-
-// Se houver outros fluxos de desenvolvimento para importar, eles podem ser adicionados aqui.
-// No entanto, geralmente os fluxos são importados onde são usados (ex: Server Actions)
-// ou o Genkit CLI pode descobri-los automaticamente se estiverem em um diretório padrão
-// dependendo da configuração do Genkit.
-// Para este arquivo dev.ts, geralmente se importa o que é necessário para o Genkit CLI "start".
-// Se nenhum fluxo específico precisa ser explicitamente iniciado/registrado aqui,
-// este arquivo pode até ficar vazio ou ser usado para outras configurações de dev do Genkit.
+runDevServer({
+  flows: [
+    agentCreatorChatFlow, // Adicionar aqui
+    basicChatFlow,
+    // ... outros fluxos
+  ],
+  // Se suas ferramentas são definidas e exportadas de arquivos e precisam ser explicitamente registradas:
+  // tools: [
+  //   webSearchTool // Exemplo, se webSearchTool for uma constante exportada
+  // ],
+  // port: 4000, // Opcional: definir porta para o servidor de desenvolvimento
+  // O Genkit pode descobrir automaticamente plugins e ferramentas em alguns casos.
+});
