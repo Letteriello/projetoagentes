@@ -309,6 +309,51 @@ export const finalizeMessageInConversation = async (
  * @param feedback The feedback status ('liked', 'disliked', or null).
  * @returns A promise that resolves when the operation is complete, or throws on error.
  */
+/**
+ * Deletes a specific message from a conversation.
+ * @param conversationId The ID of the conversation containing the message.
+ * @param messageId The ID of the message to delete.
+ * @returns A promise that resolves when the operation is complete, or throws on error.
+ */
+export async function deleteMessageFromConversation(
+  conversationId: string,
+  messageId: string
+): Promise<void> {
+  if (!conversationId || !messageId) {
+    console.error("deleteMessageFromConversation: conversationId and messageId are required.");
+    throw new Error("Conversation ID and Message ID are required.");
+  }
+  try {
+    const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
+
+    // Ensure the message exists before attempting to delete (optional, but good practice)
+    const messageSnap = await getDoc(messageRef);
+    if (!messageSnap.exists()) {
+      console.warn(`Message with ID ${messageId} not found in conversation ${conversationId}. Cannot delete.`);
+      throw new Error(`Message with ID ${messageId} not found.`);
+    }
+
+    await deleteDoc(messageRef);
+
+    // Also update the parent conversation's 'updatedAt' timestamp
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    await updateDoc(conversationDocRef, {
+      updatedAt: serverTimestamp()
+    });
+
+  } catch (error) {
+    console.error(`Error deleting message ${messageId} from conversation ${conversationId}:`, error);
+    throw error; // Re-throw for caller to handle
+  }
+}
+
+/**
+ * Updates the feedback status of a specific message within a conversation.
+ * @param conversationId The ID of the conversation.
+ * @param messageId The ID of the message to update.
+ * @param feedback The feedback status ('liked', 'disliked', or null).
+ * @returns A promise that resolves when the operation is complete, or throws on error.
+ */
 export async function updateMessageFeedback(
   conversationId: string,
   messageId: string,

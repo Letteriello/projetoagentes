@@ -8,9 +8,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Paperclip, SendHorizontal, Loader2 as Loader } from "lucide-react";
+import { Paperclip, SendHorizontal, Loader2 as Loader, Search, Sparkles, Code, Database, Globe, Bot } from "lucide-react";
 import AttachmentPopoverContent from "./AttachmentPopoverContent";
 import { cn } from "@/lib/utils";
+
+interface Tool {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  description: string;
+}
 
 interface MessageInputAreaProps {
   formRef: React.RefObject<HTMLFormElement>;
@@ -27,6 +34,46 @@ interface MessageInputAreaProps {
   onInputChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
 }
 
+// Lista de ferramentas disponíveis
+const availableTools: Tool[] = [
+  {
+    id: "web-search",
+    name: "Pesquisa na Web",
+    icon: <Globe className="h-4 w-4" />,
+    description: "Pesquisa na internet para encontrar informações atualizadas"
+  },
+  {
+    id: "code-analysis",
+    name: "Análise de Código",
+    icon: <Code className="h-4 w-4" />,
+    description: "Analisa e explica código fonte em detalhes"
+  },
+  {
+    id: "data-analysis",
+    name: "Análise de Dados",
+    icon: <Database className="h-4 w-4" />,
+    description: "Processa e analisa conjuntos de dados"
+  },
+  {
+    id: "deep-research",
+    name: "Pesquisa Profunda",
+    icon: <Search className="h-4 w-4" />,
+    description: "Realiza pesquisa detalhada sobre um tópico específico"
+  },
+  {
+    id: "creative",
+    name: "Modo Criativo",
+    icon: <Sparkles className="h-4 w-4" />,
+    description: "Gera conteúdo criativo e ideias inovadoras"
+  },
+  {
+    id: "agent",
+    name: "Assistente Especializado",
+    icon: <Bot className="h-4 w-4" />,
+    description: "Aciona um assistente especializado para tarefas específicas"
+  },
+];
+
 export default function MessageInputArea({
   formRef,
   inputRef,
@@ -42,6 +89,8 @@ export default function MessageInputArea({
   onInputChange,
 }: MessageInputAreaProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const MAX_TEXTAREA_ROWS = 6; // Define max rows for textarea
 
   useEffect(() => {
@@ -97,12 +146,78 @@ export default function MessageInputArea({
     }
   };
 
+  // Função para selecionar uma ferramenta
+  const handleToolSelect = (toolId: string) => {
+    setSelectedTool(toolId);
+    setIsToolsMenuOpen(false);
+    
+    // Foco no input após selecionar a ferramenta
+    if (inputRef.current) {
+      inputRef.current.focus();
+      // Adiciona o comando da ferramenta no início do input
+      const tool = availableTools.find(t => t.id === toolId);
+      if (tool) {
+        onInputChange({
+          target: {
+            value: `/${toolId} ${inputValue}`,
+          },
+        } as React.ChangeEvent<HTMLTextAreaElement>);
+      }
+    }
+  };
+
   return (
     <form
       ref={formRef}
       onSubmit={onSubmit}
       className="sticky bottom-0 flex items-end gap-2 p-3 border-t bg-background z-10"
     >
+      {/* Menu de ferramentas */}
+      <Popover open={isToolsMenuOpen} onOpenChange={setIsToolsMenuOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="flex-shrink-0 relative group hover:border-primary/70 transition-colors"
+            onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
+            disabled={isPending}
+            title="Ferramentas"
+          >
+            <Sparkles className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+            {selectedTool && (
+              <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full border-2 border-background" />
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="start"
+          className="w-60 p-0 border shadow-md bg-background"
+        >
+          <div className="p-2 border-b">
+            <h3 className="text-sm font-medium">Ferramentas disponíveis</h3>
+          </div>
+          <div className="p-1 max-h-[300px] overflow-y-auto">
+            {availableTools.map((tool) => (
+              <Button
+                key={tool.id}
+                variant="ghost"
+                className="w-full justify-start text-sm h-9 px-2 py-1 mb-1"
+                onClick={() => handleToolSelect(tool.id)}
+              >
+                <div className="mr-2">{tool.icon}</div>
+                <div className="flex flex-col items-start">
+                  <span>{tool.name}</span>
+                  <span className="text-xs text-muted-foreground">{tool.description}</span>
+                </div>
+              </Button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Anexo de arquivos */}
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -112,6 +227,7 @@ export default function MessageInputArea({
             className="flex-shrink-0 relative group hover:border-primary/70 transition-colors"
             onClick={() => fileInputRef.current?.click()}
             disabled={isPending}
+            title="Anexar arquivo"
           >
             <Paperclip className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
             {selectedFile && (
@@ -148,7 +264,7 @@ export default function MessageInputArea({
         <Textarea
           ref={inputRef}
           name="userInput"
-          placeholder="Digite sua mensagem ou '/ ' para comandos..."
+          placeholder="Digite sua mensagem ou '/' para comandos..."
           rows={1}
           value={inputValue}
           onChange={internalHandleChange}

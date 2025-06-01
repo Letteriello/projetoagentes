@@ -5,6 +5,7 @@ export interface Message {
   timestamp: Date;
   isLoading?: boolean;
   isError?: boolean;
+  sender?: 'user' | 'system' | 'assistant' | string; // Adiciona a propriedade sender usada no código
 }
 
 export interface Conversation {
@@ -13,6 +14,7 @@ export interface Conversation {
   createdAt: Date;
   updatedAt?: Date; // Added updatedAt field
   messages: Message[]; // Each conversation will have its own messages
+  agentId?: string; // Adiciona a propriedade agentId usada no Firestore
   // lastMessageAt?: Date; // Optional: useful for sorting
   // summary?: string; // Optional: for a brief overview
 }

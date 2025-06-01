@@ -1,5 +1,6 @@
-// ChatHeader: Responsivo com título truncado (max-w-xs md:max-w-md), itens da direita com flex-wrap, e ocultação de elementos (ex: nome do usuário em md:inline).
-// O seletor de agente ADK também possui classes de largura (min-w, max-w) para melhor adaptação.
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -18,8 +19,8 @@ import {
   LogOut,
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from "@/types/agent-configs";
-import { useAuth } from "@/contexts/AuthContext"; // Ajustado para alias
-import { toast } from "@/hooks/use-toast"; // Keep for potential other toasts, or remove if not used
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 interface Gem {
   id: string;
@@ -64,132 +65,186 @@ export default function ChatHeader({
   handleNewConversation,
   isSidebarOpen,
   isADKInitializing,
-  handleLogin, // Added
-  handleLogout, // Added
+  handleLogin,
+  handleLogout,
 }: ChatHeaderProps) {
-  const { currentUser, loading: authLoading } = useAuth(); // Added
+  const { currentUser, loading: authLoading } = useAuth();
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   const handleGemSelect = (id: string) => {
     setSelectedGemId(id);
+    setIsModelDropdownOpen(false);
   };
 
   // handleLogin and handleLogout are now passed as props
 
+  // Determina qual nome de modelo mostrar
+  const getSelectedModelName = () => {
+    if (usingADKAgent && selectedADKAgentId) {
+      const selectedAgent = adkAgents.find(agent => agent.id === selectedADKAgentId);
+      return selectedAgent?.displayName || "Agente ADK";
+    } else if (selectedGemId) {
+      const selectedGem = initialGems.find(gem => gem.id === selectedGemId);
+      return selectedGem?.name || "Gem";
+    }
+    return "Assistente IA";
+  };
+
   return (
-    <div className="flex items-center justify-between p-4 border-b bg-background">
-      <div className="flex items-center gap-2">
+    <header className="flex items-center justify-between p-3 border-b bg-background/95 backdrop-blur-sm mx-auto w-full">
+      {/* Lado esquerdo - Menu e título */}
+      <div className="flex items-center gap-2 min-w-0">
         <Button
           variant="ghost"
           size="icon"
           onClick={onMenuToggle}
           title={isSidebarOpen ? "Fechar Menu" : "Abrir Menu"}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </Button>
-        <h1 className="text-xl font-semibold truncate max-w-xs md:max-w-md lg:max-w-lg">
-          {activeChatTarget || "Chat"}
+        <h1 className="text-base font-medium truncate max-w-[120px] sm:max-w-xs md:max-w-md">
+          {activeChatTarget || "Nova Conversa"}
         </h1>
       </div>
 
-      {/* Adicionado flex-wrap para melhor responsividade em telas pequenas, permitindo que os itens quebrem linha se necessário. */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* Auth Status and Buttons */}
+      {/* Centro - Seletor de modelo */}
+      <div className="relative">
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2 h-9 rounded-full border border-muted bg-background/50 px-3 py-1"
+          onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+        >
+          {usingADKAgent ? (
+            <Cpu className="h-4 w-4 text-primary" />
+          ) : (
+            <span className="h-4 w-4 rounded-full bg-gradient-to-br from-blue-400 to-purple-500" />
+          )}
+          <span className="text-sm font-medium">{getSelectedModelName()}</span>
+          <span className="text-xs text-muted-foreground">▼</span>
+        </Button>
+        
+        {isModelDropdownOpen && (
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-60 bg-background border rounded-lg shadow-lg z-50 py-1">
+            <div className="p-2 border-b">
+              <h3 className="text-sm font-medium">Modelos</h3>
+              <div className="mt-1 space-y-1">
+                {initialGems.map((gem) => (
+                  <Button 
+                    key={gem.id} 
+                    variant={selectedGemId === gem.id ? "secondary" : "ghost"}
+                    className="w-full justify-start text-sm h-8"
+                    onClick={() => {
+                      handleGemSelect(gem.id);
+                      setUsingADKAgent(false);
+                    }}
+                  >
+                    <span className="h-3 w-3 mr-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-500" />
+                    {gem.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="p-2">
+              <h3 className="text-sm font-medium">Agentes ADK</h3>
+              <div className="mt-1 space-y-1">
+                {isADKInitializing ? (
+                  <div className="flex items-center justify-center p-2">
+                    <span className="animate-spin h-4 w-4 border-b-2 border-primary rounded-full mr-2" />
+                    <span className="text-sm text-muted-foreground">Carregando...</span>
+                  </div>
+                ) : adkAgents.length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-2">
+                    Nenhum agente ADK disponível
+                  </div>
+                ) : (
+                  adkAgents.map((agent) => (
+                    <Button 
+                      key={agent.id} 
+                      variant={selectedADKAgentId === agent.id ? "secondary" : "ghost"}
+                      className="w-full justify-start text-sm h-8"
+                      onClick={() => {
+                        setSelectedADKAgentId(agent.id);
+                        setUsingADKAgent(true);
+                        setIsModelDropdownOpen(false);
+                      }}
+                    >
+                      <Cpu className="h-3 w-3 mr-2 text-primary" />
+                      {agent.displayName}
+                    </Button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Lado direito - Ações e perfil */}
+      <div className="flex items-center gap-2">
+        {/* Nova conversa */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleNewConversation}
+          className="text-muted-foreground hover:text-foreground"
+          title="Nova conversa"
+        >
+          <Plus className="h-5 w-5" />
+        </Button>
+        
+        {/* Alternador de tema */}
+        <ThemeToggle className="text-muted-foreground hover:text-foreground" />
+        
+        {/* Autenticação */}
         {authLoading ? (
-          <span className="text-sm text-muted-foreground">Loading user...</span>
+          <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
         ) : currentUser ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm hidden md:inline">
-              {currentUser.displayName || currentUser.email}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
+          <div className="relative group">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-full overflow-hidden p-0 h-8 w-8 border border-muted" 
               onClick={handleLogout}
-              title="Logout"
+              title={currentUser.displayName || currentUser.email || "Perfil do usuário"}
             >
-              <LogOut className="h-5 w-5" />
+              {currentUser.photoURL ? (
+                <img src={currentUser.photoURL} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary">
+                  {(currentUser.displayName?.[0] || currentUser.email?.[0] || "U").toUpperCase()}
+                </div>
+              )}
             </Button>
+            <div className="absolute right-0 top-full mt-1 w-auto min-w-[150px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 bg-background border rounded-lg shadow-lg z-50 py-1 text-sm">
+              <div className="px-3 py-2 border-b truncate max-w-[200px]">
+                {currentUser.displayName || currentUser.email}
+              </div>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start h-9 px-3"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
+              </Button>
+            </div>
           </div>
         ) : (
           <Button
             variant="outline"
+            size="sm"
             onClick={handleLogin}
-            title="Login with Google"
+            className="h-8 rounded-full"
           >
-            <LogIn className="mr-2 h-5 w-5" /> Login with Google
+            <LogIn className="h-4 w-4 mr-2" />
+            Entrar
           </Button>
         )}
 
-        {usingADKAgent ? (
-          <div className="flex items-center gap-2">
-            <Cpu className="h-5 w-5 text-primary" />
-            <Select
-              value={selectedADKAgentId || ""}
-              onValueChange={(value) =>
-                setSelectedADKAgentId(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-auto min-w-[150px] max-w-[200px] truncate">
-                <SelectValue placeholder="Selecione Agente ADK" />
-              </SelectTrigger>
-              <SelectContent>
-                {isADKInitializing ? (
-                  <SelectItem value="loading" disabled>
-                    Carregando agentes ADK...
-                  </SelectItem>
-                ) : adkAgents.length === 0 ? (
-                  <SelectItem value="no-adk-agents" disabled>
-                    Nenhum agente ADK configurado
-                  </SelectItem>
-                ) : (
-                  <>
-                    {!selectedADKAgentId && (
-                      <SelectItem value="">Selecione um Agente ADK</SelectItem>
-                    )}
-                    {adkAgents.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.displayName}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-                <SelectItem value="">Desativar Agente ADK</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          // Componente AgentSelector para selecionar um "Gem" (agente configurado).
-          // A versão "Updated upstream" foi escolhida por:
-          // 1. Manter a propriedade `model: ''` em `savedAgents` para compatibilidade de tipo com SavedAgentConfiguration.
-          // 2. Preferir `showLabel={false}` e `triggerClassName=""` para uma interface mais compacta no header.
-          <AgentSelector
-            onAgentSelected={handleGemSelect}
-            selectedAgentId={selectedGemId ?? undefined}
-            savedAgents={initialGems.map((gem) => ({
-              id: gem.id,
-              agentName: gem.name, // Mapeado de gem.name
-              agentDescription: gem.prompt || '', // Mapeado de gem.prompt
-              agentVersion: '1.0.0', // Padrão
-              config: { type: 'custom', framework: 'genkit' } as import('@/types/agent-configs').AgentConfig, // Configuração mínima
-              tools: [], // Padrão
-              // Outros campos opcionais de SavedAgentConfiguration podem ser omitidos ou ter padrões
-              // Ex: icon, templateId, toolConfigsApplied, toolsDetails, createdAt, updatedAt
-            }))}
-            showLabel={false}
-            triggerClassName=""
-          />
-        )}
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleNewConversation}
-          title="Nova Conversa"
-        >
-          <Plus className="h-5 w-5" />
-        </Button>
-        <ThemeToggle />
       </div>
-    </div>
+    </header>
   );
 }

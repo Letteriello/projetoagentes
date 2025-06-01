@@ -936,7 +936,7 @@ export function ChatUI() {
     const messagesToRemove = optimisticMessages.slice(agentMessageIndex);
     for (const msgToRemove of messagesToRemove) {
       addOptimisticMessage({ type: "remove_message", id: msgToRemove.id });
-      await cs.deleteMessageFromConversation(activeConversationId, msgToRemove.id).catch(err => {
+      await cs.deleteMessageFromConversation(activeConversationId, msgToRemove.id).catch((err: Error) => {
         console.error(`Failed to delete message ${msgToRemove.id} from Firestore:`, err);
         // Optionally, re-add optimistically if Firestore deletion fails, or handle more robustly
       });
@@ -1104,87 +1104,108 @@ export function ChatUI() {
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-muted/50">
-      <ConversationSidebar
-        isOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen(false)}
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        onSelectConversation={handleSelectConversation}
-        onNewConversation={handleNewConversation}
-        onDeleteConversation={(conversation) => handleDeleteConversation(conversation)}
-        onRenameConversation={(id, newTitle) => console.log(`Renaming ${id} to ${newTitle}`)}
-        isLoading={isLoadingConversations}
-        currentUserId={currentUser?.uid}
-        gems={initialGems}
-        savedAgents={savedAgents}
-        adkAgents={adkAgents}
-        onSelectAgent={(agent) => {
-          if ('displayName' in agent) {
-            // É um ADKAgent
-            setSelectedADKAgentId(agent.id);
-          } else if ('prompt' in agent) {
-            // É um Gem
-            setSelectedGemId(agent.id);
-          } else if ('agentName' in agent || 'id' in agent) {
-            // É um SavedAgentConfiguration
-            setSelectedAgentId(agent.id);
-          }
-        }}
-      />
-      <div className={cn("flex flex-col flex-1 transition-all duration-300 ease-in-out", isSidebarOpen ? "md:ml-72" : "ml-0")}>
-        <ChatHeader
-        isSidebarOpen={isSidebarOpen}
-        activeChatTarget={activeChatTargetName}
-        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        handleLogin={handleLogin}
-        handleLogout={handleLogout}
-        adkAgents={adkAgents}
-        usingADKAgent={!!selectedADKAgentId}
-        setUsingADKAgent={(value) => {
-          if (!value) setSelectedADKAgentId(null);
-        }}
-        selectedADKAgentId={selectedADKAgentId}
-        setSelectedADKAgentId={setSelectedADKAgentId}
-        selectedGemId={selectedGemId}
-        setSelectedGemId={setSelectedGemId}
-        initialGems={initialGems}
-        handleNewConversation={() => handleNewConversation()}
-        isADKInitializing={isADKInitializing}
-      />
-        <div className="flex-1 overflow-hidden relative">
-          <ScrollArea ref={scrollAreaRef} className="h-full p-4 pt-0">
-            {isLoadingMessages ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading messages...</p> {/* Or a spinner component */}
-              </div>
-            ) : !currentUser ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <LogIn size={48} className="mb-4 text-primary" />
-                <h2 className="text-2xl font-semibold mb-2">Welcome to the Chat</h2>
-                <p className="mb-4 text-lg">Please log in to use the chat.</p>
-                <Button onClick={handleLogin} variant="default" size="lg">
-                  <LogIn className="mr-2 h-5 w-5" /> Login with Google
-                </Button>
-              </div>
-            ) : optimisticMessages.length === 0 && !isPending && !pendingAgentConfig ? (
-              <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
-            ) : (
-              <MessageList
-                messages={optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
-                isPending={isPending}
-                onRegenerate={handleRegenerate}
-                onFeedback={handleFeedback} // Pass handleFeedback
-              />
-            )}
-          </ScrollArea>
+    <div className="flex h-screen w-full overflow-hidden">
+      {/* Sidebar - fixed positioning with z-index */}
+      <div 
+        className={cn(
+          "fixed md:relative inset-y-0 left-0 z-20 w-72 h-full transition-transform duration-300 ease-in-out bg-gray-800",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        <ConversationSidebar
+          isOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(false)}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={handleSelectConversation}
+          onNewConversation={handleNewConversation}
+          onDeleteConversation={(conversation) => handleDeleteConversation(conversation)}
+          onRenameConversation={(id, newTitle) => console.log(`Renaming ${id} to ${newTitle}`)}
+          isLoading={isLoadingConversations}
+          currentUserId={currentUser?.uid}
+          gems={initialGems}
+          savedAgents={savedAgents}
+          adkAgents={adkAgents}
+          onSelectAgent={(agent) => {
+            if ('displayName' in agent) {
+              // É um ADKAgent
+              setSelectedADKAgentId(agent.id);
+            } else if ('prompt' in agent) {
+              // É um Gem
+              setSelectedGemId(agent.id);
+            } else if ('agentName' in agent || 'id' in agent) {
+              // É um SavedAgentConfiguration
+              setSelectedAgentId(agent.id);
+            }
+          }}
+        />
+      </div>
+
+      {/* Main content area - flexible width */}
+      <div className="flex flex-col flex-1 w-full md:w-auto overflow-hidden">
+        <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <ChatHeader
+            isSidebarOpen={isSidebarOpen}
+            activeChatTarget={activeChatTargetName}
+            onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            handleLogin={handleLogin}
+            handleLogout={handleLogout}
+            adkAgents={adkAgents}
+            usingADKAgent={!!selectedADKAgentId}
+            setUsingADKAgent={(value) => {
+              if (!value) setSelectedADKAgentId(null);
+            }}
+            selectedADKAgentId={selectedADKAgentId}
+            setSelectedADKAgentId={setSelectedADKAgentId}
+            selectedGemId={selectedGemId}
+            setSelectedGemId={setSelectedGemId}
+            initialGems={initialGems}
+            handleNewConversation={() => handleNewConversation()}
+            isADKInitializing={isADKInitializing}
+          />
+        </div>
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea ref={scrollAreaRef} className="h-full p-4 pt-2">
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center min-h-[calc(100vh-180px)]">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-muted-foreground">Carregando mensagens...</p>
+                  </div>
+                </div>
+              ) : !currentUser ? (
+                <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
+                  <LogIn size={48} className="mb-4 text-primary" />
+                  <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
+                  <p className="mb-4 text-lg">Por favor, faça login para usar o chat.</p>
+                  <Button onClick={handleLogin} variant="default" size="lg">
+                    <LogIn className="mr-2 h-5 w-5" /> Entrar com Google
+                  </Button>
+                </div>
+              ) : optimisticMessages.length === 0 && !isPending && !pendingAgentConfig ? (
+                <div className="min-h-[calc(100vh-180px)]">
+                  <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
+                </div>
+              ) : (
+                <div className="pb-20">
+                  <MessageList
+                    messages={optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
+                    isPending={isPending}
+                    onRegenerate={handleRegenerate}
+                    onFeedback={handleFeedback} // Pass handleFeedback
+                  />
+                </div>
+              )}
+            </ScrollArea>
+          </div>
 
           {pendingAgentConfig && (
             <Card className="m-4 border-primary shadow-lg absolute bottom-0 left-0 right-0 mb-20 bg-background z-10">
               <CardHeader>
-                <CardTitle>Review Proposed Agent Configuration</CardTitle>
+                <CardTitle>Revisar Configuração Proposta do Agente</CardTitle>
                 <CardDescription>
-                  The Agent Creator Assistant has drafted the following configuration. You can save it or discard and continue chatting to refine it.
+                  O Assistente de Criação de Agentes elaborou a seguinte configuração. Você pode salvá-la ou descartá-la e continuar conversando para refiná-la.
                 </CardDescription>
               </CardHeader>
               <CardContent className="max-h-60 overflow-y-auto bg-muted/30 p-4 rounded-md">
@@ -1194,30 +1215,34 @@ export function ChatUI() {
               </CardContent>
               <CardFooter className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={handleDiscardPendingAgent}>
-                    <Trash2 className="mr-2 h-4 w-4"/> Discard & Continue
+                    <Trash2 className="mr-2 h-4 w-4"/> Descartar e Continuar
                 </Button>
                 <Button onClick={handleSavePendingAgent}>
-                    <Save className="mr-2 h-4 w-4"/> Save This Agent
+                    <Save className="mr-2 h-4 w-4"/> Salvar Este Agente
                 </Button>
               </CardFooter>
             </Card>
           )}
         </div>
 
-        <MessageInputArea
-          formRef={useRef<HTMLFormElement>(null)} // This ref is local to MessageInputArea, not needed from ChatUI state
-          inputRef={inputRef} // Pass the shared inputRef
-          fileInputRef={fileInputRef} // Pass the shared fileInputRef
-          onSubmit={handleFormSubmit}
-          isPending={isPending || !!pendingAgentConfig}
-          selectedFile={selectedFile}
-          selectedFileName={selectedFileName ?? ""}
-          selectedFileDataUri={selectedFileDataUri}
-          onRemoveAttachment={removeSelectedFile}
-          handleFileChange={handleFileChange}
-          inputValue={inputValue}
-          onInputChange={handleInputChange}
-        />
+        <div className="sticky bottom-0 w-full bg-background border-t p-2 z-10">
+          <div className="mx-auto max-w-4xl">
+            <MessageInputArea
+              formRef={useRef<HTMLFormElement>(null)} // This ref is local to MessageInputArea, not needed from ChatUI state
+              inputRef={inputRef} // Pass the shared inputRef
+              fileInputRef={fileInputRef} // Pass the shared fileInputRef
+              onSubmit={handleFormSubmit}
+              isPending={isPending || !!pendingAgentConfig}
+              selectedFile={selectedFile}
+              selectedFileName={selectedFileName ?? ""}
+              selectedFileDataUri={selectedFileDataUri}
+              onRemoveAttachment={removeSelectedFile}
+              handleFileChange={handleFileChange}
+              inputValue={inputValue}
+              onInputChange={handleInputChange}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

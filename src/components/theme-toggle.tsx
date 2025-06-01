@@ -11,7 +11,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  className?: string;
+}
+
+export function ThemeToggle({ className = '' }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -22,7 +26,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="w-9 h-9 opacity-0">
+      <Button variant="ghost" size="icon" className={`w-9 h-9 opacity-0 ${className || ''}`}>
         <Sun className="h-4 w-4 rotate-0 scale-100 transition-all" />
       </Button>
     );
@@ -36,7 +40,7 @@ export function ThemeToggle() {
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
-            className="w-9 h-9 text-muted-foreground hover:text-foreground"
+            className={`w-9 h-9 text-muted-foreground hover:text-foreground ${className || ''}`}
           >
             {theme === "dark" ? (
               <Moon className="h-[1.15rem] w-[1.15rem] rotate-0 scale-100 transition-all" />
