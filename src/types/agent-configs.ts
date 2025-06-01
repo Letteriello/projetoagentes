@@ -136,6 +136,9 @@ export interface AgentConfigBase {
   rag?: RagMemoryConfig;
   artifacts?: ArtifactsConfig;
   a2a?: A2AConfig;
+  genkitFlowName?: string;
+  inputSchema?: string;
+  outputSchema?: string;
 }
 
 export interface LLMAgentConfig extends AgentConfigBase {

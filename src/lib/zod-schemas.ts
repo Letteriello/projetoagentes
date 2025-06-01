@@ -175,6 +175,8 @@ export const customAgentConfigSchema = agentConfigBaseSchema.extend({
   type: z.literal("custom"),
   customLogicDescription: z.string().min(1, "Custom logic description is required."),
   genkitFlowName: z.string().optional(), // Might become required depending on framework choices
+  inputSchema: z.string().optional(),
+  outputSchema: z.string().optional(),
 });
 
 // Schema for A2AAgentSpecialistConfig
