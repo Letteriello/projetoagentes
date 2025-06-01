@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@genkit-ai/flow": "latest",
     "@genkit-ai/googleai": "latest",
     "@genkit-ai/next": "latest",
     "@hookform/resolvers": "^4.1.3",

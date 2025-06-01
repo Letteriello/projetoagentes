@@ -1,5 +1,5 @@
 import { defineFlow, runFlow } from '@genkit-ai/flow';
-import { geminiPro } from '@genkit-ai/googleai'; // Assuming geminiPro is the desired LLM
+import { gemini15Pro } from '@genkit-ai/googleai'; // Assuming gemini15Pro is the desired LLM
 import * as z from 'zod';
 import { generate } from '@genkit-ai/ai';
 
@@ -56,7 +56,7 @@ Do not include any other text or explanation outside of the JSON object.
 
     try {
       const llmResponse = await generate({
-        model: geminiPro, // Ensure this model is configured in your Genkit setup
+        model: gemini15Pro, // Ensure this model is configured in your Genkit setup
         prompt: prompt,
         config: {
           // Specify JSON output mode if available and supported by the model/SDK version
