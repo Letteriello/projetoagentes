@@ -28,6 +28,11 @@ interface GeneralTabProps {
   SparklesIcon?: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
+// MODIFIED: Added Card components
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+
+
 const GeneralTab: React.FC<GeneralTabProps> = ({
   agentTypeOptions,
   agentFrameworkOptions,
@@ -94,128 +99,145 @@ const GeneralTab: React.FC<GeneralTabProps> = ({
   };
 
   return (
-    <TabsContent value="general" className="space-y-6 mt-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Agent Name */}
-        <FormField
-          control={control}
-          name="agentName"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="agentName">Nome do Agente</FormLabel>
-              <FormControl>
-                <Input id="agentName" placeholder="Ex: Agente de Pesquisa Avançada" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {/* Agent Version */}
-        <FormField
-          control={control}
-          name="agentVersion"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="agentVersion">Versão</FormLabel>
-              <FormControl>
-                <Input id="agentVersion" placeholder="Ex: 1.0.1" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-      {/* Agent Description */}
-      <FormField
-        control={control}
-        name="agentDescription"
-        render={({ field }) => (
-          <FormItem className="space-y-2">
-            <FormLabel htmlFor="agentDescription">Descrição do Agente</FormLabel>
-            <FormControl>
-              <Textarea id="agentDescription" placeholder="Descreva o propósito principal, capacidades e limitações do agente." {...field} rows={3} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+    <TabsContent value="general" className="mt-0"> {/* Adjusted mt-0 as Card will provide spacing */}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Agent Identification</CardTitle>
+            <CardDescription>Define the basic identity and purpose of your agent.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Agent Name */}
+              <FormField
+                control={control}
+                name="agentName"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel htmlFor="agentName">Agent Name</FormLabel>
+                    <FormControl>
+                      <Input id="agentName" placeholder="Ex: Advanced Research Agent" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* Agent Version */}
+              <FormField
+                control={control}
+                name="agentVersion"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel htmlFor="agentVersion">Version</FormLabel>
+                    <FormControl>
+                      <Input id="agentVersion" placeholder="Ex: 1.0.1" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            {/* Agent Description */}
+            <FormField
+              control={control}
+              name="agentDescription"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel htmlFor="agentDescription">Agent Description</FormLabel>
+                  <FormControl>
+                    <Textarea id="agentDescription" placeholder="Describe the agent's main purpose, capabilities, and limitations." {...field} rows={3} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="pt-2"> {/* Added padding top for the button */}
+              <Button
+                onClick={handleSuggestWithAI}
+                disabled={isSuggesting || !watchedAgentType}
+                variant="outline"
+                size="sm"
+                type="button" // Ensure it's not submitting the form
+              >
+                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4" />}
+                Suggest Name & Description with AI
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      <div className="my-4">
-        <Button
-          onClick={handleSuggestWithAI}
-          disabled={isSuggesting || !watchedAgentType}
-          variant="outline"
-          size="sm"
-          type="button" // Ensure it's not submitting the form
-        >
-          {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4" />}
-          Sugerir Nome & Descrição com IA
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Agent Type */}
-        <FormField
-          control={control}
-          name="config.type"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="selectedAgentType">Tipo de Agente</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger id="selectedAgentType">
-                    <SelectValue placeholder="Selecione o tipo de agente" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {agentTypeOptions.map(option => (
-                    <SelectItem key={option.id} value={option.id}>
-                      {option.icon && React.cloneElement(option.icon as React.ReactElement, { className: "inline-block mr-2 h-4 w-4" })}
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription>
-                {agentTypeOptions.find(opt => opt.id === field.value)?.description || "Selecione um tipo para ver a descrição detalhada."}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {/* Agent Framework */}
-        <FormField
-          control={control}
-          name="config.framework"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <FormLabel htmlFor="agentFramework" className="cursor-help">Framework do Agente</FormLabel>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Define o sistema subjacente que executa o agente. Genkit é o padrão...</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger id="agentFramework">
-                    <SelectValue placeholder="Selecione o framework" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {agentFrameworkOptions.map(option => (
-                    <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription>Define a biblioteca ou sistema base para a execução do agente.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <Card>
+          <CardHeader>
+            <CardTitle>Agent Architecture</CardTitle>
+            <CardDescription>Configure the fundamental type and operational framework of the agent.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Agent Type */}
+              <FormField
+                control={control}
+                name="config.type"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel htmlFor="selectedAgentType">Agent Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger id="selectedAgentType">
+                          <SelectValue placeholder="Select agent type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {agentTypeOptions.map(option => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.icon && React.cloneElement(option.icon as React.ReactElement, { className: "inline-block mr-2 h-4 w-4" })}
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {agentTypeOptions.find(opt => opt.id === field.value)?.description || "Select a type to see detailed description."}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* Agent Framework */}
+              <FormField
+                control={control}
+                name="config.framework"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <FormLabel htmlFor="agentFramework" className="cursor-help">Agent Framework</FormLabel>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Defines the underlying system that executes the agent. Genkit is the default...</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger id="agentFramework">
+                          <SelectValue placeholder="Select framework" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {agentFrameworkOptions.map(option => (
+                          <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Defines the base library or system for agent execution.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </TabsContent>
   );

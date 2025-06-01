@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { SavedAgentConfiguration, WorkflowDetailedType } from "@/types/agent-configs"; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
+import { Separator } from "@/components/ui/separator"; // Added Separator
 
 // MODIFIED: No props needed now
 interface WorkflowBehaviorFormProps {}
@@ -21,147 +23,155 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
   const detailedWorkflowType = watch("config.detailedWorkflowType");
 
   return (
-    <>
-      <FormField
-        control={control}
-        name="config.detailedWorkflowType"
-        render={({ field }) => (
-          <FormItem className="space-y-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild><FormLabel htmlFor="config.detailedWorkflowType" className="cursor-help">Tipo de Workflow</FormLabel></TooltipTrigger>
-                <TooltipContent className="w-80"><ul className="list-disc space-y-1 pl-4">
-                <li><strong>Sequencial:</strong> Passos executados em ordem linear.</li>
-                <li><strong>Loop:</strong> Executa uma série de ferramentas repetidamente até que uma condição de saída seja atendida ou um número máximo de iterações seja alcançado.</li>
-                <li><strong>Paralelo:</strong> Permite a execução simultânea de múltiplas ferramentas ou tarefas, útil para operações independentes que podem ser processadas ao mesmo tempo.</li>
-                {/* TODO: Add descriptions for graph and stateMachine once implemented */}
-              </ul></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <Select onValueChange={field.onChange} value={field.value as WorkflowDetailedType}>
-              <FormControl><SelectTrigger id="config.detailedWorkflowType"><SelectValue placeholder="Selecione o tipo de workflow" /></SelectTrigger></FormControl>
-              <SelectContent>
-                <SelectItem value="sequential">Sequencial</SelectItem>
-                <SelectItem value="loop">Loop</SelectItem>
-                <SelectItem value="parallel">Paralelo</SelectItem>
-                {/* <SelectItem value="graph">Grafo de Tarefas</SelectItem> */}
-                {/* <SelectItem value="stateMachine">Máquina de Estados</SelectItem> */}
-              </SelectContent>
-            </Select>
-            <FormDescription>Define a estrutura de execução do workflow.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Workflow Configuration</CardTitle>
+          <CardDescription>Define the structure, type, and general behavior of the workflow agent.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <FormField
+            control={control}
+            name="config.detailedWorkflowType"
+            render={({ field }) => (
+              <FormItem>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild><FormLabel htmlFor="config.detailedWorkflowType" className="cursor-help">Workflow Type</FormLabel></TooltipTrigger>
+                    <TooltipContent className="w-80"><ul className="list-disc space-y-1 pl-4">
+                    <li><strong>Sequential:</strong> Steps executed in linear order.</li>
+                    <li><strong>Loop:</strong> Executes a series of tools repeatedly until an exit condition is met or a maximum number of iterations is reached.</li>
+                    <li><strong>Parallel:</strong> Allows simultaneous execution of multiple tools or tasks, useful for independent operations.</li>
+                  </ul></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Select onValueChange={field.onChange} value={field.value as WorkflowDetailedType}>
+                  <FormControl><SelectTrigger id="config.detailedWorkflowType"><SelectValue placeholder="Select workflow type" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    <SelectItem value="sequential">Sequential</SelectItem>
+                    <SelectItem value="loop">Loop</SelectItem>
+                    <SelectItem value="parallel">Parallel</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>Defines the workflow execution structure.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="config.workflowDescription"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="config.workflowDescription">Workflow Description</FormLabel>
+                <FormControl><Textarea id="config.workflowDescription" placeholder="Describe the objective and steps..." {...field} rows={3}/></FormControl>
+                <FormDescription>An overview of what the workflow accomplishes.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+      </Card>
 
       {detailedWorkflowType === "sequential" && (
-        <div className="p-4 border rounded-md bg-muted text-sm text-muted-foreground">
-          Drag-and-drop reordering of tools will be implemented here.
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sequential Workflow</CardTitle>
+            <CardDescription>Tools in a sequential workflow are executed in order. Reordering will be available here.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 border rounded-md bg-muted text-sm text-muted-foreground">
+              Drag-and-drop reordering of tools will be implemented here.
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {detailedWorkflowType === "loop" && (
-        <div className="space-y-4 p-4 border rounded-md">
-          <FormField
-            control={control}
-            name="config.loopExitToolName"
-            render={({ field }) => (
-              <FormItem className="space-y-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitToolName" className="cursor-help">Ferramenta de Saída do Loop</FormLabel></TooltipTrigger>
-                    <TooltipContent><p>Esta ferramenta, ao ser executada com sucesso, terminará o loop.</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl><SelectTrigger id="config.loopExitToolName"><SelectValue placeholder="Selecione a ferramenta de saída" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {/* TODO: Populate with actual agent tools */}
-                    <SelectItem value="placeholder-tool">Placeholder Tool</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={control}
-            name="config.loopExitStateKey"
-            render={({ field }) => (
-              <FormItem className="space-y-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitStateKey" className="cursor-help">Chave de Estado de Saída do Loop</FormLabel></TooltipTrigger>
-                    <TooltipContent><p>A chave no estado do agente que será verificada para o valor de saída do loop.</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <FormControl><Input id="config.loopExitStateKey" type="text" placeholder="Ex: agent_scratchpad.some_key" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={control}
-            name="config.loopExitStateValue"
-            render={({ field }) => (
-              <FormItem className="space-y-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitStateValue" className="cursor-help">Valor de Estado de Saída do Loop</FormLabel></TooltipTrigger>
-                    <TooltipContent><p>Se a chave de estado de saída do loop no estado do agente corresponder a este valor, o loop terminará.</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <FormControl><Input id="config.loopExitStateValue" type="text" placeholder="Ex: loop_completed" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Loop Configuration</CardTitle>
+            <CardDescription>Settings for loop-based workflows, including termination conditions and iteration limits.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <FormField
+              control={control}
+              name="config.loopExitToolName"
+              render={({ field }) => (
+                <FormItem>
+                  <TooltipProvider> <Tooltip> <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitToolName" className="cursor-help">Loop Exit Tool</FormLabel></TooltipTrigger> <TooltipContent><p>This tool, upon successful execution, will terminate the loop.</p></TooltipContent> </Tooltip> </TooltipProvider>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger id="config.loopExitToolName"><SelectValue placeholder="Select exit tool" /></SelectTrigger></FormControl>
+                    <SelectContent> {/* TODO: Populate with actual agent tools */} <SelectItem value="placeholder-tool">Placeholder Tool</SelectItem> </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name="config.loopExitStateKey"
+              render={({ field }) => (
+                <FormItem>
+                  <TooltipProvider> <Tooltip> <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitStateKey" className="cursor-help">Loop Exit State Key</FormLabel></TooltipTrigger> <TooltipContent><p>The key in the agent's state that will be checked for the loop exit value.</p></TooltipContent> </Tooltip> </TooltipProvider>
+                  <FormControl><Input id="config.loopExitStateKey" type="text" placeholder="Ex: agent_scratchpad.some_key" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={control}
+              name="config.loopExitStateValue"
+              render={({ field }) => (
+                <FormItem>
+                  <TooltipProvider> <Tooltip> <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitStateValue" className="cursor-help">Loop Exit State Value</FormLabel></TooltipTrigger> <TooltipContent><p>If the loop exit state key in the agent's state matches this value, the loop will terminate.</p></TooltipContent> </Tooltip> </TooltipProvider>
+                  <FormControl><Input id="config.loopExitStateValue" type="text" placeholder="Ex: loop_completed" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={control}
+              name="config.loopMaxIterations"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="config.loopMaxIterations">Max Iterations</FormLabel>
+                  <FormControl>
+                    <Input
+                      id="config.loopMaxIterations"
+                      type="number"
+                      placeholder="Optional. Ex: 10"
+                      {...field}
+                      value={field.value === undefined ? "" : String(field.value)}
+                      onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormDescription>Set a limit for loops within the workflow.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {detailedWorkflowType === "parallel" && (
-        <Alert variant="info">
-          <AlertTitle>Workflows Paralelos</AlertTitle>
-          <AlertDescription>
-            As tarefas em um workflow paralelo devem ser independentes para garantir a execução correta.
-          </AlertDescription>
-        </Alert>
+         <Card>
+          <CardHeader>
+            <CardTitle>Parallel Workflow</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="info">
+              <AlertTitle>Parallel Workflow Information</AlertTitle>
+              <AlertDescription>
+                Tasks in a parallel workflow should be independent to ensure correct execution. Configuration for parallel tasks will be available here.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       )}
-
-      <FormField
-        control={control}
-        name="config.workflowDescription"
-        render={({ field }) => (
-          <FormItem className="space-y-2">
-            <FormLabel htmlFor="config.workflowDescription">Descrição do Workflow</FormLabel>
-            <FormControl><Textarea id="config.workflowDescription" placeholder="Descreva o objetivo e os passos..." {...field} rows={3}/></FormControl>
-            <FormDescription>Uma visão geral do que o workflow realiza.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="config.loopMaxIterations"
-        render={({ field }) => (
-          <FormItem className="space-y-2">
-            <FormLabel htmlFor="config.loopMaxIterations">Máximo de Iterações (para workflows com loops)</FormLabel>
-            <FormControl>
-              <Input
-                id="config.loopMaxIterations"
-                type="number"
-                placeholder="Opcional. Ex: 10"
-                {...field}
-                value={field.value === undefined ? "" : String(field.value)}
-                onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-              />
-            </FormControl>
-            <FormDescription>Se o workflow contiver loops, defina um limite.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </>
+    </div>
   );
 };
 export default WorkflowBehaviorForm;
