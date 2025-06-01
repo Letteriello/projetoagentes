@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Props para o componente WorkflowBehaviorForm.
 interface WorkflowBehaviorFormProps {
@@ -28,7 +29,20 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = ({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="detailedWorkflowType">Tipo de Workflow</Label>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Label htmlFor="detailedWorkflowType" className="cursor-help">Tipo de Workflow</Label>
+            </TooltipTrigger>
+            <TooltipContent className="w-80"> {/* Increased width for better readability */}
+              <ul className="list-disc space-y-1 pl-4">
+                <li><strong>Sequencial:</strong> Passos executados em ordem linear.</li>
+                <li><strong>Grafo de Tarefas:</strong> Para fluxos complexos onde os passos podem ter múltiplas dependências e não seguem uma ordem estritamente linear. (Exige definição de dependências entre tarefas).</li>
+                <li><strong>Máquina de Estados:</strong> O fluxo transita entre diferentes estados com base em condições ou resultados de tarefas. (Exige definição de estados e transições).</li>
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <Select
           value={detailedWorkflowType}
           onValueChange={(value: "sequential" | "graph" | "stateMachine") => setDetailedWorkflowType(value)}
