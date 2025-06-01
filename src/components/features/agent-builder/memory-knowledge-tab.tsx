@@ -19,6 +19,7 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
+import { FileUploader } from "@/components/ui/file-uploader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export type MemoryServiceType =
   | "filesystem"
   | "custom"; // Added 'custom'
 
-export type KnowledgeSourceType = "file" | "url" | "text" | "googleDoc" | "notion" | "document" | "website" | "api" | "database" | "custom"; // Keep as is, seems correct now
+export type KnowledgeSourceType = "file" | "url" | "text" | "googleDoc" | "notion" | "document" | "website" | "api" | "database" | "custom" | "document_upload";
 
 export interface KnowledgeSource {
   id: string;
@@ -175,6 +176,7 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
     description: '',
     enabled: true
   });
+  const [uploadedFiles, setUploadedFiles] = React.useState<File[]>([]);
   
   // Estado para adição de novos valores iniciais
   const [showNewStateForm, setShowNewStateForm] = React.useState(false);
@@ -202,6 +204,7 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
       case 'api': return <Cloud className="h-4 w-4" />;
       case 'database': return <Database className="h-4 w-4" />;
       case 'custom': return <Settings className="h-4 w-4" />;
+      case 'document_upload': return <UploadCloud className="h-4 w-4" />;
       default: return <Book className="h-4 w-4" />;
     }
   };
@@ -216,13 +219,23 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
 
   // Adicionar uma nova fonte de conhecimento
   const handleAddSource = () => {
-    if (!newSource.name || !newSource.pathOrContent) return;
+    // Validation based on type
+    if (newSource.type === 'document_upload') {
+      if (!newSource.name || uploadedFiles.length === 0) return;
+    } else {
+      if (!newSource.name || !newSource.pathOrContent) return;
+    }
+
+    let pathOrContentValue = newSource.pathOrContent;
+    if (newSource.type === 'document_upload') {
+      pathOrContentValue = uploadedFiles.map(file => file.name).join(', ');
+    }
 
     const completeSource: KnowledgeSource = {
       id: newSource.id || `source-${Date.now()}`,
       name: newSource.name!,
       type: (newSource.type || 'document') as KnowledgeSourceType,
-      pathOrContent: newSource.pathOrContent!,
+      pathOrContent: pathOrContentValue!,
       description: newSource.description || '',
       credentials: newSource.credentials,
       format: newSource.format,
@@ -241,10 +254,11 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
       id: `source-${Date.now() + 1}`,
       name: '',
       type: 'document' as KnowledgeSourceType,
-      pathOrContent: '', 
+      pathOrContent: '',
       description: '',
       enabled: true
     });
+    setUploadedFiles([]); // Clear uploaded files
     
     setShowNewSourceForm(false);
   };
@@ -318,7 +332,19 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
           <TabsTrigger value="rag" className="py-2 px-4">
             Configuração RAG
           </TabsTrigger>
-          <TabsTrigger value="fontes" className="py-2 px-4">
+          <TabsTrigger value="fontes" className="py-2 px-4" onClick={() => {
+            // Reset form when switching to this tab
+            setShowNewSourceForm(false);
+            setNewSource({
+              id: `source-${Date.now() + 1}`,
+              name: '',
+              type: 'document' as KnowledgeSourceType,
+              pathOrContent: '',
+              description: '',
+              enabled: true,
+            });
+            setUploadedFiles([]); // Clear uploaded files as well
+          }}>
             Fontes de Conhecimento
           </TabsTrigger>
         </TabsList>
@@ -467,10 +493,58 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
               </div>
               {enableRAG && (
                 <>
-                  {/* Exemplo de campos de ragMemoryConfig */}
                   <div className="space-y-2">
-                    <Label htmlFor="similarity-top-k">
+                    <Label htmlFor="embedding-model" className="flex items-center">
+                      Modelo de Embedding
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
+                              <Info size={14} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Seleciona o modelo de embedding que será usado para converter o texto das fontes de conhecimento e as consultas do usuário em vetores numéricos. A escolha do modelo impacta a qualidade da busca semântica. 'Nenhum / Usar Padrão' utilizará a configuração padrão do Genkit.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </Label>
+                    <Select
+                      value={ragMemoryConfig.embeddingModel}
+                      onValueChange={(value) =>
+                        setRagMemoryConfig((prev) => ({
+                          ...prev,
+                          embeddingModel: value === "none" ? undefined : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="embedding-model">
+                        <SelectValue placeholder="Selecione um modelo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum / Usar Padrão</SelectItem>
+                        <SelectItem value="text-embedding-004">Google text-embedding-004</SelectItem>
+                        <SelectItem value="textembedding-gecko@003">Google textembedding-gecko@003</SelectItem>
+                        {/* Adicionar outros modelos conforme necessário */}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="similarity-top-k" className="flex items-center">
                       Top K (Similaridade)
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
+                              <Info size={14} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Define o número máximo de documentos ou chunks de texto mais similares que o RAG deve recuperar da base de conhecimento para enriquecer a resposta do agente. Valores maiores podem trazer mais informação, mas também mais ruído.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </Label>
                     <Input
                       id="similarity-top-k"
@@ -484,9 +558,22 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                       }
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="vector-distance-threshold">
+                    <Label htmlFor="vector-distance-threshold" className="flex items-center">
                       Limite de Distância Vetorial
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
+                              <Info size={14} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Estabelece um limite para a similaridade vetorial. Apenas documentos/chunks com uma distância (ou similaridade) vetorial acima (ou abaixo, dependendo da métrica) deste limiar serão considerados. Ajuda a filtrar resultados menos relevantes.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </Label>
                     <Input
                       id="vector-distance-threshold"
@@ -502,6 +589,7 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                       }
                     />
                   </div>
+
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="include-conversation-context"
@@ -513,8 +601,20 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                         }))
                       }
                     />
-                    <Label htmlFor="include-conversation-context">
+                    <Label htmlFor="include-conversation-context" className="flex items-center">
                       Incluir Contexto da Conversa no RAG
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
+                              <Info size={14} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Indica se o histórico da conversa atual deve ser incluído como parte do contexto enviado para o RAG. Habilitar isso pode ajudar o RAG a recuperar informações mais relevantes com base no diálogo em andamento.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </Label>
                   </div>
                 </>
@@ -533,45 +633,157 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                    id="enableStateSharing"
-                    checked={enableStateSharing}
-                    onCheckedChange={setEnableStateSharing}
-                />
-                <Label htmlFor="enableStateSharing" className="flex items-center">
-                    Habilitar Compartilhamento de Estado
-                    <Tooltip>
-                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                        <TooltipContent className="max-w-xs"><p>Permite que este agente compartilhe seu estado (variáveis de estado definidas) com outros agentes dentro de um sistema ADK (Agent Development Kit), facilitando a colaboração e a passagem de contexto.</p></TooltipContent>
-                    </Tooltip>
-                </Label>
-              </div>
-              {enableStateSharing && (
-                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 pl-6">
-                    <Label htmlFor="stateSharingStrategy" className="flex items-center">
-                        Estratégia de Compartilhamento
-                        <Tooltip>
-                            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                                <p>Define quais partes do estado do agente são compartilhadas:</p>
-                                <ul className="list-disc pl-4 mt-1 text-xs">
-                                    <li><strong>Todos:</strong> Todas as variáveis de estado do agente são compartilhadas.</li>
-                                    <li><strong>Explícito:</strong> Apenas as variáveis de estado explicitamente marcadas para compartilhamento (não implementado nesta UI) são compartilhadas.</li>
-                                    <li><strong>Nenhum:</strong> Nenhum estado é compartilhado, mesmo que o compartilhamento esteja habilitado (útil para desabilitar temporariamente).</li>
-                                </ul>
-                            </TooltipContent>
-                        </Tooltip>
-                    </Label>
-                    <Select value={stateSharingStrategy} onValueChange={(v) => setStateSharingStrategy(v as 'all' | 'explicit' | 'none')}>
-                        <SelectTrigger id="stateSharingStrategy"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos os Estados</SelectItem>
-                            <SelectItem value="explicit">Apenas Estados Explícitos</SelectItem>
-                            <SelectItem value="none">Nenhum (Desabilitado Temporariamente)</SelectItem>
-                        </SelectContent>
+              {!showNewSourceForm && (
+                <Button onClick={() => setShowNewSourceForm(true)} variant="outline" size="sm">
+                  <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Fonte
+                </Button>
+              )}
+
+              {showNewSourceForm && (
+                <Card className="p-4 space-y-3 bg-muted/50">
+                  <h4 className="font-medium">Nova Fonte de Conhecimento</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      placeholder="Nome da Fonte (ex: Documento de Políticas)"
+                      value={newSource.name}
+                      onChange={(e) => setNewSource(prev => ({ ...prev, name: e.target.value }))}
+                    />
+                    <Select
+                      value={newSource.type}
+                      onValueChange={(value) => setNewSource(prev => ({ ...prev, type: value as KnowledgeSourceType, pathOrContent: '' }))} // Reset pathOrContent on type change
+                    >
+                      <SelectTrigger><SelectValue placeholder="Tipo de Fonte" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="document">Documento (Texto Genérico)</SelectItem>
+                        <SelectItem value="document_upload">Upload de Documento</SelectItem>
+                        <SelectItem value="website">Website (URL)</SelectItem>
+                        <SelectItem value="api">API (Endpoint)</SelectItem>
+                        <SelectItem value="database">Banco de Dados (Query)</SelectItem>
+                        <SelectItem value="custom">Customizado</SelectItem>
+                      </SelectContent>
                     </Select>
-                </div>
+                  </div>
+
+                  {newSource.type === 'document_upload' ? (
+                    <FileUploader
+                      value={uploadedFiles}
+                      onValueChange={setUploadedFiles}
+                      accept={{
+                        "application/pdf": [".pdf"],
+                        "text/plain": [".txt"],
+                        "text/markdown": [".md"],
+                      }}
+                      multiple
+                      maxFiles={5}
+                      maxSize={4 * 1024 * 1024} // 4MB
+                    />
+                  ) : (
+                    <Textarea
+                      placeholder={
+                        newSource.type === 'document' ? "Conteúdo do documento..." :
+                        newSource.type === 'website' ? "URL do website (ex: https://exemplo.com)" :
+                        newSource.type === 'api' ? "Endpoint da API (ex: https://api.exemplo.com/dados)" :
+                        newSource.type === 'database' ? "Query SQL ou string de conexão..." :
+                        "Configuração específica para tipo customizado..."
+                      }
+                      value={newSource.pathOrContent}
+                      onChange={(e) => setNewSource(prev => ({ ...prev, pathOrContent: e.target.value }))}
+                      rows={3}
+                    />
+                  )}
+
+                  <Textarea
+                    placeholder="Descrição (opcional)"
+                    value={newSource.description}
+                    onChange={(e) => setNewSource(prev => ({ ...prev, description: e.target.value }))}
+                    rows={2}
+                  />
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id={`source-enabled-${newSource.id}`}
+                      checked={newSource.enabled}
+                      onCheckedChange={(checked) => setNewSource(prev => ({ ...prev, enabled: checked }))}
+                    />
+                    <Label htmlFor={`source-enabled-${newSource.id}`}>Habilitada</Label>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setShowNewSourceForm(false);
+                      setNewSource({ id: `source-${Date.now()}`, name: '', type: 'document', pathOrContent: '', description: '', enabled: true });
+                      setUploadedFiles([]); // Clear files on cancel
+                    }}>
+                      Cancelar
+                    </Button>
+                    <Button size="sm" onClick={handleAddSource}>Adicionar Fonte</Button>
+                  </div>
+                </Card>
+              )}
+
+              {/* Listagem de Fontes de Conhecimento Adicionadas */}
+              {ragMemoryConfig.knowledgeSources && ragMemoryConfig.knowledgeSources.length > 0 ? (
+                <ScrollArea className="h-[300px] pr-4">
+                  <div className="space-y-3">
+                    {ragMemoryConfig.knowledgeSources.map(source => (
+                      <Card key={source.id} className="bg-card/80">
+                        <CardHeader className="p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getSourceIcon(source.type)}
+                              <CardTitle className="text-sm font-medium">{source.name}</CardTitle>
+                              <Badge variant={source.enabled ? "outline" : "secondary"} className="text-xs">
+                                {source.enabled ? "Habilitada" : "Desabilitada"}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Settings className="h-4 w-4" /></Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Editar Fonte: {source.name}</DialogTitle>
+                                  </DialogHeader>
+                                  {/* TODO: Adicionar formulário de edição aqui */}
+                                  <p className="text-sm text-muted-foreground">A edição detalhada de fontes será implementada.</p>
+                                  <DialogFooter>
+                                    <DialogClose asChild><Button variant="outline">Fechar</Button></DialogClose>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                              <Switch
+                                checked={source.enabled}
+                                onCheckedChange={() => toggleSourceEnabled(source.id)}
+                                className="h-5 w-9 [&>span]:h-4 [&>span]:w-4" // Tailwind classes for smaller switch
+                              />
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive/80" onClick={() => handleRemoveSource(source.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        {source.description && <CardContent className="p-3 text-xs text-muted-foreground">{source.description}</CardContent>}
+                        <CardFooter className="p-3 text-xs text-muted-foreground overflow-hidden">
+                          <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                              <TooltipTrigger className="truncate max-w-full">
+                                <strong>{source.type === 'document_upload' ? "Arquivos" : "Caminho/Conteúdo"}: </strong>
+                                <span className="font-mono text-xs">{source.pathOrContent}</span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-md break-words">
+                                <p>{source.pathOrContent}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                  <ScrollBar />
+                </ScrollArea>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma fonte de conhecimento adicionada ainda.
+                </p>
               )}
             </CardContent>
           </Card>
