@@ -2,12 +2,13 @@
 // Responsável por apresentar informações da ferramenta, permitir seleção e acesso à configuração.
 
 import * as React from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"; // MODIFIED: CardContent removed as it was unused
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AvailableTool } from "@/types/agent-types";
 import type { ToolConfigData } from "@/types/agent-configs";
+import { ArrowUpIcon, ArrowDownIcon } from "lucide-react"; // MODIFIED: Added icons
 
 // Props para o componente ToolCard.
 interface ToolCardProps {
@@ -20,6 +21,11 @@ interface ToolCardProps {
   Wand2IconComponent: React.FC<React.SVGProps<SVGSVGElement>>; // Pass Wand2 component itself
   SettingsIconComponent: React.FC<React.SVGProps<SVGSVGElement>>; // Pass Settings component itself
   CheckIconComponent: React.FC<React.SVGProps<SVGSVGElement>>; // Pass Check component itself
+  isSequentialWorkflow?: boolean; // MODIFIED: Added prop
+  onMoveToolUp?: (toolId: string) => void; // MODIFIED: Added prop
+  onMoveToolDown?: (toolId: string) => void; // MODIFIED: Added prop
+  isFirstTool?: boolean; // MODIFIED: Added prop
+  isLastTool?: boolean; // MODIFIED: Added prop
 }
 
 const ToolCard: React.FC<ToolCardProps> = ({
@@ -32,6 +38,11 @@ const ToolCard: React.FC<ToolCardProps> = ({
   Wand2IconComponent,
   SettingsIconComponent,
   CheckIconComponent,
+  isSequentialWorkflow,
+  onMoveToolUp,
+  onMoveToolDown,
+  isFirstTool,
+  isLastTool,
 }) => {
   const IconToRender = tool.icon ? (iconComponents[tool.icon as string] || Wand2IconComponent) : Wand2IconComponent;
   const hasBeenConfigured = toolConfig && Object.keys(toolConfig).length > 0;
@@ -52,7 +63,7 @@ const ToolCard: React.FC<ToolCardProps> = ({
         <IconToRender className="h-6 w-6 mb-2 text-primary" />
         <CardDescription className="text-xs">{tool.description}</CardDescription>
       </CardHeader>
-      <CardFooter>
+      <CardFooter className="flex flex-col items-stretch space-y-2">
         {tool.hasConfig ? (
           <Button
             variant="outline"
@@ -68,7 +79,29 @@ const ToolCard: React.FC<ToolCardProps> = ({
             )}
           </Button>
         ) : (
-          <p className="text-xs text-muted-foreground italic">Não requer configuração.</p>
+          <p className="text-xs text-muted-foreground italic text-center pb-2">Não requer configuração.</p>
+        )}
+        {isSequentialWorkflow && onMoveToolUp && onMoveToolDown && isSelected && (
+          <div className="flex justify-between space-x-2 pt-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onMoveToolUp(tool.id)}
+              disabled={isFirstTool}
+              aria-label="Mover para cima"
+            >
+              <ArrowUpIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onMoveToolDown(tool.id)}
+              disabled={isLastTool}
+              aria-label="Mover para baixo"
+            >
+              <ArrowDownIcon className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </CardFooter>
     </Card>
