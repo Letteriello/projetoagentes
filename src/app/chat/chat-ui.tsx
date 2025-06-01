@@ -865,6 +865,53 @@ export function ChatUI() {
     toast({ title: "Draft Discarded", description: "The proposed agent configuration has been discarded." });
   };
 
+  const handleExportChatLog = () => {
+    if (!activeConversationId) {
+      toast({ title: "Nenhuma Conversa Ativa", description: "Não há conversa ativa para exportar.", variant: "default" });
+      return;
+    }
+    if (optimisticMessages.length === 0) {
+      toast({ title: "Conversa Vazia", description: "A conversa atual não tem mensagens para exportar.", variant: "default" });
+      return;
+    }
+
+    const conversationName = activeChatTargetName || `conversation_${activeConversationId}`;
+    // Sanitize filename
+    const safeConversationName = conversationName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filename = `${safeConversationName}_log.json`;
+
+    const exportData = {
+      conversationId: activeConversationId,
+      conversationTitle: activeChatTargetName,
+      exportedAt: new Date().toISOString(),
+      userId: currentUserId,
+      messages: optimisticMessages.map(msg => ({
+        id: msg.id,
+        text: msg.text,
+        sender: msg.sender,
+        timestamp: msg.timestamp ? (msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp) : undefined,
+        status: msg.status,
+        isStreaming: msg.isStreaming,
+        feedback: msg.feedback,
+        imageUrl: msg.imageUrl,
+        fileName: msg.fileName,
+      })),
+    };
+
+    const jsonData = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Exportado", description: `Histórico da conversa salvo em ${filename}` });
+  };
+
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion);
     // Optionally auto-submit or focus input
@@ -1162,6 +1209,7 @@ export function ChatUI() {
             initialGems={initialGems}
             handleNewConversation={() => handleNewConversation()}
             isADKInitializing={isADKInitializing}
+            onExportChatLog={handleExportChatLog} // Add this new prop
           />
         </div>
         <div className="flex-1 flex flex-col relative overflow-hidden">

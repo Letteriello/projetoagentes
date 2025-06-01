@@ -12,6 +12,11 @@ import { savedAgentConfigurationSchema } from "@/lib/zod-schemas"; // Assuming t
 
 // ... other existing imports
 import * as React from "react";
+// ADD THESE IMPORTS
+// import { useForm, FormProvider, SubmitHandler, Controller } from "react-hook-form"; // Already exists
+// import { zodResolver } from "@hookform/resolvers/zod"; // Already exists
+// import { savedAgentConfigurationSchema } from "@/lib/zod-schemas"; // Already exists
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; // Ensure Input is imported for Controller use
 import { Label } from "@/components/ui/label";
@@ -176,6 +181,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   iconComponents,
   // agentTemplates, // No longer used directly, defaultValues logic handles template-like setup
 }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [activeEditTab, setActiveEditTab] = React.useState<string>("general");
   const methods = useForm<SavedAgentConfiguration>({
     resolver: zodResolver(savedAgentConfigurationSchema),
     mode: "onChange", // Or "onSubmit"
@@ -371,9 +378,104 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
   const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
   const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
+  const [modalAllowedPatterns, setModalAllowedPatterns] = React.useState<string>('');
+  const [modalDeniedPatterns, setModalDeniedPatterns] = React.useState<string>('');
+  const [modalCustomRules, setModalCustomRules] = React.useState<string>('');
 
   const { toast } = useToast();
   const { savedAgents: allSavedAgents } = useAgents(); // Used for sub-agent selector
+
+  const handleExport = () => {
+    const formData = methods.getValues();
+    // Ensure agentName is available for the filename, provide a default if not
+    const agentName = formData.agentName?.trim().replace(/[^a-zA-Z0-9]/g, '_') || 'agent_config';
+    const filename = `${agentName}.json`;
+    const jsonData = JSON.stringify(formData, null, 2);
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast({ title: "Exportado", description: `Configuração do agente salva em ${filename}` });
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      toast({ title: "Importação Cancelada", description: "Nenhum arquivo selecionado.", variant: "default" });
+      return;
+    }
+
+    if (file.type !== "application/json") {
+      toast({ title: "Erro de Importação", description: "Arquivo inválido. Por favor, selecione um arquivo JSON.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') {
+          toast({ title: "Erro de Leitura", description: "Não foi possível ler o conteúdo do arquivo.", variant: "destructive" });
+          return;
+        }
+        const parsedData = JSON.parse(text);
+        const validationResult = savedAgentConfigurationSchema.safeParse(parsedData);
+
+        if (validationResult.success) {
+          // Merge with default values to ensure all fields are present
+          const defaultNewAgentValues = methods.formState.defaultValues; // Get the default structure
+          const mergedData = {
+            ...defaultNewAgentValues,
+            ...validationResult.data,
+            id: editingAgent?.id || uuidv4(), // Keep existing ID if editing, or generate new one
+            config: {
+              ...(defaultNewAgentValues?.config),
+              ...(validationResult.data.config),
+            },
+            tools: validationResult.data.tools || [],
+            toolConfigsApplied: validationResult.data.toolConfigsApplied || {},
+            toolsDetails: validationResult.data.toolsDetails || [],
+          };
+
+          methods.reset(mergedData);
+          // If editing an existing agent, this effectively replaces its config.
+          // If creating a new agent, this populates the form with the imported data.
+          // Resetting view states:
+          if (editingAgent === null) { // Wizard mode
+            setCurrentStep(0); // Go to the first tab
+          } else { // Edit mode
+            setActiveEditTab("general"); // Go to general tab
+          }
+          toast({ title: "Importado com Sucesso", description: `Configuração do agente "${mergedData.agentName}" carregada.` });
+        } else {
+          console.error("Validation Error:", validationResult.error.flatten());
+          toast({
+            title: "Erro de Validação",
+            description: "O arquivo JSON não corresponde ao esquema esperado. Verifique o console para detalhes.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Import Error:", error);
+        toast({ title: "Erro de Importação", description: "Falha ao processar o arquivo JSON. Verifique o console.", variant: "destructive" });
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""; // Reset file input in all cases
+        }
+      }
+    };
+    reader.onerror = () => {
+      toast({ title: "Erro de Leitura", description: "Não foi possível ler o arquivo.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsText(file);
+  };
 
   const availableAgentsForSubSelector = React.useMemo(() =>
     allSavedAgents.filter(agent => agent.id !== editingAgent?.id), // Ensure editing agent is not in its own sub-agent list
@@ -390,16 +492,17 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   React.useEffect(() => {
     if (isOpen) {
-      const defaultVals = methods.getValues(); // Get current form values as a base
-      const newDefaultValues = methods.formState.defaultValues; // Get latest defaultValues based on editingAgent
-      methods.reset(newDefaultValues); // Reset with potentially new default values
-      // The local state `toolConfigurations` was removed, RHF state `toolConfigsApplied` is used directly.
+      const defaultVals = methods.getValues();
+      const newDefaultValues = methods.formState.defaultValues;
+      methods.reset(newDefaultValues);
+      setActiveEditTab("general");
     } else {
       setIsToolConfigModalOpen(false);
       setConfiguringTool(null);
-      if (editingAgent === null) { // Only reset step if it was a new agent creation (wizard)
+      if (editingAgent === null) {
         setCurrentStep(0);
       }
+      setActiveEditTab("general");
     }
   }, [isOpen, editingAgent, methods]); // methods is stable, defaultValues object from useForm is the key for re-runs if editingAgent changes
 
@@ -437,8 +540,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     setModalDbType(''); setModalDbHost(''); setModalDbPort(0); setModalDbName('');
     setModalDbUser(''); setModalDbPassword(''); setModalDbConnectionString(''); setModalDbDescription('');
     setModalKnowledgeBaseId(''); setModalCalendarApiEndpoint('');
+    setModalAllowedPatterns(''); setModalDeniedPatterns(''); setModalCustomRules('');
 
     // Populate based on existingConfig from RHF
+    setModalAllowedPatterns(existingConfig.allowedPatterns || '');
+    setModalDeniedPatterns(existingConfig.deniedPatterns || '');
+    setModalCustomRules(existingConfig.customRules || '');
     if (tool.id === "webSearch") {
       setModalGoogleApiKey(existingConfig.googleApiKey || '');
       setModalGoogleCseId(existingConfig.googleCseId || '');
@@ -540,35 +647,68 @@ return (
             <DialogDescription>
               {editingAgent ? `Modifique as configurações do agente "${editingAgent.agentName}".` : "Configure um novo agente inteligente para suas tarefas."}
             </DialogDescription>
+            <input
+              type="file"
+              accept=".json"
+              style={{ display: "none" }}
+              onChange={handleFileImport}
+              ref={fileInputRef}
+            />
+            <Button variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} className="mt-2 ml-auto"> {/* Added ml-auto to push to right */}
+              <UploadCloud className="mr-2 h-4 w-4" /> {/* Or FileInput icon */}
+              Importar Configuração
+            </Button>
           </DialogHeader>
           <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
             <Tabs
-              value={editingAgent === null ? tabOrder[currentStep] : undefined}
-              defaultValue="general"
+              value={editingAgent === null ? tabOrder[currentStep] : activeEditTab}
+              // defaultValue="general" // defaultValue might conflict with controlled value
               onValueChange={(value) => {
                 if (editingAgent === null) {
-                  // In wizard mode, tabs are controlled by Next/Previous buttons
-                  // Optionally, allow navigation by clicking tabs:
-                  // const newStep = tabOrder.indexOf(value);
-                  // if (newStep !== -1) setCurrentStep(newStep);
+                  // In wizard mode, tab navigation is controlled by currentStep and Next/Previous buttons.
+                  // Direct tab clicking is disabled by the 'disabled' prop on TabsTrigger.
                 } else {
-                  // Default behavior for editing: allow direct tab navigation
-                  // This typically doesn't need explicit handling if Tabs component updates its own state
-                  // unless we need to sync it with some external state not shown here.
+                  // Edit mode: update activeEditTab when a tab is clicked.
+                  setActiveEditTab(value);
                 }
               }}
               className="w-full"
             >
               <TabsList className="grid w-full grid-cols-9 mb-6"> {/* Adjusted for 9 tabs */}
-                <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === null}>Geral</TabsTrigger>
+                {/* Updated TabsTrigger props */}
+                {tabOrder.map((tab, index) => (
+                  <TabsTrigger
+                    key={tab}
+                    value={tab}
+                    disabled={editingAgent === null && index > currentStep && tab !== "review"} // Keep review tab accessible if others are disabled
+                    // onClick is not needed here as onValueChange on Tabs handles it.
+                    // However, if you need specific logic per trigger click beyond what onValueChange provides:
+                    // onClick={() => {
+                    //   if (editingAgent !== null) {
+                    //     setActiveEditTab(tab);
+                    //   } else {
+                    //     // Wizard mode logic if needed, though disabled prop should prevent most clicks
+                    //     if (index <= currentStep) {
+                    //       // Potentially allow jumping back in wizard?
+                    //       // setCurrentStep(index); // This would make tabs navigable in wizard
+                    //     }
+                    //   }
+                    // }}
+                    statusIcon={getTabStatusIcon(tab)}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace(/_/g, " ")} {/* Format tab name */}
+                  </TabsTrigger>
+                ))}
+                {/* Original TabsTriggers are replaced by the map above */}
+                {/* <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === null}>Geral</TabsTrigger>
                 <TabsTrigger value="behavior" statusIcon={getTabStatusIcon("behavior")} disabled={editingAgent === null}>Comportamento</TabsTrigger>
                 <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")} disabled={editingAgent === null}>Ferramentas</TabsTrigger>
                 <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")} disabled={editingAgent === null}>Memória & Conhecimento</TabsTrigger>
                 <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")} disabled={editingAgent === null}>Artefatos</TabsTrigger>
                 <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")} disabled={editingAgent === null}>Comunicação A2A</TabsTrigger>
-                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente</TabsTrigger> {/* Shortened label for space */}
+                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente</TabsTrigger>
                 <TabsTrigger value="advanced" statusIcon={getTabStatusIcon("advanced")} disabled={editingAgent === null}>Avançado</TabsTrigger>
-                <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === null}>Revisar</TabsTrigger>
+                <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === null}>Revisar</TabsTrigger> */}
               </TabsList>
 
               {/* General Tab */}
@@ -761,7 +901,7 @@ return (
 
               {/* Review Tab */}
               <TabsContent value="review">
-                <ReviewTab />
+                <ReviewTab setActiveEditTab={setActiveEditTab} />
               </TabsContent>
 
               {/* Advanced Tab (ADK Callbacks) */}
@@ -850,6 +990,10 @@ return (
             ) : (
               // Editing existing agent
               <>
+                <Button variant="outline" type="button" onClick={handleExport} className="mr-auto"> {/* Added mr-auto to push to left */}
+                  <Share2 className="mr-2 h-4 w-4" /> {/* Or DownloadCloud icon */}
+                  Exportar Configuração
+                </Button>
                 <DialogClose asChild>
                   <Button variant="outline" type="button">Cancelar</Button>
                 </DialogClose>
@@ -890,6 +1034,9 @@ return (
         modalDbDescription={modalDbDescription} setModalDbDescription={setModalDbDescription}
         modalKnowledgeBaseId={modalKnowledgeBaseId} setModalKnowledgeBaseId={setModalKnowledgeBaseId}
         modalCalendarApiEndpoint={modalCalendarApiEndpoint} setModalCalendarApiEndpoint={setModalCalendarApiEndpoint}
+        modalAllowedPatterns={modalAllowedPatterns} setModalAllowedPatterns={setModalAllowedPatterns}
+        modalDeniedPatterns={modalDeniedPatterns} setModalDeniedPatterns={setModalDeniedPatterns}
+        modalCustomRules={modalCustomRules} setModalCustomRules={setModalCustomRules}
         InfoIcon={Info}
       />
     </Dialog>

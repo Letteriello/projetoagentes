@@ -41,7 +41,10 @@ interface ToolConfigModalProps {
   modalKnowledgeBaseId: string; setModalKnowledgeBaseId: (value: string) => void;
   modalCalendarApiEndpoint: string; setModalCalendarApiEndpoint: (value: string) => void;
 
-  InfoIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Pass Info icon component
+  modalAllowedPatterns: string; setModalAllowedPatterns: (value: string) => void;
+  modalDeniedPatterns: string; setModalDeniedPatterns: (value: string) => void;
+  modalCustomRules: string; setModalCustomRules: (value: string) => void;
+  InfoIcon: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
 // Define a mapping for tool-specific configuration keys
@@ -81,6 +84,9 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   modalDbDescription, setModalDbDescription,
   modalKnowledgeBaseId, setModalKnowledgeBaseId,
   modalCalendarApiEndpoint, setModalCalendarApiEndpoint,
+  modalAllowedPatterns, setModalAllowedPatterns,
+  modalDeniedPatterns, setModalDeniedPatterns,
+  modalCustomRules, setModalCustomRules,
   InfoIcon,
 }) => {
   const handleInternalSave = () => {
@@ -119,6 +125,13 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
         // Handle other tools or throw an error if unexpected toolId
         console.warn(`Unknown toolId for configuration: ${toolId}`);
         break;
+    }
+
+    // Add guardrail data for relevant tools
+    if (configuringTool && ["databaseConnector", "openapiTool", "codeExecutor"].includes(configuringTool.id)) {
+      configData.allowedPatterns = modalAllowedPatterns;
+      configData.deniedPatterns = modalDeniedPatterns;
+      configData.customRules = modalCustomRules;
     }
 
     onSave(toolId, configData as ToolConfigData); // Call the parent's onSave with all data
@@ -261,6 +274,33 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
             <Input id="modalCalendarApiEndpoint" value={modalCalendarApiEndpoint} onChange={(e) => setModalCalendarApiEndpoint(e.target.value)} placeholder="ex: https://api.example.com/calendar ou meuFluxoGenkitCalendario"/>
             <p className="text-xs text-muted-foreground">URL do endpoint da API de calendário ou o identificador de um fluxo Genkit que encapsula o acesso à agenda.</p>
           </div>
+        )}
+
+        {/* Guardrail UI fields */}
+        {configuringTool && ["databaseConnector", "openapiTool", "codeExecutor"].includes(configuringTool.id) && (
+          <>
+            <div className="mt-4 pt-4 border-t">
+              <Label className="text-base font-semibold">Configurações de Guardrails</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Defina regras para restringir a operação da ferramenta. Estas são representações conceituais e sua aplicação depende da implementação da ferramenta.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="modalAllowedPatterns">Padrões Permitidos (Ex: Regex)</Label>
+                <Textarea id="modalAllowedPatterns" value={modalAllowedPatterns} onChange={(e) => setModalAllowedPatterns(e.target.value)} placeholder="Ex: ^/api/v1/users/.* (para APIs) ou ^SELECT .* FROM customers (para SQL)" rows={2}/>
+                <p className="text-xs text-muted-foreground">Opcional. Expressão regular ou padrão para saídas/requests permitidos.</p>
+              </div>
+              <div className="space-y-2 mt-2">
+                <Label htmlFor="modalDeniedPatterns">Padrões Negados (Ex: Regex)</Label>
+                <Textarea id="modalDeniedPatterns" value={modalDeniedPatterns} onChange={(e) => setModalDeniedPatterns(e.target.value)} placeholder="Ex: DELETE.* (para SQL) ou /admin.* (para APIs)" rows={2}/>
+                <p className="text-xs text-muted-foreground">Opcional. Expressão regular ou padrão para saídas/requests negados. Geralmente prevalece sobre os permitidos.</p>
+              </div>
+              <div className="space-y-2 mt-2">
+                <Label htmlFor="modalCustomRules">Regras Adicionais (Texto/JSON)</Label>
+                <Textarea id="modalCustomRules" value={modalCustomRules} onChange={(e) => setModalCustomRules(e.target.value)} placeholder="Ex: { "max_rows": 100 } ou 'PROHIBIT_FILE_WRITE'" rows={2}/>
+                <p className="text-xs text-muted-foreground">Opcional. Regras específicas em texto ou JSON, dependendo da capacidade da ferramenta.</p>
+              </div>
+            </div>
+          </>
         )}
         </div>
         <DialogFooter>
