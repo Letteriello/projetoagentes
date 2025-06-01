@@ -1,7 +1,8 @@
 // src/app/api/agents/route.ts
 import { NextResponse } from 'next/server';
-import { firestoreAdmin } from '@/lib/firebaseAdmin';
+import { firestore } from '@/lib/firebaseAdmin';
 import { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs'; // Usar os tipos unificados
+import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 const PLACEHOLDER_USER_ID = "defaultUser"; // Substituir por autenticação real
 
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await firestoreAdmin.collection('agents').add(newAgent);
+    const docRef = await firestore.collection('agents').add(newAgent);
     const savedAgent = { ...newAgent, id: docRef.id };
 
     return NextResponse.json(savedAgent, { status: 201 });
@@ -34,14 +35,14 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     // TODO: Implementar filtro por usuário quando a autenticação estiver pronta
-    const snapshot = await firestoreAdmin.collection('agents')
+    const snapshot = await firestore.collection('agents')
                                      .where('userId', '==', PLACEHOLDER_USER_ID) // Filtrar por userId
                                      .orderBy('updatedAt', 'desc')
                                      .get();
     if (snapshot.empty) {
       return NextResponse.json([], { status: 200 });
     }
-    const agents: SavedAgentConfiguration[] = snapshot.docs.map(doc => {
+    const agents: SavedAgentConfiguration[] = snapshot.docs.map((doc: QueryDocumentSnapshot) => {
       const data = doc.data();
       return {
         id: doc.id,

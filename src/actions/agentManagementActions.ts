@@ -56,7 +56,7 @@ export async function saveAgentConfigurationAction(
   //   - Client then calls this server action to synchronize the configuration with a server backend.
 
   // Simulated Save Logic:
-  if (!agentConfig.name) {
+  if (!agentConfig.agentName) {
     return { success: false, message: "Agent name is required.", error: "Validation failed: Agent name missing." };
   }
 
@@ -66,7 +66,7 @@ export async function saveAgentConfigurationAction(
 
   return {
     success: true,
-    message: `Agent configuration for '${agentConfig.name}' received and processed (simulated save).`,
+    message: `Agent configuration for '${agentConfig.agentName}' received and processed (simulated save).`,
     agentId: agentId,
   };
 }

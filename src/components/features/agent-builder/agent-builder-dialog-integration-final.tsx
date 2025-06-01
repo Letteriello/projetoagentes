@@ -52,8 +52,8 @@ import { cn } from "@/lib/utils";
 
 // Importe o componente ToolsTab para a integração
 import { ToolsTab } from "./tools-tab";
-import { allTools } from "@/app/agent-builder/available-tools";
-import { AvailableTool } from "@/types/tool-types";
+import { standardTools as allTools } from "@/data/agent-builder/available-tools";
+import type { AvailableTool } from "@/types/tool-types";
 import type { ToolConfigData } from "@/types/agent-configs"; // Import the new type
 
 /**

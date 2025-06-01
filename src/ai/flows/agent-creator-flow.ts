@@ -1,7 +1,6 @@
 // src/ai/flows/agent-creator-flow.ts
-import { defineFlow, runFlow } from '@genkit-ai/flow';
-import { generate } from '@genkit-ai/ai';
-import { geminiPro } from '@genkit-ai/googleai';
+import { ai } from '@/ai/genkit';
+import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
 import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/agent-configs';
 
@@ -35,19 +34,19 @@ function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<Sav
         config.config.framework = config.config.framework || 'genkit';
     }
     // Ensure type-specific fields are initialized if the type is set
-    if (config.config.type === 'llm' && typeof (config.config as LLMAgentConfig).agentGoal === 'undefined') {
+    if (config.config?.type === 'llm' && typeof (config.config as LLMAgentConfig).agentGoal === 'undefined') {
         const llmConfig = config.config as Partial<LLMAgentConfig>;
         llmConfig.agentGoal = "";
         llmConfig.agentTasks = [];
         llmConfig.agentPersonality = "";
         llmConfig.agentRestrictions = [];
-        llmConfig.agentModel = "geminiPro"; // Default model
+        llmConfig.agentModel = "gemini10Pro"; // Default model
         llmConfig.agentTemperature = 0.7;
-    } else if (config.config.type === 'workflow' && typeof (config.config as WorkflowAgentConfig).workflowDescription === 'undefined') {
+    } else if (config.config?.type === 'workflow' && typeof (config.config as WorkflowAgentConfig).workflowDescription === 'undefined') {
         const workflowConfig = config.config as Partial<WorkflowAgentConfig>;
         workflowConfig.detailedWorkflowType = "sequential";
         workflowConfig.workflowDescription = "";
-    } else if (config.config.type === 'custom' && typeof (config.config as CustomAgentConfig).customLogicDescription === 'undefined') {
+    } else if (config.config?.type === 'custom' && typeof (config.config as CustomAgentConfig).customLogicDescription === 'undefined') {
         (config.config as Partial<CustomAgentConfig>).customLogicDescription = "";
     }
     // A2A has no specific fields beyond base by default in this structure
@@ -55,13 +54,8 @@ function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<Sav
 }
 
 
-export const agentCreatorChatFlow = defineFlow(
-  {
-    name: 'agentCreatorChatFlow',
-    inputSchema: AgentCreatorChatInputSchema,
-    outputSchema: AgentCreatorChatOutputSchema,
-  },
-  async (input) => {
+// Define the flow function that takes the input and processes it
+export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async (input: z.infer<typeof AgentCreatorChatInputSchema>) => {
     console.log("[agentCreatorChatFlow] Input received:", JSON.stringify(input, null, 2));
 
     let currentConfig: Partial<SavedAgentConfiguration> = {};
@@ -77,7 +71,7 @@ export const agentCreatorChatFlow = defineFlow(
     }
     currentConfig = ensureBaseConfig(currentConfig);
 
-    const historyForPrompt = input.chatHistory?.map(m => `${m.role}: ${m.content}`).join('\n') || 'Nenhuma conversa anterior nesta sessão de criação.';
+    const historyForPrompt = input.chatHistory?.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n') || 'Nenhuma conversa anterior nesta sessão de criação.';
 
     const systemPrompt = `
       Você é um assistente especialista em configurar agentes de IA. Sua tarefa é ajudar um usuário a construir a configuração de um agente passo a passo, interpretando as instruções em linguagem natural e atualizando um objeto JSON que representa a configuração do agente.
@@ -140,20 +134,24 @@ export const agentCreatorChatFlow = defineFlow(
     `;
 
     try {
-      const llmResponse = await generate({
-        model: geminiPro,
-        prompt: systemPrompt,
-        config: { temperature: 0.2 }, // Baixa temperatura para mais determinismo
-        output: {
-            format: "json",
-            schema: z.object({
-                updatedConfig: z.any().transform(val => ensureBaseConfig(val as Partial<SavedAgentConfiguration>)),
-                assistantMessage: z.string(),
-            })
-        }
-      });
+      // Make the generation request with JSON schema validation
+      const { text } = await ai.generate(systemPrompt);
+      
+      // Parse the JSON response
+      let responseValue;
+      try {
+        responseValue = JSON.parse(text);
+        // Validate and transform the response
+        const { updatedConfig, assistantMessage } = responseValue;
+        responseValue = {
+          updatedConfig: ensureBaseConfig(updatedConfig as Partial<SavedAgentConfiguration>),
+          assistantMessage: assistantMessage
+        };
+      } catch (e) {
+        console.error("Error parsing JSON response:", e);
+        throw new Error("Failed to parse LLM response as JSON");
+      }
 
-      const responseValue = llmResponse.output();
       if (!responseValue) {
         throw new Error("LLM não retornou dados válidos (output nulo).");
       }
@@ -194,5 +192,4 @@ export const agentCreatorChatFlow = defineFlow(
         error: e.message,
       };
     }
-  }
-);
+});

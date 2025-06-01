@@ -187,6 +187,7 @@ import {
 } from "@/data/agentBuilderConfig";
 import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui"; // Nova UI
 import { MessageSquareText, Edit3 } from "lucide-react"; // Ícones para alternar
+import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -213,6 +214,14 @@ export default function AgentBuilderPage() {
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
     setEditingAgent(agentToEdit);
     setIsBuilderModalOpen(true);
+  };
+
+  const handleEditAgentWithMode = (agentToEdit: SavedAgentConfiguration, mode: "form" | "chat") => {
+    setEditingAgent(agentToEdit);
+    setBuildMode(mode);
+    if (mode === 'form') {
+      setIsBuilderModalOpen(true);
+    }
   };
 
   // Updated to use context functions that call the API
@@ -314,7 +323,7 @@ export default function AgentBuilderPage() {
                   <AgentCard
                     key={agent.id}
                     agent={agent}
-                    onEdit={() => handleEditAgentWithMode(agent, "form")} // Use new handler
+                    onEdit={() => handleEditAgent(agent)} // Use the edit handler
                     onTest={() =>
                       toast({
                         title: "Em breve!",
@@ -383,177 +392,4 @@ export default function AgentBuilderPage() {
 // const getAgentTemplates = (): any[] => {
 //  return []; // Replace with actual logic
 // }
-// Em src/app/agent-builder/page.tsx
-// ...
-export default function AgentBuilderPage() {
-  const { toast } = useToast();
-  const { savedAgents, addAgent: addAgentViaContext, updateAgent: updateAgentViaContext, deleteAgent: deleteAgentViaContext, isLoadingAgents } = useAgents();
 
-  const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
-  const [editingAgent, setEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
-  const [isMounted, setIsMounted] = React.useState(false);
-  const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form");
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const handleOpenCreateAgentModal = () => {
-    setEditingAgent(null);
-    // setBuildMode("form"); // Explicitly set to form mode if this button is form-specific
-    setIsBuilderModalOpen(true);
-  };
-
-  // Combined handler for editing
-  const handleEditAgentWithMode = (agentToEdit: SavedAgentConfiguration, mode: "form" | "chat") => {
-    setEditingAgent(agentToEdit);
-    setBuildMode(mode);
-    if (mode === "form") {
-        setIsBuilderModalOpen(true);
-    } else {
-        setIsBuilderModalOpen(false); // Ensure form dialog is closed if switching to chat to edit
-    }
-  };
-
-  const handleSaveAgent = async (agentConfig: SavedAgentConfiguration) => {
-    let result: SavedAgentConfiguration | null = null;
-    const isUpdating = !!(agentConfig.id && editingAgent && agentConfig.id === editingAgent.id);
-
-    if (isUpdating) {
-      const { id, userId, createdAt, updatedAt, ...updatePayload } = agentConfig;
-      result = await updateAgentViaContext(agentConfig.id!, updatePayload as Partial<SavedAgentConfiguration>);
-      if (result) {
-        toast({ title: "Agente Atualizado!", description: `O agente "${result.agentName}" foi atualizado.` });
-      }
-    } else {
-      const { id, createdAt, updatedAt, userId, ...newAgentData } = agentConfig;
-      // Ensure a new ID is generated if not present (though currentAgentConfig.id || uuidv4() in chat UI should handle it)
-      const dataForCreation = { ...newAgentData, id: id || uuidv4() } as Omit<SavedAgentConfiguration, 'createdAt' | 'updatedAt' | 'userId'>;
-      result = await addAgentViaContext(dataForCreation);
-      if (result) {
-        toast({ title: "Agente Criado!", description: `O agente "${result.agentName}" foi adicionado.` });
-      }
-    }
-    if (result) {
-        setEditingAgent(null);
-        setIsBuilderModalOpen(false); // Close form dialog if it was open
-        // Optionally, if saving from chat mode, you might want to update the `editingAgent` state
-        // if a new agent was created, so the chat now edits this newly created agent.
-        // if (buildMode === 'chat' && !isUpdating && result) {
-        //   setEditingAgent(result);
-        // }
-    }
-  };
-
-  const handleDeleteAgent = async (agentIdToDelete: string) => {
-    const success = await deleteAgentViaContext(agentIdToDelete);
-    if (success) {
-      toast({ title: "Agente Excluído", description: "O agente foi removido." });
-      if(editingAgent && editingAgent.id === agentIdToDelete){
-        setEditingAgent(null); // Clear editing state if the deleted agent was being edited
-      }
-    }
-  };
-
-  return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Cpu className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl md:text-3xl font-bold">Construtor de Agentes</h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant={buildMode === 'chat' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-                setBuildMode('chat');
-                // If not editing an agent, or want to start fresh in chat, set editingAgent to null
-                // If an agent is being edited via form, and user switches to chat,
-                // editingAgent will be passed to AgentCreatorChatUI.
-                // setEditingAgent(null); // Uncomment to always start new in chat mode
-                setIsBuilderModalOpen(false);
-            }}
-            title="Construir com Chat IA"
-            className="shadow-sm"
-          >
-            <MessageSquareText className="mr-2 h-4 w-4" /> Conversar com IA
-          </Button>
-          <Button
-            variant={buildMode === 'form' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-                setBuildMode('form');
-                // If editingAgent is set, it will be passed to AgentBuilderDialog
-                // If not, AgentBuilderDialog will start fresh if opened by "Novo Agente (Formulário)"
-                 if (editingAgent) setIsBuilderModalOpen(true); else setIsBuilderModalOpen(false);
-            }}
-            title="Editor Avançado (Formulário)"
-            className="shadow-sm"
-          >
-            <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
-          </Button>
-        </div>
-      </header>
-
-      {buildMode === 'chat' ? (
-        <AgentCreatorChatUI initialAgentConfig={editingAgent} />
-      ) : (
-        <>
-          <div className="flex items-center justify-end mt-4">
-             <Button onClick={handleOpenCreateAgentModal} className={cn("button-live-glow", isMounted && "opacity-100")}>
-               <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
-             </Button>
-          </div>
-          {isLoadingAgents && <p className="text-center py-4">Carregando agentes...</p>}
-          {!isLoadingAgents && savedAgents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {savedAgents.map((agent) => (
-                <AgentCard
-                  key={agent.id}
-                  agent={agent}
-                  onEdit={() => handleEditAgentWithMode(agent, "form")} // Default to form edit
-                  onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
-                  onDelete={() => handleDeleteAgent(agent.id)}
-                  availableTools={availableTools}
-                  agentTypeOptions={agentTypeOptions}
-                />
-              ))}
-            </div>
-          ) : (
-           !isLoadingAgents && (
-            <div className="text-center py-12 border-2 border-dashed border-border rounded-lg bg-card">
-              <Layers className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-medium text-foreground">
-                Nenhum agente criado ainda
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Use o botão "Novo Agente (Formulário)" acima ou alterne para "Conversar com IA" para criar seu primeiro agente.
-              </p>
-            </div>
-           )
-          )}
-        </>
-      )}
-
-      {buildMode === 'form' && (
-        <AgentBuilderDialog
-          isOpen={isBuilderModalOpen}
-          onOpenChange={(isOpen) => {
-            setIsBuilderModalOpen(isOpen);
-            if (!isOpen) {
-              setEditingAgent(null);
-            }
-          }}
-          editingAgent={editingAgent}
-          onSave={handleSaveAgent}
-          availableTools={availableTools}
-          agentTypeOptions={agentTypeOptions}
-          agentToneOptions={agentToneOptions}
-          iconComponents={iconComponents}
-          agentTemplates={agentTemplates}
-        />
-      )}
-    </div>
-  );
-}

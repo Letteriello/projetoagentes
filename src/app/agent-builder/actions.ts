@@ -3,7 +3,7 @@
 
 import { agentCreatorChatFlow } from "@/ai/flows/agent-creator-flow";
 import { SavedAgentConfiguration } from "@/types/agent-configs";
-import { runFlow } from "@genkit-ai/flow/lib/run"; // Corrigir import se necessário
+// Removed incorrect import for runFlow as we'll use the flow directly
 
 interface CreatorChatActionInput {
   userNaturalLanguageInput: string;
@@ -21,7 +21,8 @@ export async function invokeAgentCreatorChatFlow(
   input: CreatorChatActionInput
 ): Promise<CreatorChatActionResult> {
   try {
-    const flowResult = await runFlow(agentCreatorChatFlow, {
+    // Invoke the flow directly without using runFlow
+    const flowResult = await agentCreatorChatFlow({
       userNaturalLanguageInput: input.userNaturalLanguageInput,
       currentAgentConfigJson: input.currentAgentConfigJson,
       chatHistory: input.chatHistory,

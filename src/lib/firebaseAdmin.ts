@@ -1,20 +1,41 @@
-// src/lib/firebaseAdmin.ts
+/**
+ * @fileOverview Firebase Admin SDK initialization and export
+ * This file initializes the Firebase Admin SDK for server-side operations
+ * such as authentication verification, Firestore admin access, and other
+ * privileged operations that require admin credentials.
+ */
+
 import * as admin from 'firebase-admin';
 
+// Initialize Firebase Admin SDK if it hasn't been initialized yet
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // Replace escaped newlines in the private key with actual newlines
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       }),
-      // databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com` // Se usar Realtime Database
+      // Uncomment if using Realtime Database
+      // databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
     });
-  } catch (error) {
-    console.error('Firebase admin initialization error', error);
+    console.log('Firebase Admin SDK initialized successfully');
+  } catch (error: any) {
+    console.error('Firebase Admin SDK initialization error:', error?.message || error);
+    // Throw error in development to make issues more visible
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error(`Failed to initialize Firebase Admin: ${error?.message || 'Unknown error'}`);
+    }
   }
 }
 
-export const firestoreAdmin = admin.firestore();
+// Export the admin instance for use in other files
 export default admin;
+
+// Export commonly used services for convenience
+export const auth = admin.auth();
+export const firestore = admin.firestore();
+// Uncomment if using other Firebase services
+// export const storage = admin.storage();
+// export const messaging = admin.messaging();

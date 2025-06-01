@@ -73,6 +73,7 @@ import {
   ToolConfigData,
   LLMAgentConfig,
   WorkflowAgentConfig,
+  WorkflowDetailedType,
   CustomAgentConfig,
   AvailableTool, // Added AvailableTool
   TerminationConditionType, // Added TerminationConditionType
@@ -155,7 +156,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [agentTemperature, setAgentTemperature] = React.useState<number>(0.7); // Temperatura para controlar a criatividade do LLM.
 
   // --- Estados para Comportamento e Prompting (Específico para Workflow) ---
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<string>("sequential"); // Tipo detalhado de workflow (sequencial, grafo, máquina de estados).
+  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<WorkflowDetailedType>("sequential"); // Tipo detalhado de workflow (sequencial, grafo, máquina de estados).
   const [workflowDescription, setWorkflowDescription] = React.useState<string>(""); // Descrição do workflow.
   const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(undefined); // Número máximo de iterações para workflows com loops.
 
@@ -343,8 +344,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
         // Configurações de RAG.
         setEnableRAG(agentConfig.rag?.enabled || false);
-        // Uses initialRagMemoryConfig defined at the top of the component
-        setRagMemoryConfig(agentConfig.rag?.config ? {...initialRagMemoryConfig, ...agentConfig.rag.config} : initialRagMemoryConfig);
+        // Usa initialRagMemoryConfig definido no topo do componente
+        setRagMemoryConfig(agentConfig.rag ? {...initialRagMemoryConfig, ...agentConfig.rag} : initialRagMemoryConfig);
 
         // Configurações de Artefatos.
         setEnableArtifacts(agentConfig.artifacts?.enabled || false);
@@ -362,10 +363,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         setArtifacts(agentConfig.artifacts?.definitions || []);
 
         // Configurações A2A.
-        // Uses initialA2AConfig (now typed with imported A2AConfig)
+        // Usa initialA2AConfig (agora tipado com A2AConfig importado)
         setA2aConfig(agentConfig.a2a ? {
-            ...initialA2AConfig, // Start with defaults to ensure all keys are present
-            ...agentConfig.a2a, // Override with saved data
+            ...initialA2AConfig, // Começa com valores padrão para garantir todas as chaves estejam presentes
+            ...agentConfig.a2a, // Sobrescreve com dados salvos
             maxMessageSize: agentConfig.a2a.maxMessageSize ?? initialA2AConfig.maxMessageSize,
             defaultResponseFormat: agentConfig.a2a.defaultResponseFormat || initialA2AConfig.defaultResponseFormat,
             communicationChannels: Array.isArray(agentConfig.a2a.communicationChannels)
@@ -375,25 +376,25 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
       } else {
         // Reseta todos os campos para valores padrão ao criar um novo agente.
-        // agentName, agentDescription, agentVersion are reset using their setters
-        setAgentName(""); setAgentDescription(""); setAgentVersion("1.0.0"); // Standard defaults
-        setSelectedAgentType("llm"); setAgentFramework("genkit"); // Standard defaults
-        setIsRootAgent(true); setSubAgentIds([]); // Standard defaults
-        setGlobalInstruction(""); setSystemPromptGenerated(""); // Standard defaults
-        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]); // Standard LLM defaults
-        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7); // Standard LLM defaults
+        // agentName, agentDescription, agentVersion são resetados usando seus setters
+        setAgentName(""); setAgentDescription(""); setAgentVersion("1.0.0"); // Padrões
+        setSelectedAgentType("llm"); setAgentFramework("genkit"); // Padrões
+        setIsRootAgent(true); setSubAgentIds([]); // Padrões
+        setGlobalInstruction(""); setSystemPromptGenerated(""); // Padrões
+        setAgentGoal(""); setAgentTasks([]); setAgentPersonality(agentToneOptions[0]?.id || ""); setAgentRestrictions([]); // Padrões LLM
+        setAgentModel("gemini-1.5-flash"); setAgentTemperature(0.7); // Padrões LLM
 
-        setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined); // Standard Workflow defaults
-        setLoopTerminationConditionType("none"); setLoopExitToolName(undefined); // Standard Workflow defaults
-        setLoopExitStateKey(undefined); setLoopExitStateValue(undefined); // Standard Workflow defaults
+        setDetailedWorkflowType("sequential"); setWorkflowDescription(""); setLoopMaxIterations(undefined); // Padrões Workflow
+        setLoopTerminationConditionType("none"); setLoopExitToolName(undefined); // Padrões Workflow
+        setLoopExitStateKey(undefined); setLoopExitStateValue(undefined); // Padrões Workflow
 
-        setCustomLogicDescription(""); // Standard Custom default
-        setSelectedTools([]); setToolConfigurations({}); // Standard Tool defaults
-        setEnableStatePersistence(false); setStatePersistenceType("session"); setInitialStateValues([]); // Standard State Persistence defaults
-        setEnableRAG(false); // Standard RAG default
-        setRagMemoryConfig(initialRagMemoryConfig); // Resets to initialRagMemoryConfig
-        setEnableArtifacts(false); setArtifactStorageType('memory'); setCloudStorageBucket(""); setLocalStoragePath("./artifacts"); setArtifacts([]); // Standard Artifact defaults, storage type is 'memory'
-        setA2aConfig(initialA2AConfig); // Resets to initialA2AConfig
+        setCustomLogicDescription(""); // Padrão Custom
+        setSelectedTools([]); setToolConfigurations({}); // Padrões Ferramenta
+        setEnableStatePersistence(false); setStatePersistenceType("session"); setInitialStateValues([]); // Padrões Persistência de Estado
+        setEnableRAG(false); // Padrão RAG
+        setRagMemoryConfig(initialRagMemoryConfig); // Reseta para initialRagMemoryConfig
+        setEnableArtifacts(false); setArtifactStorageType('memory'); setCloudStorageBucket(""); setLocalStoragePath("./artifacts"); setArtifacts([]); // Padrões Artefato, tipo de armazenamento é 'memory'
+        setA2aConfig(initialA2AConfig); // Reseta para initialA2AConfig
       }
     }
     // Limpa o estado do modal de configuração de ferramenta se o diálogo principal for fechado.
@@ -477,7 +478,7 @@ const handleSaveAgent = () => {
           type: statePersistenceType,
           initialStateValues: initialStateValues // Changed from initialState
         },
-        rag: { enabled: enableRAG, config: ragMemoryConfig },
+        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
         artifacts: {
           enabled: enableArtifacts,
           storageType: artifactStorageType,
@@ -506,7 +507,7 @@ const handleSaveAgent = () => {
           type: statePersistenceType,
           initialStateValues: initialStateValues // Changed from initialState
         },
-        rag: { enabled: enableRAG, config: ragMemoryConfig },
+        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
         artifacts: {
           enabled: enableArtifacts,
           storageType: artifactStorageType,
@@ -515,7 +516,7 @@ const handleSaveAgent = () => {
           definitions: artifacts
         },
         a2a: a2aConfig,
-        detailedWorkflowType: detailedWorkflowType as ('sequential' | 'graph' | 'stateMachine' | undefined),
+        detailedWorkflowType: detailedWorkflowType ?? 'sequential',
         workflowDescription,
         loopMaxIterations,
         loopTerminationConditionType,
@@ -535,7 +536,7 @@ const handleSaveAgent = () => {
           type: statePersistenceType,
           initialStateValues: initialStateValues // Changed from initialState
         },
-        rag: { enabled: enableRAG, config: ragMemoryConfig },
+        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
         artifacts: {
           enabled: enableArtifacts,
           storageType: artifactStorageType,
@@ -558,7 +559,7 @@ const handleSaveAgent = () => {
           type: statePersistenceType,
           initialStateValues: initialStateValues // Changed from initialState
         },
-        rag: { enabled: enableRAG, config: ragMemoryConfig },
+        rag: enableRAG ? { ...ragMemoryConfig, enabled: enableRAG } : undefined,
         artifacts: {
           enabled: enableArtifacts,
           storageType: artifactStorageType,

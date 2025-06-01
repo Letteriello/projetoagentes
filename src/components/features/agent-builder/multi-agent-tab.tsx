@@ -23,7 +23,7 @@ interface MultiAgentTabProps {
   setSubAgents: (value: string[]) => void;
   globalInstruction: string;
   setGlobalInstruction: (value: string) => void;
-  savedAgents: Array<{ id: string; agentName: string; [key: string]: any }>;
+  savedAgents: Pick<SavedAgentConfiguration, 'id' | 'agentName'>[];
 }
 export function MultiAgentTab({
   isRootAgent,

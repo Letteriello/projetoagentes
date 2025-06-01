@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useState } from "react";
-import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
-import { allTools } from "./available-tools"; // Assuming this exports AvailableTool[]
+import ToolsTab from "@/components/features/agent-builder/ToolsTab";
+import { availableTools as allTools } from "@/data/available-tools";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AvailableTool, ToolConfigData } from "@/types/agent-configs"; // Import AvailableTool and ToolConfigData
