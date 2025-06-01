@@ -13,7 +13,7 @@ import { savedAgentConfigurationSchema } from "@/lib/zod-schemas"; // Assuming t
 // ... other existing imports
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input"; // No longer directly used here, but in child tabs
+import { Input } from "@/components/ui/input"; // Ensure Input is imported for Controller use
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -115,6 +115,7 @@ import RagTab from "./RagTab";
 import ArtifactsTab from "./ArtifactsTab";
 import MultiAgentTab from "./MultiAgentTab"; // Import the new MultiAgentTab component
 import ReviewTab from "./ReviewTab"; // Import the new ReviewTab component
+import { A2AConfig as A2AConfigComponent } from "./a2a-config"; // Import A2AConfig component
 
 // Removed redundant local type definitions for TerminationConditionType and A2AConfigType
 
@@ -139,9 +140,17 @@ const tabSchemaMapping = {
   a2a: ["config.a2a.enabled", "config.a2a.communicationChannels"],
   multi_agent_advanced: ["config.isRootAgent", "config.subAgentIds", "config.globalInstruction"],
   behavior: ["config.agentPersonality", "config.agentRestrictions"], // Added behavior tab fields
+  advanced: [ // Added schema paths for ADK Callbacks
+    "config.adkCallbacks.beforeAgent",
+    "config.adkCallbacks.afterAgent",
+    "config.adkCallbacks.beforeModel",
+    "config.adkCallbacks.afterModel",
+    "config.adkCallbacks.beforeTool",
+    "config.adkCallbacks.afterTool",
+  ],
 };
 
-const tabOrder = ["general", "behavior", "tools", "memory_knowledge", "artifacts", "a2a", "multi_agent_advanced", "review"];
+const tabOrder = ["general", "behavior", "tools", "memory_knowledge", "artifacts", "a2a", "multi_agent_advanced", "advanced", "review"];
 
 
 interface AgentBuilderDialogProps {
@@ -178,6 +187,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         const rag = config.rag || { enabled: false, serviceType: "in-memory", knowledgeSources: [] };
         const artifacts = config.artifacts || { enabled: false, storageType: "memory", definitions: [] };
         const a2a = config.a2a || { enabled: false, communicationChannels: [], defaultResponseFormat: "text", maxMessageSize: 1024*1024, loggingEnabled: false };
+        const adkCallbacks = config.adkCallbacks || { beforeAgent: "", afterAgent: "", beforeModel: "", afterModel: "", beforeTool: "", afterTool: "" };
 
         let specificConfigPart = {};
         if (config.type === "llm") {
@@ -260,6 +270,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
               securityPolicy: a2a.securityPolicy,
               apiKeyHeaderName: a2a.apiKeyHeaderName,
             },
+            adkCallbacks: {
+              beforeAgent: adkCallbacks.beforeAgent || "",
+              afterAgent: adkCallbacks.afterAgent || "",
+              beforeModel: adkCallbacks.beforeModel || "",
+              afterModel: adkCallbacks.afterModel || "",
+              beforeTool: adkCallbacks.beforeTool || "",
+              afterTool: adkCallbacks.afterTool || "",
+            },
             ...specificConfigPart, // Spread the type-specific config parts
           },
           tools: editingAgent.tools || [],
@@ -290,6 +308,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           rag: { enabled: false, serviceType: "in-memory", knowledgeSources: [], persistentMemory: {enabled: false} },
           artifacts: { enabled: false, storageType: "memory", definitions: [] },
           a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: "text", maxMessageSize: 1024*1024, loggingEnabled: false },
+          adkCallbacks: { // Add default empty ADK callbacks
+            beforeAgent: "",
+            afterAgent: "",
+            beforeModel: "",
+            afterModel: "",
+            beforeTool: "",
+            afterTool: "",
+          },
           // LLM specific defaults
           agentGoal: "",
           agentTasks: [],
@@ -533,14 +559,15 @@ return (
               }}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-8 mb-6"> {/* Adjusted for 8 tabs */}
+              <TabsList className="grid w-full grid-cols-9 mb-6"> {/* Adjusted for 9 tabs */}
                 <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === null}>Geral</TabsTrigger>
                 <TabsTrigger value="behavior" statusIcon={getTabStatusIcon("behavior")} disabled={editingAgent === null}>Comportamento</TabsTrigger>
                 <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")} disabled={editingAgent === null}>Ferramentas</TabsTrigger>
                 <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")} disabled={editingAgent === null}>Memória & Conhecimento</TabsTrigger>
                 <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")} disabled={editingAgent === null}>Artefatos</TabsTrigger>
                 <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")} disabled={editingAgent === null}>Comunicação A2A</TabsTrigger>
-                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente & Avançado</TabsTrigger>
+                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente</TabsTrigger> {/* Shortened label for space */}
+                <TabsTrigger value="advanced" statusIcon={getTabStatusIcon("advanced")} disabled={editingAgent === null}>Avançado</TabsTrigger>
                 <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === null}>Revisar</TabsTrigger>
               </TabsList>
 
@@ -655,60 +682,12 @@ return (
                 </Alert>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Configurações de Comunicação A2A</CardTitle>
-                    <CardDescription>Define como este agente se comunica com outros agentes no sistema.</CardDescription>
+                    {/* Title and Description are now part of A2AConfigComponent */}
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Controller
-                        name="config.a2a.enabled"
-                        control={methods.control}
-                        render={({ field }) => (
-                          <Switch
-                            id="a2aEnabledSwitchRHF"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        )}
-                      />
-                      <Label htmlFor="a2aEnabledSwitchRHF" className="text-base">Habilitar Comunicação A2A</Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Permite que este agente envie e receba mensagens de outros agentes diretamente, usando os canais configurados.
-                    </p>
-                    {methods.watch("config.a2a.enabled") && (
-                       <div className="space-y-2 pt-2">
-                        <TooltipProvider>
-                          {/* ... Tooltip for A2A channels ... */}
-                        </TooltipProvider>
-                        <Controller
-                          name="config.a2a.communicationChannels"
-                          control={methods.control}
-                          render={({ field }) => (
-                            <Textarea
-                              id="a2aCommunicationChannelsTextareaRHF"
-                              placeholder={`Exemplo de formato JSON...`}
-                              value={field.value ? JSON.stringify(field.value, null, 2) : "[]"}
-                              onChange={(e) => {
-                                try {
-                                  const val = e.target.value.trim();
-                                  if (!val) { field.onChange([]); return; }
-                                  const parsedChannels = JSON.parse(val);
-                                  field.onChange(parsedChannels);
-                                } catch (error) {
-                                  console.error("Erro ao parsear JSON dos canais A2A:", error);
-                                  toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A."})
-                                }
-                              }}
-                              rows={6}
-                            />
-                          )}
-                        />
-                         <p className="text-xs text-muted-foreground">
-                           Defina os canais, protocolos e configurações para comunicação com outros agentes (formato JSON).
-                         </p>
-                       </div>
-                    )}
+                    {/* The A2AConfigComponent will have its own internal switch for enabling/disabling */}
+                    {/* It will use useFormContext to manage config.a2a directly */}
+                    <A2AConfigComponent savedAgents={availableAgentsForSubSelector} />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -784,6 +763,53 @@ return (
               <TabsContent value="review">
                 <ReviewTab />
               </TabsContent>
+
+              {/* Advanced Tab (ADK Callbacks) */}
+              <TabsContent value="advanced" className="space-y-6 mt-4">
+                <Alert>
+                  <Settings2 className="h-4 w-4" />
+                  <AlertTitle>Configurações Avançadas</AlertTitle>
+                  <AlertDescription>
+                    Configure callbacks do ciclo de vida do agente ADK e outras opções avançadas.
+                  </AlertDescription>
+                </Alert>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Callbacks do Ciclo de Vida ADK</CardTitle>
+                    <CardDescription>
+                      Especifique nomes de fluxos Genkit ou referências de funções para serem invocadas em pontos chave do ciclo de vida do agente.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {[
+                      { name: "beforeAgent", label: "Callback Before Agent", description: "Invocado antes do agente principal processar a requisição. Útil para configuração ou validação inicial." },
+                      { name: "afterAgent", label: "Callback After Agent", description: "Invocado após o agente principal concluir. Útil para formatação final ou limpeza." },
+                      { name: "beforeModel", label: "Callback Before Model", description: "Invocado antes de uma chamada ao LLM. Permite modificar o prompt ou configurações do modelo." },
+                      { name: "afterModel", label: "Callback After Model", description: "Invocado após o LLM retornar uma resposta. Permite modificar ou validar a saída do LLM." },
+                      { name: "beforeTool", label: "Callback Before Tool", description: "Invocado antes da execução de uma ferramenta. Permite inspecionar/modificar argumentos ou cancelar a execução." },
+                      { name: "afterTool", label: "Callback After Tool", description: "Invocado após uma ferramenta ser executada. Permite inspecionar/modificar o resultado da ferramenta." },
+                    ].map(callback => (
+                      <div key={callback.name} className="space-y-1">
+                        <Label htmlFor={`config.adkCallbacks.${callback.name}`}>{callback.label}</Label>
+                        <Controller
+                          name={`config.adkCallbacks.${callback.name}` as const}
+                          control={methods.control}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              id={`config.adkCallbacks.${callback.name}`}
+                              placeholder="Nome do fluxo Genkit ou ref da função"
+                              value={field.value || ""}
+                            />
+                          )}
+                        />
+                        <p className="text-xs text-muted-foreground">{callback.description}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
             </Tabs>
           </div>
 

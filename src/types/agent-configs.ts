@@ -39,24 +39,48 @@ export interface ToolConfigData {
 
 export interface CommunicationChannel {
   id: string;
-  type: "direct_http" | "message_queue" | "custom";
-  targetAgentId?: string;
-  protocol?: "http" | "https";
-  endpoint?: string;
-  topic?: string;
-  brokerUrl?: string;
-  customConfig?: Record<string, any>;
-  description?: string;
+  name: string;
+  direction: 'inbound' | 'outbound';
+  targetAgentId?: string; // Optional, as per original, but consider if it should be mandatory for outbound
+  messageFormat: 'json' | 'text' | 'binary';
+  schema?: string; // Optional, can be a JSON schema string or URL
+  syncMode: 'sync' | 'async';
+  timeout?: number; // Optional, in milliseconds
+  retryPolicy?: {
+    maxRetries: number;
+    delayMs: number;
+    backoffFactor?: number; // Optional
+  };
 }
 
 export interface A2AConfig {
   enabled: boolean;
   communicationChannels: CommunicationChannel[];
-  defaultResponseFormat: "json" | "text" | "xml";
+  defaultResponseFormat: "json" | "text";
   maxMessageSize: number;
   loggingEnabled: boolean;
   securityPolicy?: "none" | "jwt" | "api_key";
   apiKeyHeaderName?: string;
+}
+
+/**
+ * Defines configuration for ADK (Agent Development Kit) callbacks.
+ * These callbacks allow for invoking Genkit flows or function references
+ * at various stages of an agent's lifecycle.
+ */
+export interface ADKCallbacksConfig {
+  /** Genkit flow name or function reference to call before the agent starts processing. */
+  beforeAgent?: string;
+  /** Genkit flow name or function reference to call after the agent finishes processing. */
+  afterAgent?: string;
+  /** Genkit flow name or function reference to call before a model is invoked. */
+  beforeModel?: string;
+  /** Genkit flow name or function reference to call after a model is invoked. */
+  afterModel?: string;
+  /** Genkit flow name or function reference to call before a tool is used. */
+  beforeTool?: string;
+  /** Genkit flow name or function reference to call after a tool is used. */
+  afterTool?: string;
 }
 
 export interface ArtifactDefinition {
@@ -139,6 +163,7 @@ export interface AgentConfigBase {
   genkitFlowName?: string;
   inputSchema?: string;
   outputSchema?: string;
+  adkCallbacks?: ADKCallbacksConfig;
 }
 
 export interface LLMAgentConfig extends AgentConfigBase {
