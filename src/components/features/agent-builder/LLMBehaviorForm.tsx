@@ -17,6 +17,8 @@ import { suggestLlmBehaviorAction } from "@/app/agent-builder/actions";
 import { useToast } from "@/hooks/use-toast";
 import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
+// import { Separator } from "@/components/ui/separator"; // Separator might not be needed if using Cards for all sections
 
 // MODIFIED: Simplified props
 interface LLMBehaviorFormProps {
@@ -98,151 +100,180 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
   };
 
   return (
-    <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FormField
-          control={control}
-          name="config.agentGoal"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="config.agentGoal">Objetivo do Agente (LLM)</FormLabel>
-              <FormControl><Textarea id="config.agentGoal" placeholder="Descreva o objetivo principal..." {...field} rows={3}/></FormControl>
-              <FormDescription>Qual o propósito central deste agente LLM?</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
-          name="config.agentPersonality"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <div className="flex items-center justify-between">
-                <FormLabel htmlFor="config.agentPersonality">Personalidade/Tom (LLM)</FormLabel>
-                <Popover open={showPersonalityPopover} onOpenChange={setShowPersonalityPopover}>
-                  <PopoverTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" onClick={handleSuggestPersonality} disabled={isSuggestingPersonality}>
-                      {isSuggestingPersonality ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80"> {/* Content as before */} </PopoverContent>
-                </Popover>
-              </div>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl><SelectTrigger id="config.agentPersonality"><SelectValue placeholder="Selecione a personalidade" /></SelectTrigger></FormControl>
-                <SelectContent>{agentToneOptions.map(o => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <FormDescription>Define o estilo de comunicação.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-      <FormField
-        control={control}
-        name="config.agentTasks"
-        render={({ field }) => {
-          // Helper to convert array to string for textarea and string to array for RHF
-          const tasksToString = (value: string[] | undefined) => value?.join("\n") || "";
-          const stringToTasks = (value: string) => value.split("\n").filter(task => task.trim() !== "");
-          return (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="config.agentTasks">Tarefas Principais (LLM)</FormLabel>
-              <FormControl>
-                <Textarea
-                  id="config.agentTasks"
-                  placeholder="Liste as tarefas principais... Uma tarefa por linha."
-                  value={tasksToString(field.value)}
-                  onChange={(e) => field.onChange(stringToTasks(e.target.value))}
-                  rows={4}
-                />
-              </FormControl>
-              <FormDescription>Detalhe os passos ou sub-objetivos. Uma tarefa por linha.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          );
-        }}
-      />
-      <FormField
-        control={control}
-        name="config.agentRestrictions"
-        render={({ field }) => {
-          const restrictionsToString = (value: string[] | undefined) => value?.join("\n") || "";
-          const stringToRestrictions = (value: string) => value.split("\n").filter(r => r.trim() !== "");
-          return (
-            <FormItem className="space-y-2">
-               <div className="flex items-center justify-between">
-                <FormLabel htmlFor="config.agentRestrictions">Restrições (LLM)</FormLabel>
-                <Popover open={showRestrictionPopover} onOpenChange={setShowRestrictionPopover}>
-                  <PopoverTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" onClick={handleSuggestRestrictions} disabled={isSuggestingRestrictions}>
-                      {isSuggestingRestrictions ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80">{/* Content as before */}</PopoverContent>
-                </Popover>
-              </div>
-              <FormControl>
-                <Textarea
-                  id="config.agentRestrictions"
-                  placeholder="Liste quaisquer restrições... Uma restrição por linha."
-                  value={restrictionsToString(field.value)}
-                  onChange={(e) => field.onChange(stringToRestrictions(e.target.value))}
-                  rows={3}
-                />
-              </FormControl>
-              <FormDescription>Define limites e regras. Uma restrição por linha.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          );
-        }}
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <FormField
-          control={control}
-          name="config.agentModel"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="config.agentModel">Modelo de Linguagem (LLM)</FormLabel>
-              <FormControl><Input id="config.agentModel" placeholder="Ex: gemini-1.5-pro-latest" {...field} /></FormControl>
-              <FormDescription>Especifique o identificador do modelo LLM.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
-          name="config.agentTemperature"
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel htmlFor="config.agentTemperature">Temperatura (LLM) - <Badge variant="outline">{Number(field.value)?.toFixed(1) || "0.0"}</Badge></FormLabel>
-              <FormControl>
-                <Slider
-                  id="config.agentTemperature"
-                  min={0} max={1} step={0.1}
-                  value={[Number(field.value) || 0]}
-                  onValueChange={(value) => field.onChange(value[0])}
-                />
-              </FormControl>
-              <FormDescription>Controla a criatividade/aleatoriedade.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-      <FormField
-        control={control}
-        name="config.systemPromptGenerated"
-        render={({ field }) => (
-          <FormItem className="space-y-2">
-            <FormLabel htmlFor="config.systemPromptGenerated">Prompt do Sistema Gerado (LLM Preview)</FormLabel>
-            <FormControl><Textarea id="config.systemPromptGenerated" readOnly {...field} rows={5} className="bg-muted/40" /></FormControl>
-            <FormDescription>Este é um preview de como o prompt do sistema pode ser construído.</FormDescription>
-            <FormMessage /> {/* Although readonly, maybe a message could appear if some combination is invalid */}
-          </FormItem>
-        )}
-      />
-    </>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Core Definition</CardTitle>
+          <CardDescription>Define the primary objective and key tasks for the LLM agent.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <FormField
+            control={control}
+            name="config.agentGoal"
+            render={({ field }) => (
+              <FormItem> {/* Removed space-y-2, relying on CardContent padding */}
+                <FormLabel htmlFor="config.agentGoal">Agent Goal (LLM)</FormLabel>
+                <FormControl><Textarea id="config.agentGoal" placeholder="Describe the main objective..." {...field} rows={3}/></FormControl>
+                <FormDescription>What is the central purpose of this LLM agent?</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="config.agentTasks"
+            render={({ field }) => {
+              const tasksToString = (value: string[] | undefined) => value?.join("\n") || "";
+              const stringToTasks = (value: string) => value.split("\n").filter(task => task.trim() !== "");
+              return (
+                <FormItem>
+                  <FormLabel htmlFor="config.agentTasks">Main Tasks (LLM)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      id="config.agentTasks"
+                      placeholder="List the main tasks... One task per line."
+                      value={tasksToString(field.value)}
+                      onChange={(e) => field.onChange(stringToTasks(e.target.value))}
+                      rows={4}
+                    />
+                  </FormControl>
+                  <FormDescription>Detail the steps or sub-goals. One task per line.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Behavioral Profile</CardTitle>
+          <CardDescription>Configure the agent's personality, tone, and operational restrictions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <FormField
+            control={control}
+            name="config.agentPersonality"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel htmlFor="config.agentPersonality">Personality/Tone (LLM)</FormLabel>
+                  <Popover open={showPersonalityPopover} onOpenChange={setShowPersonalityPopover}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="ghost" size="sm" onClick={handleSuggestPersonality} disabled={isSuggestingPersonality}>
+                        {isSuggestingPersonality ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80"> {/* Content as before */} </PopoverContent>
+                  </Popover>
+                </div>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl><SelectTrigger id="config.agentPersonality"><SelectValue placeholder="Select personality" /></SelectTrigger></FormControl>
+                  <SelectContent>{agentToneOptions.map(o => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <FormDescription>Defines the communication style.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="config.agentRestrictions"
+            render={({ field }) => {
+              const restrictionsToString = (value: string[] | undefined) => value?.join("\n") || "";
+              const stringToRestrictions = (value: string) => value.split("\n").filter(r => r.trim() !== "");
+              return (
+                <FormItem>
+                  <div className="flex items-center justify-between">
+                    <FormLabel htmlFor="config.agentRestrictions">Restrictions (LLM)</FormLabel>
+                    <Popover open={showRestrictionPopover} onOpenChange={setShowRestrictionPopover}>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" onClick={handleSuggestRestrictions} disabled={isSuggestingRestrictions}>
+                          {isSuggestingRestrictions ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80">{/* Content as before */}</PopoverContent>
+                    </Popover>
+                  </div>
+                  <FormControl>
+                    <Textarea
+                      id="config.agentRestrictions"
+                      placeholder="List any restrictions... One restriction per line."
+                      value={restrictionsToString(field.value)}
+                      onChange={(e) => field.onChange(stringToRestrictions(e.target.value))}
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormDescription>Define boundaries and rules. One restriction per line.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Model Configuration</CardTitle>
+          <CardDescription>Specify the language model and its operational parameters.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField
+            control={control}
+            name="config.agentModel"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="config.agentModel">Language Model (LLM)</FormLabel>
+                <FormControl><Input id="config.agentModel" placeholder="Ex: gemini-1.5-pro-latest" {...field} /></FormControl>
+                <FormDescription>Specify the LLM identifier.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="config.agentTemperature"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="config.agentTemperature">Temperature (LLM) - <Badge variant="outline">{Number(field.value)?.toFixed(1) || "0.0"}</Badge></FormLabel>
+                <FormControl>
+                  <Slider
+                    id="config.agentTemperature"
+                    min={0} max={1} step={0.1}
+                    value={[Number(field.value) || 0]}
+                    onValueChange={(value) => field.onChange(value[0])}
+                  />
+                </FormControl>
+                <FormDescription>Controls creativity/randomness.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>System Prompt Preview</CardTitle>
+          <CardDescription>This is a preview of how the system prompt might be constructed based on your settings.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FormField
+            control={control}
+            name="config.systemPromptGenerated"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="config.systemPromptGenerated" className="sr-only">Generated System Prompt (LLM Preview)</FormLabel>
+                <FormControl><Textarea id="config.systemPromptGenerated" readOnly {...field} rows={5} className="bg-muted/40" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 export default LLMBehaviorForm;

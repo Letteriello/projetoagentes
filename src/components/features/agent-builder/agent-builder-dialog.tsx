@@ -114,6 +114,7 @@ import StateMemoryTab from "./StateMemoryTab";
 import RagTab from "./RagTab";
 import ArtifactsTab from "./ArtifactsTab";
 import MultiAgentTab from "./MultiAgentTab"; // Import the new MultiAgentTab component
+import ReviewTab from "./ReviewTab"; // Import the new ReviewTab component
 
 // Removed redundant local type definitions for TerminationConditionType and A2AConfigType
 
@@ -137,7 +138,11 @@ const tabSchemaMapping = {
   artifacts: ["config.artifacts.enabled", "config.artifacts.storageType", "config.artifacts.definitions"],
   a2a: ["config.a2a.enabled", "config.a2a.communicationChannels"],
   multi_agent_advanced: ["config.isRootAgent", "config.subAgentIds", "config.globalInstruction"],
+  behavior: ["config.agentPersonality", "config.agentRestrictions"], // Added behavior tab fields
 };
+
+const tabOrder = ["general", "behavior", "tools", "memory_knowledge", "artifacts", "a2a", "multi_agent_advanced", "review"];
+
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -309,6 +314,17 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null); // Which tool is being configured
   // const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // REMOVED - Now part of RHF form state: methods.watch("toolConfigsApplied")
 
+  // --- Wizard Flow State ---
+  const [currentStep, setCurrentStep] = React.useState(0);
+
+  const handleNext = () => {
+    setCurrentStep(prev => Math.min(prev + 1, tabOrder.length - 1));
+  };
+
+  const handlePrevious = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 0));
+  };
+
   // --- Estados para Campos do Modal de Configuração de Ferramentas (Mantidos para o modal, mas poderiam ser RHF sub-forms) ---
   const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
   const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
@@ -350,6 +366,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     } else {
       setIsToolConfigModalOpen(false);
       setConfiguringTool(null);
+      if (editingAgent === null) { // Only reset step if it was a new agent creation (wizard)
+        setCurrentStep(0);
+      }
     }
   }, [isOpen, editingAgent, methods]); // methods is stable, defaultValues object from useForm is the key for re-runs if editingAgent changes
 
@@ -492,14 +511,32 @@ return (
             </DialogDescription>
           </DialogHeader>
           <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
-            <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-6 mb-6"> {/* Adjusted for 6 tabs */}
-                <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")}>Geral</TabsTrigger>
-                <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")}>Ferramentas</TabsTrigger>
-                <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")}>Memória & Conhecimento</TabsTrigger>
-                <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")}>Artefatos</TabsTrigger>
-                <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")}>Comunicação A2A</TabsTrigger>
-                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")}>Multi-Agente & Avançado</TabsTrigger>
+            <Tabs
+              value={editingAgent === null ? tabOrder[currentStep] : undefined}
+              defaultValue="general"
+              onValueChange={(value) => {
+                if (editingAgent === null) {
+                  // In wizard mode, tabs are controlled by Next/Previous buttons
+                  // Optionally, allow navigation by clicking tabs:
+                  // const newStep = tabOrder.indexOf(value);
+                  // if (newStep !== -1) setCurrentStep(newStep);
+                } else {
+                  // Default behavior for editing: allow direct tab navigation
+                  // This typically doesn't need explicit handling if Tabs component updates its own state
+                  // unless we need to sync it with some external state not shown here.
+                }
+              }}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-8 mb-6"> {/* Adjusted for 8 tabs */}
+                <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === null}>Geral</TabsTrigger>
+                <TabsTrigger value="behavior" statusIcon={getTabStatusIcon("behavior")} disabled={editingAgent === null}>Comportamento</TabsTrigger>
+                <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")} disabled={editingAgent === null}>Ferramentas</TabsTrigger>
+                <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")} disabled={editingAgent === null}>Memória & Conhecimento</TabsTrigger>
+                <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")} disabled={editingAgent === null}>Artefatos</TabsTrigger>
+                <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")} disabled={editingAgent === null}>Comunicação A2A</TabsTrigger>
+                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente & Avançado</TabsTrigger>
+                <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === null}>Revisar</TabsTrigger>
               </TabsList>
 
               {/* General Tab */}
@@ -737,21 +774,64 @@ return (
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* Review Tab */}
+              <TabsContent value="review">
+                <ReviewTab />
+              </TabsContent>
             </Tabs>
           </div>
 
           <DialogFooter className="p-6 pt-4 border-t">
-            <DialogClose asChild>
-              <Button variant="outline" type="button">Cancelar</Button> {/* Add type="button" */}
-            </DialogClose>
-            <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
-              {methods.formState.isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Salvar Agente
-            </Button>
+            {editingAgent === null ? (
+              // New agent wizard flow
+              <div className="flex justify-between w-full">
+                <Button variant="outline" type="button" onClick={() => { onOpenChange(false); setCurrentStep(0); }}>Cancelar</Button>
+                <div className="flex gap-2">
+                  <Button type="button" onClick={handlePrevious} disabled={currentStep === 0}>
+                    Anterior
+                  </Button>
+                  {/* Show "Next" if not the step before "review" and not the last step overall */}
+                  {currentStep < tabOrder.length - 1 && tabOrder[currentStep + 1] !== "review" && (
+                    <Button type="button" onClick={handleNext}>
+                      Próximo
+                    </Button>
+                  )}
+                  {/* Show "Revisar" if the next step is "review" */}
+                  {currentStep < tabOrder.length - 1 && tabOrder[currentStep + 1] === "review" && (
+                    <Button type="button" onClick={handleNext}>
+                      Revisar
+                    </Button>
+                  )}
+                  {/* Show "Salvar Agente" only on the "review" tab */}
+                  {tabOrder[currentStep] === "review" && (
+                    <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
+                      {methods.formState.isSubmitting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      Salvar Agente
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Editing existing agent
+              <>
+                <DialogClose asChild>
+                  <Button variant="outline" type="button">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
+                  {methods.formState.isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Salvar Agente
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </form>
       </FormProvider>
