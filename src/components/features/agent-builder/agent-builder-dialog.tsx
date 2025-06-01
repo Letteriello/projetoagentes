@@ -611,7 +611,7 @@ const handleSaveAgent = () => {
   };
 
 return (
-  <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-4xl p-0"> {/* Using p-0 on DialogContent and adding padding to an inner div for Tabs */}
       <DialogHeader className="p-6 pb-4 border-b">
         <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
