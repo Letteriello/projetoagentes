@@ -34,6 +34,7 @@ type SidebarContextValue = {
   isMobile?: boolean;
   toggleSidebar: () => void;
   collapsible?: "offcanvas" | "icon" | "none";
+  side: "left" | "right"; // Added side
   mounted: boolean;
   isPinnedOpen: boolean; // For icon collapsible hover behavior
   setIsPinnedOpen: (pinned: boolean) => void; // For icon collapsible hover behavior
@@ -41,7 +42,7 @@ type SidebarContextValue = {
 
 const SidebarContext = React.createContext<SidebarContextValue | null>(null);
 
-export function useSidebar() {
+function useSidebar() {
   const context = React.useContext(SidebarContext);
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider.");
@@ -49,13 +50,14 @@ export function useSidebar() {
   return context;
 }
 
-export const SidebarProvider = React.forwardRef<
+const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
     defaultOpen?: boolean;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     collapsible?: "offcanvas" | "icon" | "none";
+    side?: "left" | "right"; // Added side prop
   }
 >(
   (
@@ -64,6 +66,7 @@ export const SidebarProvider = React.forwardRef<
       open: openProp,
       onOpenChange: setOpenProp,
       collapsible: collapsibleProp = "icon",
+      side = "left", // Added side prop with default
       className,
       style,
       children,
@@ -159,6 +162,7 @@ export const SidebarProvider = React.forwardRef<
         setOpenMobile,
         toggleSidebar,
         collapsible,
+        side, // Added side
         mounted,
         isPinnedOpen,
         setIsPinnedOpen,
@@ -172,6 +176,7 @@ export const SidebarProvider = React.forwardRef<
         setOpenMobile,
         toggleSidebar,
         collapsible,
+        side, // Added side to dependencies
         mounted,
         isPinnedOpen,
         setIsPinnedOpen,
@@ -296,7 +301,7 @@ export const Sidebar = React.forwardRef<
         data-state={state}
         data-collapsible={collapsible || "none"}
         data-variant={variant}
-        data-side={side}
+        data-side="left"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
@@ -394,7 +399,7 @@ export const SidebarRail = React.forwardRef<
 });
 SidebarRail.displayName = "SidebarRail";
 
-export const SidebarInset = React.forwardRef<
+const SidebarInset = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, style, children, ...props }, ref) => {
@@ -436,7 +441,7 @@ export const SidebarInput = React.forwardRef<
 });
 SidebarInput.displayName = "SidebarInput";
 
-export const SidebarHeader = React.forwardRef<
+const SidebarHeader = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
@@ -458,7 +463,7 @@ export const SidebarHeader = React.forwardRef<
 });
 SidebarHeader.displayName = "SidebarHeader";
 
-export const SidebarFooter = React.forwardRef<
+const SidebarFooter = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
@@ -495,7 +500,7 @@ export const SidebarSeparator = React.forwardRef<
 });
 SidebarSeparator.displayName = "SidebarSeparator";
 
-export const SidebarContent = React.forwardRef<
+const SidebarContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
@@ -594,7 +599,7 @@ export const SidebarGroupContent = React.forwardRef<
 ));
 SidebarGroupContent.displayName = "SidebarGroupContent";
 
-export const SidebarMenu = React.forwardRef<
+const SidebarMenu = React.forwardRef<
   HTMLUListElement,
   React.ComponentProps<"ul">
 >(({ className, ...props }, ref) => {
@@ -616,7 +621,7 @@ export const SidebarMenu = React.forwardRef<
 });
 SidebarMenu.displayName = "SidebarMenu";
 
-export const SidebarMenuItem = React.forwardRef<
+const SidebarMenuItem = React.forwardRef<
   HTMLLIElement,
   React.ComponentProps<"li">
 >(({ className, ...props }, ref) => (
@@ -651,7 +656,7 @@ const sidebarMenuButtonVariants = cva(
   },
 );
 
-export const SidebarMenuButton = React.forwardRef<
+const SidebarMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> &
     React.ComponentProps<typeof Slot> & {

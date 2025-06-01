@@ -235,8 +235,39 @@ export interface ToolConfigData {
   calendarApiEndpoint?: string;
 }
 
+
+export interface ADKTool {
+  id: string;
+  name: string;
+  description?: string;
+  // icon?: React.FC<React.SVGProps<SVGSVGElement>>;
+  // inputSchema?: any;
+  // outputSchema?: any;
+}
+
+export interface Gem {
+  id: string; 
+  name: string; 
+  templateId?: string;
+  agentDescription?: string;
+  agentType?: 'llm' | 'workflow' | 'custom' | 'a2a';
+  framework?: AgentFramework;
+  agentModel?: string; 
+  agentTemperature?: number; 
+  toolsDetails?: Array<{
+    id: string;
+    label: string;
+    iconName?: keyof typeof iconComponents | "default";
+    needsConfiguration?: boolean;
+    genkitToolName?: string;
+  }>;
+  agentGoal?: string; 
+}
+
 export interface SavedAgentConfiguration extends AgentConfigBase {
   id: string;
+  name?: string; // Added for UI consistency, especially with Gems/ADK Agents
+  framework?: AgentFramework; // Added to align with AgentConfigBase and Gem
   templateId: string;
   systemPromptGenerated?: string;
   toolsDetails: Array<{
@@ -532,6 +563,35 @@ export const agentTemplates: AgentTemplate[] = [
       agentVersion: "1.0.0",
       agentTools: ["webSearch", "customApiIntegration"],
     },
+  },
+];
+
+// Initial Gems (predefined configurations for chat UI selection)
+export const initialGems: Gem[] = [
+  {
+    id: "simple_chat_gem",
+    templateId: "custom_llm", 
+    name: "Bate-papo Simples",
+    agentDescription: "Um assistente de conversação direto.",
+    agentType: "llm",
+    framework: "genkit",
+    agentModel: "googleai/gemini-1.5-flash-latest",
+    agentTemperature: 0.7,
+    toolsDetails: [],
+  },
+  {
+    id: "helpful_assistant_gem",
+    templateId: "custom_llm",
+    name: "Assistente Prestativo",
+    agentDescription: "Um assistente pronto para ajudar com informações gerais.",
+    agentType: "llm",
+    framework: "genkit",
+    agentModel: "googleai/gemini-1.5-pro-latest",
+    agentTemperature: 0.6,
+    toolsDetails: [
+      { id: "webSearch", label: "Busca na Web", iconName: "Search" as const, genkitToolName: "performWebSearch", needsConfiguration: true }
+    ],
+    agentGoal: "Fornecer respostas úteis e precisas.",
   },
 ];
 

@@ -24,15 +24,20 @@ import { useAgents } from "@/contexts/AgentsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebaseClient";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-// Updated import path for SavedAgentConfigType
-import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig";
+import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType, AgentFramework, Gem, ADKTool } from "@/data/agentBuilderConfig";
+import { initialGems, iconComponents, availableTools as builderAvailableTools } from "@/data/agentBuilderConfig";
 
-// UI Components & Types
+export type ADKAgentConfig = {
+  name: string;
+  [key: string]: any; 
+};
+
 import ChatHeader from "@/components/features/chat/ChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
-import { ChatMessageUI, Conversation } from "@/types/chat";
+import { Message } from "@/types/chat";
+import { Conversation, ChatMessageUI } from "@/types/chat";
 import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -41,54 +46,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label"; 
 import { AgentSelector } from "@/components/agent-selector";
-
-// Firestore Conversation Storage
 import * as cs from "@/lib/firestoreConversationStorage";
 
-// Client-safe API and types
-import { sendMessageToAI, streamChatFromAI } from '@/lib/client-api'; // Not used in the final merged version but kept for now
-import { ChatInput, ChatOutput, ChatFormState as ImportedChatFormState } from '@/types/chat-types';
-import { ADKAgentConfig, ADKTool } from '@/types/adk-types';
-
-// Import initialGems from its new location
-import { initialGems } from '@/data/chatConfig';
-
-// Type definitions that were part of Stashed Changes (kept during merge)
-interface ChatHistoryMessage {
-  role: 'user' | 'model';
-  content: any; 
-}
-
-interface ServerMessage { 
-  id?: string;
-  role: 'user' | 'model' | 'assistant' | 'tool';
-  content: string | any; 
-  text?: string; 
-  createdAt?: Date | string;
-  timestamp?: Date | string;
-  type?: 'text' | 'image' | 'file' | string; 
-  attachments?: any[];
-  status?: 'sending' | 'delivered' | 'failed' | 'seen';
-}
-
-// `initialGems` is now imported from "@/data/chatConfig"
-
-// Usando o ChatFormState importado dos tipos compartilhados
-type ChatFormState = ImportedChatFormState;
-
-const initialChatFormState: ChatFormState = {
-  message: "", 
-  agentResponse: null,
-  errors: null,
-};
-
-const initialActionState: { message: string | null; serverResponse?: ChatMessageUI; error?: string } = {
-  message: null,
-  serverResponse: undefined,
-  error: undefined,
-};
-
-// Componente de botão de recurso estilo Gemini aprimorado
 const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
   <button
     type="button"
@@ -102,128 +61,103 @@ const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label:
   </button>
 );
 
-type OptimisticMessageAction = 
-  | { type: 'addUserMessage'; message: ChatMessageUI }
-  | { type: 'addAgentMessage'; message: ChatMessageUI } 
-  | { type: 'updateAgentMessageChunk'; id: string; chunk: string } 
-  | { type: 'finalizeAgentMessage'; id: string; finalMessage?: string; error?: boolean }
-  | { type: 'reconcileUserMessage'; id: string; serverId?: string; error?: boolean };
+export default function ChatPage() {
+  return <ChatUI />;
+}
 
 export function ChatUI() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser } = useAuth();
   const currentUserId = currentUser?.uid;
 
-  const { savedAgents, setSavedAgents, availableTools: builderAvailableTools } = useAgents();
-  const [pendingAgentConfig, setPendingAgentConfig] = useState<Partial<SavedAgentConfigType> | null>(null);
+  const {
+    savedAgents,
+    setSavedAgents,
+    addAgent,
+    updateAgent,
+    deleteAgent,
+    isLoadingAgents
+  } = useAgents();
 
-
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      toast({
-        title: "Login Successful",
-        description: "You are now logged in.",
-      });
-    } catch (error) {
-      console.error("Error during Google login:", error);
-      toast({
-        title: "Login Failed",
-        description: "Could not sign in with Google. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      toast({
-        title: "Logout Successful",
-        description: "You have been logged out.",
-      });
-      setPendingAgentConfig(null);
-    } catch (error) {
-      console.error("Error during logout:", error);
-      toast({
-        title: "Logout Failed",
-        description: "Could not sign out. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const [messages, setMessages] = useState<ChatMessageUI[]>([]);
-  const [optimisticMessages, setOptimisticMessages] = useOptimistic<
-    ChatMessageUI[],
-    ChatMessageUI
-  >(messages, (currentMessages, optimisticUpdateMessage) => {
-    const existingMessageIndex = currentMessages.findIndex(
-      (msg) => msg.id === optimisticUpdateMessage.id,
-    );
-
-    if (existingMessageIndex !== -1) {
-      const updatedMessage = {
-        ...currentMessages[existingMessageIndex],
-        ...optimisticUpdateMessage,
-        text:
-          optimisticUpdateMessage.text !== undefined
-            ? optimisticUpdateMessage.text
-            : currentMessages[existingMessageIndex].text,
-      };
-      return currentMessages.map((msg, index) =>
-        index === existingMessageIndex ? updatedMessage : msg,
-      );
-    } else {
-      return [...currentMessages, optimisticUpdateMessage];
-    }
-  });
-
-  const [selectedGemId, setSelectedGemId] = useState<string | null>(
-    initialGems[0].id,
-  );
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>("none");
-  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null);
-
-  const activeChatTarget = useMemo(() => {
-    if (selectedGemId && selectedGemId !== "none") {
-      return initialGems.find(g => g.id === selectedGemId)?.name || "Chat";
-    }
-    if (selectedAgentId && selectedAgentId !== "none" && savedAgents) { // Ensure savedAgents is not null
-      return savedAgents.find(a => a.id === selectedAgentId)?.agentName || "Chat"; // Use agentName
-    }
-    if (usingADKAgent && selectedADKAgentId && adkAgents) { // Ensure adkAgents is not null
-        const adkAgent = adkAgents.find(a => a.name === selectedADKAgentId);
-        if (adkAgent) return adkAgent.name;
-    }
-    return initialGems[0].name;
-  }, [selectedGemId, selectedAgentId, savedAgents, usingADKAgent, selectedADKAgentId, adkAgents]);
-
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [usingADKAgent, setUsingADKAgent] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [isPending, setIsPending] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null); 
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null); 
-  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); 
-  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+
+  const [selectedGemId, setSelectedGemId] = useState<string | null>(
+    initialGems[0]?.id ?? null
+  );
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedAgentConfig, setSelectedAgentConfig] = useState<SavedAgentConfigType | null>(null);
+  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null);
   const [adkAgents, setAdkAgents] = useState<ADKAgentConfig[]>([]);
   const [isADKInitializing, setIsADKInitializing] = useState(false);
+
+  const usingADKAgent = useMemo(() => !!selectedADKAgentId, [selectedADKAgentId]);
+
+  const activeChatTarget = useMemo(() => {
+    if (usingADKAgent && selectedADKAgentId && adkAgents.length > 0) {
+      const adkAgent = adkAgents.find((agent: ADKAgentConfig) => agent.name === selectedADKAgentId);
+      if (adkAgent) return { id: adkAgent.name, name: adkAgent.name, type: 'adk-agent' as const, config: adkAgent };
+    }
+    if (selectedAgentId && savedAgents.length > 0) {
+      const currentSavedAgent = savedAgents.find((a: SavedAgentConfigType) => a.id === selectedAgentId);
+      if (currentSavedAgent) return { id: currentSavedAgent.id, name: currentSavedAgent.name, type: 'agent' as const, config: currentSavedAgent };
+    }
+    if (selectedGemId && initialGems.length > 0) {
+      const gem = initialGems.find((g: Gem) => g.id === selectedGemId);
+      if (gem) return { id: gem.id, name: gem.name, type: 'gem' as const, config: gem };
+    }
+    return initialGems.length > 0 ? { id: initialGems[0].id, name: initialGems[0].name, type: 'gem' as const, config: initialGems[0] } : null;
+  }, [selectedAgentId, savedAgents, selectedGemId, selectedADKAgentId, adkAgents, usingADKAgent, initialGems]);
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [pendingAgentConfig, setPendingAgentConfig] = useState<AgentConfig | null>(null);
+
+  type OptimisticUpdateAction =
+    | { type: "add"; message: Message }
+    | { type: "update"; id: string; text?: string; isStreaming?: boolean; imageUrl?: string; fileName?: string; fileDataUri?: string; }
+    | { type: "remove"; id: string };
+
+  const optimisticUpdateReducer = (
+    state: Message[],
+    action: OptimisticUpdateAction
+  ): Message[] => {
+    switch (action.type) {
+      case "add":
+        return state.find(m => m.id === action.message.id) ? state : [...state, action.message];
+      case "update":
+        const { type, ...updatePayload } = action;
+        return state.map(msg =>
+          msg.id === action.id ? { ...msg, ...updatePayload } : msg
+        );
+      case "remove":
+        return state.filter(msg => msg.id !== action.id);
+      default:
+        const _exhaustiveCheck: never = action;
+        return state;
+    }
+  };
+
+  const [optimisticMessages, setOptimisticMessages] = useOptimistic<Message[], OptimisticUpdateAction>(
+    messages,
+    optimisticUpdateReducer
+  );
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [isPending, setIsPending] = useState<boolean>(false);
-
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
     setPendingAgentConfig(null);
-  }, [selectedGemId, selectedAgentId]);
+  }, [selectedGemId, selectedAgentId, selectedADKAgentId]);
 
   useEffect(() => {
     const loadConversations = async () => {
@@ -236,6 +170,9 @@ export function ChatUI() {
       try {
         const fetchedConversations = await cs.getAllConversations(currentUserId);
         setConversations(fetchedConversations);
+        if (fetchedConversations.length > 0 && !activeConversationId) {
+           setActiveConversationId(fetchedConversations[0].id);
+        }
       } catch (error) {
         console.error("Error loading conversations:", error);
         toast({ title: "Error", description: "Failed to load conversations.", variant: "destructive" });
@@ -244,23 +181,22 @@ export function ChatUI() {
       }
     };
     loadConversations();
-  }, [currentUserId]);
+  }, [currentUserId, activeConversationId]); // Ensure activeConversationId is a dependency if it can change elsewhere and require reload
 
   useEffect(() => {
     if (activeConversationId) {
       const loadMessages = async () => {
         setIsLoadingMessages(true);
-        setMessages([]);
+        setMessages([]); 
         try {
           const conversationWithMessages = await cs.getConversationById(activeConversationId);
           if (conversationWithMessages && conversationWithMessages.messages) {
-            const uiMessages: ChatMessageUI[] = conversationWithMessages.messages.map((msg) => ({
-              id: msg.id || uuidv4(),
-              text: msg.content || msg.text || "",
-              sender: msg.isUser ? "user" : "agent",
-              isStreaming: msg.isLoading,
-              imageUrl: msg.imageUrl,
-              fileName: msg.fileName,
+            const uiMessages: Message[] = conversationWithMessages.messages.map((dbMessage: Message) => ({
+              id: dbMessage.id || uuidv4(),
+              isUser: dbMessage.isUser,
+              content: dbMessage.content || "",
+              timestamp: dbMessage.timestamp ? (dbMessage.timestamp instanceof Date ? dbMessage.timestamp : (dbMessage.timestamp as any).toDate()) : new Date(),
+              // isLoading and isError are UI concerns, not directly from DB message generally
             }));
             setMessages(uiMessages);
           } else {
@@ -280,23 +216,43 @@ export function ChatUI() {
     }
   }, [activeConversationId]);
 
+  const handleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      toast({ title: "Login Successful", variant: "default" });
+    } catch (error) {
+      console.error("Error during Google sign-in:", error);
+      toast({
+        title: "Login Failed",
+        description: "Could not sign in with Google. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({ title: "Logout Successful", variant: "default" });
+      setMessages([]);
+      setConversations([]);
+      setActiveConversationId(null);
+      setPendingAgentConfig(null);
+    } catch (error) {
+      console.error("Error during logout:", error);
+      toast({ title: "Logout Failed", variant: "destructive" });
+    }
+  };
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
       setSelectedFileName(file.name);
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onloadend = () => setSelectedFileDataUri(reader.result as string);
-        reader.readAsDataURL(file);
-      } else {
-        // For non-image files, could also read as data URI if backend expects that for files
-        // Or handle ArrayBuffer for direct upload elsewhere
-        const reader = new FileReader();
-        reader.onloadend = () => setSelectedFileDataUri(reader.result as string);
-        reader.readAsDataURL(file); // Example: pass as data URI
-      }
+      const reader = new FileReader();
+      reader.onloadend = () => setSelectedFileDataUri(reader.result as string);
+      reader.readAsDataURL(file);
     } else {
       setSelectedFile(null);
       setSelectedFileName(null);
@@ -316,55 +272,69 @@ export function ChatUI() {
     const currentInput = inputValue.trim();
 
     if (!currentUserId) {
-      toast({ title: "Authentication Error", description: "Please log in.", variant: "destructive" });
+      toast({ title: "Authentication Error", description: "Please log in.", variant: "default" });
       return;
     }
     if (!currentInput && !selectedFile) {
-      toast({ title: "Input required", description: "Please type a message or select a file.", variant: "destructive" });
+      toast({ title: "Input required", description: "Please type a message or select a file.", variant: "default" });
       return;
     }
-     if (pendingAgentConfig && isPending) {
+    if (pendingAgentConfig && isPending) {
       toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
       return;
     }
 
     setIsPending(true);
-    setPendingAgentConfig(null);
+    setPendingAgentConfig(null); 
 
     const userMessageId = uuidv4();
     const agentMessageId = uuidv4();
 
-    const userMessage: ChatMessageUI = {
+    const userMessageForOptimistic: Message = {
       id: userMessageId,
-      sender: "user",
-      text: currentInput,
-      imageUrl: selectedFile && selectedFile.type.startsWith("image/") ? selectedFileDataUri : undefined,
-      fileName: selectedFile ? selectedFile.name : undefined,
-      // fileDataUri: selectedFile && !selectedFile.type.startsWith("image/") ? selectedFileDataUri : undefined, // If passing non-image file data
-      isStreaming: false,
-      timestamp: new Date(),
+      isUser: true,
+      content: currentInput,
+      timestamp: new Date(), // Add timestamp for Message type
+      // imageUrl and fileName are not part of Message type, handle separately if needed for UI
     };
-    setOptimisticMessages(userMessage);
+    setOptimisticMessages({ type: "add", message: userMessageForOptimistic });
 
-    if (activeConversationId) {
-        await cs.addMessageToConversation(activeConversationId, {
-            id: userMessageId, // ensure we use the same ID
-            sender: currentUserId,
-            text: currentInput,
-            isUser: true,
-            isLoading: false,
-            isError: false,
-            imageUrl: userMessage.imageUrl,
-            fileName: userMessage.fileName,
-            content: currentInput,
-            timestamp: userMessage.timestamp,
-        }).catch(err => {
-            console.error("Failed to save user message:", err);
-            toast({ title: "Error saving message", variant: "destructive" });
-        });
-        setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
+    let currentConvId = activeConversationId;
+    if (!currentConvId) {
+      const newConv = await cs.createNewConversation(currentUserId, activeChatTarget?.name || "New Chat");
+      if (newConv) {
+        currentConvId = newConv.id;
+        setActiveConversationId(newConv.id);
+        setConversations(prev => [newConv, ...prev]);
+      } else {
+        toast({ title: "Error", description: "Failed to create new conversation.", variant: "destructive" });
+        setIsPending(false);
+        return;
+      }
+    }
+    
+    if (currentConvId) {
+      // Note: The object passed to addMessageToConversation should match what Firestore expects.
+      // If Firestore auto-generates IDs for messages, userMessageId might not be needed here or could cause issues.
+      // For now, assuming cs.addMessageToConversation handles the ID.
+      // Also, Message does not have timestamp, so we don't pass it to Firestore if Message type doesn't have it.
+      await cs.addMessageToConversation(currentConvId, {
+        // id: userMessageId, // Let Firestore handle ID if that's the design
+        isUser: true, // Store the actual user ID
+        content: currentInput,
+        // timestamp: serverTimestamp(), // Let Firestore handle timestamp
+        // imageUrl: uploadedImageUrl, // Message type doesn't have imageUrl directly, handle this if needed
+        // fileName: uploadedFileName, // Message type doesn't have fileName directly
+      }).catch(err => {
+        console.error("Failed to save user message:", err);
+        toast({ title: "Error saving message", variant: "destructive" });
+        // Optionally revert optimistic update for user message on failure
+        setOptimisticMessages({ type: "remove", id: userMessageId });
+      });
+      setConversations(prevConvs => prevConvs.map(c => c.id === currentConvId ? { ...c, updatedAt: new Date(), lastMessagePreview: currentInput.substring(0,30) } : c));
     } else {
-      toast({ title: "No Active Conversation", variant: "warning" });
+      // This case should ideally not be reached if new conversation creation is successful
+      toast({ title: "No Active Conversation", variant: "destructive" });
       setIsPending(false);
       return;
     }
@@ -374,57 +344,47 @@ export function ChatUI() {
     inputRef.current?.focus();
 
     const isAgentCreatorSession = selectedGemId === "agent_creator_assistant";
-    let apiEndpoint = isAgentCreatorSession ? "/api/agent-creator-stream" : "/api/chat-stream";
+    const apiEndpoint = isAgentCreatorSession ? "/api/agent-creator-stream" : "/api/chat-stream";
 
-    const historyForBackend = messages.map(msg => ({ // use 'messages' for more stable history
-      role: msg.sender === "user" ? "user" : "model",
-      content: isAgentCreatorSession ? [{ text: msg.text || "" }] : (msg.text || ""),
-    }));
+    const historyForBackend = messages.map(msg => ({
+      role: msg.isUser ? "user" : "model",
+      content: isAgentCreatorSession && msg.isUser ? [{ text: msg.content || "" }] : (msg.content || ""),
+    })); 
 
-    let requestBody: ChatInput | any = {
+    const requestBody: any = {
       userMessage: currentInput,
       history: historyForBackend,
       userId: currentUserId,
       stream: true,
-      fileDataUri: selectedFile && selectedFileDataUri ? selectedFileDataUri : undefined, // Pass file data URI for all types
+      fileDataUri: selectedFile && selectedFileDataUri ? selectedFileDataUri : undefined,
+      conversationId: currentConvId, // Pass conversation ID
     };
 
-    if (!isAgentCreatorSession) {
-      const currentSavedAgent = savedAgents.find(a => a.id === selectedAgentId);
-      const activeADKAgent = usingADKAgent ? adkAgents.find(a => a.name === selectedADKAgentId) : null;
-
-      requestBody = {
-        ...requestBody,
-        modelName: activeADKAgent
-          ? activeADKAgent.model?.name
-          : currentSavedAgent?.agentModel,
-        systemPrompt: activeADKAgent
-          ? activeADKAgent.description
-          : currentSavedAgent?.agentDescription || (currentSavedAgent as SavedAgentConfigType)?.globalInstruction,
-        temperature: activeADKAgent
-          ? activeADKAgent.model?.temperature
-          : currentSavedAgent?.agentTemperature,
-        agentToolsDetails: activeADKAgent
-          ? activeADKAgent.tools?.map((t: ADKTool) => ({ id: t.name, name: t.name, description: t.description || t.name, enabled: true }))
-          : currentSavedAgent?.toolsDetails?.map(tool => ({ id: tool.id, name: tool.label, description: tool.genkitToolName || tool.label, enabled: true }))
-      };
+    if (!isAgentCreatorSession && activeChatTarget?.type === 'agent' && activeChatTarget.config) {
+      const agentCfg = activeChatTarget.config as SavedAgentConfigType;
+      requestBody.modelName = agentCfg.agentModel;
+      requestBody.systemPrompt = agentCfg.agentDescription || agentCfg.globalInstruction;
+      requestBody.temperature = agentCfg.agentTemperature;
+      requestBody.agentToolsDetails = agentCfg.toolsDetails?.map(tool => ({ 
+        id: tool.id, 
+        name: tool.label, 
+        description: tool.genkitToolName || tool.label, 
+        enabled: true 
+      }));
+    } else if (!isAgentCreatorSession && activeChatTarget?.type === 'adk-agent' && activeChatTarget.config) {
+      const adkCfg = activeChatTarget.config as ADKAgentConfig;
+      requestBody.modelName = adkCfg.model?.name;
+      requestBody.systemPrompt = adkCfg.description;
+      requestBody.temperature = adkCfg.model?.temperature;
+      requestBody.agentToolsDetails = adkCfg.tools?.map((t: ADKTool) => ({ 
+        id: t.name, 
+        name: t.name, 
+        description: t.description || t.name, 
+        enabled: true 
+      }));
     }
 
-    const pendingAgentMessage: ChatMessageUI = {
-      id: agentMessageId, sender: "agent", text: "", isStreaming: true, timestamp: new Date(),
-    };
-    setOptimisticMessages(pendingAgentMessage);
-
-    let agentMessageStorageId: string | null = null;
-    if (activeConversationId) {
-        const placeholder = await cs.addMessageToConversation(activeConversationId, {
-            id: agentMessageId, // ensure we use the same ID
-            sender: "agent", text: "", content: "", isUser: false, isLoading: true, isError: false,
-            timestamp: pendingAgentMessage.timestamp,
-        });
-        if (placeholder && placeholder.id) agentMessageStorageId = placeholder.id;
-        setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, updatedAt: new Date() } : c));
-    }
+    setOptimisticMessages({ type: "add", message: { id: agentMessageId, isUser: false, content: "", timestamp: new Date(), isLoading: true } });
 
     try {
       const response = await fetch(apiEndpoint, {
@@ -434,337 +394,240 @@ export function ChatUI() {
       });
 
       if (!response.ok || !response.body) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+        const errorData = await response.json().catch(() => ({ message: "Unknown error occurred" }));
+        throw new Error(response.statusText + ": " + (errorData.message || "Failed to fetch stream"));
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
-      let accumulatedContent = "";
+      let accumulatedAgentResponse = "";
+      let finalAgentConfig: AgentConfig | null = null;
 
       while (true) {
-        const { value, done } = await reader.read();
+        const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex;
-        while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.substring(0, newlineIndex).trim();
-          buffer = buffer.substring(newlineIndex + 1);
-
-          if (line) {
-            if (isAgentCreatorSession) {
-              try {
-                const jsonChunk = JSON.parse(line);
-                if (jsonChunk.agentResponseChunk) {
-                  accumulatedContent += jsonChunk.agentResponseChunk;
-                }
-                if (jsonChunk.suggestedConfig) {
-                  setPendingAgentConfig(jsonChunk.suggestedConfig as SavedAgentConfigType);
-                }
-                if (jsonChunk.error) {
-                  accumulatedContent += `\n\n[STREAM ERROR]: ${jsonChunk.error}`;
-                  console.error("Agent Creator Stream Error Chunk:", jsonChunk.error);
-                }
-                 if (jsonChunk.rawJsonForDebug) {
-                  console.log("Raw JSON for debug (parsing failed by flow):", jsonChunk.rawJsonForDebug);
-                }
-              } catch (e) {
-                console.warn("ChatUI: Failed to parse JSON chunk from agent creator stream:", line, e);
-                // If parsing fails, but we have content, append it as text
-                if (line.includes("agentResponseChunk") || line.includes("suggestedConfig")) { // Basic check
-                    // Avoid adding malformed JSON directly if it's not simple text
-                } else {
-                    accumulatedContent += line + "\n";
-                }
-              }
-            } else {
-              accumulatedContent += line + "\n";
+        const chunk = decoder.decode(value, { stream: true });
+        
+        // Check for special JSON block for agent configuration
+        if (chunk.includes('{"agentConfig":')) { // Basic check for the start of our special block
+          try {
+            const potentialJsonBlock = chunk.substring(chunk.indexOf('{"agentConfig":'));
+            const parsedChunk = JSON.parse(potentialJsonBlock);
+            if (parsedChunk.agentConfig) {
+              finalAgentConfig = parsedChunk.agentConfig;
+              // Don't add this control message to chat, but process it
+              setPendingAgentConfig(finalAgentConfig);
+              continue; // Skip adding this chunk to the message text
             }
+          } catch (e) { 
+            // Not a valid JSON block or not our agentConfig block, treat as regular text
           }
         }
-        setOptimisticMessages({ id: agentMessageId, sender: "agent", text: accumulatedContent, isStreaming: true });
+        
+        accumulatedAgentResponse += chunk;
+        setOptimisticMessages({ type: "update", id: agentMessageId, text: accumulatedAgentResponse, isStreaming: true });
       }
-
-      if (buffer.trim()) {
-         if (isAgentCreatorSession) {
-            try {
-                const jsonChunk = JSON.parse(buffer.trim());
-                 if (jsonChunk.agentResponseChunk) accumulatedContent += jsonChunk.agentResponseChunk;
-                 if (jsonChunk.suggestedConfig) setPendingAgentConfig(jsonChunk.suggestedConfig as SavedAgentConfigType);
-                 if (jsonChunk.error) accumulatedContent += `\n\n[STREAM ERROR]: ${jsonChunk.error}`;
-            } catch (e) {
-                console.warn("ChatUI: Failed to parse final JSON chunk:", buffer.trim(), e);
-                if (!isAgentCreatorSession || (!buffer.includes("agentResponseChunk") && !buffer.includes("suggestedConfig"))) {
-                   accumulatedContent += buffer.trim();
-                }
-            }
-         } else {
-            accumulatedContent += buffer.trim();
-         }
+      
+      setOptimisticMessages({ type: "update", id: agentMessageId, text: accumulatedAgentResponse, isStreaming: false });
+      
+      if (currentConvId && !finalAgentConfig) { // Only save if not an agent-creator response with pending config
+        await cs.addMessageToConversation(currentConvId, {
+          isUser: false,
+          content: accumulatedAgentResponse,
+          // timestamp: serverTimestamp(), // Let Firestore handle timestamp
+        });
+        setConversations(prevConvs => prevConvs.map(c => c.id === currentConvId ? { ...c, updatedAt: new Date(), lastMessagePreview: accumulatedAgentResponse.substring(0,30) } : c));
       }
-      setOptimisticMessages({ id: agentMessageId, sender: "agent", text: accumulatedContent, isStreaming: false });
-
-      if (activeConversationId && agentMessageStorageId) {
-        await cs.finalizeMessageInConversation(activeConversationId, agentMessageStorageId, accumulatedContent, false);
-      }
-      // Final update to the main messages state
-        setMessages(prevMsgs =>
-            prevMsgs.map(msg =>
-                msg.id === userMessageId ? userMessage : // ensure user message is the optimistic one
-                (msg.id === agentMessageId ? { ...pendingAgentMessage, text: accumulatedContent, isStreaming: false } : msg)
-            ).filter(msg => !(msg.id === agentMessageId && prevMsgs.find(pm => pm.id === agentMessageId && pm.sender === "agent"))) // Avoid duplicates if already added
-            .concat(prevMsgs.find(pm => pm.id === agentMessageId) ? [] : [{ ...pendingAgentMessage, text: accumulatedContent, isStreaming: false }]) // Add if not present
-        );
-
 
     } catch (error: any) {
-      console.error("Error during agent response streaming:", error);
-      const errorText = `Error: ${error.message}`;
-      setOptimisticMessages({ id: agentMessageId, sender: "agent", text: errorText, isStreaming: false, isError: true });
-      if (activeConversationId && agentMessageStorageId) {
-        await cs.finalizeMessageInConversation(activeConversationId, agentMessageStorageId, errorText, true);
+      console.error("Error streaming chat response:", error);
+      toast({ title: "Error", description: error.message || "Failed to get response from AI.", variant: "destructive" });
+      setOptimisticMessages({ type: "update", id: agentMessageId, text: "Sorry, something went wrong.", isStreaming: false });
+      if (currentConvId) {
+         await cs.addMessageToConversation(currentConvId, {
+          isUser: false,
+          content: "Sorry, something went wrong.",
+          // timestamp: serverTimestamp(), // Let Firestore handle timestamp
+        });
       }
-       setMessages(prevMsgs =>
-            prevMsgs.map(msg =>
-                msg.id === agentMessageId ? { ...pendingAgentMessage, text: errorText, isStreaming: false, isError: true } : msg
-            ).filter(msg => !(msg.id === agentMessageId && msg.isError && prevMsgs.find(pm => pm.id === agentMessageId && pm.isError)))
-            .concat(prevMsgs.find(pm => pm.id === agentMessageId) ? [] : [{ ...pendingAgentMessage, text: errorText, isStreaming: false, isError: true }])
-        );
     } finally {
       setIsPending(false);
     }
   };
 
-  const handleSavePendingAgent = () => {
-    if (!pendingAgentConfig || !setSavedAgents) return;
-
-    const toolsDetails = (pendingAgentConfig.agentTools || []).map(toolId => {
-        const foundTool = builderAvailableTools.find(t => t.id === toolId);
-        return {
-            id: toolId,
-            label: foundTool?.label || toolId, // Use label from builderAvailableTools
-            name: foundTool?.name || toolId, // Ensure name is populated
-            description: foundTool?.description || `Details for ${toolId}`,
-            hasConfig: foundTool?.hasConfig || false,
-            iconName: foundTool?.icon ? (Object.keys(iconComponents).find(key => iconComponents[key] === foundTool.icon) || "Default") : "Default", // Map icon component to name
-            genkitToolName: foundTool?.genkitToolName,
-        };
-    });
-
-    const finalConfig: SavedAgentConfigType = {
-      id: pendingAgentConfig.id || uuidv4(),
-      agentName: pendingAgentConfig.agentName || "Untitled Agent",
-      agentDescription: pendingAgentConfig.agentDescription || "",
-      agentVersion: pendingAgentConfig.agentVersion || "1.0.0",
-      agentIcon: pendingAgentConfig.agentIcon || "Sparkles",
-      agentTools: pendingAgentConfig.agentTools || [],
-      agentType: pendingAgentConfig.agentType || 'llm',
-      agentFramework: pendingAgentConfig.agentFramework || 'genkit',
-      globalInstruction: pendingAgentConfig.globalInstruction || pendingAgentConfig.agentGoal || "",
-      agentGoal: pendingAgentConfig.agentGoal || "",
-      agentTasks: pendingAgentConfig.agentTasks || "",
-      agentPersonality: pendingAgentConfig.agentPersonality || "",
-      agentRestrictions: pendingAgentConfig.agentRestrictions || "",
-      agentModel: pendingAgentConfig.agentModel || "googleai/gemini-1.5-flash-latest",
-      agentTemperature: pendingAgentConfig.agentTemperature !== undefined ? pendingAgentConfig.agentTemperature : 0.7,
-      detailedWorkflowType: pendingAgentConfig.detailedWorkflowType,
-      workflowDescription: pendingAgentConfig.workflowDescription,
-      loopMaxIterations: pendingAgentConfig.loopMaxIterations,
-      loopTerminationConditionType: pendingAgentConfig.loopTerminationConditionType,
-      loopExitToolName: pendingAgentConfig.loopExitToolName,
-      loopExitStateKey: pendingAgentConfig.loopExitStateKey,
-      loopExitStateValue: pendingAgentConfig.loopExitStateValue,
-      customLogicDescription: pendingAgentConfig.customLogicDescription,
-      enableStatePersistence: pendingAgentConfig.enableStatePersistence || false,
-      statePersistenceType: pendingAgentConfig.statePersistenceType || 'session',
-      initialStateValues: pendingAgentConfig.initialStateValues || [],
-      enableStateSharing: pendingAgentConfig.enableStateSharing || false,
-      stateSharingStrategy: pendingAgentConfig.stateSharingStrategy || 'none',
-      enableRAG: pendingAgentConfig.enableRAG || false,
-      enableArtifacts: pendingAgentConfig.enableArtifacts || false,
-      artifactStorageType: pendingAgentConfig.artifactStorageType || 'memory',
-      artifacts: pendingAgentConfig.artifacts || [],
-      cloudStorageBucket: pendingAgentConfig.cloudStorageBucket || "",
-      localStoragePath: pendingAgentConfig.localStoragePath || "",
-      ragMemoryConfig: pendingAgentConfig.ragMemoryConfig || { enabled: false, serviceType: "", projectId: "", location: "", ragCorpusName: "", similarityTopK: 0, vectorDistanceThreshold: 0, embeddingModel: "", knowledgeSources: [], includeConversationContext: false, persistentMemory: false },
-      a2aConfig: pendingAgentConfig.a2aConfig || { enabled: false, communicationChannels: [], defaultResponseFormat: "", maxMessageSize: 0, loggingEnabled: false },
-      toolsDetails: toolsDetails,
-      toolConfigsApplied: pendingAgentConfig.toolConfigsApplied || {},
-      templateId: 'custom_by_creator',
-      systemPromptGenerated: pendingAgentConfig.systemPromptGenerated || "",
-      subAgents: pendingAgentConfig.subAgents || [],
-      isRootAgent: pendingAgentConfig.isRootAgent !== undefined ? pendingAgentConfig.isRootAgent : true,
-    };
-
-    setSavedAgents(prev => [...(prev || []), finalConfig]);
-    toast({ title: "Agent Saved!", description: `Agent "${finalConfig.agentName}" has been saved.` });
-    setPendingAgentConfig(null);
+  const handleSelectConversation = (conversationId: string) => {
+    setActiveConversationId(conversationId);
+    setMessages([]); // Clear messages briefly while new ones load
   };
 
-  const handleDiscardPendingAgent = () => {
-    toast({ title: "Configuration Discarded", variant: "default" });
-    setPendingAgentConfig(null);
-  };
-
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [optimisticMessages, pendingAgentConfig]);
-
-  const handleNewConversation = useCallback(async () => {
-    if (!currentUserId) {
-      toast({ title: "Authentication Error", description: "Please log in.", variant: "destructive" });
-      return;
-    }
-    setIsLoadingConversations(true);
+  const handleNewConversation = async () => {
+    if (!currentUserId) return;
     try {
-      const newConv = await cs.createNewConversation(currentUserId, "Nova Conversa");
+      const newConv = await cs.createNewConversation(currentUserId, activeChatTarget?.name || "New Chat");
       if (newConv) {
-        setConversations((prev) => [newConv, ...prev]);
+        setConversations(prev => [newConv, ...prev]);
         setActiveConversationId(newConv.id);
         setMessages([]);
         setPendingAgentConfig(null);
-        setInputValue("");
-        removeSelectedFile();
-        toast({ title: "Nova Conversa Criada", description: `"${newConv.title}" iniciada.` });
-      } else {
-        toast({ title: "Erro", description: "Não foi possível criar uma nova conversa.", variant: "destructive" });
       }
     } catch (error) {
       console.error("Error creating new conversation:", error);
-      toast({ title: "Erro ao Criar", description: "Falha ao iniciar uma nova conversa.", variant: "destructive" });
-    } finally {
-      setIsLoadingConversations(false);
+      toast({ title: "Error", description: "Failed to create new conversation.", variant: "destructive" });
     }
-  }, [currentUserId, removeSelectedFile]);
+  };
 
-  const handleRenameConversation = useCallback(async (id: string, newTitle: string) => {
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!currentUserId) return;
     try {
-      await cs.renameConversationInStorage(id, newTitle);
-      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title: newTitle, updatedAt: new Date() } : c));
-      toast({ title: "Conversa Renomeada", description: `Conversa renomeada para ${newTitle}.`});
-    } catch (error) {
-      console.error("Error renaming conversation:", error);
-      toast({ title: "Erro", description: "Falha ao renomear conversa.", variant: "destructive" });
-    }
-  }, []);
-
-  const handleDeleteConversation = useCallback(async (conversationToDelete: Conversation) => {
-    if (!conversationToDelete || !conversationToDelete.id) return;
-    const { id } = conversationToDelete;
-    try {
-      await cs.deleteConversationFromStorage(id);
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (activeConversationId === id) {
+      await cs.deleteConversationAndMessages(conversationId);
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      if (activeConversationId === conversationId) {
         setActiveConversationId(null);
         setMessages([]);
-        setPendingAgentConfig(null);
       }
-      toast({ title: "Conversa Apagada" });
+      toast({ title: "Conversation Deleted" });
     } catch (error) {
       console.error("Error deleting conversation:", error);
-      toast({ title: "Erro", description: "Falha ao apagar conversa.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to delete conversation.", variant: "destructive" });
     }
-  }, [activeConversationId]);
+  };
+  
+  const fetchADKAgents = async () => {
+    setIsADKInitializing(true);
+    try {
+      const response = await fetch('/api/adk-agents');
+      if (!response.ok) throw new Error('Failed to fetch ADK agents');
+      const data = await response.json();
+      setAdkAgents(data.agents || []);
+    } catch (error) {
+      console.error('Error fetching ADK agents:', error);
+      toast({ title: 'Error Fetching ADK Agents', variant: 'destructive' });
+    } finally {
+      setIsADKInitializing(false);
+    }
+  };
 
-  const handleSelectConversationById = useCallback((id: string): void => {
-    if (!id) {
-      console.error("handleSelectConversationById called with invalid id");
-      return;
-    }
-    setActiveConversationId(id);
-    setPendingAgentConfig(null);
+  useEffect(() => {
+    fetchADKAgents();
   }, []);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setInputValue(event.target.value);
+  const handleSaveAgent = async (configToSave: AgentConfig | SavedAgentConfigType) => {
+    if (!currentUserId) return;
+    
+    const agentDataToSave: Omit<SavedAgentConfigType, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { userId: string } = {
+      ...configToSave,
+      userId: currentUserId,
+      framework: ('framework' in configToSave ? configToSave.framework : undefined) || ('agentFramework' in configToSave ? configToSave.agentFramework : undefined) || 'custom',
+      templateId: configToSave.templateId || "custom_llm", // Default templateId
+      toolsDetails: configToSave.toolsDetails || [], // Default toolsDetails
+      // Ensure other required fields from SavedAgentConfigType are present or defaulted
+      agentType: configToSave.agentType || "llm", // Example default for agentType
+    };
+
+    try {
+      let savedAgent;
+      if ('id' in configToSave && configToSave.id) { // It's an existing agent, update it
+        savedAgent = await updateAgent(configToSave.id, agentDataToSave);
+        toast({ title: "Agent Updated", description: `${savedAgent?.name || 'The agent'} has been updated.` });
+      } else { // It's a new agent, add it
+        savedAgent = await addAgent(agentDataToSave);
+        toast({ title: "Agent Saved", description: `${savedAgent?.name || 'The agent'} has been saved.` });
+      }
+      // Optionally, select the newly saved/updated agent
+      setSelectedAgentId(savedAgent.id);
+      setSelectedGemId(null); // Deselect any gem
+      setSelectedADKAgentId(null); // Deselect ADK agent
+      setPendingAgentConfig(null); // Clear pending config
+    } catch (error) {
+      console.error("Error saving agent:", error);
+      toast({ title: "Error Saving Agent", variant: "destructive" });
+    }
+  };
+
+  const handleSavePendingAgent = () => {
+    if (pendingAgentConfig) {
+      handleSaveAgent(pendingAgentConfig);
+    }
+  };
+
+  const handleDiscardPendingAgent = () => {
+    setPendingAgentConfig(null);
+    toast({ title: "Draft Discarded", description: "The proposed agent configuration has been discarded." });
   };
 
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion);
+    // Optionally auto-submit or focus input
+    inputRef.current?.focus();
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement> | string) => {
+    if (typeof e === 'string') {
+      setInputValue(e);
+    } else {
+      setInputValue(e.target.value);
+    }
   };
 
+  // Scroll to bottom when messages change, or pending state changes
   useEffect(() => {
-    const storedADKAgents = localStorage.getItem("adkAgents");
-    if (storedADKAgents) {
-      try {
-        const parsedAgents = JSON.parse(storedADKAgents) as ADKAgentConfig[];
-        setAdkAgents(parsedAgents);
-      } catch (e) { console.error("Failed to parse ADK agents from localStorage", e); }
+    if (scrollAreaRef.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('div'); // Target the inner div for scrolling
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
     }
-    setIsADKInitializing(false);
-  }, []);
+  }, [optimisticMessages, isPending]);
 
-  const selectedADKAgent = useMemo(() => {
-    if (!selectedADKAgentId || adkAgents.length === 0) return null;
-    return adkAgents.find((agent) => agent.name === selectedADKAgentId) || null;
-  }, [selectedADKAgentId, adkAgents]);
-
- const currentSelectedAgentForHeader = useMemo(() => {
-    if (selectedGemId && selectedGemId !== "none") {
-        const gem = initialGems.find(g => g.id === selectedGemId);
-        return gem ? { id: gem.id, name: gem.name, description: gem.description } : null;
-    }
-    if (selectedAgentId && selectedAgentId !== "none" && savedAgents) {
-        const agent = savedAgents.find(a => a.id === selectedAgentId);
-        return agent ? { id: agent.id, name: agent.agentName, description: agent.agentDescription } : null;
-    }
-    if (usingADKAgent && selectedADKAgentId && adkAgents) {
-        const adkAgent = adkAgents.find(a => a.name === selectedADKAgentId);
-        if (adkAgent) return { id: adkAgent.name, name: adkAgent.name, description: adkAgent.description };
-    }
-    const defaultGem = initialGems[0];
-    return defaultGem ? {id: defaultGem.id, name: defaultGem.name, description: defaultGem.description } : null;
-  }, [selectedGemId, selectedAgentId, savedAgents, usingADKAgent, selectedADKAgentId, adkAgents]);
-
-
-  if (authLoading) {
-    return <div className="flex h-full items-center justify-center"><p>Loading authentication...</p></div>;
+  if (!currentUser && auth.currentUser === null) { // Check auth.currentUser for initial load
+    // This block can be simplified if loading state from useAuth is used
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-full flex-col bg-muted/50">
       <ConversationSidebar
         isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
         conversations={conversations}
-        activeConversationId={activeConversationId}
-        onSelectConversation={handleSelectConversationById}
+        activeConversationId={activeConversationId || undefined}
+        onSelectConversation={async (id: string) => { setActiveConversationId(id); }}
         onNewConversation={handleNewConversation}
-        onRenameConversation={handleRenameConversation}
         onDeleteConversation={handleDeleteConversation}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isLoading={isLoadingConversations}
+        currentUserId={currentUserId}
       />
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <ChatHeader
-          activeChatTarget={currentSelectedAgentForHeader?.name || "Chat"}
-          usingADKAgent={usingADKAgent}
-          setUsingADKAgent={setUsingADKAgent}
-          selectedADKAgentId={selectedADKAgentId}
-          setSelectedADKAgentId={setSelectedADKAgentId}
-          adkAgents={adkAgents.map((agent) => ({ id: agent.name, name: agent.name, displayName: agent.name, description: agent.description }))}
-          isADKInitializing={isADKInitializing}
-          selectedAgentId={selectedAgentId}
-          setSelectedAgentId={setSelectedAgentId}
-          savedAgents={(savedAgents || []).map(a => ({id: a.id, name: a.agentName, displayName: a.agentName, description: a.agentDescription}))}
-          selectedGemId={selectedGemId}
-          setSelectedGemId={setSelectedGemId}
-          initialGems={initialGems.map(g => ({...g, displayName: g.name}))}
-          handleNewConversation={handleNewConversation}
+      <div className={cn("flex flex-col flex-1 transition-all duration-300 ease-in-out", isSidebarOpen ? "md:ml-72" : "ml-0")}>
+        <ChatHeader 
+          onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
           isSidebarOpen={isSidebarOpen}
-          onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-          handleLogin={handleLogin}
-          handleLogout={handleLogout}
+          activeChatTargetName={activeChatTarget?.name || "Chat"}
+          currentUser={currentUser}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          savedAgents={savedAgents}
+          adkAgents={adkAgents}
+          initialGems={initialGems}
+          iconComponents={iconComponents}
+          selectedAgentId={selectedAgentId}
+          onSelectAgent={(id) => { setSelectedAgentId(id); setSelectedGemId(null); setSelectedADKAgentId(null); setActiveConversationId(null); setMessages([]);}}
+          selectedGemId={selectedGemId}
+          onSelectGem={(id) => { setSelectedGemId(id); setSelectedAgentId(null); setSelectedADKAgentId(null); setActiveConversationId(null); setMessages([]);}}
+          onSelectADKAgent={(id) => { setSelectedADKAgentId(id); setSelectedAgentId(null); setSelectedGemId(null); setActiveConversationId(null); setMessages([]);}}
+          isLoadingAgents={isLoadingAgents || isADKInitializing}
+          onSaveAgentConfig={handleSaveAgent} // Pass the handler for saving
+          currentAgentConfig={selectedAgentConfig} // Pass the config for the agent being edited/viewed
         />
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 space-y-4" id="message-scroll-area">
-            {!currentUser && !authLoading ? (
-              <div className="flex flex-col items-center justify-center h-full">
+
+        <div className="flex-1 overflow-hidden relative">
+          <ScrollArea ref={scrollAreaRef} className="h-full p-4 pt-0">
+            {isLoadingMessages ? (
+              <div className="flex items-center justify-center h-full">
+                <p>Loading messages...</p> {/* Or a spinner component */}
+              </div>
+            ) : !currentUser ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <LogIn size={48} className="mb-4 text-primary" />
+                <h2 className="text-2xl font-semibold mb-2">Welcome to the Chat</h2>
                 <p className="mb-4 text-lg">Please log in to use the chat.</p>
                 <Button onClick={handleLogin} variant="default" size="lg">
                   <LogIn className="mr-2 h-5 w-5" /> Login with Google
@@ -778,7 +641,7 @@ export function ChatUI() {
           </ScrollArea>
 
           {pendingAgentConfig && (
-            <Card className="m-4 border-primary shadow-lg">
+            <Card className="m-4 border-primary shadow-lg absolute bottom-0 left-0 right-0 mb-20 bg-background z-10">
               <CardHeader>
                 <CardTitle>Review Proposed Agent Configuration</CardTitle>
                 <CardDescription>
@@ -803,9 +666,9 @@ export function ChatUI() {
         </div>
 
         <MessageInputArea
-          formRef={useRef<HTMLFormElement>(null)}
-          inputRef={inputRef}
-          fileInputRef={fileInputRef}
+          formRef={useRef<HTMLFormElement>(null)} // This ref is local to MessageInputArea, not needed from ChatUI state
+          inputRef={inputRef} // Pass the shared inputRef
+          fileInputRef={fileInputRef} // Pass the shared fileInputRef
           onSubmit={handleFormSubmit}
           isPending={isPending || !!pendingAgentConfig}
           selectedFile={selectedFile}

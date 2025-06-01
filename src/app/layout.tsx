@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AgentsProvider } from '@/contexts/AgentsContext';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { EnvironmentProvider } from '@/contexts/EnvironmentContext';
 
 // Import polyfills for Node.js modules in browser environment
@@ -65,18 +66,20 @@ export default function RootLayout({
         <NodePolyfillScript />
       </head>
       <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
-        <ThemeProvider>
-          <EnvironmentProvider>
-            <AgentsProvider>
-              <SidebarProvider defaultOpen>
-                <AppLayout>
-                  {children}
-                </AppLayout>
-              </SidebarProvider>
-            </AgentsProvider>
-            <Toaster />
-          </EnvironmentProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <EnvironmentProvider>
+              <AgentsProvider>
+                <SidebarProvider defaultOpen>
+                  <AppLayout>
+                    {children}
+                  </AppLayout>
+                </SidebarProvider>
+              </AgentsProvider>
+              <Toaster />
+            </EnvironmentProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -17,13 +17,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AvailableTool } from "@/types/agent-types";
+import type { ToolConfigData } from "@/types/agent-configs"; // Import ToolConfigData
 
 // Props para o componente ToolConfigModal.
 interface ToolConfigModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void; // Handles closing the modal
   configuringTool: AvailableTool | null;
-  onSave: () => void; // This will be handleSaveToolConfiguration from the parent
+  onSave: (toolId: string, configData: ToolConfigData) => void; // This will be handleSaveToolConfiguration from the parent
 
   modalGoogleApiKey: string; setModalGoogleApiKey: (value: string) => void;
   modalGoogleCseId: string; setModalGoogleCseId: (value: string) => void;
@@ -42,6 +43,24 @@ interface ToolConfigModalProps {
 
   InfoIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Pass Info icon component
 }
+
+// Define a mapping for tool-specific configuration keys
+const toolConfigKeys: Record<string, (keyof ToolConfigData)[]> = {
+  googleSearch: ["googleApiKey", "googleCseId"],
+  openapiTool: ["openapiSpecUrl", "openapiApiKey"],
+  databaseConnector: [
+    "dbType",
+    "dbHost",
+    "dbPort",
+    "dbName",
+    "dbUser",
+    "dbPassword",
+    "dbConnectionString",
+    "dbDescription",
+  ],
+  knowledgeBase: ["knowledgeBaseId"],
+  calendarAccess: ["calendarApiEndpoint"],
+};
 
 const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   isOpen,
@@ -64,6 +83,47 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   modalCalendarApiEndpoint, setModalCalendarApiEndpoint,
   InfoIcon,
 }) => {
+  const handleInternalSave = () => {
+    if (!configuringTool) return;
+
+    const configData: Partial<ToolConfigData> = {};
+    const toolId = configuringTool.id;
+
+    // Populate configData based on the tool type and its defined keys
+    switch (toolId) {
+      case "googleSearch":
+        configData.googleApiKey = modalGoogleApiKey;
+        configData.googleCseId = modalGoogleCseId;
+        break;
+      case "openapiTool":
+        configData.openapiSpecUrl = modalOpenapiSpecUrl;
+        configData.openapiApiKey = modalOpenapiApiKey;
+        break;
+      case "databaseConnector":
+        configData.dbType = modalDbType as ToolConfigData['dbType']; // Cast if modalDbType is broader
+        configData.dbHost = modalDbHost;
+        configData.dbPort = modalDbPort;
+        configData.dbName = modalDbName;
+        configData.dbUser = modalDbUser;
+        configData.dbPassword = modalDbPassword;
+        configData.dbConnectionString = modalDbConnectionString;
+        configData.dbDescription = modalDbDescription;
+        break;
+      case "knowledgeBase":
+        configData.knowledgeBaseId = modalKnowledgeBaseId;
+        break;
+      case "calendarAccess":
+        configData.calendarApiEndpoint = modalCalendarApiEndpoint;
+        break;
+      default:
+        // Handle other tools or throw an error if unexpected toolId
+        console.warn(`Unknown toolId for configuration: ${toolId}`);
+        break;
+    }
+
+    onSave(toolId, configData as ToolConfigData); // Call the parent's onSave with all data
+  };
+
   if (!configuringTool) {
     return null; // Não renderiza nada se não houver ferramenta para configurar
   }
@@ -205,7 +265,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
         </div>
         <DialogFooter>
            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-           <Button onClick={onSave}>Salvar Configuração da Ferramenta</Button>
+           <Button onClick={handleInternalSave}>Salvar Configuração da Ferramenta</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -6,7 +6,7 @@
  */
 import { defineFlow } from '@genkit-ai/core';
 import { z } from 'zod';
-import { ai, generate, type MessageData, type Part } from '@genkit-ai/ai'; // For history type, added Part
+import { generate, generateStream, type MessageData, type Part } from '@genkit-ai/ai';
 import { gemini15Pro } from '@genkit-ai/googleai'; // Using Gemini 1.5 Pro, removed unused gemini10Pro
 import { logger } from '@/lib/logger'; // Assuming a logger
 
@@ -78,161 +78,181 @@ Be helpful, thorough, and conversational.
 
 
 // 1. Input and Output Schemas
-export const AgentCreatorFlowInputSchema = z.object({
-  userId: z.string().optional().describe("User ID for context, if available."),
-  userMessage: z.string().describe("The user's current message."),
-  history: z.array(z.object({
-    role: z.enum(['user', 'model', 'system']),
-    content: z.array(z.object({text: z.string()})),
-  })).optional().describe("Conversation history."),
-  stream: z.boolean().optional().default(true).describe("Whether to stream the response."),
+const RoleEnum = z.enum(["user", "model", "system"]); // Define Role enum for clarity
+
+// Define a schema for individual message parts if not already available from Genkit
+const MessagePartSchema = z.object({
+  text: z.string().optional(),
+  // Add other part types if necessary, e.g., toolRequest, toolResponse
 });
 
+// Define a schema for MessageData
+const MessageDataSchema = z.object({
+  role: RoleEnum,
+  content: z.array(MessagePartSchema),
+});
+
+export const AgentCreatorFlowInputSchema = z.object({
+  messages: z.array(MessageDataSchema), // Changed from userMessage to messages array
+  stream: z.boolean().optional().default(true),
+  userId: z.string().optional(),
+  history: z.array(z.object({
+    role: RoleEnum,
+    content: z.array(z.object({ text: z.string() })),
+  })).optional(),
+  tools: z.any().optional(), // Placeholder for Genkit tools schema
+  toolChoice: z.any().optional(), // Placeholder for Genkit toolChoice schema
+});
+export type AgentCreatorFlowInput = z.infer<typeof AgentCreatorFlowInputSchema>;
 
 
 // 3. Agent Creator Flow Definition
 export const agentCreatorFlow = defineFlow(
-  {
-    name: 'agentCreatorFlow',
+  'agentCreatorFlow', // name: string
+  { // options: FlowDefinition<S, O, SC>
     inputSchema: AgentCreatorFlowInputSchema,
-    outputSchema: z.void(), // Output is handled via streamCallback
-  } as const,
-  async (input: AgentCreatorFlowInput, streamCallback?: (chunk: any) => void | Promise<void>) => {
-    const { userMessage, history = [], stream = true } = input;
+    outputSchema: AgentCreatorFlowStreamOutputSchema,
+    streamSchema: AgentCreatorFlowStreamOutputSchema,
+  },
+  // handler: FlowHandler<S, O, SC>
+  async (input: AgentCreatorFlowInput, { sendChunk }: { sendChunk: (chunk: AgentCreatorFlowStreamOutput) => void | Promise<void> }) => {
+    // Variables defined at the top of the handler scope
+    let accumulatedText: string = "";
+    let jsonProcessedMidStream: boolean = false;
+    // Destructure input with aliases for clarity and to match previous usage patterns
+    const { messages: inputMessages, stream: inputStream, tools: inputTools, toolChoice: inputToolChoice } = input;
+    const currentStreamSetting = inputStream ?? true; // Default to true
 
-    if (!streamCallback && stream) {
-        logger.error("[AgentCreatorFlow] Stream mode is true but no streamCallback was provided.");
-        throw new Error("streamCallback is required for streaming in agentCreatorFlow.");
-    }
+    // Helper function: extractJsonFromMarkdown - defined within handler scope
+    const extractJsonFromMarkdown = (text: string): string | null => {
+      const match = text.match(/```json\n([\s\S]*?)\n```/);
+      return match ? match[1] : null;
+    };
 
-    const messages: MessageData[] = [
-      { role: 'system', content: [{ text: SYSTEM_PROMPT_AGENT_CREATOR }] },
-    ];
-
-    history.forEach((h: MessageData) => {
-        // Ensure content is an array of Parts and all parts are text.
-        if (h.role && h.content && Array.isArray(h.content) && h.content.every((c: Part) => typeof c.text === 'string')) {
-            messages.push(h as MessageData); // Cast is okay if structure aligns, which it does due to the check.
+    // Helper function: tryParseFinalJson - defined within handler scope
+    const tryParseFinalJson = async (text: string, isStreamingContext: boolean, chunkCallback: typeof sendChunk): Promise<SavedAgentConfiguration | null> => {
+      logger.debug(`[tryParseFinalJson] Attempting to parse (isStreaming: ${isStreamingContext}): ${text.substring(0,100)}...`);
+      if (!text.trim()) {
+        return null;
+      }
+      try {
+        const extracted = extractJsonFromMarkdown(text);
+        if (extracted) {
+          const config = JSON.parse(extracted) as SavedAgentConfiguration;
+          // USER ACTION: Verify that 'name' and 'description' exist and are required on SavedAgentConfiguration type.
+          // If they are optional or named differently, this check will need adjustment.
+          if (config && config.name && config.description) { 
+            logger.info('[tryParseFinalJson] Successfully parsed JSON config.');
+            await chunkCallback({ suggestedConfig: config, agentResponseChunk: isStreamingContext ? undefined : "Final configuration extracted." });
+            return config;
+          }
         }
-    });
-    messages.push({ role: 'user', content: [{ text: userMessage }] });
+      } catch (e) {
+        logger.warn('[tryParseFinalJson] Failed to parse JSON from text.', e);
+        if (!isStreamingContext) {
+          // Only send error if not streaming, as streaming might recover or send text later
+          await chunkCallback({ error: 'Failed to extract valid JSON configuration from the response.' });
+        }
+      }
+      // If not streaming and no JSON found (or parsing failed), send the raw text as a response chunk
+      if (!isStreamingContext && text.trim()) {
+          await chunkCallback({ agentResponseChunk: text }); // Send raw text if no JSON and not streaming context
+      }
+      return null;
+    };
 
+    // Main try-catch for the flow logic
     try {
-      const llmResponse = await generate({
-        model: gemini15Pro,
-        messages: messages,
-        stream: stream,
-        config: { temperature: 0.5 },
-      });
+      if (!currentStreamSetting) {
+        logger.info('[AgentCreatorFlow] Using non-streaming generate.');
+        // Switched to multi-argument generate, as per Genkit documentation patterns
+        const llmResponse = await generate(
+          gemini15Pro, // model
+          { // options
+            messages: inputMessages, // Ensure this uses the destructured alias
+            config: { temperature: 0.5 },
+            tools: inputTools, // Pass if defined in schema and available
+            toolChoice: inputToolChoice, // Pass if defined in schema and available
+          }
+        );
+        accumulatedText = llmResponse.text ?? ""; // Use .text property (no parentheses)
+        logger.info(`[AgentCreatorFlow] Non-streaming generation complete. Accumulated text length: ${accumulatedText.length}`);
+      } else {
+        logger.info('[AgentCreatorFlow] Using streaming generateStream.');
+        // Switched to multi-argument generateStream, as per Genkit documentation patterns
+        const { stream: modelStream, response: modelResponsePromise } = await generateStream(
+          gemini15Pro, // model
+          { // options
+            messages: inputMessages, // Ensure this uses the destructured alias
+            config: { temperature: 0.5 },
+            tools: inputTools, // Pass if defined in schema and available
+            toolChoice: inputToolChoice, // Pass if defined in schema and available
+          }
+        );
 
-      let accumulatedText = "";
-      let jsonProcessedMidStream = false; // Flag to track if JSON was handled mid-stream
+        for await (const part of modelStream) {
+          if (part.text) { // Use .text property (no parentheses)
+            const textContent = part.text ?? "";
+            accumulatedText += textContent;
+            await sendChunk({ agentResponseChunk: textContent });
 
-      for await (const chunk of llmResponse.stream()) {
-        const textContent = chunk.text();
-        if (!textContent) continue;
-
-        accumulatedText += textContent;
-
-        // Optimistic mid-stream parsing for early preview
-        if (accumulatedText.includes("```json") && accumulatedText.trim().endsWith("```")) {
-          const jsonRegex = /```json\n([\s\S]*?)\n```/;
-          const match = accumulatedText.match(jsonRegex);
-
-          if (match && match[1]) {
-            const jsonString = match[1];
-            try {
-              const parsedConfig = JSON.parse(jsonString);
-              logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON mid-stream (optimistic).");
-
-              const textBeforeJson = accumulatedText.substring(0, match.index!).trim();
-              if (textBeforeJson) {
-                streamCallback?.({ agentResponseChunk: textBeforeJson });
+            // Mid-stream JSON parsing attempt
+            if (accumulatedText.includes('```json') && accumulatedText.trim().endsWith('```')) {
+              const extracted = extractJsonFromMarkdown(accumulatedText);
+              if (extracted) {
+                try {
+                  const config = JSON.parse(extracted) as SavedAgentConfiguration;
+                  // USER ACTION: Verify that 'name' exists on SavedAgentConfiguration type.
+                  // This is a common check for a valid config object.
+                  if (config && config.name) { 
+                    await sendChunk({ suggestedConfig: config });
+                    jsonProcessedMidStream = true;
+                    logger.info('[AgentCreatorFlow] Successfully parsed and sent config mid-stream.');
+                  }
+                } catch (e) {
+                  logger.debug('[AgentCreatorFlow] Mid-stream JSON block detected but failed to parse, continuing stream.', e);
+                }
               }
-
-              streamCallback?.({
-                agentResponseChunk: "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes.",
-                suggestedConfig: parsedConfig
-              });
-
-              // Clear the processed part from accumulatedText
-              accumulatedText = accumulatedText.substring(match.index! + match[0].length);
-              jsonProcessedMidStream = true; // Mark that we've processed JSON
-
-            } catch (e: any) {
-              // Parsing failed mid-stream, could be incomplete JSON.
-              // Log and continue accumulating. The robust post-loop parsing will handle it.
-              logger.debug('[AgentCreatorFlow] Optimistic JSON parsing failed mid-stream, continuing accumulation. Error details:', e);
             }
+          } else if (part.toolRequests && part.toolRequests.length > 0) {
+            logger.warn('[AgentCreatorFlow] Received tool requests, but not processing them in this version.', part.toolRequests);
+            await sendChunk({ error: "Tool requests are not handled in this agent creator version.", rawJsonForDebug: JSON.stringify(part.toolRequests) });
           }
         }
-      } // End of for-await loop
-
-      // Robust post-loop processing for any remaining accumulatedText
-      if (accumulatedText.trim()) {
-        const jsonRegex = /```json\n([\s\S]*?)\n```/;
-        const match = accumulatedText.match(jsonRegex);
-
-        if (match && match[1]) {
-          const jsonString = match[1];
-          try {
-            const parsedConfig = JSON.parse(jsonString);
-            logger.info("[AgentCreatorFlow] Successfully parsed suggestedConfig JSON from final accumulated text.");
-
-            // Stream text before JSON, if any, and if JSON wasn't already handled mid-stream
-            const textBeforeJson = accumulatedText.substring(0, match.index!).trim();
-            if (textBeforeJson) {
-                streamCallback?.({ agentResponseChunk: textBeforeJson });
+        logger.info(`[AgentCreatorFlow] Streaming generation complete. Accumulated text length: ${accumulatedText.length}`);
+        
+        const finalModelResponse = await modelResponsePromise;
+        // .candidates() access removed as it was causing errors and its utility here was minor.
+        // logger.info(`[AgentCreatorFlow] Stream finished. Finish reason: ${finalModelResponse.candidates()?.[0]?.finishReason}`);
+        
+        // If no text was accumulated during streaming but the final response has text (e.g., non-streaming part of a stream)
+        if (!accumulatedText && finalModelResponse.text) { // Use .text property
+            accumulatedText = finalModelResponse.text ?? "";
+            if (accumulatedText) {
+              await sendChunk({ agentResponseChunk: accumulatedText });
             }
-
-            // Send the suggested config. If it was already sent mid-stream, this might be redundant
-            // or could be a corrected version if the LLM sent more data.
-            // UI should ideally handle duplicate `suggestedConfig` if states are the same.
-            streamCallback?.({
-              agentResponseChunk: !jsonProcessedMidStream ? "I've drafted the agent configuration based on our conversation. Please review it below. You can then save it or ask for more changes." : "",
-              suggestedConfig: parsedConfig
-            });
-
-            const textAfterJson = accumulatedText.substring(match.index! + match[0].length).trim();
-            if (textAfterJson) {
-                streamCallback?.({ agentResponseChunk: textAfterJson });
-            }
-          } catch (e: any) {
-            logger.warn('[AgentCreatorFlow] Failed to parse JSON from final accumulated text. Error details:', e);
-            // Send the conversational part that might have preceded the malformed JSON.
-            const textBeforePotentialJson = match.index! > 0 ? accumulatedText.substring(0, match.index!).trim() : "";
-
-            // If JSON was processed mid-stream, we might have already sent the text before it.
-            // Only send textBeforePotentialJson if it's different from what might have been part of mid-stream processing.
-            // However, accumulatedText here is *only* what remained *after* mid-stream processing. So this is fine.
-            if (textBeforePotentialJson) {
-                 streamCallback?.({ agentResponseChunk: textBeforePotentialJson });
-            }
-            streamCallback?.({
-              agentResponseChunk: "\n\nI attempted to provide a configuration, but it seems to be malformed.",
-              error: `Malformed configuration JSON. Please review the raw output. Error: ${e instanceof Error ? e.message : String(e)}`,
-              rawJsonForDebug: jsonString
-            });
-          }
-        } else {
-          // No JSON block found in the remaining accumulated text.
-          // If JSON was already processed mid-stream, this is just trailing text.
-          // If no JSON was ever processed, this is the full conversational response.
-          streamCallback?.({ agentResponseChunk: accumulatedText });
         }
-      } else if (jsonProcessedMidStream && !accumulatedText.trim()) {
-        // This case means JSON was processed mid-stream and there was no trailing text.
-        // We might want to send a confirmation or ensure the UI knows the stream ended.
-        // For now, this is implicitly handled as the loop ends and no more chunks are sent.
-        logger.info("[AgentCreatorFlow] JSON processed mid-stream and no further text followed.");
+      }
+
+      // Final attempt to parse JSON from the full accumulated text if not done mid-stream
+      if (!jsonProcessedMidStream && accumulatedText.trim()) {
+        logger.info('[AgentCreatorFlow] Attempting to parse final JSON from accumulated text.');
+        // Pass currentStreamSetting to tryParseFinalJson to indicate context
+        await tryParseFinalJson(accumulatedText, currentStreamSetting, sendChunk);
+      } else if (jsonProcessedMidStream) {
+        logger.info('[AgentCreatorFlow] JSON was processed and sent mid-stream.');
+      } else if (!accumulatedText.trim()) {
+        logger.warn('[AgentCreatorFlow] No text accumulated for final JSON parsing. LLM might have returned empty content.');
       }
 
     } catch (err: unknown) {
-      logger.error('[AgentCreatorFlow] Error in generate call or streaming loop. Error details:', err);
-      if (streamCallback) {
-        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during agent creation LLM call.';
-        streamCallback({ error: errorMessage });
+      logger.error('[AgentCreatorFlow] Error in flow handler try block. Error details:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during agent creation.';
+      try {
+        await sendChunk({ error: errorMessage });
+      } catch (sendChunkError) {
+        logger.error('[AgentCreatorFlow] Critical: Failed to send error chunk via sendChunk:', sendChunkError);
       }
-    }
-  }
-);
+    } 
+  } // End of async handler function
+); // End of defineFlow call

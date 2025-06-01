@@ -167,9 +167,13 @@ export default function ChatHeader({
             selectedAgentId={selectedGemId ?? undefined}
             savedAgents={initialGems.map((gem) => ({
               id: gem.id,
-              displayName: gem.name,
-              description: gem.prompt,
-              model: '', // Mantido para compatibilidade de tipo.
+              agentName: gem.name, // Mapeado de gem.name
+              agentDescription: gem.prompt || '', // Mapeado de gem.prompt
+              agentVersion: '1.0.0', // Padrão
+              config: { type: 'custom', framework: 'genkit' } as import('@/types/agent-configs').AgentConfig, // Configuração mínima
+              tools: [], // Padrão
+              // Outros campos opcionais de SavedAgentConfiguration podem ser omitidos ou ter padrões
+              // Ex: icon, templateId, toolConfigsApplied, toolsDetails, createdAt, updatedAt
             }))}
             showLabel={false}
             triggerClassName=""
