@@ -14,6 +14,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Network, Plus, Terminal } from "lucide-react";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
+import {
   A2AConfig as A2AConfigType,
   CommunicationChannel,
 } from "@/types/a2a-types";
@@ -85,7 +92,16 @@ export function A2AConfig({
 
       <div className="space-y-4 mt-2">
         <div className="flex justify-between items-center">
-          <Label className="text-sm font-medium">Canais de Comunicação</Label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <Label className="text-sm font-medium">Canais de Comunicação</Label>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Define dedicated pathways for information exchange between agents, specifying how they connect and interact.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             variant="outline"
             size="sm"
@@ -129,12 +145,21 @@ export function A2AConfig({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label
-                        htmlFor={`channel-direction-${channel.id}`}
-                        className="text-xs"
-                      >
-                        Direção
-                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Label
+                              htmlFor={`channel-direction-${channel.id}`}
+                              className="text-xs"
+                            >
+                              Direção
+                            </Label>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Inbound: Agent receives messages. Outbound: Agent sends messages. Bidirectional: Agent can send and receive messages.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Select
                         value={channel.direction}
                         onValueChange={(value) =>
@@ -167,12 +192,21 @@ export function A2AConfig({
                       </Select>
                     </div>
                     <div>
-                      <Label
-                        htmlFor={`channel-format-${channel.id}`}
-                        className="text-xs"
-                      >
-                        Formato
-                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Label
+                              htmlFor={`channel-format-${channel.id}`}
+                              className="text-xs"
+                            >
+                              Formato
+                            </Label>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Defines the data structure for messages (JSON for structured data, Text for plain text, Binary for custom formats).</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Select
                         value={channel.messageFormat}
                         onValueChange={(value) =>
@@ -196,6 +230,24 @@ export function A2AConfig({
                       </Select>
                     </div>
                   </div>
+                  {(channel.direction === "outbound" ||
+                    channel.direction === "bidirectional") && (
+                    <div className="mt-3">
+                      <Label className="text-xs">Agente Alvo</Label>
+                      <SubAgentSelector
+                        selectedAgents={
+                          channel.targetAgentId ? [channel.targetAgentId] : []
+                        }
+                        availableAgents={savedAgents}
+                        onChange={(selectedIds) => {
+                          handleUpdateChannel(index, {
+                            ...channel,
+                            targetAgentId: selectedIds[0] || undefined,
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -204,13 +256,31 @@ export function A2AConfig({
       </div>
 
       <div className="mt-4 space-y-4">
-        <h4 className="text-sm font-medium">Políticas de Comunicação</h4>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <h4 className="text-sm font-medium">Políticas de Comunicação</h4>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>General rules governing A2A interactions for this agent.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="defaultResponseFormat" className="text-xs">
-              Formato de Resposta Padrão
-            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Label htmlFor="defaultResponseFormat" className="text-xs">
+                    Formato de Resposta Padrão
+                  </Label>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Default message format this agent uses when responding, if not specified by the channel.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Select
               value={a2aConfig.defaultResponseFormat}
               onValueChange={(value) =>
@@ -231,9 +301,18 @@ export function A2AConfig({
           </div>
 
           <div>
-            <Label htmlFor="maxMessageSize" className="text-xs">
-              Tamanho Máximo de Mensagem (bytes)
-            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Label htmlFor="maxMessageSize" className="text-xs">
+                    Tamanho Máximo de Mensagem (bytes)
+                  </Label>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Maximum allowed size for a single message to prevent overload.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Input
               id="maxMessageSize"
               type="number"
@@ -259,7 +338,16 @@ export function A2AConfig({
               setA2AConfig({ ...a2aConfig, loggingEnabled: checked })
             }
           />
-          <Label htmlFor="loggingEnabled">Habilitar log de comunicação</Label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <Label htmlFor="loggingEnabled">Habilitar log de comunicação</Label>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Enables recording of A2A message exchanges for debugging or auditing.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
     </div>
