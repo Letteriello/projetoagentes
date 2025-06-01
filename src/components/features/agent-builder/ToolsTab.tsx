@@ -20,6 +20,7 @@ interface ToolsTabProps {
   SettingsIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Actual Settings component
   CheckIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Actual Check component
   AlertIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Icon for the Alert (e.g., Wand2)
+  isSequentialWorkflow?: boolean; // MODIFIED: Added prop
 }
 
 const ToolsTab: React.FC<ToolsTabProps> = ({
@@ -33,12 +34,52 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
   SettingsIcon,
   CheckIcon,
   AlertIcon,
+  isSequentialWorkflow,
 }) => {
   const handleSelectTool = (toolId: string, checked: boolean) => {
-    setSelectedTools((prev: string[]) =>
-      checked ? [...prev, toolId] : prev.filter(id => id !== toolId)
-    );
+    setSelectedTools((prevSelectedTools: string[]) => {
+      if (checked) {
+        // Add tool to the end of the list if not already present
+        return prevSelectedTools.includes(toolId) ? prevSelectedTools : [...prevSelectedTools, toolId];
+      } else {
+        // Remove tool and its configuration if it exists
+        // Note: toolConfigurations are handled in the main form, this just updates the ID list
+        return prevSelectedTools.filter(id => id !== toolId);
+      }
+    });
   };
+
+  const handleMoveToolUp = (toolId: string) => {
+    setSelectedTools((prevSelectedTools) => {
+      const index = prevSelectedTools.indexOf(toolId);
+      if (index > 0) {
+        const newSelectedTools = [...prevSelectedTools];
+        [newSelectedTools[index - 1], newSelectedTools[index]] = [newSelectedTools[index], newSelectedTools[index - 1]];
+        return newSelectedTools;
+      }
+      return prevSelectedTools;
+    });
+  };
+
+  const handleMoveToolDown = (toolId: string) => {
+    setSelectedTools((prevSelectedTools) => {
+      const index = prevSelectedTools.indexOf(toolId);
+      if (index < prevSelectedTools.length - 1 && index !== -1) {
+        const newSelectedTools = [...prevSelectedTools];
+        [newSelectedTools[index + 1], newSelectedTools[index]] = [newSelectedTools[index], newSelectedTools[index + 1]];
+        return newSelectedTools;
+      }
+      return prevSelectedTools;
+    });
+  };
+
+  // Display selected tools first, in their selected order, then unselected tools
+  const sortedTools = React.useMemo(() => {
+    const selectedToolObjects = selectedTools.map(id => availableTools.find(tool => tool.id === id)).filter(Boolean) as AvailableTool[];
+    const unselectedToolObjects = availableTools.filter(tool => !selectedTools.includes(tool.id));
+    return [...selectedToolObjects, ...unselectedToolObjects];
+  }, [availableTools, selectedTools]);
+
 
   return (
     <TabsContent value="tools" className="space-y-6 mt-4">
@@ -47,23 +88,43 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
         <AlertTitle>Gerenciamento de Ferramentas</AlertTitle>
         <AlertDescription>
           Selecione as ferramentas que este agente poderá utilizar. Algumas ferramentas podem requerer configuração adicional clicando em 'Configurar'.
+          {isSequentialWorkflow && " Para workflows sequenciais, a ordem das ferramentas selecionadas é importante e pode ser ajustada usando os botões de mover."}
         </AlertDescription>
       </Alert>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {availableTools.map((tool) => (
-          <ToolCard
-            key={tool.id}
-            tool={tool}
-            isSelected={selectedTools.includes(tool.id)}
-            onSelectTool={handleSelectTool}
-            onConfigureTool={handleToolConfigure}
-            toolConfig={toolConfigurations[tool.id]}
-            iconComponents={iconComponents}
-            Wand2IconComponent={Wand2Icon} // Pass the component itself
-            SettingsIconComponent={SettingsIcon} // Pass the component itself
-            CheckIconComponent={CheckIcon} // Pass the component itself
-          />
-        ))}
+        {sortedTools.map((tool, index) => {
+          const isSelected = selectedTools.includes(tool.id);
+          // Determine if the tool is the first or last *among selected tools* for enabling/disabling move buttons
+          // This only matters if the workflow is sequential and the tool is selected.
+          let isFirstSelectedTool = false;
+          let isLastSelectedTool = false;
+
+          if (isSequentialWorkflow && isSelected) {
+            const selectedToolIndex = selectedTools.indexOf(tool.id);
+            isFirstSelectedTool = selectedToolIndex === 0;
+            isLastSelectedTool = selectedToolIndex === selectedTools.length - 1;
+          }
+
+          return (
+            <ToolCard
+              key={tool.id}
+              tool={tool}
+              isSelected={isSelected}
+              onSelectTool={handleSelectTool}
+              onConfigureTool={handleToolConfigure}
+              toolConfig={toolConfigurations[tool.id]}
+              iconComponents={iconComponents}
+              Wand2IconComponent={Wand2Icon}
+              SettingsIconComponent={SettingsIcon}
+              CheckIconComponent={CheckIcon}
+              isSequentialWorkflow={isSequentialWorkflow && isSelected} // Pass only if selected in sequential
+              onMoveToolUp={isSequentialWorkflow && isSelected ? handleMoveToolUp : undefined}
+              onMoveToolDown={isSequentialWorkflow && isSelected ? handleMoveToolDown : undefined}
+              isFirstTool={isFirstSelectedTool}
+              isLastTool={isLastSelectedTool}
+            />
+          );
+        })}
       </div>
       {availableTools.length === 0 && (
         <p className="text-sm text-muted-foreground text-center">Nenhuma ferramenta disponível no momento.</p>
