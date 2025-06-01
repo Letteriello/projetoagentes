@@ -26,6 +26,13 @@ export interface ChatMessageUI {
   fileDataUri?: string;
   isStreaming?: boolean; // Added for streaming
   status?: 'pending' | 'completed' | 'error'; // Added status for UI
+  toolUsed?: {
+    name: string;
+    status?: 'pending' | 'success' | 'error';
+    input?: Record<string, any>; // Or a more specific type if available
+    output?: any; // Or a more specific type if available
+  };
+  feedback?: 'liked' | 'disliked' | null; // Added for message feedback
 }
 
 // You might also want a type for the overall chat state if you use a reducer or context

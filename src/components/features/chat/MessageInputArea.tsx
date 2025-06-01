@@ -42,6 +42,7 @@ export default function MessageInputArea({
   onInputChange,
 }: MessageInputAreaProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const MAX_TEXTAREA_ROWS = 6; // Define max rows for textarea
 
   useEffect(() => {
     if (selectedFile) {
@@ -59,6 +60,40 @@ export default function MessageInputArea({
       if (formRef.current) {
         formRef.current.requestSubmit();
       }
+    }
+  };
+
+  const internalHandleChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>,
+  ) => {
+    // Call the parent's handler to update inputValue
+    onInputChange(event);
+
+    // Dynamic height adjustment
+    const textarea = event.target;
+    textarea.rows = 1; // Reset rows to 1 to correctly calculate scrollHeight
+    // Ensure line-height is properly computed. If it's 'normal', this might need a default.
+    const computedStyle = getComputedStyle(textarea);
+    let lineHeight = parseInt(computedStyle.lineHeight, 10);
+    if (isNaN(lineHeight) && computedStyle.lineHeight === 'normal') {
+      // Estimate line height if "normal" - this is an approximation
+      // A more robust solution might involve a hidden div or ensuring CSS sets a specific line-height
+      const fontSize = parseInt(computedStyle.fontSize, 10);
+      lineHeight = Math.floor(fontSize * 1.2); // Common approximation for "normal"
+    }
+
+
+    const scrollHeight = textarea.scrollHeight;
+    const newRows = Math.min(
+      MAX_TEXTAREA_ROWS,
+      Math.max(1, Math.floor(scrollHeight / lineHeight)),
+    );
+    textarea.rows = newRows;
+
+    if (newRows >= MAX_TEXTAREA_ROWS) {
+      textarea.style.overflowY = "auto";
+    } else {
+      textarea.style.overflowY = "hidden";
     }
   };
 
@@ -116,10 +151,10 @@ export default function MessageInputArea({
           placeholder="Digite sua mensagem ou '/ ' para comandos..."
           rows={1}
           value={inputValue}
-          onChange={onInputChange}
+          onChange={internalHandleChange}
           onKeyDown={handleTextareaKeyDown}
           disabled={isPending}
-          className="min-h-[44px] max-h-36 pr-12 resize-none custom-scrollbar py-2.5 leading-tight"
+          className="min-h-[44px] pr-12 resize-none overflow-y-hidden custom-scrollbar py-2.5 leading-tight"
         />
         {/* Character count or other indicators can go here if needed */}
       </div>

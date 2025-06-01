@@ -302,6 +302,52 @@ export const finalizeMessageInConversation = async (
   }
 };
 
+/**
+ * Updates the feedback status of a specific message within a conversation.
+ * @param conversationId The ID of the conversation.
+ *  @param messageId The ID of the message to update.
+ * @param feedback The feedback status ('liked', 'disliked', or null).
+ * @returns A promise that resolves when the operation is complete, or throws on error.
+ */
+export async function updateMessageFeedback(
+  conversationId: string,
+  messageId: string,
+  feedback: 'liked' | 'disliked' | null
+): Promise<void> {
+  if (!conversationId || !messageId) {
+    console.error("updateMessageFeedback: conversationId and messageId are required.");
+    throw new Error("Conversation ID and Message ID are required.");
+  }
+  try {
+    const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
+
+    // Ensure the message exists before attempting to update (optional, but good practice)
+    const messageSnap = await getDoc(messageRef);
+    if (!messageSnap.exists()) {
+      console.warn(`Message with ID ${messageId} not found in conversation ${conversationId}. Cannot update feedback.`);
+      // Depending on desired behavior, could throw an error or return silently.
+      // For now, let's throw an error to make it clear if a message isn't found.
+      throw new Error(`Message with ID ${messageId} not found.`);
+    }
+
+    await updateDoc(messageRef, {
+      feedback: feedback, // Store the feedback status
+      // Optionally, you might want to update another timestamp here, e.g., 'lastInteractedAt'
+    });
+
+    // Also update the parent conversation's 'updatedAt' timestamp
+    // to reflect recent activity, if this interaction is considered an update.
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    await updateDoc(conversationDocRef, {
+        updatedAt: serverTimestamp(), // Or a specific 'lastFeedbackAt' field
+    });
+
+  } catch (error) {
+    console.error(`Error updating feedback for message ${messageId} in conversation ${conversationId}:`, error);
+    throw error; // Re-throw for caller to handle
+  }
+}
+
 
 /*
  Firestore Security Rules (Conceptual - to be defined/updated in firestore.rules):

@@ -8,7 +8,7 @@ import React, {
   FormEvent,
 } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Send, PaperclipIcon, X, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
@@ -31,12 +31,31 @@ export function StreamingInputArea({
   const [inputValue, setInputValue] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileDataUri, setFileDataUri] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_TEXTAREA_ROWS = 6; // Define max rows for textarea
+
   // Manipula mudanças no campo de entrada
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value);
+
+    // Dynamic height adjustment
+    const textarea = e.target;
+    textarea.rows = 1; // Reset rows to 1 to correctly calculate scrollHeight
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight, 10);
+    const scrollHeight = textarea.scrollHeight;
+    const newRows = Math.min(
+      MAX_TEXTAREA_ROWS,
+      Math.max(1, Math.floor(scrollHeight / lineHeight)),
+    );
+    textarea.rows = newRows;
+
+    if (newRows >= MAX_TEXTAREA_ROWS) {
+      textarea.style.overflowY = "auto";
+    } else {
+      textarea.style.overflowY = "hidden";
+    }
   };
 
   // Manipula envio do formulário
@@ -52,7 +71,7 @@ export function StreamingInputArea({
   };
 
   // Manipula tecla Enter para envio
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -157,14 +176,15 @@ export function StreamingInputArea({
           />
         </Button>
 
-        <Input
+        <Textarea
           ref={inputRef}
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={isProcessing || disabled}
-          className="flex-1"
+          rows={1}
+          className="flex-1 resize-none overflow-y-hidden"
         />
 
         <Button

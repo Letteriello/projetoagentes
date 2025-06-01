@@ -79,8 +79,24 @@ export function ChatUIStreaming() {
     error: genkitError, // Renamed to avoid conflict with other error variables if any
     sendMessage,
     clearMessages,
+    updateMessageExtras, // Added from useGenkitSession
     // createNewSession, // Not directly used, session re-initializes with options change
   } = useGenkitSession(genkitSessionOptions);
+
+  const getAgentConfigForMessage = () => {
+    let modelId = "googleai/gemini-1.5-flash-latest";
+    let systemPrompt = "Você é um assistente útil.";
+    let temperature = 0.7;
+    const currentAgentTools = getConfiguredTools();
+
+    if (selectedAgent?.config?.type === "llm") {
+      const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>;
+      modelId = llmConfig.agentModel || modelId;
+      systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
+      temperature = llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature;
+    }
+    return { modelId, systemPrompt, tools: currentAgentTools, temperature };
+  };
 
   useEffect(() => {
     if (genkitError) {
@@ -148,6 +164,69 @@ export function ChatUIStreaming() {
     setEvents([]);
   };
 
+  const handleRegenerate = async (messageId: string) => {
+    const agentMessageIndex = messages.findIndex(msg => msg.id === messageId);
+
+    if (agentMessageIndex === -1) {
+      toast({ title: "Error", description: "Agent message to regenerate not found.", variant: "destructive" });
+      return;
+    }
+
+    const agentMessage = messages[agentMessageIndex];
+    if (agentMessage.role !== 'model') {
+      toast({ title: "Error", description: "Only model responses can be regenerated.", variant: "destructive" });
+      return;
+    }
+
+    // Find the last user message before this agent message
+    let userMessageIndex = -1;
+    for (let i = agentMessageIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        userMessageIndex = i;
+        break;
+      }
+    }
+
+    if (userMessageIndex === -1) {
+      toast({ title: "Error", description: "Could not find the original user prompt for this message.", variant: "destructive" });
+      return;
+    }
+
+    const userPromptMessage = messages[userMessageIndex];
+
+    // History is all messages UP TO (but not including) the user prompt message
+    const historyForRegeneration = messages.slice(0, userMessageIndex);
+
+    const agentConfig = getAgentConfigForMessage();
+
+    try {
+      setEvents((prev) => [
+        ...prev,
+        { type: "user-message-regenerate", originalPrompt: userPromptMessage.content, fromMessageId: messageId, timestamp: new Date().toISOString() },
+      ]);
+
+      // As per subtask, assume sendMessage appends. Old message remains.
+      await sendMessage(userPromptMessage.content, {
+        ...agentConfig,
+        // fileDataUri: userPromptMessage.fileDataUri || undefined, // Assuming no re-attachment for now
+      }, historyForRegeneration); // Pass history as the third argument
+
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }, 100);
+
+    } catch (err: any) {
+      console.error("Erro ao regenerar mensagem:", err);
+      setEvents((prev) => [
+        ...prev,
+        { type: "error-regenerate-message", message: err instanceof Error ? err.message : "Erro desconhecido", timestamp: new Date().toISOString() },
+      ]);
+       toast({ title: "Error", description: "Failed to regenerate response.", variant: "destructive" });
+    }
+  };
+
   const handleSuggestionClick = (suggestion: string) => {
     handleSendMessage(suggestion);
   };
@@ -158,6 +237,24 @@ export function ChatUIStreaming() {
     clearMessages(); 
     // createNewSession(); // Call if useGenkitSession needs explicit re-init beyond options change
     clearEventsLog();
+  };
+
+  const handleFeedback = (messageId: string, feedback: 'liked' | 'disliked' | null) => {
+    console.log("Feedback for streaming message:", { messageId, feedback });
+    if (updateMessageExtras) {
+      updateMessageExtras(messageId, { feedback });
+    } else {
+      // Fallback or error if updateMessageExtras is not available
+      // This might involve manually updating the messages array if it were directly state managed here
+      console.warn("updateMessageExtras is not available from useGenkitSession. Cannot update feedback in state.");
+      // As a temporary workaround if messages were local state:
+      // setMessages(prevMessages => prevMessages.map(m => m.id === messageId ? { ...m, feedback } : m));
+      toast({
+        title: "Warning",
+        description: "Could not persist feedback change in the UI state directly. The hook needs an update mechanism.",
+        variant: "default",
+      });
+    }
   };
 
   return (
@@ -213,7 +310,12 @@ export function ChatUIStreaming() {
               {messages.length === 0 ? (
                 <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
               ) : (
-                <StreamingMessageList messages={messages} isProcessing={isProcessing} />
+                <StreamingMessageList
+                  messages={messages}
+                  isProcessing={isProcessing}
+                  onRegenerate={handleRegenerate}
+                  onFeedback={handleFeedback}
+                />
               )}
             </div>
           </ScrollArea>
