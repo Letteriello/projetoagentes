@@ -16,6 +16,10 @@ interface MessageListProps {
   containerRef?: React.RefObject<HTMLDivElement>;
   /** Callback when the messages container is scrolled */
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
+  /** Callback to regenerate a message */
+  onRegenerate?: (messageId: string) => void;
+  /** Callback for message feedback */
+  onFeedback?: (messageId: string, feedback: 'liked' | 'disliked' | null) => void;
 }
 
 /**
@@ -26,6 +30,8 @@ const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
   isPending, 
   className = '',
   onScroll,
+  onRegenerate,
+  onFeedback, // Destructure onFeedback
   ...props 
 }, ref) => {
   // Animation variants for message entry
@@ -76,7 +82,7 @@ const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
               }}
               className="w-full"
             >
-              <SimplerChatMessage message={msg} />
+              <SimplerChatMessage message={msg} onRegenerate={onRegenerate} onFeedback={onFeedback} />
             </motion.div>
           ))}
           {isPending && (

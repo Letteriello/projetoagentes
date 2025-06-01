@@ -93,7 +93,8 @@ type OptimisticUpdateAction =
   | { type: "update_message_content"; id: string; content: string } // content, not text
   | { type: "update_message_status"; id: string; status: ChatMessageUI['status']; isStreaming?: boolean }
   | { type: "remove_message"; id: string }
-  | { type: "set_messages"; messages: ExtendedChatMessageUI[] };
+  | { type: "set_messages"; messages: ExtendedChatMessageUI[] }
+  | { type: "update_message_feedback"; id: string; feedback: 'liked' | 'disliked' | null }; // Added feedback action
 
 import ChatHeader from "@/components/features/chat/ChatHeader";
 // Corrigindo a importação do tipo ChatHeaderProps
@@ -272,6 +273,10 @@ export function ChatUI() {
           return state.filter((msg) => msg.id !== action.id);
         case "set_messages":
           return action.messages;
+        case "update_message_feedback":
+          return state.map((msg) =>
+            msg.id === action.id ? { ...msg, feedback: action.feedback } : msg
+          );
         default:
           return state;
       }
@@ -865,6 +870,216 @@ export function ChatUI() {
     // Optionally auto-submit or focus input
     inputRef.current?.focus();
   };
+
+  const handleFeedback = async (messageId: string, feedback: 'liked' | 'disliked' | null) => {
+    console.log("Feedback for message:", { messageId, feedback });
+    addOptimisticMessage({ type: "update_message_feedback", id: messageId, feedback });
+
+    if (activeConversationId) {
+      try {
+        await cs.updateMessageFeedback(activeConversationId, messageId, feedback);
+      } catch (error) {
+        console.error("Error updating message feedback in Firestore:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save feedback. Please try again.",
+          variant: "destructive",
+        });
+        // Revert optimistic update if Firestore update fails
+        const originalMessage = messages.find(msg => msg.id === messageId); // Use `messages` (original state) for reversion
+        addOptimisticMessage({
+          type: "update_message_feedback",
+          id: messageId,
+          feedback: originalMessage?.feedback || null
+        });
+      }
+    }
+  };
+
+  const handleRegenerate = async (messageIdToRegenerate: string) => {
+    if (!currentUserId || !activeConversationId) {
+      toast({ title: "Error", description: "User or conversation not active.", variant: "destructive" });
+      return;
+    }
+
+    const agentMessageIndex = optimisticMessages.findIndex(msg => msg.id === messageIdToRegenerate);
+
+    if (agentMessageIndex === -1) {
+      toast({ title: "Error", description: "Agent message to regenerate not found.", variant: "destructive" });
+      return;
+    }
+
+    const agentMessageToRegenerate = optimisticMessages[agentMessageIndex];
+    if (agentMessageToRegenerate.sender !== 'agent') {
+      toast({ title: "Error", description: "Only agent responses can be regenerated.", variant: "destructive" });
+      return;
+    }
+
+    // Find the user message that prompted this agent message
+    let userPromptIndex = -1;
+    for (let i = agentMessageIndex - 1; i >= 0; i--) {
+      if (optimisticMessages[i].sender === 'user') {
+        userPromptIndex = i;
+        break;
+      }
+    }
+
+    if (userPromptIndex === -1) {
+      toast({ title: "Error", description: "Could not find the original user prompt.", variant: "destructive" });
+      return;
+    }
+    const userPromptMessage = optimisticMessages[userPromptIndex];
+
+    setIsPending(true);
+
+    // 1. Remove the old agent message and any subsequent messages
+    const messagesToRemove = optimisticMessages.slice(agentMessageIndex);
+    for (const msgToRemove of messagesToRemove) {
+      addOptimisticMessage({ type: "remove_message", id: msgToRemove.id });
+      await cs.deleteMessageFromConversation(activeConversationId, msgToRemove.id).catch(err => {
+        console.error(`Failed to delete message ${msgToRemove.id} from Firestore:`, err);
+        // Optionally, re-add optimistically if Firestore deletion fails, or handle more robustly
+      });
+    }
+
+    // History for backend is messages up to (but not including) the user prompt that led to the message being regenerated.
+    const historyForBackend = optimisticMessages.slice(0, userPromptIndex).map(msg => ({
+      role: msg.sender === "user" ? "user" : "model",
+      // Ensure content structure matches backend expectations
+      content: (activeChatTarget?.type === 'agent' && (activeChatTarget.config as ExtendedSavedAgentConfigType).templateId === "agent_creator_assistant" && msg.sender === "user")
+               ? [{ text: msg.text || "" }]
+               : (msg.text || ""),
+    }));
+
+    const newAgentMessageId = uuidv4(); // For the new response
+
+    // Re-add the user prompt that we are regenerating from (as it was part of messagesToRemove if it was the last message)
+    // This is not strictly needed if we use userPromptMessage.text directly for the API
+    // For now, we are resending the userPromptMessage.text.
+
+    // Reset file selection for regeneration
+    removeSelectedFile();
+
+    const apiEndpoint = (activeChatTarget?.type === 'agent' && (activeChatTarget.config as ExtendedSavedAgentConfigType).templateId === "agent_creator_assistant")
+      ? "/api/agent-creator-stream"
+      : "/api/chat-stream";
+
+    const requestBody: any = {
+      userMessage: userPromptMessage.text, // Use the original user prompt's text
+      history: historyForBackend,
+      userId: currentUserId,
+      stream: true,
+      // fileDataUri: undefined, // No re-attachment for regeneration
+      conversationId: activeConversationId,
+    };
+
+    // Apply agent configuration (similar to handleFormSubmit)
+    if (activeChatTarget?.type === 'agent' && activeChatTarget.config) {
+      const agentCfg = activeChatTarget.config as ExtendedSavedAgentConfigType;
+      if (agentCfg.config && typeof agentCfg.config === 'object' && 'type' in agentCfg.config && agentCfg.config.type === 'llm') {
+        const llmConfig = agentCfg.config as LLMAgentConfig;
+        requestBody.modelName = llmConfig.agentModel;
+        requestBody.systemPrompt = agentCfg.agentDescription || llmConfig.globalInstruction;
+        requestBody.temperature = llmConfig.agentTemperature;
+      } else {
+        requestBody.modelName = agentCfg.agentModel;
+        requestBody.systemPrompt = agentCfg.agentDescription || agentCfg.globalInstruction;
+        requestBody.temperature = agentCfg.agentTemperature;
+      }
+      requestBody.agentToolsDetails = agentCfg.toolsDetails?.map(tool => ({
+        id: tool.id, name: tool.label, description: tool.genkitToolName || tool.label, enabled: true
+      }));
+    } else if (activeChatTarget?.type === 'adk-agent' && activeChatTarget.config) {
+      const adkCfg = activeChatTarget.config as ADKAgentConfig;
+      requestBody.modelName = adkCfg.model?.name;
+      requestBody.systemPrompt = adkCfg.description;
+      requestBody.temperature = adkCfg.model?.temperature;
+      requestBody.agentToolsDetails = adkCfg.tools?.map((t) => ({
+        id: t.name, name: t.name, description: t.description || t.name, enabled: true
+      }));
+    }
+
+    addOptimisticMessage({
+      type: "add_message",
+      message: {
+        id: newAgentMessageId,
+        text: "",
+        sender: "agent",
+        status: "pending",
+        isStreaming: true
+      }
+    });
+
+    try {
+      const response = await fetch(apiEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok || !response.body) {
+        const errorData = await response.json().catch(() => ({ message: "Unknown error occurred" }));
+        throw new Error(response.statusText + ": " + (errorData.message || "Failed to fetch stream for regeneration"));
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedAgentResponse = "";
+      let finalAgentConfig: AgentConfig | null = null; // For agent creator
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+
+        if (chunk.includes('{"agentConfig":')) {
+          try {
+            const potentialJsonBlock = chunk.substring(chunk.indexOf('{"agentConfig":'));
+            const parsedChunk = JSON.parse(potentialJsonBlock);
+            if (parsedChunk.agentConfig) {
+              finalAgentConfig = parsedChunk.agentConfig;
+              setPendingAgentConfig(finalAgentConfig);
+              continue;
+            }
+          } catch (e) { /* Not our special JSON block */ }
+        }
+
+        accumulatedAgentResponse += chunk;
+        addOptimisticMessage({ type: "update_message_content", id: newAgentMessageId, content: accumulatedAgentResponse });
+        addOptimisticMessage({ type: "update_message_status", id: newAgentMessageId, status: "pending", isStreaming: true });
+      }
+
+      addOptimisticMessage({
+        type: "update_message_status",
+        id: newAgentMessageId,
+        status: "completed",
+        isStreaming: false
+      });
+
+      if (activeConversationId && !finalAgentConfig) {
+        await cs.addMessageToConversation(activeConversationId, {
+          isUser: false,
+          content: accumulatedAgentResponse,
+        });
+        setConversations((prevConvs: Conversation[]) => prevConvs.map((c: Conversation) => c.id === activeConversationId ? { ...c, updatedAt: new Date(), lastMessagePreview: accumulatedAgentResponse.substring(0,30) } : c));
+      }
+
+    } catch (error: any) {
+      console.error("Error regenerating chat response:", error);
+      toast({ title: "Error", description: error.message || "Failed to get regenerated response from AI.", variant: "destructive" });
+      addOptimisticMessage({ type: "update_message_status", id: newAgentMessageId, status: "error" });
+      addOptimisticMessage({ type: "update_message_content", id: newAgentMessageId, content: "Sorry, something went wrong during regeneration." });
+      if (activeConversationId) {
+         await cs.addMessageToConversation(activeConversationId, {
+          isUser: false,
+          content: "Sorry, something went wrong during regeneration.",
+        });
+      }
+    } finally {
+      setIsPending(false);
+      setInputValue(""); // Clear input after regeneration attempt
+    }
+  };
   
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement> | string) => {
     if (typeof e === 'string') {
@@ -955,7 +1170,12 @@ export function ChatUI() {
             ) : optimisticMessages.length === 0 && !isPending && !pendingAgentConfig ? (
               <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
             ) : (
-              <MessageList messages={optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))} isPending={isPending} />
+              <MessageList
+                messages={optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
+                isPending={isPending}
+                onRegenerate={handleRegenerate}
+                onFeedback={handleFeedback} // Pass handleFeedback
+              />
             )}
           </ScrollArea>
 
