@@ -158,6 +158,8 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   loopExitToolName?: string;
   loopExitStateKey?: string;
   loopExitStateValue?: string;
+  parallelSubagentIds?: string[];
+  sequentialSteps?: { toolId: string; outputKey?: string }[];
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
