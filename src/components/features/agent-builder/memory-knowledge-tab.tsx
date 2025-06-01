@@ -128,10 +128,10 @@ interface MemoryKnowledgeTabProps {
   setEnableStatePersistence: (enabled: boolean) => void;
   statePersistenceType: "session" | "memory" | "database";
   setStatePersistenceType: (type: "session" | "memory" | "database") => void;
-  // Align with centralized initialState type: Array<{ key: string; value: any; }>
-  initialStateValues: Array<{ key: string; value: any; }>;
+  // Align with centralized initialState type: Array<{ key: string; value: any; type: 'string' | 'number' | 'boolean'; }>
+  initialStateValues: Array<{ key: string; value: any; type: 'string' | 'number' | 'boolean'; }>;
   setInitialStateValues: (
-    values: Array<{ key: string; value: any; }>,
+    values: Array<{ key: string; value: any; type: 'string' | 'number' | 'boolean'; }>,
   ) => void;
 
   // Compartilhamento de estado
@@ -180,15 +180,17 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
   
   // Estado para adição de novos valores iniciais
   const [showNewStateForm, setShowNewStateForm] = React.useState(false);
-  // Simplified newStateValue to align with centralized initialState type
+  // Expanded newStateValue to include type
   const [newStateValue, setNewStateValue] = React.useState<{
     key: string;
     value: string;
+    type: 'string' | 'number' | 'boolean';
     // scope and description are removed as they are not in the centralized type
     // If they are needed, the centralized type must be updated first.
   }>({
     key: '',
     value: '',
+    type: 'string', // Default type
     // scope: 'agent', // Removed
     // description: '' // Removed
   });
@@ -283,18 +285,46 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
 
   // Adicionar novo valor de estado inicial
   const handleAddStateValue = () => {
-    if (!newStateValue.key) return; // Simple validation
-    
-    // Adapt to the new structure for initialStateValues
+    if (!newStateValue.key.trim()) {
+      alert("A chave não pode estar vazia."); // Or use a more sophisticated notification
+      return;
+    }
+    if (!newStateValue.value.trim() && newStateValue.type === 'string') {
+        alert("O valor não pode estar vazio para o tipo Texto.");
+        return;
+    }
+
+    let parsedValue: any = newStateValue.value;
+
+    if (newStateValue.type === 'number') {
+      parsedValue = parseFloat(newStateValue.value);
+      if (isNaN(parsedValue)) {
+        alert("Valor inválido para o tipo Número."); // Or use a more sophisticated notification
+        return;
+      }
+    } else if (newStateValue.type === 'boolean') {
+      const lowerValue = newStateValue.value.toLowerCase();
+      if (lowerValue === 'true') {
+        parsedValue = true;
+      } else if (lowerValue === 'false') {
+        parsedValue = false;
+      } else {
+        alert("Valor inválido para o tipo Booleano. Use 'true' ou 'false'."); // Or use a more sophisticated notification
+        return;
+      }
+    }
+    // For string, no special parsing needed beyond initial trim check
+
     setInitialStateValues([...initialStateValues, { 
       key: newStateValue.key,
-      value: newStateValue.value, // Value is stored directly
-      // scope and description are not part of the new structure
+      value: parsedValue,
+      type: newStateValue.type,
     }]);
     
     setNewStateValue({ // Reset to the simplified structure
       key: '',
       value: '',
+      type: 'string', // Reset type to default
     });
     
     setShowNewStateForm(false);
@@ -379,9 +409,9 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                             <TooltipContent className="max-w-xs">
                                 <p>Define onde o estado do agente será armazenado:</p>
                                 <ul className="list-disc pl-4 mt-1 text-xs">
-                                    <li><strong>Sessão (Navegador):</strong> O estado é salvo no armazenamento da sessão do navegador e persiste enquanto a aba estiver aberta.</li>
-                                    <li><strong>Memória (Curto Prazo):</strong> O estado é mantido na memória do servidor do agente, útil para contextos de interações rápidas, mas não sobrevive a reinícios do servidor.</li>
-                                    <li><strong>Banco de Dados (Longo Prazo):</strong> O estado é salvo em um banco de dados configurado (ex: Firestore, PostgreSQL), garantindo persistência robusta e recuperação entre reinícios e diferentes instâncias do agente (ADK State).</li>
+                                    <li><strong>Estado da Sessão (Navegador):</strong> O estado é salvo no armazenamento da sessão do navegador e persiste enquanto a aba estiver aberta.</li>
+                                    <li><strong>Memória de Curto Prazo (Servidor):</strong> O estado é mantido na memória do servidor do agente, útil para contextos de interações rápidas, mas não sobrevive a reinícios do servidor.</li>
+                                    <li><strong>Memória de Longo Prazo (ADK MemoryService):</strong> O estado é salvo usando o ADK MemoryService, garantindo persistência robusta e recuperação entre reinícios e diferentes instâncias do agente.</li>
                                 </ul>
                             </TooltipContent>
                         </Tooltip>
@@ -389,9 +419,9 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                     <Select value={statePersistenceType} onValueChange={(value) => setStatePersistenceType(value as 'session' | 'memory' | 'database')}>
                         <SelectTrigger id="statePersistenceType"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="session">Sessão (Navegador)</SelectItem>
-                            <SelectItem value="memory">Memória (Curto Prazo)</SelectItem>
-                            <SelectItem value="database">Banco de Dados (Longo Prazo - ADK State)</SelectItem>
+                            <SelectItem value="session">Estado da Sessão (Navegador)</SelectItem>
+                            <SelectItem value="memory">Memória de Curto Prazo (Servidor)</SelectItem>
+                            <SelectItem value="database">Memória de Longo Prazo (ADK MemoryService)</SelectItem>
                         </SelectContent>
                     </Select>
                   </div>
@@ -400,6 +430,17 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                         <Tooltip>
                             <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
                             <TooltipContent className="max-w-xs"><p>Define variáveis de estado e seus valores iniciais quando o agente é carregado. Útil para pré-configurar o agente com informações padrão ou contextos específicos.</p></TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
+                            <TooltipContent className="max-w-sm">
+                                <p className="font-medium mb-1">Escopos de Estado:</p>
+                                <ul className="list-disc pl-4 text-xs space-y-1">
+                                    <li><strong>Global:</strong> Estado compartilhado entre todos os agentes e sessões. Mudanças aqui afetam todos os usuários e instâncias do agente. (Use com cautela).</li>
+                                    <li><strong>Agente:</strong> Estado específico para esta instância do agente. Persiste entre sessões para este agente se a persistência estiver habilitada. Este é o escopo mais comum.</li>
+                                    <li><strong>Temporário:</strong> Estado que dura apenas para a sessão ou interação atual. Não persistido. Útil para dados de curta duração.</li>
+                                </ul>
+                            </TooltipContent>
                         </Tooltip>
                     </Label>
                     <Table>
@@ -414,10 +455,15 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                                 <TableHead>Valor Inicial
                                     <Tooltip>
                                         <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
-                                        <TooltipContent><p>O valor inicial para esta variável de estado. Deve ser um valor JSON válido (ex: "algum texto", 123, true, {"{"}"subChave":"subValor"{"}"},  [1,2,3]).</p></TooltipContent>
+                                        <TooltipContent><p>O valor inicial para esta variável de estado. Formato depende do tipo selecionado.</p></TooltipContent>
                                     </Tooltip>
                                 </TableHead>
-                                {/* Scope and Description columns removed from table as they are not in centralized type */}
+                                <TableHead>Tipo
+                                     <Tooltip>
+                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 p-0"><Info size={12}/></Button></TooltipTrigger>
+                                        <TooltipContent><p>O tipo de dado do valor inicial.</p></TooltipContent>
+                                    </Tooltip>
+                                </TableHead>
                                 <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -427,24 +473,39 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                                     <TableCell>{item.key}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="font-mono">
-                                            {typeof item.value === 'string' ? item.value : JSON.stringify(item.value)}
+                                            {typeof item.value === 'boolean' ? item.value.toString() : item.value}
                                         </Badge>
                                     </TableCell>
-                                    {/* <TableCell>{item.scope}</TableCell> */} {/* Removed */}
-                                    {/* <TableCell className="text-xs">{item.description}</TableCell> */} {/* Removed */}
+                                    <TableCell>
+                                        <Badge variant="secondary">{item.type}</Badge>
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon" onClick={() => handleRemoveStateValue(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {initialStateValues.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Nenhum valor inicial definido.</TableCell></TableRow>} {/* Adjusted colSpan */}
+                            {initialStateValues.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Nenhum valor inicial definido.</TableCell></TableRow>} {/* Adjusted colSpan */}
                         </TableBody>
                     </Table>
                     <Button variant="outline" size="sm" onClick={() => setShowNewStateForm(true)} className="mt-2"><Plus className="mr-2 h-4 w-4" /> Adicionar Valor de Estado</Button>
                     {showNewStateForm && (
                         <Card className="mt-2 p-4 space-y-3 bg-muted/50">
                             <Input placeholder="Chave (ex: userRole)" value={newStateValue.key} onChange={(e) => setNewStateValue(prev => ({...prev, key: e.target.value}))} />
-                            <Textarea placeholder='Valor (JSON válido, ex: "admin" ou {"theme":"dark"})' value={newStateValue.value} onChange={(e) => setNewStateValue(prev => ({...prev, value: e.target.value}))} rows={2}/>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Textarea placeholder={
+                                    newStateValue.type === 'string' ? 'Valor (texto)' :
+                                    newStateValue.type === 'number' ? 'Valor (número, ex: 12.5)' :
+                                    'Valor (true ou false)'
+                                } value={newStateValue.value} onChange={(e) => setNewStateValue(prev => ({...prev, value: e.target.value}))} rows={1}/>
+                                <Select value={newStateValue.type} onValueChange={(v) => setNewStateValue(prev => ({...prev, type: v as 'string' | 'number' | 'boolean', value: ''}))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="string">Texto</SelectItem>
+                                        <SelectItem value="number">Número</SelectItem>
+                                        <SelectItem value="boolean">Booleano</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             {/* UI for scope and description removed */}
                             {/*
                             <Select value={newStateValue.scope} onValueChange={(v) => setNewStateValue(prev => ({...prev, scope: v as any}))}>
