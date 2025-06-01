@@ -65,9 +65,21 @@ export function MultiAgentTab({
         {isRootAgent && (
           <>
             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-4">
-              <Label htmlFor="subAgents" className="text-left pt-2">
-                Sub-Agentes
-              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger className="text-left pt-2 flex items-center">
+                    <Label htmlFor="subAgents">Sub-Agentes</Label>
+                    <Info className="h-3 w-3 ml-1 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="max-w-xs">
+                      Sub-agents are other agents that this root agent can
+                      delegate tasks to, enabling more complex workflows and
+                      specialized task handling.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <SubAgentSelector
                 selectedAgents={subAgents}
                 availableAgents={savedAgents || []}
@@ -76,9 +88,22 @@ export function MultiAgentTab({
             </div>
 
             <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-4">
-              <Label htmlFor="globalInstruction" className="text-left pt-2">
-                Instrução Global
-              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger className="text-left pt-2 flex items-center">
+                    <Label htmlFor="globalInstruction">Instrução Global</Label>
+                    <Info className="h-3 w-3 ml-1 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="max-w-xs">
+                      The Global Instruction is a directive provided to all
+                      sub-agents within this multi-agent system. It helps guide
+                      their behavior and ensures they align with the overall
+                      objectives defined by the root agent.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Textarea
                 id="globalInstruction"
                 placeholder="Instruções que se aplicam a todos os agentes do sistema..."
