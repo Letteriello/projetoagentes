@@ -204,6 +204,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           specificConfigPart = {
             customLogicDescription: (config as CustomAgentConfig).customLogicDescription || "",
             genkitFlowName: (config as CustomAgentConfig).genkitFlowName || "",
+            inputSchema: (config as CustomAgentConfig).inputSchema || "",
+            outputSchema: (config as CustomAgentConfig).outputSchema || "",
           };
         } else if (config.type === "a2a") {
           // No extra fields beyond base for a2a specialist type in current types
@@ -281,6 +283,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           isRootAgent: true,
           subAgentIds: [],
           globalInstruction: "",
+          genkitFlowName: "", // Added for new agents
+          inputSchema: "",    // Added for new agents
+          outputSchema: "",   // Added for new agents
           statePersistence: { enabled: false, type: "session", initialStateValues: [], validationRules: [] },
           rag: { enabled: false, serviceType: "in-memory", knowledgeSources: [], persistentMemory: {enabled: false} },
           artifacts: { enabled: false, storageType: "memory", definitions: [] },

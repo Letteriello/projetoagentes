@@ -4,6 +4,7 @@
 import * as React from "react";
 import { useFormContext, Controller } from "react-hook-form"; // MODIFIED
 // import { Label } from "@/components/ui/label"; // No longer directly used if FormLabel is used consistently
+import { Input } from "@/components/ui/input"; // Added Input import
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
@@ -42,21 +43,60 @@ const CustomBehaviorForm: React.FC<CustomBehaviorFormProps> = () => {
             </FormItem>
           )}
         />
-        {/* TODO: Consider adding a field for config.genkitFlowName if it's intended to be user-editable here */}
-        {/* For example:
+
         <FormField
           control={control}
           name="config.genkitFlowName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel htmlFor="config.genkitFlowName">Genkit Flow Name (Optional)</FormLabel>
-              <FormControl><Input id="config.genkitFlowName" placeholder="Ex: myCustomFlow" {...field} /></FormControl>
-              <FormDescription>The specific Genkit flow this agent executes.</FormDescription>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild><FormLabel htmlFor="config.genkitFlowName" className="cursor-help">Genkit Flow Name (Optional)</FormLabel></TooltipTrigger>
+                  <TooltipContent className="w-80"><p>If this agent is implemented as a Genkit flow, specify the flow name here. This allows the system to directly invoke it.</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <FormControl><Input id="config.genkitFlowName" placeholder="e.g., myCustomSummarizationFlow" {...field} /></FormControl>
+              <FormDescription className="pt-2">The registered name of the Genkit flow this agent executes.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        */}
+
+        <FormField
+          control={control}
+          name="config.inputSchema"
+          render={({ field }) => (
+            <FormItem>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild><FormLabel htmlFor="config.inputSchema" className="cursor-help">Input Schema (Optional)</FormLabel></TooltipTrigger>
+                  <TooltipContent className="w-80"><p>Define the JSON schema for the expected input of this agent or Genkit flow. This helps with validation and documentation.</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <FormControl><Textarea id="config.inputSchema" placeholder={'{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string" }\n  },\n  "required": ["query"]\n}'} {...field} rows={5}/></FormControl>
+              <FormDescription className="pt-2">JSON schema for the agent's input. Leave blank if not applicable.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="config.outputSchema"
+          render={({ field }) => (
+            <FormItem>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild><FormLabel htmlFor="config.outputSchema" className="cursor-help">Output Schema (Optional)</FormLabel></TooltipTrigger>
+                  <TooltipContent className="w-80"><p>Define the JSON schema for the expected output of this agent or Genkit flow. This helps with validation and data handling.</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <FormControl><Textarea id="config.outputSchema" placeholder={'{\n  "type": "object",\n  "properties": {\n    "summary": { "type": "string" }\n  },\n  "required": ["summary"]\n}'} {...field} rows={5}/></FormControl>
+              <FormDescription className="pt-2">JSON schema for the agent's output. Leave blank if not applicable.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </CardContent>
     </Card>
   );
