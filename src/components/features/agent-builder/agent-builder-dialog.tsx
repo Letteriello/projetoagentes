@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 // Permite definir nome, tipo, comportamento, ferramentas, memória, RAG, artefatos e configurações multi-agente/A2A.
 // import { CommunicationChannelItem } from "./a2a-communication-channel"; // No longer directly used here
 import { Textarea } from "@/components/ui/textarea";
+// LUCIDE ICONS - Ensure AlertCircle and Check are here
 import {
   AlertCircle,
   Ban,
@@ -63,8 +64,9 @@ import {
   // Waypoints, // Moved to BehaviorTab
   // Wand2,     // Already listed above
   // Settings,  // Already listed above
-  // Check,     // Already listed above
+  // Check,     // Already listed above - CONFIRMED
   // Info,      // Already listed above
+  // AlertCircle, // Already listed above - CONFIRMED
 } from "lucide-react";
 
 import { v4 as uuidv4 } from "uuid";
@@ -117,6 +119,26 @@ import MultiAgentTab from "./MultiAgentTab"; // Import the new MultiAgentTab com
 
 import { AgentTemplate } from "@/data/agentBuilderConfig";
 
+// Helper function to safely access nested properties
+const get = (obj, path, defaultValue = undefined) => {
+  const travel = (regexp) =>
+    String.prototype.split
+      .call(path, regexp)
+      .filter(Boolean)
+      .reduce((res, key) => (res !== null && res !== undefined ? res[key] : res), obj);
+  const result = travel(/[,[\]]+?/) || travel(/[\/\.-]+/);
+  return result === undefined || result === obj ? defaultValue : result;
+};
+
+const tabSchemaMapping = {
+  general: ["agentName", "agentDescription", "agentVersion", "icon", "config.type", "config.framework", "config.agentGoal", "config.agentTasks", "config.agentPersonality", "config.agentModel", "config.agentTemperature", "config.workflowDescription", "config.detailedWorkflowType", "config.customLogicDescription", "config.genkitFlowName"],
+  tools: ["tools", "toolConfigsApplied"],
+  memory_knowledge: ["config.statePersistence.enabled", "config.statePersistence.type", "config.statePersistence.initialStateValues", "config.rag.enabled", "config.rag.serviceType", "config.rag.knowledgeSources"],
+  artifacts: ["config.artifacts.enabled", "config.artifacts.storageType", "config.artifacts.definitions"],
+  a2a: ["config.a2a.enabled", "config.a2a.communicationChannels"],
+  multi_agent_advanced: ["config.isRootAgent", "config.subAgentIds", "config.globalInstruction"],
+};
+
 interface AgentBuilderDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -140,49 +162,6 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   iconComponents,
   // agentTemplates, // No longer used directly, defaultValues logic handles template-like setup
 }) => {
-  // REMOVE OR COMMENT OUT ALL React.useState hooks that manage form data.
-  // For example:
-  // const [agentName, setAgentName] = React.useState<string>("");
-  // ... and all others related to agent configuration fields.
-
-  // --- Estados para Configuração de Ferramentas e Modal de Configuração (Mantidos por enquanto, pois o modal é separado) ---
-  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
-  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
-  const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // This will be part of RHF's form state via `config.toolConfigsApplied`
-
-  // --- Estados para Campos do Modal de Configuração de Ferramentas (Mantidos) ---
-  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
-  const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
-  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>('');
-  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>('');
-  const [modalDbType, setModalDbType] = React.useState<string>('');
-  const [modalDbHost, setModalDbHost] = React.useState<string>('');
-  const [modalDbPort, setModalDbPort] = React.useState<number>(0);
-  const [modalDbName, setModalDbName] = React.useState<string>('');
-  const [modalDbUser, setModalDbUser] = React.useState<string>('');
-  const [modalDbPassword, setModalDbPassword] = React.useState<string>('');
-  const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>('');
-  const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
-  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
-  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
-
-  const { toast } = useToast();
-  const { savedAgents: allSavedAgents } = useAgents();
-
-  const availableAgentsForSubSelector = React.useMemo(() =>
-    allSavedAgents.filter(agent => agent.id !== editingAgent?.id),
-    [allSavedAgents, editingAgent?.id]
-  );
-
-  // Opções fixas para o seletor de framework do agente (poderia vir de props ou config)
-  const agentFrameworkOptions = [ // This could also be derived from schema or props
-    { id: "genkit", label: "Genkit" },
-    { id: "crewai", label: "CrewAI" },
-    { id: "custom", label: "Custom Framework" },
-    { id: "none", label: "None (Manual/External)" },
-  ];
-
-  // ADD THIS useForm HOOK
   const methods = useForm<SavedAgentConfiguration>({
     resolver: zodResolver(savedAgentConfigurationSchema),
     mode: "onChange", // Or "onSubmit"
@@ -320,40 +299,96 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     },
   });
 
-  // UPDATE THE useEffect that populates form state
+  // REMOVE OR COMMENT OUT ALL React.useState hooks that manage form data.
+  // For example:
+  // const [agentName, setAgentName] = React.useState<string>(""); // This is now part of RHF
+  // ... and all others related to agent configuration fields.
+
+  // --- Estados para Configuração de Ferramentas e Modal de Configuração (Modal é separado, mas data pode vir de RHF) ---
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false); // Modal visibility is local state
+  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null); // Which tool is being configured
+  // const [toolConfigurations, setToolConfigurations] = React.useState<Record<string, ToolConfigData>>({}); // REMOVED - Now part of RHF form state: methods.watch("toolConfigsApplied")
+
+  // --- Estados para Campos do Modal de Configuração de Ferramentas (Mantidos para o modal, mas poderiam ser RHF sub-forms) ---
+  const [modalGoogleApiKey, setModalGoogleApiKey] = React.useState<string>('');
+  const [modalGoogleCseId, setModalGoogleCseId] = React.useState<string>('');
+  const [modalOpenapiSpecUrl, setModalOpenapiSpecUrl] = React.useState<string>('');
+  const [modalOpenapiApiKey, setModalOpenapiApiKey] = React.useState<string>('');
+  const [modalDbType, setModalDbType] = React.useState<string>('');
+  const [modalDbHost, setModalDbHost] = React.useState<string>('');
+  const [modalDbPort, setModalDbPort] = React.useState<number>(0);
+  const [modalDbName, setModalDbName] = React.useState<string>('');
+  const [modalDbUser, setModalDbUser] = React.useState<string>('');
+  const [modalDbPassword, setModalDbPassword] = React.useState<string>('');
+  const [modalDbConnectionString, setModalDbConnectionString] = React.useState<string>('');
+  const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
+  const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
+  const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
+
+  const { toast } = useToast();
+  const { savedAgents: allSavedAgents } = useAgents(); // Used for sub-agent selector
+
+  const availableAgentsForSubSelector = React.useMemo(() =>
+    allSavedAgents.filter(agent => agent.id !== editingAgent?.id), // Ensure editing agent is not in its own sub-agent list
+    [allSavedAgents, editingAgent?.id]
+  );
+
+  // Opções fixas para o seletor de framework do agente (poderia vir de props ou config)
+  const agentFrameworkOptions = [
+    { id: "genkit", label: "Genkit" },
+    { id: "crewai", label: "CrewAI" },
+    { id: "custom", label: "Custom Framework" },
+    { id: "none", label: "None (Manual/External)" },
+  ];
+
   React.useEffect(() => {
     if (isOpen) {
-      // `reset` will update the form values and also update the component state
-      // if `defaultValues` object identity changes or `reset` is called.
-      // The defaultValues memoization above handles the identity change based on editingAgent.
-      const defaultVals = methods.defaultValues; // Access the memoized default values
-      methods.reset(defaultVals);
-      // Sync the separate toolConfigurations state with RHF state on open/edit
-      setToolConfigurations(defaultVals?.toolConfigsApplied || {});
-
+      const defaultVals = methods.getValues(); // Get current form values as a base
+      const newDefaultValues = methods.formState.defaultValues; // Get latest defaultValues based on editingAgent
+      methods.reset(newDefaultValues); // Reset with potentially new default values
+      // The local state `toolConfigurations` was removed, RHF state `toolConfigsApplied` is used directly.
+    } else {
+      setIsToolConfigModalOpen(false);
+      setConfiguringTool(null);
     }
-    // Limpa o estado do modal de configuração de ferramenta se o diálogo principal for fechado.
-    if (!isOpen) {
-        setIsToolConfigModalOpen(false);
-        setConfiguringTool(null);
-    }
-  }, [isOpen, editingAgent, methods, agentToneOptions]); // Add methods and agentToneOptions to dependency array
+  }, [isOpen, editingAgent, methods]); // methods is stable, defaultValues object from useForm is the key for re-runs if editingAgent changes
 
+  // Helper function to determine tab status icon
+  const getTabStatusIcon = (tabValue: string): React.ReactNode | null => {
+    const schemaPaths = tabSchemaMapping[tabValue as keyof typeof tabSchemaMapping] || [];
+    if (!schemaPaths.length) return null;
+
+    const errors = methods.formState.errors;
+    const dirtyFields = methods.formState.dirtyFields;
+
+    const hasError = schemaPaths.some(path => get(errors, path));
+    if (hasError) {
+      return <AlertCircle className="h-4 w-4 text-destructive" />;
+    }
+
+    const isDirty = schemaPaths.some(path => get(dirtyFields, path));
+    if (isDirty) { // Considered "complete" if dirty and no errors for this simple proxy
+      return <Check className="h-4 w-4 text-green-500" />;
+    }
+
+    return null;
+  };
 
   // Manipulador para abrir o modal de configuração de uma ferramenta específica.
-  // Popula os campos do modal com a configuração existente da ferramenta, se houver.
+  // Popula os campos do modal com a configuração existente da ferramenta, se houver (data from RHF).
   const handleToolConfigure = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    // Get current tool configs from RHF state
-    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {}; // Get from RHF
     const existingConfig = currentToolConfigs[tool.id] || {};
 
+    // Reset all modal fields before populating
     setModalGoogleApiKey(''); setModalGoogleCseId('');
     setModalOpenapiSpecUrl(''); setModalOpenapiApiKey('');
     setModalDbType(''); setModalDbHost(''); setModalDbPort(0); setModalDbName('');
     setModalDbUser(''); setModalDbPassword(''); setModalDbConnectionString(''); setModalDbDescription('');
     setModalKnowledgeBaseId(''); setModalCalendarApiEndpoint('');
 
+    // Populate based on existingConfig from RHF
     if (tool.id === "webSearch") {
       setModalGoogleApiKey(existingConfig.googleApiKey || '');
       setModalGoogleCseId(existingConfig.googleCseId || '');
@@ -363,7 +398,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     } else if (tool.id === "databaseAccess") {
       setModalDbType(existingConfig.dbType || '');
       setModalDbHost(existingConfig.dbHost || '');
-      setModalDbPort(Number(existingConfig.dbPort) || 0);
+      setModalDbPort(Number(existingConfig.dbPort) || 0); // Ensure number conversion
       setModalDbName(existingConfig.dbName || '');
       setModalDbUser(existingConfig.dbUser || '');
       setModalDbPassword(existingConfig.dbPassword || '');
@@ -377,18 +412,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     setIsToolConfigModalOpen(true);
   };
 
+  // Saves tool config data into RHF state.
   const handleSaveToolConfiguration = (toolId: string, configData: ToolConfigData) => {
     const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
-    const updatedToolConfigs = {
-      ...currentToolConfigs,
-      [toolId]: configData,
-    };
+    const updatedToolConfigs = { ...currentToolConfigs, [toolId]: configData };
     methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
-    // Also update the local state if still needed for modal re-opening, though RHF should be the source of truth.
-    setToolConfigurations(updatedToolConfigs);
+    // The local `toolConfigurations` state was removed. RHF is the source of truth.
 
     setIsToolConfigModalOpen(false);
-    setConfiguringTool(null);
+    setConfiguringTool(null); // Clear the tool being configured
     toast({
       title: "Configuração Salva",
       description: `A configuração para a ferramenta foi salva com sucesso.`,
@@ -462,12 +494,12 @@ return (
           <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
             <Tabs defaultValue="general" className="w-full">
               <TabsList className="grid w-full grid-cols-6 mb-6"> {/* Adjusted for 6 tabs */}
-                <TabsTrigger value="general">Geral</TabsTrigger>
-                <TabsTrigger value="tools">Ferramentas</TabsTrigger>
-                <TabsTrigger value="memory_knowledge">Memória & Conhecimento</TabsTrigger>
-                <TabsTrigger value="artifacts">Artefatos</TabsTrigger>
-                <TabsTrigger value="a2a">Comunicação A2A</TabsTrigger>
-                <TabsTrigger value="multi_agent_advanced">Multi-Agente & Avançado</TabsTrigger>
+                <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")}>Geral</TabsTrigger>
+                <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")}>Ferramentas</TabsTrigger>
+                <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")}>Memória & Conhecimento</TabsTrigger>
+                <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")}>Artefatos</TabsTrigger>
+                <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")}>Comunicação A2A</TabsTrigger>
+                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")}>Multi-Agente & Avançado</TabsTrigger>
               </TabsList>
 
               {/* General Tab */}
@@ -712,7 +744,14 @@ return (
             <DialogClose asChild>
               <Button variant="outline" type="button">Cancelar</Button> {/* Add type="button" */}
             </DialogClose>
-            <Button type="submit"><Save className="mr-2 h-4 w-4" /> Salvar Agente</Button> {/* Changed to type="submit" */}
+            <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
+              {methods.formState.isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Salvar Agente
+            </Button>
           </DialogFooter>
         </form>
       </FormProvider>
