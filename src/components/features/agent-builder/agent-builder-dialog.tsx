@@ -44,6 +44,10 @@ import {
   Loader2
 } from 'lucide-react';
 
+import { HelpModal } from '@/components/ui/HelpModal';
+import { InfoIcon } from '@/components/ui/InfoIcon'; // Though used in tabs, modal logic is here
+import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
+
 import GeneralTab from './tabs/general-tab';
 import ToolsTab from './tabs/tools-tab';
 import BehaviorTab from './tabs/behavior-tab';
@@ -110,6 +114,22 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [activeEditTab, setActiveEditTab] = React.useState('general');
   const [currentStep, setCurrentStep] = React.useState(0);
   const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'review'];
+
+  const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
+  const [helpModalContent, setHelpModalContent] = React.useState<{ title: string; body: React.ReactNode } | null>(null);
+
+  const showHelpModal = (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => {
+    const content = agentBuilderHelpContent[contentKey.tab]?.[contentKey.field]?.modal;
+    if (content) {
+      let modalBody = content.body;
+      if (typeof modalBody === 'string') {
+        // Ensure agent-builder-help-content.ts provides sanitized HTML or preferably JSX.
+        modalBody = <div dangerouslySetInnerHTML={{ __html: modalBody }} />;
+      }
+      setHelpModalContent({ title: content.title, body: modalBody });
+      setIsHelpModalOpen(true);
+    }
+  };
 
   const methods = useForm<AgentConfig>({
     defaultValues: editingAgent || {
@@ -252,13 +272,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 <TabsContent value="general">
                   <GeneralTab
                     agentTypeOptions={agentTypeOptions}
-                    agentFrameworkOptions={agentFrameworkOptions}
+                    // agentFrameworkOptions={agentFrameworkOptions} // This prop seems to be missing in GeneralTab's definition based on previous files
                     availableTools={availableTools} // For AI suggestions
                     SparklesIcon={Wand2}
-                    // agentToneOptions might still be needed if it populates a selector in GeneralTab directly.
-                    // If agentPersonality is a selector in GeneralTab, pass agentToneOptions.
-                    // Otherwise, if it's handled in BehaviorTab, it's not needed here.
-                    // For now, assuming it's NOT for GeneralTab directly, but for BehaviorTab later.
+                    showHelpModal={showHelpModal}
                   />
                 </TabsContent>
 
@@ -268,14 +285,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     availableTools={availableTools}
                     selectedTools={methods.watch("tools") || []} // RHF state
                     setSelectedTools={(tools) => methods.setValue("tools", tools, {shouldValidate: true, shouldDirty: true})} // RHF action
-                    toolConfigurations={methods.watch("toolConfigsApplied") || {}} // RHF state
+                    // toolConfigurations={methods.watch("toolConfigsApplied") || {}} // This prop seems to be missing in ToolsTab's definition
                     onToolConfigure={handleToolConfigure} // Still uses local modal state management for now
                     iconComponents={iconComponents}
-                    InfoIcon={Info}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
                     SettingsIcon={Settings}
                     CheckIcon={Check}
                     PlusCircleIcon={PlusCircle}
                     Trash2Icon={Trash2}
+                    showHelpModal={showHelpModal}
                   />
                 </TabsContent>
 
@@ -283,6 +301,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 <TabsContent value="behavior">
                   <BehaviorTab
                     agentToneOptions={agentToneOptions} // Pass only necessary static options
+                    showHelpModal={showHelpModal}
                   />
                 </TabsContent>
 
@@ -307,7 +326,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     ListChecksIcon={ListChecks}
                     PlusIcon={Plus}
                     Trash2Icon={Trash2}
-                    InfoIcon={Info}
+                    SaveIcon={Save}
+                    ListChecksIcon={ListChecks}
+                    PlusIcon={Plus}
+                    Trash2Icon={Trash2}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                    showHelpModal={showHelpModal}
                   />
                   <Separator className="my-6" />
                   <RagTab
@@ -321,7 +345,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     FileTextIcon={FileText}
                     PlusIcon={Plus}
                     Trash2Icon={Trash2}
-                    InfoIcon={Info}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                    showHelpModal={showHelpModal}
                   />
                 </TabsContent>
 
@@ -329,8 +354,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 <TabsContent value="artifacts">
                   <ArtifactsTab
                     // Props will be replaced by useFormContext in ArtifactsTab
-                    enableArtifacts={methods.watch("config.artifacts.enabled") || false}
-                    setEnableArtifacts={(val) => methods.setValue("config.artifacts.enabled", val)}
+                    // enableArtifacts={methods.watch("config.artifacts.enabled") || false} // Prop seems missing in ArtifactsTab definition
+                    // setEnableArtifacts={(val) => methods.setValue("config.artifacts.enabled", val)} // Prop seems missing
                     artifactStorageType={methods.watch("config.artifacts.storageType") || "memory"}
                     setArtifactStorageType={(val) => methods.setValue("config.artifacts.storageType", val as 'local' | 'cloud')}
                     artifacts={methods.watch("config.artifacts.definitions") || []}
@@ -344,7 +369,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     BinaryIcon={Binary}
                     PlusIcon={Plus}
                     Trash2Icon={Trash2}
-                    InfoIcon={Info}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                    showHelpModal={showHelpModal}
                   />
                 </TabsContent>
 
@@ -364,7 +390,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     <CardContent className="space-y-4">
                       {/* The A2AConfigComponent will have its own internal switch for enabling/disabling */}
                       {/* It will use useFormContext to manage config.a2a directly */}
-                      <A2AConfig savedAgents={availableAgentsForSubSelector} />
+                      <A2AConfig savedAgents={availableAgentsForSubSelector} showHelpModal={showHelpModal} />
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -396,10 +422,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         SubAgentSelectorComponent={SubAgentSelector} // Keep passing component
                         UsersIcon={Users}
                         LayersIcon={Layers}
-                        InfoIcon={Info}
+                        InfoIcon={InfoIcon} // Pass the imported InfoIcon
                         ChevronsUpDownIcon={ChevronsUpDown}
                         PlusCircleIcon={PlusCircle}
                         Trash2Icon={Trash2}
+                        showHelpModal={showHelpModal}
                       />
                       <div className="space-y-2 pt-4">
                         <TooltipProvider>
@@ -438,7 +465,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
                 {/* Review Tab */}
                 <TabsContent value="review">
-                  <ReviewTab setActiveEditTab={setActiveEditTab} />
+                  <ReviewTab setActiveEditTab={setActiveEditTab} showHelpModal={showHelpModal} />
                 </TabsContent>
 
                 {/* Advanced Tab (ADK Callbacks) */}
@@ -491,6 +518,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
             </div>
 
             <DialogFooter className="p-6 pt-4 border-t">
+              {helpModalContent && (
+                <HelpModal
+                  isOpen={isHelpModalOpen}
+                  onClose={() => setIsHelpModalOpen(false)}
+                  title={helpModalContent.title}
+                >
+                  {helpModalContent.body}
+                </HelpModal>
+              )}
               {editingAgent === undefined ? (
                 // New agent wizard flow
                 <div className="flex justify-between w-full">

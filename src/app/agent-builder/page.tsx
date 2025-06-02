@@ -193,6 +193,9 @@ import { MessageSquareText, Edit3 } from "lucide-react"; // Ícones para alterna
 import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
 import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
 import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
+import { HelpModal } from '@/components/ui/HelpModal';
+import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-builder-help-content';
+import { Layers } from 'lucide-react'; // Ensure Layers is imported if used for the new button
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -209,8 +212,39 @@ export default function AgentBuilderPage() {
   const [isMounted, setIsMounted] = React.useState(false);
   const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form"); // Novo estado
 
+  const [activeTutorial, setActiveTutorial] = React.useState<GuidedTutorial | null>(null);
+  const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
+  const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
+
   const searchParams = useSearchParams();
   const router = useRouter(); // For clearing URL param
+
+  const startTutorial = (tutorialId: string) => {
+    const tutorial = guidedTutorials.find(t => t.id === tutorialId);
+    if (tutorial) {
+      setActiveTutorial(tutorial);
+      setCurrentTutorialStep(0);
+      setIsTutorialModalOpen(true);
+    }
+  };
+
+  const handleTutorialNext = () => {
+    if (activeTutorial && currentTutorialStep < activeTutorial.steps.length - 1) {
+      setCurrentTutorialStep(prev => prev + 1);
+    }
+  };
+
+  const handleTutorialPrev = () => {
+    if (currentTutorialStep > 0) {
+      setCurrentTutorialStep(prev => prev - 1);
+    }
+  };
+
+  const closeTutorialModal = () => {
+    setIsTutorialModalOpen(false);
+    setActiveTutorial(null);
+    setCurrentTutorialStep(0);
+  };
 
   React.useEffect(() => {
     const templateId = searchParams.get("templateId");
@@ -415,6 +449,9 @@ export default function AgentBuilderPage() {
           <h1 className="text-2xl md:text-3xl font-bold">Construtor de Agentes</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => { startTutorial(guidedTutorials[0].id); }} className="shadow-sm">
+            <Layers className="mr-2 h-4 w-4" /> Ver Tutoriais
+          </Button>
           <Button
             variant={buildMode === 'chat' ? 'default' : 'outline'}
             size="sm"
@@ -447,7 +484,8 @@ export default function AgentBuilderPage() {
         <AgentCreatorChatUI initialAgentConfig={editingAgent} />
       ) : (
         <>
-          <div className="flex items-center justify-end pt-4"> {/* Adjusted pt instead of justify-between and h2 */}
+          <div className="flex items-center justify-end pt-4 gap-2"> {/* Adjusted pt and added gap */}
+            {/* Tutorial Button already added in the header for all modes, or could be here specifically for form mode */}
             <Button onClick={handleOpenCreateAgentModal} className={cn("button-live-glow", isMounted && "opacity-100")}>
               <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
             </Button>
@@ -553,8 +591,8 @@ export default function AgentBuilderPage() {
       {buildMode === 'form' && editingAgent && !selectedAgentForMonitoring && ( // Ensure dialog only shows for direct edits, not when viewing monitoring section
             <AgentBuilderDialog
               isOpen={isBuilderModalOpen && !!editingAgent} // Only open if editingAgent is set
-              onOpenChange={(isOpen: boolean) => {
-                setIsBuilderModalOpen(isOpen);
+              onOpenChange={(isOpenValue: boolean) => { // Renamed isOpen to isOpenValue to avoid conflict
+                setIsBuilderModalOpen(isOpenValue);
                 if (!isOpen) {
                   setEditingAgent(null); // Clear editingAgent when modal closes
                 }
@@ -565,8 +603,26 @@ export default function AgentBuilderPage() {
               agentTypeOptions={agentTypeOptions}
               agentToneOptions={agentToneOptions}
               iconComponents={iconComponents}
-              agentTemplates={agentTemplates}
+              // agentTemplates={agentTemplates} // Prop agentTemplates is not expected by AgentBuilderDialog
             />
+      )}
+
+      {activeTutorial && isTutorialModalOpen && (
+        <HelpModal
+          isOpen={isTutorialModalOpen}
+          onClose={closeTutorialModal}
+          title={activeTutorial.steps[currentTutorialStep].title}
+          isTutorial={true}
+          currentStep={currentTutorialStep}
+          totalSteps={activeTutorial.steps.length}
+          onNextStep={handleTutorialNext}
+          onPrevStep={handleTutorialPrev}
+          size="lg" // Or another appropriate size for tutorials
+        >
+          {/* Render tutorial step content. Similar to help modal, handle HTML strings carefully */}
+          <div dangerouslySetInnerHTML={{ __html: activeTutorial.steps[currentTutorialStep].content as string }} />
+          {/* Add visual if present: activeTutorial.steps[currentTutorialStep].visual */}
+        </HelpModal>
       )}
     </div>
   );
