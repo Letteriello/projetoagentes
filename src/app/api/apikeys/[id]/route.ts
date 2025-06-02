@@ -1,91 +1,135 @@
 import { NextRequest, NextResponse } from "next/server";
+// We need to import the actual registeredServices array from the parent route file.
+// This requires `registeredServices` to be exported from `../route`.
+// And crucially, for mutations (DELETE, PUT) to affect the original array,
+// it must be the *same* array instance. In Node.js module caching usually handles this,
+// but with Next.js serverless functions, this can be tricky.
+// A proper database or external store is the robust solution.
+// For this exercise, we'll assume direct import works as intended for shared in-memory state.
 
-// This should ideally interact with the same in-memory store as in src/app/api/apikeys/route.ts
-// For demonstration, we'll re-declare it here. In a real app, use a shared module or database.
-let registeredServices: {
-  id: string;
-  serviceName: string;
-  dateAdded: string;
-}[] = [
-  // This array should be kept in sync with the one in the main route.ts or managed by a shared data service.
-  // Since this is a separate file and for demo purposes, it won't share the exact instance from the other route.
-  // This limitation needs to be addressed with a proper data store in a real application.
-];
+import { registeredServices } from "../route"; // Import from parent
+import { ApiKeyVaultEntry } from "../../../types/apiKeyVaultTypes";
 
-/**
- * Handles DELETE requests to deregister an API service by its ID.
- * The ID is taken from the dynamic path parameter.
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    const idToDelete = params.id;
+    const id = params.id;
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    }
 
-    if (!idToDelete) {
+    console.log(`API Route: DELETE request for ID: ${id}`);
+
+    const index = registeredServices.findIndex((service) => service.id === id);
+
+    if (index === -1) {
+      return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    }
+
+    registeredServices.splice(index, 1); // Mutates the imported array
+    console.log(`API Route: Service with ID ${id} deregistered.`);
+
+    return NextResponse.json(
+      { message: "Service deregistered successfully" },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error(`API Route DELETE /api/apikeys/[id] error:`, error);
+    return NextResponse.json(
+      { error: "Failed to deregister service." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const id = params.id;
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    // Only destructure fields that are expected and updatable
+    const { serviceName, associatedAgents, serviceType } = body;
+
+    console.log(`API Route: PUT request for ID: ${id} with body:`, body);
+
+    const index = registeredServices.findIndex((service) => service.id === id);
+
+    if (index === -1) {
+      return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    }
+
+    const serviceToUpdate: ApiKeyVaultEntry = registeredServices[index];
+
+    if (serviceName !== undefined) {
+      if (typeof serviceName !== "string" || serviceName.trim() === "") {
+        return NextResponse.json(
+          { error: "Service name must be a non-empty string." },
+          { status: 400 },
+        );
+      }
+      serviceToUpdate.serviceName = serviceName.trim();
+    }
+
+    if (serviceType !== undefined) {
+      if (typeof serviceType !== "string" || serviceType.trim() === "") {
+        return NextResponse.json(
+          { error: "Service type must be a non-empty string." },
+          { status: 400 },
+        );
+      }
+      serviceToUpdate.serviceType = serviceType.trim();
+    }
+
+    if (associatedAgents !== undefined) {
+      if (!Array.isArray(associatedAgents)) {
+        return NextResponse.json(
+          { error: "Associated agents must be an array." },
+          { status: 400 },
+        );
+      }
+      // Ensure all elements in associatedAgents are strings
+      if (!associatedAgents.every(agentId => typeof agentId === 'string')) {
+        return NextResponse.json(
+          { error: "All associated agent IDs must be strings." },
+          { status: 400 },
+        );
+      }
+      serviceToUpdate.associatedAgents = associatedAgents;
+    }
+
+    // The `lastUsed` field should typically be updated when the key is *used*,
+    // not necessarily when the entry is manually edited via PUT.
+    // However, if the intention is to allow manual update of `lastUsed` via PUT:
+    if (body.lastUsed !== undefined) {
+      if (typeof body.lastUsed !== 'string' || isNaN(Date.parse(body.lastUsed))) {
+         return NextResponse.json({ error: 'Invalid lastUsed date format. Must be ISO string.' }, { status: 400 });
+      }
+      serviceToUpdate.lastUsed = body.lastUsed;
+    }
+
+
+    // registeredServices[index] = serviceToUpdate; // This line is redundant as serviceToUpdate is a reference
+    console.log(`API Route: Service with ID ${id} updated:`, serviceToUpdate);
+
+    return NextResponse.json(serviceToUpdate, { status: 200 });
+  } catch (error) {
+    console.error(`API Route PUT /api/apikeys/[id] error:`, error);
+    if (error instanceof SyntaxError) {
       return NextResponse.json(
-        { error: "Service ID is required for deletion." },
+        { error: "Invalid JSON payload." },
         { status: 400 },
       );
     }
-
-    console.log(
-      `API Route (Dynamic): Received request to delete service with ID: ${idToDelete}`,
-    );
-
-    const initialLength = registeredServices.length;
-    // Note: This `registeredServices` array is local to this file's scope in this simplified example.
-    // In a real application, this would interact with a database or a shared in-memory store
-    // to ensure consistency with the main /api/apikeys route.
-    // For this subtask, we are simulating the deletion. A GET after DELETE might still show the item
-    // if the main route's in-memory array was not affected. This is a known limitation of the current approach.
-
-    const serviceExists = registeredServices.find(
-      (service) => service.id === idToDelete,
-    );
-    if (!serviceExists) {
-      // To mimic actual deletion behavior even if the array here is not the "source of truth"
-      // we can assume it was deleted if the frontend thinks it exists.
-      // Or, for a more robust simulation, this endpoint could be aware of the main list.
-      // For now, we'll proceed as if it might exist and try to filter.
-      // A better simulation would be to return 404 if not found, but the prompt asks to simulate success.
-      console.log(
-        `API Route (Dynamic): Service with ID ${idToDelete} not found in this local array, but proceeding with simulated success.`,
-      );
-    }
-
-    registeredServices = registeredServices.filter(
-      (service) => service.id !== idToDelete,
-    );
-
-    if (registeredServices.length < initialLength || serviceExists) {
-      // Check if something was "removed" or if it was "found"
-      console.log(
-        `API Route (Dynamic): Service with ID "${idToDelete}" (conceptually) deregistered.`,
-      );
-      return NextResponse.json(
-        { message: `Service with ID ${idToDelete} deregistered successfully.` },
-        { status: 200 },
-      );
-    } else {
-      // If strict checking is desired and the item must be in *this* array:
-      // return NextResponse.json({ error: `Service with ID ${idToDelete} not found.` }, { status: 404 });
-      // Per instructions, simulate success.
-      console.log(
-        `API Route (Dynamic): Service with ID ${idToDelete} not found in local array, but simulating successful deletion as per instructions.`,
-      );
-      return NextResponse.json(
-        {
-          message: `Service with ID ${idToDelete} (simulated) deregistered successfully.`,
-        },
-        { status: 200 },
-      );
-    }
-  } catch (error) {
-    console.error(`API Route DELETE /api/apikeys/${params.id} error:`, error);
     return NextResponse.json(
-      { error: "Failed to deregister service." },
+      { error: "Failed to update service." },
       { status: 500 },
     );
   }

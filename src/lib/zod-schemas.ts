@@ -144,7 +144,25 @@ export const agentConfigBaseSchema = z.object({
   rag: ragMemoryConfigSchema.optional(),
   artifacts: artifactsConfigSchema.optional(),
   a2a: a2aConfigSchema.optional(),
+  // adkCallbacks will be added here
 });
+
+// Schema for ADKCallbacksConfig
+export const adkCallbacksConfigSchema = z.object({
+  beforeAgent: z.string().optional().describe("Genkit flow name or function reference to call before the agent starts processing."),
+  afterAgent: z.string().optional().describe("Genkit flow name or function reference to call after the agent finishes processing."),
+  beforeModel: z.string().optional().describe("Genkit flow name or function reference to call before a model is invoked."),
+  afterModel: z.string().optional().describe("Genkit flow name or function reference to call after a model is invoked."),
+  beforeTool: z.string().optional().describe("Genkit flow name or function reference to call before a tool is used."),
+  afterTool: z.string().optional().describe("Genkit flow name or function reference to call after a tool is used.")
+}).optional();
+
+
+// Update agentConfigBaseSchema to include adkCallbacks
+export const updatedAgentConfigBaseSchema = agentConfigBaseSchema.extend({
+  adkCallbacks: adkCallbacksConfigSchema, // Already optional from its own definition
+});
+
 
 // Schema for LLMAgentConfig
 export const llmAgentConfigSchema = agentConfigBaseSchema.extend({
@@ -175,6 +193,8 @@ export const customAgentConfigSchema = agentConfigBaseSchema.extend({
   type: z.literal("custom"),
   customLogicDescription: z.string().min(1, "Custom logic description is required."),
   genkitFlowName: z.string().optional(), // Might become required depending on framework choices
+  inputSchema: z.string().optional(),
+  outputSchema: z.string().optional(),
 });
 
 // Schema for A2AAgentSpecialistConfig
@@ -184,11 +204,18 @@ export const a2aAgentSpecialistConfigSchema = agentConfigBaseSchema.extend({
 });
 
 // Discriminated union for AgentConfig
+// IMPORTANT: Re-define specific agent configs to use the updated base schema
+export const llmAgentConfigSchemaUpdated = updatedAgentConfigBaseSchema.extend(llmAgentConfigSchema.shape);
+export const workflowAgentConfigSchemaUpdated = updatedAgentConfigBaseSchema.extend(workflowAgentConfigSchema.shape);
+export const customAgentConfigSchemaUpdated = updatedAgentConfigBaseSchema.extend(customAgentConfigSchema.shape);
+export const a2aAgentSpecialistConfigSchemaUpdated = updatedAgentConfigBaseSchema.extend(a2aAgentSpecialistConfigSchema.shape);
+
+
 export const agentConfigSchema = z.discriminatedUnion("type", [
-  llmAgentConfigSchema,
-  workflowAgentConfigSchema,
-  customAgentConfigSchema,
-  a2aAgentSpecialistConfigSchema,
+  llmAgentConfigSchemaUpdated,
+  workflowAgentConfigSchemaUpdated,
+  customAgentConfigSchemaUpdated,
+  a2aAgentSpecialistConfigSchemaUpdated,
 ]);
 
 // Schema for SavedAgentConfiguration

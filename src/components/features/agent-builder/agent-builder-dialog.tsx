@@ -12,8 +12,13 @@ import { savedAgentConfigurationSchema } from "@/lib/zod-schemas"; // Assuming t
 
 // ... other existing imports
 import * as React from "react";
+// ADD THESE IMPORTS
+// import { useForm, FormProvider, SubmitHandler, Controller } from "react-hook-form"; // Already exists
+// import { zodResolver } from "@hookform/resolvers/zod"; // Already exists
+// import { savedAgentConfigurationSchema } from "@/lib/zod-schemas"; // Already exists
+
 import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input"; // No longer directly used here, but in child tabs
+import { Input } from "@/components/ui/input"; // Ensure Input is imported for Controller use
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -115,6 +120,7 @@ import RagTab from "./RagTab";
 import ArtifactsTab from "./ArtifactsTab";
 import MultiAgentTab from "./MultiAgentTab"; // Import the new MultiAgentTab component
 import ReviewTab from "./ReviewTab"; // Import the new ReviewTab component
+import { A2AConfig as A2AConfigComponent } from "./a2a-config"; // Import A2AConfig component
 
 // Removed redundant local type definitions for TerminationConditionType and A2AConfigType
 
@@ -139,9 +145,17 @@ const tabSchemaMapping = {
   a2a: ["config.a2a.enabled", "config.a2a.communicationChannels"],
   multi_agent_advanced: ["config.isRootAgent", "config.subAgentIds", "config.globalInstruction"],
   behavior: ["config.agentPersonality", "config.agentRestrictions"], // Added behavior tab fields
+  advanced: [ // Added schema paths for ADK Callbacks
+    "config.adkCallbacks.beforeAgent",
+    "config.adkCallbacks.afterAgent",
+    "config.adkCallbacks.beforeModel",
+    "config.adkCallbacks.afterModel",
+    "config.adkCallbacks.beforeTool",
+    "config.adkCallbacks.afterTool",
+  ],
 };
 
-const tabOrder = ["general", "behavior", "tools", "memory_knowledge", "artifacts", "a2a", "multi_agent_advanced", "review"];
+const tabOrder = ["general", "behavior", "tools", "memory_knowledge", "artifacts", "a2a", "multi_agent_advanced", "advanced", "review"];
 
 
 interface AgentBuilderDialogProps {
@@ -167,6 +181,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   iconComponents,
   // agentTemplates, // No longer used directly, defaultValues logic handles template-like setup
 }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [activeEditTab, setActiveEditTab] = React.useState<string>("general");
   const methods = useForm<SavedAgentConfiguration>({
     resolver: zodResolver(savedAgentConfigurationSchema),
     mode: "onChange", // Or "onSubmit"
@@ -178,6 +194,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         const rag = config.rag || { enabled: false, serviceType: "in-memory", knowledgeSources: [] };
         const artifacts = config.artifacts || { enabled: false, storageType: "memory", definitions: [] };
         const a2a = config.a2a || { enabled: false, communicationChannels: [], defaultResponseFormat: "text", maxMessageSize: 1024*1024, loggingEnabled: false };
+        const adkCallbacks = config.adkCallbacks || { beforeAgent: "", afterAgent: "", beforeModel: "", afterModel: "", beforeTool: "", afterTool: "" };
 
         let specificConfigPart = {};
         if (config.type === "llm") {
@@ -204,6 +221,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           specificConfigPart = {
             customLogicDescription: (config as CustomAgentConfig).customLogicDescription || "",
             genkitFlowName: (config as CustomAgentConfig).genkitFlowName || "",
+            inputSchema: (config as CustomAgentConfig).inputSchema || "",
+            outputSchema: (config as CustomAgentConfig).outputSchema || "",
           };
         } else if (config.type === "a2a") {
           // No extra fields beyond base for a2a specialist type in current types
@@ -258,6 +277,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
               securityPolicy: a2a.securityPolicy,
               apiKeyHeaderName: a2a.apiKeyHeaderName,
             },
+            adkCallbacks: {
+              beforeAgent: adkCallbacks.beforeAgent || "",
+              afterAgent: adkCallbacks.afterAgent || "",
+              beforeModel: adkCallbacks.beforeModel || "",
+              afterModel: adkCallbacks.afterModel || "",
+              beforeTool: adkCallbacks.beforeTool || "",
+              afterTool: adkCallbacks.afterTool || "",
+            },
             ...specificConfigPart, // Spread the type-specific config parts
           },
           tools: editingAgent.tools || [],
@@ -281,10 +308,21 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           isRootAgent: true,
           subAgentIds: [],
           globalInstruction: "",
+          genkitFlowName: "", // Added for new agents
+          inputSchema: "",    // Added for new agents
+          outputSchema: "",   // Added for new agents
           statePersistence: { enabled: false, type: "session", initialStateValues: [], validationRules: [] },
           rag: { enabled: false, serviceType: "in-memory", knowledgeSources: [], persistentMemory: {enabled: false} },
           artifacts: { enabled: false, storageType: "memory", definitions: [] },
           a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: "text", maxMessageSize: 1024*1024, loggingEnabled: false },
+          adkCallbacks: { // Add default empty ADK callbacks
+            beforeAgent: "",
+            afterAgent: "",
+            beforeModel: "",
+            afterModel: "",
+            beforeTool: "",
+            afterTool: "",
+          },
           // LLM specific defaults
           agentGoal: "",
           agentTasks: [],
@@ -340,9 +378,104 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [modalDbDescription, setModalDbDescription] = React.useState<string>('');
   const [modalKnowledgeBaseId, setModalKnowledgeBaseId] = React.useState<string>('');
   const [modalCalendarApiEndpoint, setModalCalendarApiEndpoint] = React.useState<string>('');
+  const [modalAllowedPatterns, setModalAllowedPatterns] = React.useState<string>('');
+  const [modalDeniedPatterns, setModalDeniedPatterns] = React.useState<string>('');
+  const [modalCustomRules, setModalCustomRules] = React.useState<string>('');
 
   const { toast } = useToast();
   const { savedAgents: allSavedAgents } = useAgents(); // Used for sub-agent selector
+
+  const handleExport = () => {
+    const formData = methods.getValues();
+    // Ensure agentName is available for the filename, provide a default if not
+    const agentName = formData.agentName?.trim().replace(/[^a-zA-Z0-9]/g, '_') || 'agent_config';
+    const filename = `${agentName}.json`;
+    const jsonData = JSON.stringify(formData, null, 2);
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast({ title: "Exportado", description: `Configuração do agente salva em ${filename}` });
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      toast({ title: "Importação Cancelada", description: "Nenhum arquivo selecionado.", variant: "default" });
+      return;
+    }
+
+    if (file.type !== "application/json") {
+      toast({ title: "Erro de Importação", description: "Arquivo inválido. Por favor, selecione um arquivo JSON.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') {
+          toast({ title: "Erro de Leitura", description: "Não foi possível ler o conteúdo do arquivo.", variant: "destructive" });
+          return;
+        }
+        const parsedData = JSON.parse(text);
+        const validationResult = savedAgentConfigurationSchema.safeParse(parsedData);
+
+        if (validationResult.success) {
+          // Merge with default values to ensure all fields are present
+          const defaultNewAgentValues = methods.formState.defaultValues; // Get the default structure
+          const mergedData = {
+            ...defaultNewAgentValues,
+            ...validationResult.data,
+            id: editingAgent?.id || uuidv4(), // Keep existing ID if editing, or generate new one
+            config: {
+              ...(defaultNewAgentValues?.config),
+              ...(validationResult.data.config),
+            },
+            tools: validationResult.data.tools || [],
+            toolConfigsApplied: validationResult.data.toolConfigsApplied || {},
+            toolsDetails: validationResult.data.toolsDetails || [],
+          };
+
+          methods.reset(mergedData);
+          // If editing an existing agent, this effectively replaces its config.
+          // If creating a new agent, this populates the form with the imported data.
+          // Resetting view states:
+          if (editingAgent === null) { // Wizard mode
+            setCurrentStep(0); // Go to the first tab
+          } else { // Edit mode
+            setActiveEditTab("general"); // Go to general tab
+          }
+          toast({ title: "Importado com Sucesso", description: `Configuração do agente "${mergedData.agentName}" carregada.` });
+        } else {
+          console.error("Validation Error:", validationResult.error.flatten());
+          toast({
+            title: "Erro de Validação",
+            description: "O arquivo JSON não corresponde ao esquema esperado. Verifique o console para detalhes.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Import Error:", error);
+        toast({ title: "Erro de Importação", description: "Falha ao processar o arquivo JSON. Verifique o console.", variant: "destructive" });
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""; // Reset file input in all cases
+        }
+      }
+    };
+    reader.onerror = () => {
+      toast({ title: "Erro de Leitura", description: "Não foi possível ler o arquivo.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsText(file);
+  };
 
   const availableAgentsForSubSelector = React.useMemo(() =>
     allSavedAgents.filter(agent => agent.id !== editingAgent?.id), // Ensure editing agent is not in its own sub-agent list
@@ -359,16 +492,17 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   React.useEffect(() => {
     if (isOpen) {
-      const defaultVals = methods.getValues(); // Get current form values as a base
-      const newDefaultValues = methods.formState.defaultValues; // Get latest defaultValues based on editingAgent
-      methods.reset(newDefaultValues); // Reset with potentially new default values
-      // The local state `toolConfigurations` was removed, RHF state `toolConfigsApplied` is used directly.
+      const defaultVals = methods.getValues();
+      const newDefaultValues = methods.formState.defaultValues;
+      methods.reset(newDefaultValues);
+      setActiveEditTab("general");
     } else {
       setIsToolConfigModalOpen(false);
       setConfiguringTool(null);
-      if (editingAgent === null) { // Only reset step if it was a new agent creation (wizard)
+      if (editingAgent === null) {
         setCurrentStep(0);
       }
+      setActiveEditTab("general");
     }
   }, [isOpen, editingAgent, methods]); // methods is stable, defaultValues object from useForm is the key for re-runs if editingAgent changes
 
@@ -397,7 +531,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   // Popula os campos do modal com a configuração existente da ferramenta, se houver (data from RHF).
   const handleToolConfigure = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {}; // Get from RHF
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
     const existingConfig = currentToolConfigs[tool.id] || {};
 
     // Reset all modal fields before populating
@@ -406,8 +540,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     setModalDbType(''); setModalDbHost(''); setModalDbPort(0); setModalDbName('');
     setModalDbUser(''); setModalDbPassword(''); setModalDbConnectionString(''); setModalDbDescription('');
     setModalKnowledgeBaseId(''); setModalCalendarApiEndpoint('');
+    setModalAllowedPatterns(''); setModalDeniedPatterns(''); setModalCustomRules('');
 
     // Populate based on existingConfig from RHF
+    setModalAllowedPatterns(existingConfig.allowedPatterns || '');
+    setModalDeniedPatterns(existingConfig.deniedPatterns || '');
+    setModalCustomRules(existingConfig.customRules || '');
     if (tool.id === "webSearch") {
       setModalGoogleApiKey(existingConfig.googleApiKey || '');
       setModalGoogleCseId(existingConfig.googleCseId || '');
@@ -436,10 +574,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
     const updatedToolConfigs = { ...currentToolConfigs, [toolId]: configData };
     methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
-    // The local `toolConfigurations` state was removed. RHF is the source of truth.
 
     setIsToolConfigModalOpen(false);
-    setConfiguringTool(null); // Clear the tool being configured
+    setConfiguringTool(null);
     toast({
       title: "Configuração Salva",
       description: `A configuração para a ferramenta foi salva com sucesso.`,
@@ -447,8 +584,23 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     });
   };
 
+  const handleApiKeyIdChange = (toolId: string, apiKeyId?: string) => {
+    if (!toolId) return;
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+    const existingToolConfig = currentToolConfigs[toolId] || {};
+    const updatedToolConfig = { ...existingToolConfig, selectedApiKeyId: apiKeyId };
+    const updatedToolConfigs = { ...currentToolConfigs, [toolId]: updatedToolConfig };
+    methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
+
+    // Additionally, if a new API key ID is selected, we might want to clear out any old direct-input key
+    // that might have been stored previously for that tool, though this is less critical now.
+    // For example, if existingToolConfig had 'googleApiKey', we could set it to undefined.
+    // This depends on how strictly we want to manage old data.
+    // For now, just updating selectedApiKeyId is the primary goal.
+  };
+
 // MODIFY handleSaveAgent
-const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = (data) => {
+const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = async (data) => {
   // Data is now the validated form data from react-hook-form
   // The logic to construct coreConfig based on selectedAgentType (data.config.type)
   // needs to be done using the `data` object.
@@ -494,7 +646,33 @@ const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = (data) => {
   };
 
   // console.log("Agent data to save (from RHF):", JSON.stringify(agentDataToSave, null, 2));
-  onSave(agentDataToSave);
+  onSave(agentDataToSave); // This likely calls the context update/add function
+
+  // After the primary onSave logic (which might be asynchronous itself if onSave performs API calls)
+  // Update lastUsed for selected API keys
+  if (agentDataToSave.toolConfigsApplied) {
+    Object.values(agentDataToSave.toolConfigsApplied).forEach(async (toolConfig) => {
+      if (toolConfig.selectedApiKeyId) {
+        try {
+          const response = await fetch(`/api/apikeys/${toolConfig.selectedApiKeyId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lastUsed: new Date().toISOString() }),
+          });
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error(`Failed to update lastUsed for API key ${toolConfig.selectedApiKeyId}: ${errorData.error || response.statusText}`);
+            // Non-critical, so don't block UI, just log
+          } else {
+            console.log(`Successfully updated lastUsed for API key ${toolConfig.selectedApiKeyId}`);
+          }
+        } catch (error) {
+          console.error(`Error updating lastUsed for API key ${toolConfig.selectedApiKeyId}:`, error);
+        }
+      }
+    });
+  }
+
   toast({ title: "Agente Salvo", description: `${data.agentName} foi salvo com sucesso.`, variant: "default" });
   onOpenChange(false);
 };
@@ -509,34 +687,68 @@ return (
             <DialogDescription>
               {editingAgent ? `Modifique as configurações do agente "${editingAgent.agentName}".` : "Configure um novo agente inteligente para suas tarefas."}
             </DialogDescription>
+            <input
+              type="file"
+              accept=".json"
+              style={{ display: "none" }}
+              onChange={handleFileImport}
+              ref={fileInputRef}
+            />
+            <Button variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} className="mt-2 ml-auto"> {/* Added ml-auto to push to right */}
+              <UploadCloud className="mr-2 h-4 w-4" /> {/* Or FileInput icon */}
+              Importar Configuração
+            </Button>
           </DialogHeader>
           <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
             <Tabs
-              value={editingAgent === null ? tabOrder[currentStep] : undefined}
-              defaultValue="general"
+              value={editingAgent === null ? tabOrder[currentStep] : activeEditTab}
+              // defaultValue="general" // defaultValue might conflict with controlled value
               onValueChange={(value) => {
                 if (editingAgent === null) {
-                  // In wizard mode, tabs are controlled by Next/Previous buttons
-                  // Optionally, allow navigation by clicking tabs:
-                  // const newStep = tabOrder.indexOf(value);
-                  // if (newStep !== -1) setCurrentStep(newStep);
+                  // In wizard mode, tab navigation is controlled by currentStep and Next/Previous buttons.
+                  // Direct tab clicking is disabled by the 'disabled' prop on TabsTrigger.
                 } else {
-                  // Default behavior for editing: allow direct tab navigation
-                  // This typically doesn't need explicit handling if Tabs component updates its own state
-                  // unless we need to sync it with some external state not shown here.
+                  // Edit mode: update activeEditTab when a tab is clicked.
+                  setActiveEditTab(value);
                 }
               }}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-8 mb-6"> {/* Adjusted for 8 tabs */}
-                <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === null}>Geral</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-9 mb-6"> {/* Adjusted for 9 tabs */}
+                {/* Updated TabsTrigger props */}
+                {tabOrder.map((tab, index) => (
+                  <TabsTrigger
+                    key={tab}
+                    value={tab}
+                    disabled={editingAgent === null && index > currentStep && tab !== "review"} // Keep review tab accessible if others are disabled
+                    // onClick is not needed here as onValueChange on Tabs handles it.
+                    // However, if you need specific logic per trigger click beyond what onValueChange provides:
+                    // onClick={() => {
+                    //   if (editingAgent !== null) {
+                    //     setActiveEditTab(tab);
+                    //   } else {
+                    //     // Wizard mode logic if needed, though disabled prop should prevent most clicks
+                    //     if (index <= currentStep) {
+                    //       // Potentially allow jumping back in wizard?
+                    //       // setCurrentStep(index); // This would make tabs navigable in wizard
+                    //     }
+                    //   }
+                    // }}
+                    statusIcon={getTabStatusIcon(tab)}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace(/_/g, " ")} {/* Format tab name */}
+                  </TabsTrigger>
+                ))}
+                {/* Original TabsTriggers are replaced by the map above */}
+                {/* <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === null}>Geral</TabsTrigger>
                 <TabsTrigger value="behavior" statusIcon={getTabStatusIcon("behavior")} disabled={editingAgent === null}>Comportamento</TabsTrigger>
                 <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")} disabled={editingAgent === null}>Ferramentas</TabsTrigger>
                 <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")} disabled={editingAgent === null}>Memória & Conhecimento</TabsTrigger>
                 <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")} disabled={editingAgent === null}>Artefatos</TabsTrigger>
                 <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")} disabled={editingAgent === null}>Comunicação A2A</TabsTrigger>
-                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente & Avançado</TabsTrigger>
-                <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === null}>Revisar</TabsTrigger>
+                <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === null}>Multi-Agente</TabsTrigger>
+                <TabsTrigger value="advanced" statusIcon={getTabStatusIcon("advanced")} disabled={editingAgent === null}>Avançado</TabsTrigger>
+                <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === null}>Revisar</TabsTrigger> */}
               </TabsList>
 
               {/* General Tab */}
@@ -650,60 +862,12 @@ return (
                 </Alert>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Configurações de Comunicação A2A</CardTitle>
-                    <CardDescription>Define como este agente se comunica com outros agentes no sistema.</CardDescription>
+                    {/* Title and Description are now part of A2AConfigComponent */}
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Controller
-                        name="config.a2a.enabled"
-                        control={methods.control}
-                        render={({ field }) => (
-                          <Switch
-                            id="a2aEnabledSwitchRHF"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        )}
-                      />
-                      <Label htmlFor="a2aEnabledSwitchRHF" className="text-base">Habilitar Comunicação A2A</Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Permite que este agente envie e receba mensagens de outros agentes diretamente, usando os canais configurados.
-                    </p>
-                    {methods.watch("config.a2a.enabled") && (
-                       <div className="space-y-2 pt-2">
-                        <TooltipProvider>
-                          {/* ... Tooltip for A2A channels ... */}
-                        </TooltipProvider>
-                        <Controller
-                          name="config.a2a.communicationChannels"
-                          control={methods.control}
-                          render={({ field }) => (
-                            <Textarea
-                              id="a2aCommunicationChannelsTextareaRHF"
-                              placeholder={`Exemplo de formato JSON...`}
-                              value={field.value ? JSON.stringify(field.value, null, 2) : "[]"}
-                              onChange={(e) => {
-                                try {
-                                  const val = e.target.value.trim();
-                                  if (!val) { field.onChange([]); return; }
-                                  const parsedChannels = JSON.parse(val);
-                                  field.onChange(parsedChannels);
-                                } catch (error) {
-                                  console.error("Erro ao parsear JSON dos canais A2A:", error);
-                                  toast({variant: "destructive", title: "Erro no JSON", description: "Formato inválido para Canais de Comunicação A2A."})
-                                }
-                              }}
-                              rows={6}
-                            />
-                          )}
-                        />
-                         <p className="text-xs text-muted-foreground">
-                           Defina os canais, protocolos e configurações para comunicação com outros agentes (formato JSON).
-                         </p>
-                       </div>
-                    )}
+                    {/* The A2AConfigComponent will have its own internal switch for enabling/disabling */}
+                    {/* It will use useFormContext to manage config.a2a directly */}
+                    <A2AConfigComponent savedAgents={availableAgentsForSubSelector} />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -777,8 +941,55 @@ return (
 
               {/* Review Tab */}
               <TabsContent value="review">
-                <ReviewTab />
+                <ReviewTab setActiveEditTab={setActiveEditTab} />
               </TabsContent>
+
+              {/* Advanced Tab (ADK Callbacks) */}
+              <TabsContent value="advanced" className="space-y-6 mt-4">
+                <Alert>
+                  <Settings2 className="h-4 w-4" />
+                  <AlertTitle>Configurações Avançadas</AlertTitle>
+                  <AlertDescription>
+                    Configure callbacks do ciclo de vida do agente ADK e outras opções avançadas.
+                  </AlertDescription>
+                </Alert>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Callbacks do Ciclo de Vida ADK</CardTitle>
+                    <CardDescription>
+                      Especifique nomes de fluxos Genkit ou referências de funções para serem invocadas em pontos chave do ciclo de vida do agente.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {[
+                      { name: "beforeAgent", label: "Callback Before Agent", description: "Invocado antes do agente principal processar a requisição. Útil para configuração ou validação inicial." },
+                      { name: "afterAgent", label: "Callback After Agent", description: "Invocado após o agente principal concluir. Útil para formatação final ou limpeza." },
+                      { name: "beforeModel", label: "Callback Before Model", description: "Invocado antes de uma chamada ao LLM. Permite modificar o prompt ou configurações do modelo." },
+                      { name: "afterModel", label: "Callback After Model", description: "Invocado após o LLM retornar uma resposta. Permite modificar ou validar a saída do LLM." },
+                      { name: "beforeTool", label: "Callback Before Tool", description: "Invocado antes da execução de uma ferramenta. Permite inspecionar/modificar argumentos ou cancelar a execução." },
+                      { name: "afterTool", label: "Callback After Tool", description: "Invocado após uma ferramenta ser executada. Permite inspecionar/modificar o resultado da ferramenta." },
+                    ].map(callback => (
+                      <div key={callback.name} className="space-y-1">
+                        <Label htmlFor={`config.adkCallbacks.${callback.name}`}>{callback.label}</Label>
+                        <Controller
+                          name={`config.adkCallbacks.${callback.name}` as const}
+                          control={methods.control}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              id={`config.adkCallbacks.${callback.name}`}
+                              placeholder="Nome do fluxo Genkit ou ref da função"
+                              value={field.value || ""}
+                            />
+                          )}
+                        />
+                        <p className="text-xs text-muted-foreground">{callback.description}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
             </Tabs>
           </div>
 
@@ -819,6 +1030,10 @@ return (
             ) : (
               // Editing existing agent
               <>
+                <Button variant="outline" type="button" onClick={handleExport} className="mr-auto"> {/* Added mr-auto to push to left */}
+                  <Share2 className="mr-2 h-4 w-4" /> {/* Or DownloadCloud icon */}
+                  Exportar Configuração
+                </Button>
                 <DialogClose asChild>
                   <Button variant="outline" type="button">Cancelar</Button>
                 </DialogClose>
@@ -840,11 +1055,13 @@ return (
         onOpenChange={(open) => {
           setIsToolConfigModalOpen(open);
           if (!open) {
-            setConfiguringTool(null); // Limpa a ferramenta em configuração se o modal for fechado
+            setConfiguringTool(null);
           }
         }}
         configuringTool={configuringTool}
         onSave={handleSaveToolConfiguration}
+        currentSelectedApiKeyId={configuringTool ? methods.watch(`toolConfigsApplied.${configuringTool.id}.selectedApiKeyId`) : undefined}
+        onApiKeyIdChange={handleApiKeyIdChange}
         modalGoogleApiKey={modalGoogleApiKey} setModalGoogleApiKey={setModalGoogleApiKey}
         modalGoogleCseId={modalGoogleCseId} setModalGoogleCseId={setModalGoogleCseId}
         modalOpenapiSpecUrl={modalOpenapiSpecUrl} setModalOpenapiSpecUrl={setModalOpenapiSpecUrl}
@@ -859,6 +1076,9 @@ return (
         modalDbDescription={modalDbDescription} setModalDbDescription={setModalDbDescription}
         modalKnowledgeBaseId={modalKnowledgeBaseId} setModalKnowledgeBaseId={setModalKnowledgeBaseId}
         modalCalendarApiEndpoint={modalCalendarApiEndpoint} setModalCalendarApiEndpoint={setModalCalendarApiEndpoint}
+        modalAllowedPatterns={modalAllowedPatterns} setModalAllowedPatterns={setModalAllowedPatterns}
+        modalDeniedPatterns={modalDeniedPatterns} setModalDeniedPatterns={setModalDeniedPatterns}
+        modalCustomRules={modalCustomRules} setModalCustomRules={setModalCustomRules}
         InfoIcon={Info}
       />
     </Dialog>
