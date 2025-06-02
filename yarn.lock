@@ -747,26 +747,7 @@
     partial-json "^0.1.7"
     uuid "^10.0.0"
 
-"@genkit-ai/core@0.5.17":
-  version "0.5.17"
-  resolved "https://registry.npmjs.org/@genkit-ai/core/-/core-0.5.17.tgz"
-  integrity sha512-o8aEIFjQ4FugS5w5XK1c6hmiX6bqx7u+UuikARJPMhqOek7aovcXXdYj2zbVmX2/4c94aXerSokB0vD59Pj3GQ==
-  dependencies:
-    "@opentelemetry/api" "^1.9.0"
-    "@opentelemetry/context-async-hooks" "^1.25.0"
-    "@opentelemetry/core" "^1.25.0"
-    "@opentelemetry/sdk-metrics" "^1.25.0"
-    "@opentelemetry/sdk-node" "^0.52.0"
-    "@opentelemetry/sdk-trace-base" "^1.25.0"
-    ajv "^8.12.0"
-    ajv-formats "^3.0.1"
-    async-mutex "^0.5.0"
-    express "^4.21.0"
-    json-schema "^0.4.0"
-    zod "^3.22.4"
-    zod-to-json-schema "^3.22.4"
-
-"@genkit-ai/core@1.11.0":
+"@genkit-ai/core@^1.11.0", "@genkit-ai/core@1.11.0":
   version "1.11.0"
   resolved "https://registry.npmjs.org/@genkit-ai/core/-/core-1.11.0.tgz"
   integrity sha512-76J6fcAFVQCqqJErND2NdE0qTx2mEp/574cYBW59BQLRYaD8YtBj1CTQXhO/bxYRtSDlUvGJjF2xX0yfUmIMtA==
@@ -790,7 +771,26 @@
     zod "^3.23.8"
     zod-to-json-schema "^3.22.4"
 
-"@genkit-ai/flow@latest":
+"@genkit-ai/core@0.5.17":
+  version "0.5.17"
+  resolved "https://registry.npmjs.org/@genkit-ai/core/-/core-0.5.17.tgz"
+  integrity sha512-o8aEIFjQ4FugS5w5XK1c6hmiX6bqx7u+UuikARJPMhqOek7aovcXXdYj2zbVmX2/4c94aXerSokB0vD59Pj3GQ==
+  dependencies:
+    "@opentelemetry/api" "^1.9.0"
+    "@opentelemetry/context-async-hooks" "^1.25.0"
+    "@opentelemetry/core" "^1.25.0"
+    "@opentelemetry/sdk-metrics" "^1.25.0"
+    "@opentelemetry/sdk-node" "^0.52.0"
+    "@opentelemetry/sdk-trace-base" "^1.25.0"
+    ajv "^8.12.0"
+    ajv-formats "^3.0.1"
+    async-mutex "^0.5.0"
+    express "^4.21.0"
+    json-schema "^0.4.0"
+    zod "^3.22.4"
+    zod-to-json-schema "^3.22.4"
+
+"@genkit-ai/flow@^0.5.17":
   version "0.5.17"
   resolved "https://registry.npmjs.org/@genkit-ai/flow/-/flow-0.5.17.tgz"
   integrity sha512-+P2VGfa5z2e9VzjAJysLAw0oHuPv02UEj/z4Csxuurv2xgL3CQCZ9DV81i+14/ybp5LJ8waPSFsrJ29ffQCPwg==

@@ -147,6 +147,7 @@ interface AgentCardProps {
   onEdit: (agent: SavedAgentConfiguration) => void;
   onTest: (agent: SavedAgentConfiguration) => void;
   onDelete: (agentId: string) => void;
+  onViewMonitoring: (agent: SavedAgentConfiguration) => void; // New prop for monitoring
   availableTools: AvailableTool[]; // Necessário para obter o label correto e o ícone da ferramenta
   agentTypeOptions: {
     id: string;
@@ -161,6 +162,7 @@ export function AgentCard({
   onEdit,
   onTest,
   onDelete,
+  onViewMonitoring, // Destructure new prop
   availableTools,
   agentTypeOptions,
 }: AgentCardProps) {
@@ -441,9 +443,17 @@ export function AgentCard({
         <Button variant="outline" size="sm" onClick={() => onEdit(agent)}>
           <EditIcon size={16} className="mr-1.5" /> Editar
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onTest(agent)}>
+        <Button variant="outline" size="sm" onClick={() => onViewMonitoring(agent)}>
+          <EyeIcon size={16} className="mr-1.5" /> Monitorar
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex"> {/* Testar button might be hidden on smaller card footers if too many buttons */}
           <ChatIcon size={16} className="mr-1.5" /> Testar
         </Button>
+        {/* Simplified Test button for very small screens, or adjust layout above */}
+        {/* <Button variant="outline" size="icon" onClick={() => onTest(agent)} className="sm:hidden">
+          <ChatIcon size={16} />
+          <span className="sr-only">Testar</span>
+        </Button> */}
         <Button
           variant="destructive"
           size="sm"

@@ -187,6 +187,9 @@ import {
 } from "@/data/agentBuilderConfig";
 import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui"; // Nova UI
 import { MessageSquareText, Edit3 } from "lucide-react"; // Ícones para alternar
+// Import the new monitoring components
+import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
+import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
 import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 
 export default function AgentBuilderPage() {
@@ -199,6 +202,8 @@ export default function AgentBuilderPage() {
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgent, setEditingAgent] =
     React.useState<SavedAgentConfiguration | null>(null);
+  const [selectedAgentForMonitoring, setSelectedAgentForMonitoring] = React.useState<SavedAgentConfiguration | null>(null);
+  const [currentViewTab, setCurrentViewTab] = React.useState<'details' | 'monitoring'>('details');
   const [isMounted, setIsMounted] = React.useState(false);
   const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form"); // Novo estado
 
@@ -213,13 +218,28 @@ export default function AgentBuilderPage() {
 
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
     setEditingAgent(agentToEdit);
+    setSelectedAgentForMonitoring(null); // Clear monitoring view when opening edit modal
+    setCurrentViewTab('details'); // Default to details tab
     setIsBuilderModalOpen(true);
+  };
+
+  const handleViewAgentMonitoring = (agentToView: SavedAgentConfiguration) => {
+    setSelectedAgentForMonitoring(agentToView);
+    setEditingAgent(null); // Clear editing modal state
+    setIsBuilderModalOpen(false);
+    setCurrentViewTab('monitoring'); // Switch to monitoring tab
+     // Potentially switch buildMode to 'form' if monitoring is part of that view.
+    // For now, let's assume monitoring view can exist independently or alongside form elements.
+    // If buildMode should be 'form' to see this, uncomment:
+    // setBuildMode('form');
   };
 
   const handleEditAgentWithMode = (agentToEdit: SavedAgentConfiguration, mode: "form" | "chat") => {
     setEditingAgent(agentToEdit);
+    setSelectedAgentForMonitoring(null);
     setBuildMode(mode);
     if (mode === 'form') {
+      setCurrentViewTab('details');
       setIsBuilderModalOpen(true);
     }
   };
@@ -254,12 +274,16 @@ export default function AgentBuilderPage() {
     }
     if (result) { // If save was successful (either add or update)
         setEditingAgent(null); // Clear editing state
+        // setSelectedAgentForMonitoring(null); // Also clear monitoring selection if tied to edit
         setIsBuilderModalOpen(false); // Close modal
     }
     // The context should ideally refresh the savedAgents list after add/update
   };
 
   const handleDeleteAgent = async (agentIdToDelete: string) => {
+    if (selectedAgentForMonitoring?.id === agentIdToDelete) {
+      setSelectedAgentForMonitoring(null); // Clear monitoring view if the deleted agent was being monitored
+    }
     const success = await deleteAgentViaContext(agentIdToDelete);
     if (success) {
       toast({
@@ -323,7 +347,9 @@ export default function AgentBuilderPage() {
                   <AgentCard
                     key={agent.id}
                     agent={agent}
-                    onEdit={() => handleEditAgent(agent)} // Use the edit handler
+                    onEdit={() => handleEditAgent(agent)}
+                    // Add a new prop/handler to AgentCard for monitoring
+                    onViewMonitoring={() => handleViewAgentMonitoring(agent)}
                     onTest={() =>
                       toast({
                         title: "Em breve!",
@@ -350,16 +376,73 @@ export default function AgentBuilderPage() {
               </div>
             )
           )}
+
+          {/* Section for displaying selected agent's monitoring or details */}
+          {selectedAgentForMonitoring && buildMode === 'form' && (
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Visualizando Agente: {selectedAgentForMonitoring.agentName}</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedAgentForMonitoring(null)}>Fechar</Button>
+                </div>
+                <div className="flex space-x-2 pt-2">
+                  <Button
+                    variant={currentViewTab === 'details' ? 'default' : 'outline'}
+                    onClick={() => {
+                      setCurrentViewTab('details');
+                      // Optionally, if AgentBuilderDialog should open for this agent's details:
+                      // setEditingAgent(selectedAgentForMonitoring);
+                      // setIsBuilderModalOpen(true);
+                      // For now, details tab can be a placeholder or show read-only info.
+                      // To re-open the modal for editing from here:
+                      handleEditAgent(selectedAgentForMonitoring);
+                      // And ensure selectedAgentForMonitoring is cleared if modal takes full control
+                      // setSelectedAgentForMonitoring(null); // if opening modal means exiting this view
+                    }}
+                  >
+                    Configuração
+                  </Button>
+                  <Button
+                    variant={currentViewTab === 'monitoring' ? 'default' : 'outline'}
+                    onClick={() => setCurrentViewTab('monitoring')}
+                  >
+                    Monitoramento
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {currentViewTab === 'details' && (
+                  <div>
+                    <p>Exibindo detalhes de configuração para: <strong>{selectedAgentForMonitoring.agentName}</strong>.</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Para editar, feche esta visualização e clique no botão de edição do card do agente,
+                      ou clique em 'Configuração' acima para reabrir o editor.
+                    </p>
+                    {/* Or, directly embed/render a read-only view of agent config here */}
+                  </div>
+                )}
+                {currentViewTab === 'monitoring' && (
+                  <div className="space-y-6"> {/* Add spacing between metrics and logs */}
+                    {/* AgentMetricsView */}
+                    <AgentMetricsView agentId={selectedAgentForMonitoring.id} />
+
+                    {/* AgentLogView */}
+                    <AgentLogView agentId={selectedAgentForMonitoring.id} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 
-      {buildMode === 'form' && (
+      {buildMode === 'form' && editingAgent && !selectedAgentForMonitoring && ( // Ensure dialog only shows for direct edits, not when viewing monitoring section
             <AgentBuilderDialog
-              isOpen={isBuilderModalOpen}
+              isOpen={isBuilderModalOpen && !!editingAgent} // Only open if editingAgent is set
               onOpenChange={(isOpen: boolean) => {
                 setIsBuilderModalOpen(isOpen);
                 if (!isOpen) {
-                  setEditingAgent(null);
+                  setEditingAgent(null); // Clear editingAgent when modal closes
                 }
               }}
               editingAgent={editingAgent}
