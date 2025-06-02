@@ -32,6 +32,7 @@ import type { SavedAgentConfiguration } from "@/types/agent-configs"; // Adjuste
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
+import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog"; // Import new dialog
 import {
   Tooltip,
   TooltipContent,
@@ -214,6 +215,10 @@ export default function AgentBuilderPage() {
   const [isMounted, setIsMounted] = React.useState(false);
   const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form"); // Novo estado
 
+  // State for the new Save As Template dialog
+  const [isSaveAsTemplateDialogOpen, setIsSaveAsTemplateDialogOpen] = React.useState(false);
+  const [currentAgentForTemplating, setCurrentAgentForTemplating] = React.useState<SavedAgentConfiguration | null>(null);
+
   const [activeTutorial, setActiveTutorial] = React.useState<GuidedTutorial | null>(null);
   const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
@@ -388,6 +393,10 @@ export default function AgentBuilderPage() {
     if (selectedAgentForMonitoring?.id === agentIdToDelete) {
       setSelectedAgentForMonitoring(null); // Clear monitoring view if the deleted agent was being monitored
     }
+    if (currentAgentForTemplating?.id === agentIdToDelete) {
+      setCurrentAgentForTemplating(null); // Clear if it was about to be templated
+      setIsSaveAsTemplateDialogOpen(false);
+    }
     const success = await deleteAgentViaContext(agentIdToDelete);
     if (success) {
       toast({
@@ -399,37 +408,41 @@ export default function AgentBuilderPage() {
   };
 
   const handleSaveAsTemplate = async (agent: SavedAgentConfiguration) => {
-    const {
-      id, // Exclude original agent ID
-      createdAt, // Exclude original creation date
-      updatedAt, // Exclude original update date
-      // userId, // Exclude original userId, new one will be set by service
-      isFavorite, // Exclude favorite status
-      tags, // Potentially exclude or reset tags for a new template
-      // templateId, // This agent is becoming a template, not based on one.
-      ...agentDataToCopy
-    } = agent;
+    // This function now just opens the dialog
+    setCurrentAgentForTemplating(agent);
+    setIsSaveAsTemplateDialogOpen(true);
+  };
 
-    const templateName = `Template de ${agent.agentName}`; // Or prompt user for a name
+  const executeSaveAsTemplate = async (templateDetails: { useCases: string[]; templateDetailsPreview: string }) => {
+    if (!currentAgentForTemplating) {
+      toast({ title: "Erro", description: "Nenhum agente selecionado para salvar como template.", variant: "destructive" });
+      return;
+    }
+
+    const {
+      id, createdAt, updatedAt, isFavorite, // Exclude these from the new template
+      ...agentDataToCopy // Keep most of the agent's configuration
+    } = currentAgentForTemplating;
+
+    const templateName = `Template de ${currentAgentForTemplating.agentName}`; // Or prompt user for a name
 
     const newTemplateData: Partial<SavedAgentConfiguration> = {
-      ...agentDataToCopy, // Copy all other relevant fields
-      agentName: templateName, // Give it a new name or allow user input
-      agentDescription: `Template baseado em ${agent.agentName}: ${agent.agentDescription}`,
-      // isTemplate: true, // Service will set this, but can be explicit
-      // templateId: null, // This is a new template
-      // userId: currentUserId, // Service will handle setting this from its args
-      // createdAt and updatedAt will be set by the service or Firestore
+      ...agentDataToCopy,
+      agentName: templateName,
+      agentDescription: `Template baseado em ${currentAgentForTemplating.agentName}: ${currentAgentForTemplating.agentDescription}`,
+      useCases: templateDetails.useCases, // Add new field
+      templateDetailsPreview: templateDetails.templateDetailsPreview, // Add new field
+      isTemplate: true, // Mark as template
+      // userId, createdAt, updatedAt will be handled by the backend service
+      // templateId should be null or not set for a new template.
     };
 
     try {
-      // Pass undefined for userId if not available, service should handle it or be updated.
-      // For now, assuming saveAgentTemplate can handle undefined userId or it's passed correctly.
-      const savedTemplateId = await saveAgentTemplate(newTemplateData as SavedAgentConfiguration, undefined /* Pass currentUserId here if available */);
+      const savedTemplateId = await saveAgentTemplate(newTemplateData as SavedAgentConfiguration, undefined /* currentUserId if available */);
       if (savedTemplateId) {
         toast({
           title: "Template Salvo!",
-          description: `O agente "${agent.agentName}" foi salvo como um novo template com nome "${templateName}".`,
+          description: `O agente "${currentAgentForTemplating.agentName}" foi salvo como um novo template com nome "${templateName}".`,
         });
       } else {
         throw new Error("Falha ao obter o ID do template salvo.");
@@ -441,6 +454,9 @@ export default function AgentBuilderPage() {
         description: "Não foi possível salvar o agente como template. Tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setCurrentAgentForTemplating(null);
+      setIsSaveAsTemplateDialogOpen(false);
     }
   };
 
@@ -592,23 +608,37 @@ export default function AgentBuilderPage() {
         </>
       )}
 
-      {buildMode === 'form' && editingAgent && !selectedAgentForMonitoring && ( // Ensure dialog only shows for direct edits, not when viewing monitoring section
-            <AgentBuilderDialog
-              isOpen={isBuilderModalOpen && !!editingAgent} // Only open if editingAgent is set
-              onOpenChange={(isOpenValue: boolean) => { // Renamed isOpen to isOpenValue to avoid conflict
-                setIsBuilderModalOpen(isOpenValue);
-                if (!isOpen) {
-                  setEditingAgent(null); // Clear editingAgent when modal closes
-                }
-              }}
-              editingAgent={editingAgent}
-              onSave={handleSaveAgent}
-              availableTools={availableTools}
-              agentTypeOptions={agentTypeOptions}
-              agentToneOptions={agentToneOptions}
-              iconComponents={iconComponents}
-              // agentTemplates={agentTemplates} // Prop agentTemplates is not expected by AgentBuilderDialog
-            />
+      {buildMode === 'form' && editingAgent && !selectedAgentForMonitoring && (
+        <AgentBuilderDialog
+          isOpen={isBuilderModalOpen && !!editingAgent && !isSaveAsTemplateDialogOpen} // Ensure save as template dialog is not also open
+          onOpenChange={(isOpenValue: boolean) => {
+            setIsBuilderModalOpen(isOpenValue);
+            if (!isOpenValue) {
+              setEditingAgent(null);
+            }
+          }}
+          editingAgent={editingAgent}
+          onSave={handleSaveAgent}
+          availableTools={availableTools}
+          agentTypeOptions={agentTypeOptions}
+          agentToneOptions={agentToneOptions}
+          iconComponents={iconComponents}
+          availableAgentsForSubSelector={savedAgents.map(a => ({id: a.id, agentName: a.agentName}))} // Pass available agents for sub-selector
+        />
+      )}
+
+      {isSaveAsTemplateDialogOpen && currentAgentForTemplating && (
+        <SaveAsTemplateDialog
+          isOpen={isSaveAsTemplateDialogOpen}
+          onOpenChange={(isOpenValue) => {
+            setIsSaveAsTemplateDialogOpen(isOpenValue);
+            if (!isOpenValue) {
+              setCurrentAgentForTemplating(null);
+            }
+          }}
+          agentToTemplate={currentAgentForTemplating}
+          onSaveTemplate={executeSaveAsTemplate}
+        />
       )}
 
       {activeTutorial && isTutorialModalOpen && (
@@ -632,6 +662,7 @@ export default function AgentBuilderPage() {
         isOpen={isFeedbackModalOpen}
         onOpenChange={setIsFeedbackModalOpen}
       /> {/* Added */}
+
     </div>
   );
 }

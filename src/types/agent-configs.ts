@@ -250,6 +250,8 @@ export interface SavedAgentConfiguration {
   agentDescription: string;
   agentVersion: string;
   icon?: string;
+  useCases?: string[];
+  templateDetailsPreview?: string;
   templateId?: string;
   isTemplate?: boolean; // New field
   isFavorite?: boolean;

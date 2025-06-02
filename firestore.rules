@@ -37,5 +37,13 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
+
+    // Agent Templates Collection:
+    // All authenticated users can read templates.
+    // Only admin users can write (create, update, delete) templates.
+    match /agent-templates/{templateId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true; // Placeholder for admin check
+    }
   }
 }

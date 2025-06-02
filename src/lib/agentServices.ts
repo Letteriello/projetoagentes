@@ -91,6 +91,7 @@ export async function getAgentConfiguration(agentId: string): Promise<SavedAgent
 
 // Example for saveAgentTemplate
 export async function saveAgentTemplate(templateConfig: SavedAgentConfiguration, userId?: string): Promise<string> {
+  // TODO: Implement admin-only restriction for saving templates (e.g., check custom claims or a role in user's profile)
   try {
     const templatesCollection = collection(firestore, 'agent-templates');
     const dataToSave = {
