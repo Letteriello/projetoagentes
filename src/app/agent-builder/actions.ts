@@ -18,6 +18,8 @@ import {
   serverTimestamp,
   query,
   where,
+  orderBy, // Added orderBy
+  limit // Added limit
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebaseClient";
 
@@ -41,16 +43,7 @@ export async function suggestAgentNameAndDescriptionAction(
   input: z.infer<typeof SuggestActionInputSchema>
 ): Promise<SuggestionResult> {
   try {
-    // Input is already expected to be structured according to AgentNameDescriptionSuggesterInputSchema
-    // If additional server-side validation is desired before hitting the flow, it can be done here.
-    // For example, SuggestActionInputSchema.parse(input); can be called explicitly.
-    // However, runFlow will also validate against the flow's inputSchema.
-
     const result = await runFlow(agentNameDescriptionSuggesterFlow, input);
-
-    // Ensure the result matches the expected output schema (optional, as runFlow should also handle this)
-    // const validatedResult = AgentNameDescriptionSuggesterOutputSchema.parse(result);
-
     return {
       success: true,
       suggestedName: result.suggestedName,
@@ -58,7 +51,6 @@ export async function suggestAgentNameAndDescriptionAction(
     };
   } catch (e: any) {
     console.error('Error in suggestAgentNameAndDescriptionAction:', e);
-    // Check if the error is a ZodError for more specific messages, or handle other error types
     if (e instanceof z.ZodError) {
       return {
         success: false,
@@ -78,16 +70,20 @@ const agentsCollection = collection(firestore, "agents");
 // CRUD actions for agent configurations
 
 export async function createAgent(
-  agentConfigData: Omit<SavedAgentConfiguration, "id" | "createdAt" | "updatedAt">,
+  agentConfigData: Omit<SavedAgentConfiguration, "id" | "createdAt" | "updatedAt" | "internalVersion" | "isLatest" | "originalAgentId">,
   userId: string
 ): Promise<SavedAgentConfiguration | { error: string }> {
   try {
     const newAgentDoc = await addDoc(agentsCollection, {
       ...agentConfigData,
       userId,
+      internalVersion: 1,
+      isLatest: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    await updateDoc(newAgentDoc.ref, { originalAgentId: newAgentDoc.id });
     const agentSnapshot = await getDoc(newAgentDoc);
     const agentData = agentSnapshot.data();
     return {
@@ -100,6 +96,7 @@ export async function createAgent(
   }
 }
 
+/* // Commenting out the old updateAgent function
 export async function updateAgent(
   agentId: string,
   agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, "id" | "createdAt" | "updatedAt" | "userId">>
@@ -122,13 +119,100 @@ export async function updateAgent(
     return { error: e.message || "Failed to update agent." };
   }
 }
+*/
+
+export async function updateAgent(
+  agentId: string, // This is the ID of the current version to be updated (which becomes the base for the new version)
+  agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, "id" | "createdAt" | "updatedAt" | "userId" | "internalVersion" | "isLatest" | "originalAgentId">>
+): Promise<SavedAgentConfiguration | { error: string; status?: number }> {
+  try {
+    const currentVersionRef = doc(firestore, "agents", agentId);
+    const currentVersionSnapshot = await getDoc(currentVersionRef);
+
+    if (!currentVersionSnapshot.exists()) {
+      return { error: "Agent version to update not found.", status: 404 };
+    }
+
+    const currentVersionData = currentVersionSnapshot.data() as SavedAgentConfiguration; // Cast for easier access
+    const userId = currentVersionData.userId;
+    // Fallback for originalAgentId for older documents that might not have it.
+    const originalAgentId = currentVersionData.originalAgentId || agentId;
+
+    if (!userId) {
+        // This case should ideally not happen if agents are created correctly.
+        return { error: "User ID not found on the agent version. Cannot update.", status: 400 };
+    }
+    // TODO: Add check to ensure the `userId` from `currentVersionData` matches the currently authenticated user.
+
+    // Step 4c & 4d: Find current "latest" version(s) for this originalAgentId and set isLatest to false
+    const latestQuery = query(
+      agentsCollection,
+      where("originalAgentId", "==", originalAgentId),
+      where("isLatest", "==", true)
+    );
+    const latestSnapshot = await getDocs(latestQuery);
+
+    const updatePromises: Promise<void>[] = [];
+    latestSnapshot.forEach((docSnapshot) => {
+      updatePromises.push(
+        updateDoc(docSnapshot.ref, {
+          isLatest: false,
+          updatedAt: serverTimestamp(),
+        })
+      );
+    });
+    await Promise.all(updatePromises);
+
+    // Step 4e & 4f: Determine the new internalVersion
+    const internalVersionQuery = query(
+      agentsCollection,
+      where("originalAgentId", "==", originalAgentId),
+      orderBy("internalVersion", "desc"),
+      limit(1)
+    );
+    const internalVersionSnapshot = await getDocs(internalVersionQuery);
+    let newInternalVersion = 1;
+    if (!internalVersionSnapshot.empty) {
+      const highestVersionDocData = internalVersionSnapshot.docs[0].data();
+      newInternalVersion = (highestVersionDocData.internalVersion || 0) + 1;
+    }
+
+    // Step 4g: Prepare data for the new agent version document
+    const newAgentVersionData = {
+      ...currentVersionData,
+      ...agentConfigUpdate,
+      config: { ...currentVersionData.config, ...agentConfigUpdate.config },
+      toolConfigsApplied: { ...currentVersionData.toolConfigsApplied, ...agentConfigUpdate.toolConfigsApplied },
+      userId,
+      originalAgentId,
+      internalVersion: newInternalVersion,
+      isLatest: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    delete newAgentVersionData.id;
+
+
+    const newAgentVersionDocRef = await addDoc(agentsCollection, newAgentVersionData);
+    const newAgentVersionSnapshot = await getDoc(newAgentVersionDocRef);
+
+    return {
+      id: newAgentVersionSnapshot.id,
+      ...(newAgentVersionSnapshot.data() as Omit<SavedAgentConfiguration, "id">),
+    } as SavedAgentConfiguration;
+
+  } catch (e: any) {
+    console.error("Error updating agent (creating new version):", e);
+    return { error: e.message || "Failed to update agent by creating a new version." };
+  }
+}
+
 
 export async function deleteAgent(
   agentId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const agentRef = doc(firestore, "agents", agentId);
-    // TODO: Add check to ensure user owns the agent before deleting
     await deleteDoc(agentRef);
     return { success: true };
   } catch (e: any) {
@@ -141,7 +225,14 @@ export async function listAgents(
   userId: string
 ): Promise<SavedAgentConfiguration[] | { error: string }> {
   try {
-    const q = query(agentsCollection, where("userId", "==", userId));
+    // This query will fetch all agent versions for the user.
+    // UI/client might want to additionally filter for isLatest === true for a default view.
+    const q = query(
+        agentsCollection,
+        where("userId", "==", userId),
+        orderBy("originalAgentId"), // Group versions of the same agent together
+        orderBy("internalVersion", "desc") // List newest versions first within each group
+    );
     const querySnapshot = await getDocs(q);
     const agents: SavedAgentConfiguration[] = [];
     querySnapshot.forEach((doc) => {
@@ -166,9 +257,8 @@ export async function getAgentById(
       return { error: "Agent not found.", status: 404 };
     }
 
-    const agentData = agentSnapshot.data();
+    const agentData = agentSnapshot.data() as SavedAgentConfiguration;
 
-    // Verify ownership
     if (agentData.userId !== userId) {
       return { error: "Forbidden. User does not own this agent.", status: 403 };
     }
@@ -182,6 +272,113 @@ export async function getAgentById(
     return { error: e.message || "Failed to get agent.", status: 500 };
   }
 }
+
+export async function getAgentHistory(
+  originalAgentId: string,
+  userId: string
+): Promise<SavedAgentConfiguration[] | { error: string }> {
+  try {
+    const q = query(
+      agentsCollection,
+      where("originalAgentId", "==", originalAgentId),
+      where("userId", "==", userId), // Ensure user owns these versions
+      orderBy("internalVersion", "desc") // Newest version first
+    );
+
+    const querySnapshot = await getDocs(q);
+    const history: SavedAgentConfiguration[] = [];
+    querySnapshot.forEach((doc) => {
+      history.push({ id: doc.id, ...doc.data() } as SavedAgentConfiguration);
+    });
+
+    return history;
+  } catch (e: any) {
+    console.error("Error getting agent history:", e);
+    return { error: e.message || "Failed to get agent history." };
+  }
+}
+
+export async function restoreAgentVersion(
+  agentIdToRestore: string,
+  userId: string
+): Promise<SavedAgentConfiguration | { error: string; status?: number }> {
+  try {
+    const agentToRestoreRef = doc(firestore, "agents", agentIdToRestore);
+    const agentToRestoreSnapshot = await getDoc(agentToRestoreRef);
+
+    if (!agentToRestoreSnapshot.exists()) {
+      return { error: "Version to restore not found.", status: 404 };
+    }
+
+    const agentToRestoreData = agentToRestoreSnapshot.data() as SavedAgentConfiguration;
+
+    if (agentToRestoreData.userId !== userId) {
+      return { error: "Forbidden. User does not own this agent version.", status: 403 };
+    }
+
+    const originalAgentId = agentToRestoreData.originalAgentId;
+    if (!originalAgentId) {
+      // This should not happen for properly versioned agents
+      return { error: "Cannot restore: originalAgentId missing from the version to restore.", status: 500 };
+    }
+
+    // Find current "latest" version(s) for this originalAgentId and set isLatest to false
+    const latestQuery = query(
+      agentsCollection,
+      where("originalAgentId", "==", originalAgentId),
+      where("isLatest", "==", true)
+    );
+    const latestSnapshot = await getDocs(latestQuery);
+
+    const updatePromises: Promise<void>[] = [];
+    latestSnapshot.forEach((docSnapshot) => {
+      updatePromises.push(
+        updateDoc(docSnapshot.ref, {
+          isLatest: false,
+          updatedAt: serverTimestamp(),
+        })
+      );
+    });
+    await Promise.all(updatePromises);
+
+    // Determine the new internalVersion
+    const internalVersionQuery = query(
+      agentsCollection,
+      where("originalAgentId", "==", originalAgentId),
+      orderBy("internalVersion", "desc"),
+      limit(1)
+    );
+    const internalVersionSnapshot = await getDocs(internalVersionQuery);
+    let newInternalVersion = 1;
+    if (!internalVersionSnapshot.empty) {
+      const highestVersionDocData = internalVersionSnapshot.docs[0].data();
+      newInternalVersion = (highestVersionDocData.internalVersion || 0) + 1;
+    }
+
+    // Prepare data for the new "restored" version document
+    const newRestoredVersionData = {
+      ...agentToRestoreData,
+      internalVersion: newInternalVersion,
+      isLatest: true,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    };
+    delete newRestoredVersionData.id;
+
+    const newDocRef = await addDoc(agentsCollection, newRestoredVersionData);
+    const newDocSnapshot = await getDoc(newDocRef);
+
+    return {
+      id: newDocSnapshot.id,
+      ...(newDocSnapshot.data() as Omit<SavedAgentConfiguration, "id">),
+    } as SavedAgentConfiguration;
+
+  } catch (e: any) {
+    console.error("Error restoring agent version:", e);
+    return { error: e.message || "Failed to restore agent version.", status: 500 };
+  }
+}
+
 
 // Added for LLM Behavior Suggestions
 import {
@@ -199,9 +396,7 @@ export async function suggestLlmBehaviorAction(
   input: z.infer<typeof LlmBehaviorSuggesterInputSchema>
 ): Promise<BehaviorSuggestionResult> {
   try {
-    // runFlow will validate input against LlmBehaviorSuggesterInputSchema
     const result = await runFlow(llmBehaviorSuggesterFlow, input);
-
     return {
       success: true,
       suggestions: result.suggestions,
@@ -210,7 +405,6 @@ export async function suggestLlmBehaviorAction(
     console.error('Error in suggestLlmBehaviorAction:', e);
     let errorMessage = 'Failed to get behavior suggestions from AI.';
     if (e instanceof z.ZodError) {
-      // More detailed error message for Zod validation errors from the flow itself or runFlow
       errorMessage = 'Data validation error: ' + e.errors.map(err => `${err.path.join('.')} - ${err.message}`).join(', ');
     } else if (e.message) {
       errorMessage = e.message;
@@ -232,7 +426,6 @@ export async function invokeAgentCreatorChatFlow(
   input: CreatorChatActionInput
 ): Promise<CreatorChatActionResult> {
   try {
-    // Invoke the flow directly without using runFlow
     const flowResult = await agentCreatorChatFlow({
       userNaturalLanguageInput: input.userNaturalLanguageInput,
       currentAgentConfigJson: input.currentAgentConfigJson,
