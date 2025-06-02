@@ -109,7 +109,7 @@ export function SubAgentSelector({
                   <CommandItem
                     key={agent.id}
                     value={agent.id}
-                    onSelect={disabled ? undefined : () => handleSelect(agent.id)}
+                    onSelect={() => { if (!disabled) { handleSelect(agent.id); } }}
                     aria-disabled={disabled}
                     className={cn(disabled && "opacity-50 cursor-not-allowed")}
                   >
