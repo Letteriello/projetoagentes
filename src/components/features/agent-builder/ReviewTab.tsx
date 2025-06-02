@@ -7,12 +7,13 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import type { SavedAgentConfiguration } from "@/types/agent-configs";
+import { Button } from "@/components/ui/button"; // Added import
 
 interface ReviewTabProps {
-  // Props can be added here if needed in the future
+  setActiveEditTab?: (tabName: string) => void;
 }
 
-const ReviewTab: React.FC<ReviewTabProps> = () => {
+const ReviewTab: React.FC<ReviewTabProps> = ({ setActiveEditTab }) => {
   const { watch } = useFormContext<SavedAgentConfiguration>();
 
   // Watch all form values
@@ -60,9 +61,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
       </Alert>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>General Information</CardTitle>
           <CardDescription>Basic details and type of the agent.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("general")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div><strong>Agent Name:</strong> {renderValue(formData.agentName)}</div>
@@ -78,9 +82,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
 
       {formData.config?.type === "llm" && (
         <Card>
-          <CardHeader>
+          <CardHeader className="relative">
             <CardTitle>LLM Configuration</CardTitle>
             <CardDescription>Settings specific to LLM agents.</CardDescription>
+            {setActiveEditTab && (
+              <Button variant="link" size="sm" onClick={() => setActiveEditTab("behavior")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             <div><strong>Goal:</strong> {renderValue(formData.config.agentGoal)}</div>
@@ -96,9 +103,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
 
       {formData.config?.type === "workflow" && (
          <Card>
-           <CardHeader>
+           <CardHeader className="relative">
              <CardTitle>Workflow Configuration</CardTitle>
              <CardDescription>Settings specific to Workflow agents.</CardDescription>
+             {setActiveEditTab && (
+               <Button variant="link" size="sm" onClick={() => setActiveEditTab("behavior")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+             )}
            </CardHeader>
            <CardContent className="space-y-3">
             <div><strong>Workflow Description:</strong> {renderValue(formData.config.workflowDescription)}</div>
@@ -118,9 +128,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
 
       {formData.config?.type === "custom" && (
         <Card>
-          <CardHeader>
+          <CardHeader className="relative">
             <CardTitle>Custom Logic Configuration</CardTitle>
             <CardDescription>Settings specific to Custom Logic agents.</CardDescription>
+            {setActiveEditTab && (
+              <Button variant="link" size="sm" onClick={() => setActiveEditTab("behavior")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             <div><strong>Custom Logic Description:</strong> {renderValue(formData.config.customLogicDescription)}</div>
@@ -133,9 +146,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
       <Separator />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Tools</CardTitle>
           <CardDescription>Selected tools and their configurations.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("tools")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div><strong>Selected Tools:</strong> {renderValue(formData.tools, "tools")}</div>
@@ -149,9 +165,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
       <Separator />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Memory & Knowledge</CardTitle>
           <CardDescription>State persistence and RAG settings.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("memory_knowledge")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <section>
@@ -188,9 +207,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
       <Separator />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Artifacts</CardTitle>
           <CardDescription>Settings for agent-generated artifacts.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("artifacts")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div><strong>Enabled:</strong> {renderValue(formData.config?.artifacts?.enabled)}</div>
@@ -208,9 +230,12 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
       <Separator />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Agent-to-Agent (A2A) Communication</CardTitle>
           <CardDescription>Settings for communication with other agents.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("a2a")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div><strong>Enabled:</strong> {renderValue(formData.config?.a2a?.enabled)}</div>
@@ -230,14 +255,36 @@ const ReviewTab: React.FC<ReviewTabProps> = () => {
       <Separator />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Multi-Agent & Advanced</CardTitle>
           <CardDescription>Hierarchy, collaboration, and other advanced settings.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("multi_agent_advanced")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           <div><strong>Is Root Agent:</strong> {renderValue(formData.config?.isRootAgent)}</div>
           <div><strong>Sub-Agent IDs:</strong> {renderValue(formData.config?.subAgentIds, "subAgentIds")}</div>
           <div><strong>Global Instruction for Sub-Agents:</strong> <pre className="whitespace-pre-wrap text-sm bg-muted p-2 rounded-md"><code>{renderValue(formData.config?.globalInstruction)}</code></pre></div>
+        </CardContent>
+      </Card>
+
+      <Separator />
+      <Card>
+        <CardHeader className="relative">
+          <CardTitle>Advanced ADK Callbacks</CardTitle>
+          <CardDescription>Configuration for ADK lifecycle callbacks.</CardDescription>
+          {setActiveEditTab && (
+            <Button variant="link" size="sm" onClick={() => setActiveEditTab("advanced")} className="absolute top-2 right-2 h-auto p-1">Edit</Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div><strong>Before Agent:</strong> {renderValue(formData.config?.adkCallbacks?.beforeAgent)}</div>
+          <div><strong>After Agent:</strong> {renderValue(formData.config?.adkCallbacks?.afterAgent)}</div>
+          <div><strong>Before Model:</strong> {renderValue(formData.config?.adkCallbacks?.beforeModel)}</div>
+          <div><strong>After Model:</strong> {renderValue(formData.config?.adkCallbacks?.afterModel)}</div>
+          <div><strong>Before Tool:</strong> {renderValue(formData.config?.adkCallbacks?.beforeTool)}</div>
+          <div><strong>After Tool:</strong> {renderValue(formData.config?.adkCallbacks?.afterTool)}</div>
         </CardContent>
       </Card>
 

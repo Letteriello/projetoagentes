@@ -34,7 +34,27 @@ export interface AvailableTool {
 }
 
 export interface ToolConfigData {
-  [key: string]: any;
+  googleApiKey?: string;
+  googleCseId?: string;
+  openapiSpecUrl?: string;
+  openapiApiKey?: string;
+  dbType?: "postgresql" | "mysql" | "sqlserver" | "sqlite" | "other";
+  dbHost?: string;
+  dbPort?: number;
+  dbName?: string;
+  dbUser?: string;
+  dbPassword?: string;
+  dbConnectionString?: string;
+  dbDescription?: string;
+  knowledgeBaseId?: string;
+  calendarApiEndpoint?: string;
+
+  // New Guardrail fields
+  allowedPatterns?: string;
+  deniedPatterns?: string;
+  customRules?: string;
+
+  [key: string]: any; // Keep for flexibility
 }
 
 export interface CommunicationChannel {

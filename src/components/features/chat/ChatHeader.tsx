@@ -17,6 +17,7 @@ import {
   Plus,
   LogIn,
   LogOut,
+  DownloadCloud, // Added DownloadCloud
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from "@/types/agent-configs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,8 +48,9 @@ interface ChatHeaderProps {
   handleNewConversation: () => void;
   isSidebarOpen?: boolean;
   isADKInitializing?: boolean;
-  handleLogin: () => void; // Added
-  handleLogout: () => void; // Added
+  onExportChatLog?: () => void; // Add this
+  handleLogin: () => void;
+  handleLogout: () => void;
 }
 
 export default function ChatHeader({
@@ -65,6 +67,7 @@ export default function ChatHeader({
   handleNewConversation,
   isSidebarOpen,
   isADKInitializing,
+  onExportChatLog, // Add this
   handleLogin,
   handleLogout,
 }: ChatHeaderProps) {
@@ -194,6 +197,19 @@ export default function ChatHeader({
           <Plus className="h-5 w-5" />
         </Button>
         
+        {/* Add Export Button Before ThemeToggle or New Conversation for grouping user actions */}
+        {currentUser && onExportChatLog && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onExportChatLog}
+            className="text-muted-foreground hover:text-foreground"
+            title="Exportar Histórico da Conversa"
+          >
+            <DownloadCloud className="h-5 w-5" />
+          </Button>
+        )}
+
         {/* Alternador de tema */}
         <ThemeToggle className="text-muted-foreground hover:text-foreground" />
         
