@@ -76,6 +76,7 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "util": "^0.12.5",
+    "uuid": "^11.1.0",
     "zod": "^3.25.46"
   },
   "devDependencies": {
@@ -87,6 +88,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/uuid": "^10.0.0",
     "buffer": "^6.0.3",
     "critters": "^0.0.23",
     "events": "^3.3.0",
