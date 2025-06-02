@@ -26,41 +26,88 @@ export async function saveAgentConfiguration(agentConfig: SavedAgentConfiguratio
   try {
     const agentsCollection = collection(firestore, 'agent-configurations');
     
-    // Preparando os dados da configuração para salvar no Firestore
-    // Aqui separamos o userId do restante da configuração para evitar problemas de tipagem
-    const firestoreData = {
-      ...agentConfig,
-      // Se userId for fornecido, adicionamos como campo do documento
-      ...(userId && { userId })
-    };
-    
-    // Se o agente já possui um ID, atualiza o documento existente
-    if (agentConfig.id && agentConfig.id.length > 0) {
-      const agentDocRef = doc(agentsCollection, agentConfig.id);
-      await setDoc(agentDocRef, firestoreData, { merge: true });
-    } 
-    // Caso contrário, cria um novo documento com ID gerado automaticamente
-    else {
-      // Verificamos se já existe um agente com o mesmo nome e o mesmo usuário
-      // Só executamos esta verificação se tivermos userId disponível
-      if (userId) {
+    // Prepare the data for Firestore
+    // ownerId and sharedWith are handled explicitly below based on userId presence and new/existing agent logic.
+    const firestoreData: any = { ...agentConfig };
+
+    if (userId) { // Ensure userId is provided
+      if (agentConfig.id && agentConfig.id.length > 0) { // Existing agent
+        const agentDocRef = doc(agentsCollection, agentConfig.id);
+        const agentSnapshot = await getDoc(agentDocRef);
+        if (agentSnapshot.exists()) {
+          const existingData = agentSnapshot.data();
+          if (!existingData.ownerId) { // Backfill ownerId if it doesn't exist
+            firestoreData.ownerId = userId;
+          } else {
+            // Ensure ownerId is not changed from what's in Firestore
+            firestoreData.ownerId = existingData.ownerId; 
+          }
+          // sharedWith will be merged by setDoc unless explicitly changed in firestoreData.
+          // For now, we are not modifying sharedWith during a simple save of other details.
+          // If firestoreData contains sharedWith (e.g. from a future UI to edit shares), it will be updated.
+          // If firestoreData does not contain sharedWith, existing sharedWith in Firestore remains untouched due to merge:true.
+        } else {
+          // Document doesn't exist, though an ID was provided. Treat as new for ownership.
+          // This case should ideally not happen if IDs are managed correctly.
+          enhancedLogger.logWarning({
+            message: "Agent ID provided but document not found in Firestore. Treating as new for ownership.",
+            details: { agentId: agentConfig.id, userId },
+            flowName: "agentServices",
+          });
+          firestoreData.ownerId = userId;
+          firestoreData.sharedWith = []; // Initialize sharedWith for this edge case
+        }
+        await setDoc(agentDocRef, firestoreData, { merge: true });
+      } else { // New agent
+        firestoreData.ownerId = userId;
+        firestoreData.sharedWith = []; // Initialize sharedWith for new agents
+
+        // Check for existing agent with the same name and user (owner)
         const existingAgentQuery = query(agentsCollection, 
           where("agentName", "==", agentConfig.agentName), 
-          where("userId", "==", userId));
+          where("ownerId", "==", userId)); // Query by ownerId now
         
         const existingAgentSnapshot = await getDocs(existingAgentQuery);
         
         if (!existingAgentSnapshot.empty) {
-          // Se existir um agente com o mesmo nome, atualizamos ele
+          // If an agent with the same name and owner exists, update it.
           const existingAgentDoc = existingAgentSnapshot.docs[0];
+          firestoreData.id = existingAgentDoc.id; // Get the ID to update the existing one
           const agentDocRef = doc(agentsCollection, existingAgentDoc.id);
-          await setDoc(agentDocRef, { ...firestoreData, id: existingAgentDoc.id }, { merge: true });
-          return;
+          // Merge with existing data, especially if sharedWith or other fields were set by another process
+          await setDoc(agentDocRef, firestoreData, { merge: true }); 
+        } else {
+          // Create new document
+          // Remove id from firestoreData if it's null/empty, so Firestore auto-generates it.
+          if (!firestoreData.id) {
+            delete firestoreData.id;
+          }
+          const newDocRef = await addDoc(agentsCollection, firestoreData);
+          // Update the agentConfig with the new ID if needed by the caller (though this function doesn't return it)
+          // agentConfig.id = newDocRef.id; // This would modify the input object, usually not ideal.
         }
       }
-      
-      // Caso não exista ou não tenhamos userId, criamos um novo documento
-      await addDoc(agentsCollection, firestoreData);
+    } else {
+      // Handle case where userId is not provided
+      console.warn("Attempted to save agent configuration without a userId. ownerId and sharedWith will not be set/modified.");
+      enhancedLogger.logWarning({
+        message: "Attempted to save agent configuration without a userId. ownerId and sharedWith will not be set/modified.",
+        details: { agentName: agentConfig.agentName, agentId: agentConfig.id },
+        flowName: "agentServices",
+      });
+      // Fallback to original logic if no userId, though this is not ideal for new requirements.
+      // This will save the agent without ownerId or sharedWith being explicitly managed here.
+      // If agentConfig already contains ownerId/sharedWith (e.g. loaded and re-saved), they will persist.
+      if (agentConfig.id && agentConfig.id.length > 0) {
+        const agentDocRef = doc(agentsCollection, agentConfig.id);
+        await setDoc(agentDocRef, firestoreData, { merge: true });
+      } else {
+        // Remove id from firestoreData if it's null/empty, so Firestore auto-generates it.
+        if (!firestoreData.id) {
+            delete firestoreData.id;
+          }
+        await addDoc(agentsCollection, firestoreData);
+      }
     }
   } catch (error: any) {
     console.error("Erro ao salvar a configuração do agente:", error);
@@ -229,7 +276,7 @@ export async function getCommunityAgentTemplates(): Promise<SavedAgentConfigurat
  */
 export async function getUserAgentConfigurations(userId: string): Promise<SavedAgentConfiguration[]> {
   try {
-    const agentsQuery = query(collection(firestore, 'agent-configurations'), where("userId", "==", userId));
+    const agentsQuery = query(collection(firestore, 'agent-configurations'), where("ownerId", "==", userId));
     const agentsSnapshot = await getDocs(agentsQuery);
     
     return agentsSnapshot.docs.map(doc => ({
