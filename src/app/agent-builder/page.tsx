@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
 import { Button } from "@/components/ui/button";
 // Card components are used, keep them.
 import {
@@ -25,6 +26,7 @@ import {
   // Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
 import type { SavedAgentConfiguration } from "@/types/agent-configs"; // Adjusted path
 import { cn } from "@/lib/utils";
@@ -207,6 +209,71 @@ export default function AgentBuilderPage() {
   const [isMounted, setIsMounted] = React.useState(false);
   const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form"); // Novo estado
 
+  const searchParams = useSearchParams();
+  const router = useRouter(); // For clearing URL param
+
+  React.useEffect(() => {
+    const templateId = searchParams.get("templateId");
+
+    if (templateId) {
+      const loadTemplate = async () => {
+        try {
+          const template = await getAgentTemplate(templateId);
+          if (template) {
+            // Prepare a new agent configuration from the template
+            const {
+              id, // Original template ID - do not reuse for the new agent
+              userId, // Original template owner - do not reuse
+              createdAt, // Original template creation date
+              updatedAt, // Original template update date
+              isTemplate, // New agent is not a template itself (yet)
+              // templateId: originalTemplateId, // This was the ID of the template it was based on, if any. Not needed for the new agent's templateId field.
+              ...restOfTemplateData
+            } = template;
+
+            const newAgentFromTemplate: SavedAgentConfiguration = {
+              ...restOfTemplateData,
+              id: uuidv4(), // Generate a new unique ID for this new agent draft
+              agentName: `Cópia de ${template.agentName}`, // Suggest a new name
+              // agentDescription: template.agentDescription, // Already in restOfTemplateData
+              // config: template.config, // Already in restOfTemplateData
+              // tools: template.tools, // Already in restOfTemplateData
+              // toolConfigsApplied: template.toolConfigsApplied, // Already in restOfTemplateData
+              templateId: templateId, // Link to the template it was created from
+              isTemplate: false, // This new config is an agent, not a template
+              createdAt: new Date().toISOString(), // Set new creation time
+              updatedAt: new Date().toISOString(), // Set new update time
+              // userId: currentUserId, // Set current user ID if available
+            };
+
+            setEditingAgent(newAgentFromTemplate);
+            setIsBuilderModalOpen(true);
+            // Clear the templateId from URL to prevent re-triggering
+            // Using window.history.replaceState for simplicity with next/navigation's current router
+            // A more Next.js idiomatic way might involve router.replace with careful handling of state
+            window.history.replaceState(null, '', '/agent-builder');
+
+          } else {
+            toast({
+              title: "Template não encontrado",
+              description: "Não foi possível carregar o template selecionado.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao carregar template:", error);
+          toast({
+            title: "Erro ao Carregar Template",
+            description: "Ocorreu um problema ao tentar carregar o template.",
+            variant: "destructive",
+          });
+        }
+      };
+
+      loadTemplate();
+    }
+  }, [searchParams, router, toast]); // Add router and toast to dependencies
+
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -294,6 +361,52 @@ export default function AgentBuilderPage() {
     // Context should refresh the list
   };
 
+  const handleSaveAsTemplate = async (agent: SavedAgentConfiguration) => {
+    const {
+      id, // Exclude original agent ID
+      createdAt, // Exclude original creation date
+      updatedAt, // Exclude original update date
+      // userId, // Exclude original userId, new one will be set by service
+      isFavorite, // Exclude favorite status
+      tags, // Potentially exclude or reset tags for a new template
+      // templateId, // This agent is becoming a template, not based on one.
+      ...agentDataToCopy
+    } = agent;
+
+    const templateName = `Template de ${agent.agentName}`; // Or prompt user for a name
+
+    const newTemplateData: Partial<SavedAgentConfiguration> = {
+      ...agentDataToCopy, // Copy all other relevant fields
+      agentName: templateName, // Give it a new name or allow user input
+      agentDescription: `Template baseado em ${agent.agentName}: ${agent.agentDescription}`,
+      // isTemplate: true, // Service will set this, but can be explicit
+      // templateId: null, // This is a new template
+      // userId: currentUserId, // Service will handle setting this from its args
+      // createdAt and updatedAt will be set by the service or Firestore
+    };
+
+    try {
+      // Pass undefined for userId if not available, service should handle it or be updated.
+      // For now, assuming saveAgentTemplate can handle undefined userId or it's passed correctly.
+      const savedTemplateId = await saveAgentTemplate(newTemplateData as SavedAgentConfiguration, undefined /* Pass currentUserId here if available */);
+      if (savedTemplateId) {
+        toast({
+          title: "Template Salvo!",
+          description: `O agente "${agent.agentName}" foi salvo como um novo template com nome "${templateName}".`,
+        });
+      } else {
+        throw new Error("Falha ao obter o ID do template salvo.");
+      }
+    } catch (error) {
+      console.error("Erro ao salvar como template:", error);
+      toast({
+        title: "Erro ao Salvar Template",
+        description: "Não foi possível salvar o agente como template. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-8 p-4">
       <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -348,6 +461,7 @@ export default function AgentBuilderPage() {
                     key={agent.id}
                     agent={agent}
                     onEdit={() => handleEditAgent(agent)}
+                    onSaveAsTemplate={handleSaveAsTemplate} // Add this line
                     // Add a new prop/handler to AgentCard for monitoring
                     onViewMonitoring={() => handleViewAgentMonitoring(agent)}
                     onTest={() =>

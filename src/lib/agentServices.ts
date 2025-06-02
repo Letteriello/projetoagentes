@@ -89,6 +89,94 @@ export async function getAgentConfiguration(agentId: string): Promise<SavedAgent
   }
 }
 
+// Example for saveAgentTemplate
+export async function saveAgentTemplate(templateConfig: SavedAgentConfiguration, userId?: string): Promise<string> {
+  try {
+    const templatesCollection = collection(firestore, 'agent-templates');
+    const dataToSave = {
+      ...templateConfig,
+      isTemplate: true,
+      userId: userId || null, // Ensure userId is either a string or null
+      // Ensure createdAt and updatedAt are properly handled (e.g., server timestamp or ISO string)
+      // If templateConfig.id is undefined or empty, addDoc will generate one.
+      // If templateConfig.id is provided, it implies an update or specific ID assignment.
+    };
+
+    if (!dataToSave.createdAt) {
+        dataToSave.createdAt = new Date().toISOString();
+    }
+    dataToSave.updatedAt = new Date().toISOString();
+
+
+    let docRef;
+    if (templateConfig.id && templateConfig.id.length > 0) {
+      docRef = doc(templatesCollection, templateConfig.id);
+      await setDoc(docRef, dataToSave, { merge: true });
+      return templateConfig.id;
+    } else {
+      // Remove id if it's empty so Firestore auto-generates it
+      const { id, ...dataWithoutId } = dataToSave;
+      docRef = await addDoc(templatesCollection, dataWithoutId);
+      return docRef.id;
+    }
+  } catch (error) {
+    console.error("Erro ao salvar o template do agente:", error);
+    throw error;
+  }
+}
+
+// Example for getAgentTemplate
+export async function getAgentTemplate(templateId: string): Promise<SavedAgentConfiguration | null> {
+  try {
+    const templateDocRef = doc(collection(firestore, 'agent-templates'), templateId);
+    const templateSnapshot = await getDoc(templateDocRef);
+
+    if (templateSnapshot.exists()) {
+      return { ...templateSnapshot.data(), id: templateSnapshot.id } as SavedAgentConfiguration;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Erro ao recuperar o template do agente:", error);
+    throw error;
+  }
+}
+
+// Example for getUserAgentTemplates
+export async function getUserAgentTemplates(userId: string): Promise<SavedAgentConfiguration[]> {
+  try {
+    const templatesQuery = query(
+      collection(firestore, 'agent-templates'),
+      where("userId", "==", userId)
+    );
+    const templatesSnapshot = await getDocs(templatesQuery);
+
+    return templatesSnapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id
+    } as SavedAgentConfiguration));
+  } catch (error) {
+    console.error("Erro ao recuperar os templates de agente do usuário:", error);
+    throw error;
+  }
+}
+
+// Example for getCommunityAgentTemplates
+export async function getCommunityAgentTemplates(): Promise<SavedAgentConfiguration[]> {
+  try {
+    const templatesQuery = query(collection(firestore, 'agent-templates'));
+    const templatesSnapshot = await getDocs(templatesQuery);
+
+    return templatesSnapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id
+    } as SavedAgentConfiguration));
+  } catch (error) {
+    console.error("Erro ao recuperar os templates de agente da comunidade:", error);
+    throw error;
+  }
+}
+
 /**
  * Recupera todas as configurações de agente de um usuário específico.
  * 

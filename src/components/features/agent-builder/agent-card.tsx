@@ -148,6 +148,7 @@ interface AgentCardProps {
   onTest: (agent: SavedAgentConfiguration) => void;
   onDelete: (agentId: string) => void;
   onViewMonitoring: (agent: SavedAgentConfiguration) => void; // New prop for monitoring
+  onSaveAsTemplate: (agent: SavedAgentConfiguration) => void; // New prop
   availableTools: AvailableTool[]; // Necessário para obter o label correto e o ícone da ferramenta
   agentTypeOptions: {
     id: string;
@@ -163,6 +164,7 @@ export function AgentCard({
   onTest,
   onDelete,
   onViewMonitoring, // Destructure new prop
+  onSaveAsTemplate, // Destructure new prop
   availableTools,
   agentTypeOptions,
 }: AgentCardProps) {
@@ -442,6 +444,9 @@ export function AgentCard({
       <CardFooter className="gap-2 mt-auto pt-4 border-t">
         <Button variant="outline" size="sm" onClick={() => onEdit(agent)}>
           <EditIcon size={16} className="mr-1.5" /> Editar
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onSaveAsTemplate(agent)}>
+          <SaveIcon size={16} className="mr-1.5" /> Salvar como Template
         </Button>
         <Button variant="outline" size="sm" onClick={() => onViewMonitoring(agent)}>
           <EyeIcon size={16} className="mr-1.5" /> Monitorar
