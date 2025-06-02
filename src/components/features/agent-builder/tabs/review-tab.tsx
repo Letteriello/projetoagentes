@@ -24,7 +24,7 @@ export default function ReviewTab(props: ReviewTabProps) {
   // const { setActiveEditTab, showHelpModal } = props; // Assuming props are passed
 
   const agentName = watch('agentName');
-  const description = watch('description');
+  const description = watch('agentDescription');
   const agentTone = watch('config.agentPersonality'); // Corrected path based on LLMBehaviorForm
   const tools = watch('tools') || [];
   const config = watch('config') || {}; // This is the full config object

@@ -79,7 +79,7 @@ export default function MultiAgentTab({
               render={({ field }) => (
                 <SubAgentSelectorComponent
                   availableAgents={availableAgentsForSubSelector}
-                  selectedAgents={field.value || []}
+                  selectedAgents={(field.value || []).filter(id => typeof id === 'string') as string[]}
                   onChange={(newSelection: string[]) => field.onChange(newSelection)}
                   // Pass necessary icons to SubAgentSelectorComponent if it expects them
                   UsersIcon={UsersIcon}
