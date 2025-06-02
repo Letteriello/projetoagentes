@@ -196,6 +196,8 @@ export interface AgentConfigBase {
   inputSchema?: string;
   outputSchema?: string;
   adkCallbacks?: ADKCallbacksConfig;
+  ownerId?: string;
+  sharedWith?: { userId: string, role: 'viewer' | 'editor' }[];
 }
 
 export interface ModelSafetySettingItem {

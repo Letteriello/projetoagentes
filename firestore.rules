@@ -29,13 +29,12 @@ service cloud.firestore {
       }
     }
 
-    // Agents Collection (for Phase 3):
-    // Users can read, create, update, and delete their own agents.
-    match /agents/{agentId} {
-      // For 'create': ensure the incoming resource has the userId set to the auth.uid.
-      // For 'read, update, delete': ensure the existing resource's userId matches auth.uid.
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    // Agent Configurations Collection:
+    // Users can read, create, update, and delete their own agent configurations.
+    // Access is controlled by matching the 'ownerId' field with the authenticated user's UID.
+    match /agent-configurations/{agentId} {
+      allow read, update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
     }
 
     // Agent Templates Collection:
