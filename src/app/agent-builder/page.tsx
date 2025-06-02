@@ -196,6 +196,8 @@ import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 import { HelpModal } from '@/components/ui/HelpModal';
 import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-builder-help-content';
 import { Layers } from 'lucide-react'; // Ensure Layers is imported if used for the new button
+import { FeedbackButton } from "@/components/features/agent-builder/feedback-button"; // Added
+import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal"; // Added
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -215,6 +217,7 @@ export default function AgentBuilderPage() {
   const [activeTutorial, setActiveTutorial] = React.useState<GuidedTutorial | null>(null);
   const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = React.useState(false); // Added
 
   const searchParams = useSearchParams();
   const router = useRouter(); // For clearing URL param
@@ -477,6 +480,7 @@ export default function AgentBuilderPage() {
           >
             <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
           </Button>
+          <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} /> {/* Added */}
         </div>
       </header>
 
@@ -624,6 +628,10 @@ export default function AgentBuilderPage() {
           {/* Add visual if present: activeTutorial.steps[currentTutorialStep].visual */}
         </HelpModal>
       )}
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onOpenChange={setIsFeedbackModalOpen}
+      /> {/* Added */}
     </div>
   );
 }
