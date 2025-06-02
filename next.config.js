@@ -26,7 +26,7 @@ const nextConfig = {
   
   eslint: {
     // Ignorar erros durante o desenvolvimento
-    ignoreDuringBuilds: true,
+    // ignoreDuringBuilds: true,
   },
   
   // Melhorias para chunks e cache
