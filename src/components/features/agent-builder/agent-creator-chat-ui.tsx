@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SavedAgentConfiguration, AgentConfig } from "@/types/agent-configs"; // Importar tipo unificado
 import { Send, Loader2 } from "lucide-react"; // Adicionado Loader2
-import { invokeAgentCreatorChatFlow } from "@/app/agent-builder/actions";
+import { getAiConfigurationSuggestionsAction } from "@/app/agent-builder/actions";
 import { toast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import { v4 as uuidv4 } from 'uuid';
@@ -55,10 +55,10 @@ export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIPro
     setIsLoading(true);
 
     try {
-      const result = await invokeAgentCreatorChatFlow({
+      const result = await getAiConfigurationSuggestionsAction({
         userNaturalLanguageInput: userMessageText,
-        currentAgentConfigJson: JSON.stringify(currentAgentConfig),
-        chatHistory: currentConversationHistory,
+        currentAgentConfig: currentAgentConfig,
+        chatHistory: currentConversationHistory
       });
 
       if (result.error) {

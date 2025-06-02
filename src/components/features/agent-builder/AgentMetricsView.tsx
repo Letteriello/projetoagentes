@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AlertTriangle, Loader2, Zap, CheckCircle, XCircle, Tool, BarChart3 } from "lucide-react";
+import { AlertTriangle, Loader2, Zap, CheckCircle, XCircle, PenToolIcon, BarChart3 } from "lucide-react";
 import type { LogEntry } from "./AgentLogView"; // Import LogEntry type
 
 interface AgentMetricsViewProps {
@@ -216,7 +216,7 @@ export function AgentMetricsView({ agentId }: AgentMetricsViewProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Tool className="h-5 w-5 mr-2 text-muted-foreground" />
+            <PenToolIcon className="h-5 w-5 mr-2 text-muted-foreground" />
             Uso de Ferramentas
           </CardTitle>
           <CardDescription>Ferramentas mais frequentemente utilizadas pelo agente.</CardDescription>

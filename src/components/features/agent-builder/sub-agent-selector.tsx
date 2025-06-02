@@ -1,31 +1,29 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import * as React from 'react';
+import { Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
-} from "@/components/ui/command";
+} from '@/components/ui/command';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Importamos apenas o tipo SavedAgentConfiguration, sem precisar criar uma dependência circular
-import type { SavedAgentConfiguration as ImportedSavedAgentConfiguration } from "@/types/agent-configs";
-
-type SavedAgentConfiguration = ImportedSavedAgentConfiguration & {
+type SavedAgentConfiguration = {
   id: string;
   agentName: string;
-  [key: string]: any;
+  description?: string;
+  config?: Record<string, unknown>;
 };
 
 interface SubAgentSelectorProps {
@@ -33,6 +31,7 @@ interface SubAgentSelectorProps {
   availableAgents: SavedAgentConfiguration[];
   onChange: (value: string[]) => void;
   disabled?: boolean;
+  maxSelection?: number;
 }
 
 export function SubAgentSelector({
@@ -40,15 +39,21 @@ export function SubAgentSelector({
   availableAgents,
   onChange,
   disabled = false,
+  maxSelection,
 }: SubAgentSelectorProps) {
   const [open, setOpen] = React.useState(false);
 
   const handleSelect = (agentId: string) => {
+    if (disabled) return;
+    
     const newSelection = selectedAgents.includes(agentId)
       ? selectedAgents.filter((id) => id !== agentId)
-      : [...selectedAgents, agentId];
+      : maxSelection && selectedAgents.length >= maxSelection
+        ? [...selectedAgents.slice(1), agentId]
+        : [...selectedAgents, agentId];
     onChange(newSelection);
   };
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2 mb-2">
@@ -61,10 +66,9 @@ export function SubAgentSelector({
                 variant="secondary"
                 className="flex items-center gap-1"
               >
-                {agent?.agentName || "Agente não encontrado"}
+                {agent?.agentName || 'Agente não encontrado'}
                 <Button
                   variant="ghost"
-                  size="icon"
                   className="h-4 w-4 p-0 ml-1"
                   onClick={() => handleSelect(agentId)}
                   disabled={disabled}
@@ -81,6 +85,7 @@ export function SubAgentSelector({
           </div>
         )}
       </div>
+
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -88,7 +93,7 @@ export function SubAgentSelector({
             role="combobox"
             aria-expanded={open}
             className="w-full justify-between"
-            disabled={disabled}
+            disabled={disabled || (maxSelection && selectedAgents.length >= maxSelection)}
           >
             <span>Selecionar sub-agentes</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -105,16 +110,22 @@ export function SubAgentSelector({
                     key={agent.id}
                     value={agent.id}
                     onSelect={() => handleSelect(agent.id)}
+                    disabled={disabled}
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        'mr-2 h-4 w-4',
                         selectedAgents.includes(agent.id)
-                          ? "opacity-100"
-                          : "opacity-0",
+                          ? 'opacity-100'
+                          : 'opacity-0',
                       )}
                     />
                     {agent.agentName}
+                    {agent.description && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {agent.description}
+                      </span>
+                    )}
                   </CommandItem>
                 ))}
               </ScrollArea>
@@ -122,6 +133,12 @@ export function SubAgentSelector({
           </Command>
         </PopoverContent>
       </Popover>
+
+      {maxSelection && (
+        <div className="text-xs text-muted-foreground">
+          Máximo de {maxSelection} sub-agente(s) permitido(s)
+        </div>
+      )}
     </div>
   );
 }
