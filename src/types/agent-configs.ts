@@ -31,6 +31,8 @@ export interface AvailableTool {
   genkitToolName?: string;
   configFields?: ToolConfigField[];
   category?: string;
+  requiresAuth: boolean;
+  serviceTypeRequired: string;
 }
 
 export interface ToolConfigData {
@@ -53,6 +55,9 @@ export interface ToolConfigData {
   allowedPatterns?: string;
   deniedPatterns?: string;
   customRules?: string;
+
+  // For API Key Vault integration
+  selectedApiKeyId?: string;
 
   [key: string]: any; // Keep for flexibility
 }
