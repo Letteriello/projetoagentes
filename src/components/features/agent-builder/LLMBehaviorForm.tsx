@@ -19,6 +19,8 @@ import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
 // import { Separator } from "@/components/ui/separator"; // Separator might not be needed if using Cards for all sections
+import { useFieldArray } from "react-hook-form"; // ADDED for safety settings
+import { Trash2 } from "lucide-react"; // ADDED for remove button icon
 
 // MODIFIED: Simplified props
 interface LLMBehaviorFormProps {
@@ -47,6 +49,28 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
   const watchedSystemPromptGenerated = watch("config.systemPromptGenerated");
   const watchedAgentTemperature = watch("config.agentTemperature");
 
+  // ADDED: useFieldArray for safetySettings
+  const { fields: safetySettingFields, append: appendSafetySetting, remove: removeSafetySetting } = useFieldArray({
+    control,
+    name: "config.safetySettings",
+  });
+
+  // ADDED: Options for safety settings dropdowns
+  const safetyCategoryOptions = [
+    { label: "Harassment", value: "HARM_CATEGORY_HARASSMENT" },
+    { label: "Hate Speech", value: "HARM_CATEGORY_HATE_SPEECH" },
+    { label: "Sexually Explicit", value: "HARM_CATEGORY_SEXUALLY_EXPLICIT" },
+    { label: "Dangerous Content", value: "HARM_CATEGORY_DANGEROUS_CONTENT" },
+    // TODO: Confirm these with actual Genkit documentation
+  ];
+
+  const safetyThresholdOptions = [
+    { label: "Block None", value: "BLOCK_NONE" },
+    { label: "Block Low and Above", value: "BLOCK_LOW_AND_ABOVE" },
+    { label: "Block Medium and Above", value: "BLOCK_MEDIUM_AND_ABOVE" },
+    { label: "Block Only High", value: "BLOCK_ONLY_HIGH" },
+    // TODO: Confirm these with actual Genkit documentation
+  ];
 
   const handleSuggestPersonality = async () => {
     setIsSuggestingPersonality(true); setShowPersonalityPopover(false);
@@ -271,6 +295,87 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
               </FormItem>
             )}
           />
+        </CardContent>
+      </Card>
+
+      {/* --- Model Safety Settings Card --- */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Model Safety Settings</CardTitle>
+          <CardDescription>
+            Configure content filters and safety thresholds for the LLM. These settings help control harmful content generation.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {safetySettingFields.map((item, index) => (
+            <div key={item.id} className="flex items-end space-x-2 p-3 border rounded-md bg-muted/20">
+              <FormField
+                control={control}
+                name={`config.safetySettings.${index}.category`}
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel htmlFor={`config.safetySettings.${index}.category`}>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {safetyCategoryOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name={`config.safetySettings.${index}.threshold`}
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel htmlFor={`config.safetySettings.${index}.threshold`}>Threshold</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select threshold" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {safetyThresholdOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeSafetySetting(index)}
+                className="text-destructive hover:bg-destructive/10"
+                aria-label="Remove safety setting"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => appendSafetySetting({ category: "", threshold: "" })}
+          >
+            Add Safety Setting
+          </Button>
+          <FormDescription className="pt-2">
+            Consult the Genkit (or specific model provider) documentation for details on available categories and thresholds.
+            Incorrect or unsupported values may be ignored by the model or cause errors.
+          </FormDescription>
         </CardContent>
       </Card>
     </div>

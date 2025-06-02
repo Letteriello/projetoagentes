@@ -59,6 +59,12 @@ export interface ToolConfigData {
   // For API Key Vault integration
   selectedApiKeyId?: string;
 
+  // New Guardrail fields for specific tools
+  allowedDomains?: string[];
+  blockedDomains?: string[];
+  allowedSqlOperations?: string[];
+  allowedHttpMethods?: string[];
+
   [key: string]: any; // Keep for flexibility
 }
 
@@ -191,6 +197,11 @@ export interface AgentConfigBase {
   adkCallbacks?: ADKCallbacksConfig;
 }
 
+export interface ModelSafetySettingItem {
+  category: string; // e.g., "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", etc.
+  threshold: string; // e.g., "BLOCK_NONE", "BLOCK_LOW_AND_ABOVE", "BLOCK_MEDIUM_AND_ABOVE", "BLOCK_ONLY_HIGH"
+}
+
 export interface LLMAgentConfig extends AgentConfigBase {
   type: "llm";
   agentGoal: string;
@@ -200,6 +211,7 @@ export interface LLMAgentConfig extends AgentConfigBase {
   agentModel: string;
   agentTemperature: number;
   systemPromptGenerated?: string;
+  safetySettings?: ModelSafetySettingItem[];
 }
 
 export interface WorkflowAgentConfig extends AgentConfigBase {

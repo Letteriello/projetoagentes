@@ -52,10 +52,22 @@ export const standardTools: AvailableTool[] = [
         required: true,
         placeholder: "a123456...",
         description: "ID do mecanismo de busca personalizado"
+      },
+      {
+        id: "allowedDomains",
+        label: "Allowed Domains (comma-separated)",
+        type: "textarea",
+        description: "List of domains the search is restricted to. E.g., 'example.com,another.org'"
+      },
+      {
+        id: "blockedDomains",
+        label: "Blocked Domains (comma-separated)",
+        type: "textarea",
+        description: "List of domains to exclude from search. E.g., 'undesired.com,restricted.net'"
       }
     ]
   },
-  { 
+  {
     id: "calculator", 
     name: "Calculadora", 
     icon: Calculator, 
@@ -127,10 +139,17 @@ export const standardTools: AvailableTool[] = [
         required: false,
         placeholder: "Chave secreta",
         description: "Chave de autenticação para a API"
+      },
+      {
+        id: "allowedHttpMethods",
+        label: "Allowed HTTP Methods (comma-separated)",
+        type: "textarea",
+        placeholder: "GET,POST",
+        description: "Define allowed HTTP methods like GET, POST, PUT, DELETE. Leave empty for all."
       }
     ]
   },
-  { 
+  {
     id: "databaseAccess", 
     name: "Acesso a Banco de Dados (SQL)", 
     icon: Database, 
@@ -200,10 +219,17 @@ export const standardTools: AvailableTool[] = [
         required: false,
         placeholder: "Tabela 'usuarios' com colunas id, nome, email...",
         description: "Descrição das tabelas e estrutura do banco"
+      },
+      {
+        id: "allowedSqlOperations",
+        label: "Allowed SQL Operations (comma-separated)",
+        type: "textarea",
+        placeholder: "SELECT,INSERT",
+        description: "Define allowed SQL commands like SELECT, INSERT, UPDATE, DELETE. Leave empty for all allowed by DB user."
       }
     ]
   },
-  { 
+  {
     id: "codeExecutor", 
     name: "Execução de Código (Python Sandbox)", 
     icon: Code2, 
