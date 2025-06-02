@@ -8,6 +8,19 @@ import CustomBehaviorForm from './CustomBehaviorForm';
 import type { SavedAgentConfiguration, CustomAgentConfig } from '@/types/agent-configs';
 import { TooltipProvider } from '@/components/ui/tooltip'; // Required for tooltips to render
 
+// Mock JsonEditorField
+jest.mock('@/components/ui/JsonEditorField', () => {
+  const MockJsonEditorField = jest.fn(({ value, onChange, id, ...props }) => (
+    <textarea
+      data-testid={id || 'mock-json-editor'} // Use id for specific testid
+      value={value || ''} // Ensure value is not null/undefined
+      onChange={(e) => onChange(e.target.value)}
+      {...props} // Pass through other props like placeholder
+    />
+  ));
+  return MockJsonEditorField;
+});
+
 // Mock ResizeObserver
 global.ResizeObserver = jest.fn().mockImplementation(() => ({
   observe: jest.fn(),
@@ -77,12 +90,15 @@ describe('CustomBehaviorForm', () => {
   });
 
   describe('Input Schema Field', () => {
-    it('renders the label and textarea field', () => {
+    it('renders the label and JsonEditorField for input schema', () => {
       render(<TestWrapper><CustomBehaviorForm /></TestWrapper>);
       expect(screen.getByLabelText(/Input Schema \(Optional\)/i)).toBeInTheDocument();
-      const textareaField = screen.getByPlaceholderText(/{\s*"type": "object",\s*"properties": {\s*"query": { "type": "string" }\s*},\s*"required": \["query"\]\s*}/i);
-      expect(textareaField).toBeInTheDocument();
-      expect(textareaField).toHaveValue('{"type":"object", "properties":{"inputKey":{"type":"string"}}}');
+      // Query by testid passed as id to JsonEditorField (which is field.name = "config.inputSchema")
+      const editorField = screen.getByTestId('config.inputSchema');
+      expect(editorField).toBeInTheDocument();
+      expect(editorField).toHaveValue('{"type":"object", "properties":{"inputKey":{"type":"string"}}}');
+      // Check placeholder if your mock passes it through
+      expect(editorField).toHaveAttribute('placeholder', '{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string" }\n  },\n  "required": ["query"]\n}');
     });
 
     it('renders the tooltip for Input Schema', () => {
@@ -93,12 +109,15 @@ describe('CustomBehaviorForm', () => {
   });
 
   describe('Output Schema Field', () => {
-    it('renders the label and textarea field', () => {
+    it('renders the label and JsonEditorField for output schema', () => {
       render(<TestWrapper><CustomBehaviorForm /></TestWrapper>);
       expect(screen.getByLabelText(/Output Schema \(Optional\)/i)).toBeInTheDocument();
-      const textareaField = screen.getByPlaceholderText(/{\s*"type": "object",\s*"properties": {\s*"summary": { "type": "string" }\s*},\s*"required": \["summary"\]\s*}/i);
-      expect(textareaField).toBeInTheDocument();
-      expect(textareaField).toHaveValue('{"type":"object", "properties":{"outputKey":{"type":"string"}}}');
+      // Query by testid passed as id to JsonEditorField (which is field.name = "config.outputSchema")
+      const editorField = screen.getByTestId('config.outputSchema');
+      expect(editorField).toBeInTheDocument();
+      expect(editorField).toHaveValue('{"type":"object", "properties":{"outputKey":{"type":"string"}}}');
+      // Check placeholder if your mock passes it through
+      expect(editorField).toHaveAttribute('placeholder', '{\n  "type": "object",\n  "properties": {\n    "summary": { "type": "string" }\n  },\n  "required": ["summary"]\n}');
     });
 
     it('renders the tooltip for Output Schema', () => {
@@ -117,15 +136,15 @@ describe('CustomBehaviorForm', () => {
     await user.type(genkitFlowInput, 'newFlowName');
     expect(genkitFlowInput).toHaveValue('newFlowName');
 
-    const inputSchemaTextarea = screen.getByLabelText(/Input Schema \(Optional\)/i);
-    await user.clear(inputSchemaTextarea);
-    await user.type(inputSchemaTextarea, '{"type":"number"}');
-    expect(inputSchemaTextarea).toHaveValue('{"type":"number"}');
+    const inputSchemaEditor = screen.getByTestId('config.inputSchema');
+    await user.clear(inputSchemaEditor);
+    await user.type(inputSchemaEditor, '{"type":"number"}');
+    expect(inputSchemaEditor).toHaveValue('{"type":"number"}');
 
-    const outputSchemaTextarea = screen.getByLabelText(/Output Schema \(Optional\)/i);
-    await user.clear(outputSchemaTextarea);
-    await user.type(outputSchemaTextarea, '{"type":"boolean"}');
-    expect(outputSchemaTextarea).toHaveValue('{"type":"boolean"}');
+    const outputSchemaEditor = screen.getByTestId('config.outputSchema');
+    await user.clear(outputSchemaEditor);
+    await user.type(outputSchemaEditor, '{"type":"boolean"}');
+    expect(outputSchemaEditor).toHaveValue('{"type":"boolean"}');
   });
 });
 
@@ -167,9 +186,9 @@ describe('CustomBehaviorForm with minimal default values', () => {
         <CustomBehaviorForm />
       </TestWrapper>
     );
-    const textareaField = screen.getByLabelText(/Input Schema \(Optional\)/i);
-    expect(textareaField).toBeInTheDocument();
-    expect(textareaField).toHaveValue(''); // Check for empty value
+    const editorField = screen.getByTestId('config.inputSchema');
+    expect(editorField).toBeInTheDocument();
+    expect(editorField).toHaveValue(''); // Check for empty value
   });
 
     it('renders Output Schema field with empty initial value', () => {
@@ -178,8 +197,8 @@ describe('CustomBehaviorForm with minimal default values', () => {
         <CustomBehaviorForm />
       </TestWrapper>
     );
-    const textareaField = screen.getByLabelText(/Output Schema \(Optional\)/i);
-    expect(textareaField).toBeInTheDocument();
-    expect(textareaField).toHaveValue(''); // Check for empty value
+    const editorField = screen.getByTestId('config.outputSchema');
+    expect(editorField).toBeInTheDocument();
+    expect(editorField).toHaveValue(''); // Check for empty value
   });
 });

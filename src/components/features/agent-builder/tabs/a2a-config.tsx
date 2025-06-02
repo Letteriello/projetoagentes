@@ -5,6 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// import { Textarea } from '@/components/ui/textarea'; // Removed unnecessary import
+import JsonEditorField from '@/components/ui/JsonEditorField'; // Added import for JsonEditorField
 import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, Title, Desc from here
 import { Separator } from '@/components/ui/separator';
 import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon'; // Renamed
@@ -128,7 +130,20 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
                     {watch(`config.a2a.communicationChannels.${index}.direction`) === 'outbound' && (
                          <Input {...register(`config.a2a.communicationChannels.${index}.targetAgentId`)} placeholder="Target Agent ID (for outbound)" />
                     )}
-                    <Textarea {...register(`config.a2a.communicationChannels.${index}.schema`)} placeholder="Message Schema (JSON Schema string or URL, optional)" rows={2}/>
+                    <Controller
+                      name={`config.a2a.communicationChannels.${index}.schema`}
+                      control={control}
+                      render={({ field, fieldState }) => (
+                        <JsonEditorField
+                          id={field.name}
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Message Schema (JSON Schema string or URL, optional)"
+                          height="150px"
+                          error={fieldState.error?.message}
+                        />
+                      )}
+                    />
                     {/* TODO: Retry Policy fields if needed */}
                     <Button type="button" variant="destructive" size="sm" onClick={() => removeChannel(index)} className="mt-2">
                       <Trash2Icon className="mr-2 h-4 w-4" />Remove Channel
