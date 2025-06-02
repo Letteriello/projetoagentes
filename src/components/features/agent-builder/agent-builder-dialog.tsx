@@ -57,6 +57,7 @@ import ArtifactsTab from './tabs/artifacts-tab';
 import A2AConfig from './tabs/a2a-config';
 import MultiAgentTab from './tabs/multi-agent-tab';
 import ReviewTab from './tabs/review-tab';
+import DeployTab from './tabs/DeployTab'; // Import DeployTab
 import { SubAgentSelector } from './sub-agent-selector';
 import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
 
@@ -103,7 +104,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeEditTab, setActiveEditTab] = React.useState('general');
   const [currentStep, setCurrentStep] = React.useState(0);
-  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'review'];
+  // Add 'deploy' to tabOrder and update grid columns for TabsList later
+  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'deploy', 'review'];
 
   const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
   const [helpModalContent, setHelpModalContent] = React.useState<{ title: string; body: React.ReactNode } | null>(null);
@@ -161,6 +163,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       internalVersion: 1,
       isLatest: true,
       originalAgentId: newId, // For new agents, originalId is the same as id
+      // Initialize deploymentConfig
+      deploymentConfig: {
+        targetPlatform: undefined,
+        environmentVariables: [],
+        resourceRequirements: {
+          cpu: '',
+          memory: '',
+        },
+      },
     };
   };
 
@@ -264,7 +275,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 }}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-9 mb-6"> {/* Adjusted for 9 tabs */}
+                <TabsList className="grid w-full grid-cols-10 mb-6"> {/* Adjusted for 10 tabs */}
                   {/* Updated TabsTrigger props */}
                   {tabOrder.map((tab, index) => (
                     <TabsTrigger
@@ -486,6 +497,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 {/* Review Tab */}
                 <TabsContent value="review">
                   <ReviewTab setActiveEditTab={setActiveEditTab} showHelpModal={showHelpModal} />
+                </TabsContent>
+
+                {/* Deploy Tab */}
+                <TabsContent value="deploy">
+                  <DeployTab />
                 </TabsContent>
 
                 {/* Advanced Tab (ADK Callbacks) */}

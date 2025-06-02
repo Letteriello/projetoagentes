@@ -246,6 +246,22 @@ export type AgentConfig =
   | CustomAgentConfig
   | A2AAgentSpecialistConfig;
 
+export interface EnvironmentVariable {
+  key: string;
+  value: string;
+}
+
+export interface ResourceRequirements {
+  cpu: string;
+  memory: string;
+}
+
+export interface DeploymentConfig {
+  targetPlatform?: "cloudRun" | "vertexAI" | "gke" | "other";
+  environmentVariables?: EnvironmentVariable[];
+  resourceRequirements?: ResourceRequirements;
+}
+
 export interface SavedAgentConfiguration {
   id: string;
   agentName: string;
@@ -276,4 +292,5 @@ export interface SavedAgentConfiguration {
   internalVersion: number;
   isLatest: boolean;
   originalAgentId: string;
+  deploymentConfig?: DeploymentConfig;
 }

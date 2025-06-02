@@ -160,6 +160,44 @@ export const agentBuilderHelpContent: Record<string, Record<string, HelpContent>
     },
     // Query Parameters content can be added later
   },
+  deploy: {
+    tabOverall: { // General help for the Deploy tab itself
+      tooltip: "Configure settings related to deploying your agent to various platforms.",
+      modal: {
+        title: "Deploy Tab Overview",
+        body: `
+          <p>This section allows you to specify configurations for deploying your agent.</p>
+          <ul>
+            <li><strong>Plataforma Alvo:</strong> Choose the intended deployment platform.</li>
+            <li><strong>Variáveis de Ambiente:</strong> Define necessary environment variables for your agent in production.</li>
+            <li><strong>Requisitos de Recurso:</strong> Estimate CPU and Memory needed for your agent.</li>
+          </ul>
+          <p>In the future, this section might assist in generating Dockerfiles or apphosting.yaml.</p>
+        `
+      }
+    },
+    targetPlatform: {
+      tooltip: "Select the target platform where your agent will be deployed.",
+      modal: {
+        title: "Plataforma Alvo",
+        body: "<p>Choose the environment where your agent is intended to run. Options include Cloud Run, Vertex AI Agent Engine, Google Kubernetes Engine (GKE), or 'Outro' for custom environments. This helps in planning and potential future automated setup.</p>"
+      }
+    },
+    environmentVariables: {
+      tooltip: "Define key-value pairs for environment variables.",
+      modal: {
+        title: "Variáveis de Ambiente Necessárias",
+        body: "<p>List any environment variables that your agent will require to function correctly in a production environment. These could include API keys, configuration paths, or other settings. For each variable, provide a 'Chave' (name) and 'Valor' (value).</p>"
+      }
+    },
+    resourceRequirements: {
+      tooltip: "Estimate the CPU and Memory resources your agent will need.",
+      modal: {
+        title: "Requisitos de Recurso",
+        body: "<p>Provide an estimation of the CPU and Memory resources your agent is expected to consume. Examples for CPU: '1', '500m' (0.5 CPU). Examples for Memory: '512Mi', '2Gi'. These are typically used for capacity planning on platforms like Cloud Run or GKE.</p>"
+      }
+    }
+  },
   // Placeholder for other tabs
   stateMemoryTab: {},
   artifactsTab: {},
