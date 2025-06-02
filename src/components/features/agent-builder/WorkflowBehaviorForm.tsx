@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 // import { Separator } from "@/components/ui/separator"; // Separator might not be needed
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Added
-import { Loader2 } from "lucide-react"; // Added
+import { Loader2, ArrowDown, Repeat, GitFork } from "lucide-react"; // Added
 import { useToast } from "@/hooks/use-toast"; // Added
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions'; // Added
 import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow'; // Added
@@ -30,7 +30,13 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
   const { toast } = useToast(); // Added
 
   const detailedWorkflowType = watch("config.detailedWorkflowType");
-  const loopTerminationConditionType = watch("config.loopTerminationConditionType");
+  // Watch fields for visualizations
+  const loopTerminationConditionType = watch("config.loopTerminationConditionType") as TerminationConditionType | undefined;
+  const loopMaxIterations = watch("config.loopMaxIterations");
+  const loopExitToolName = watch("config.loopExitToolName");
+  const loopExitStateKey = watch("config.loopExitStateKey");
+  const loopExitStateValue = watch("config.loopExitStateValue");
+  const configParallelSubagentIds = watch("config.parallelSubagentIds");
 
   // State for AI Suggestions
   const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
@@ -263,6 +269,84 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* START: Execution Flow Visualization */}
+            <div className="p-3 border rounded-md my-4 bg-slate-100 dark:bg-slate-800 shadow-sm space-y-3">
+              <h5 className="text-lg font-medium text-slate-700 dark:text-slate-300">Execution Flow Overview:</h5>
+              {(() => {
+                // MOCK DATA for executed tool IDs in a trace - replace with actual prop later
+                // This attempts to pick the first and last tool ID from the current fields for dynamic testing.
+                const executedToolIdsForTrace_MOCK: string[] = fields.length > 2 
+                  ? [fields[0].toolId, fields[fields.length - 1].toolId].filter(id => id) // ensure IDs are actual strings
+                  : (fields.length > 0 && fields[0].toolId ? [fields[0].toolId] : []);
+
+                if (fields.length === 0) {
+                  return (
+                    <Alert variant="info" className="bg-white dark:bg-slate-700/80">
+                      <AlertTitle>No Steps Defined</AlertTitle>
+                      <AlertDescription>
+                        No steps defined to visualize. Add tools to this agent to see the flow.
+                      </AlertDescription>
+                    </Alert>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {fields.map((item, index) => {
+                      const toolDetail = agentToolsDetails?.find(td => td.id === item.toolId);
+                      const toolName = toolDetail?.name || item.toolId;
+                      const stepName = toolDetail?.name || `step${index + 1}`;
+                      const isExecuted = executedToolIdsForTrace_MOCK.includes(item.toolId);
+
+                      const stepClasses = `p-2.5 border rounded-md shadow-sm transition-all duration-150 ease-in-out ${
+                        isExecuted
+                          ? "bg-green-50 dark:bg-green-800/40 border-green-500 dark:border-green-600 border-2 ring-2 ring-green-500/30 dark:ring-green-600/40"
+                          : "bg-white dark:bg-slate-700/80 border-slate-200 dark:border-slate-600" 
+                      }`;
+                      
+                      const textPrimaryColor = isExecuted ? "text-green-800 dark:text-green-100" : "text-slate-800 dark:text-slate-200";
+                      const textSecondaryColor = isExecuted ? "text-green-700 dark:text-green-300" : "text-slate-600 dark:text-slate-400";
+                      const codeBgColor = isExecuted ? "bg-green-200/70 dark:bg-green-700/50" : "bg-slate-200 dark:bg-slate-600";
+                      const codeTextColor = isExecuted ? "text-green-900 dark:text-green-50" : "text-slate-700 dark:text-slate-300";
+                      const mutedTextColor = isExecuted ? "text-green-600 dark:text-green-400" : "text-muted-foreground";
+
+                      return (
+                        <React.Fragment key={`vis-fragment-${item.id}`}>
+                          <div key={`vis-step-${item.id}`} className={stepClasses}>
+                            <p className={`font-semibold text-sm ${textPrimaryColor}`}>
+                              Step {index + 1}: {toolName}
+                            </p>
+                            {item.outputKey && (
+                              <div className="mt-1.5 space-y-0.5">
+                                <p className={`text-xs ${textSecondaryColor}`}>
+                                  Output Key: <code className={`${codeBgColor} ${codeTextColor} px-1 py-0.5 rounded text-xs`}>{item.outputKey}</code>
+                                </p>
+                                <p className={`text-xs ${mutedTextColor}`}>
+                                  (Usable as <code className={`text-xs ${codeBgColor} ${codeTextColor} px-1 py-0.5 rounded`}>{'{'}{'{'}{stepName}.{item.outputKey}{'}'}{'}'}</code> in subsequent compatible inputs)
+                                </p>
+                              </div>
+                            )}
+                            {isExecuted && (
+                              <div className="mt-2 pt-1.5 border-t border-green-300 dark:border-green-600/70">
+                                <span className="text-xs font-bold uppercase tracking-wide text-green-600 dark:text-green-400">Executed</span>
+                              </div>
+                            )}
+                          </div>
+                          {index < fields.length - 1 && (
+                            <div className="flex justify-center my-2">
+                              <ArrowDown className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                            </div>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+            {/* END: Execution Flow Visualization */}
+
             {fields.map((item, index) => {
               const toolDetail = agentToolsDetails?.find(td => td.id === item.toolId);
               const toolName = toolDetail?.name || item.toolId;
@@ -361,6 +445,59 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
               )}
             />
 
+            {/* START: Loop Execution Visualization */}
+            <div className="p-3 border rounded-md my-4 bg-slate-100 dark:bg-slate-800 shadow-sm space-y-3">
+              <h5 className="text-lg font-medium text-slate-700 dark:text-slate-300">Loop Execution Overview:</h5>
+              
+              <div className="p-2.5 rounded-md bg-white dark:bg-slate-700/80">
+                <div className="flex items-start">
+                  <Repeat className="h-5 w-5 mr-2.5 mt-0.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                  <div className="flex-grow">
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">Tools Executed in Each Iteration:</p>
+                    {(agentToolsDetails && agentToolsDetails.length > 0) ? (
+                      <ul className="list-disc pl-5 text-xs text-slate-600 dark:text-slate-400 space-y-0.5 mt-1">
+                        {agentToolsDetails.map(tool => (
+                          <li key={tool.id}>{tool.label || tool.name || tool.id}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        No tools have been added to this agent to run in the loop. Add tools in the 'Tools' tab.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-md bg-white dark:bg-slate-700/80">
+                <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">Termination Condition:</p>
+                <div className="text-xs p-2 mt-1 bg-blue-50 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-md">
+                  {!loopTerminationConditionType ? (
+                    "Termination condition not yet configured."
+                  ) : loopTerminationConditionType === "max_iterations" ? (
+                    <>Loop stops after <strong>{loopMaxIterations || "N/A"}</strong> iterations.</>
+                  ) : loopTerminationConditionType === "tool_success" ? (
+                    <>
+                      Loop stops when the tool&nbsp;
+                      <strong>
+                        {agentToolsDetails?.find(td => td.id === loopExitToolName)?.name || loopExitToolName || "N/A"}
+                      </strong>
+                      &nbsp;executes successfully.
+                    </>
+                  ) : loopTerminationConditionType === "state_change" ? (
+                    <>
+                      Loop stops when state key <strong>{loopExitStateKey || "N/A"}</strong> becomes <strong>{loopExitStateValue || "N/A"}</strong>.
+                    </>
+                  ) : loopTerminationConditionType === "none" ? (
+                    "Loop runs indefinitely (or until manually stopped / system limit)."
+                  ) : (
+                    "Unknown termination condition."
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* END: Loop Execution Visualization */}
+
             {loopTerminationConditionType === "max_iterations" && (
               <FormField
                 control={control}
@@ -392,9 +529,19 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
                 render={({ field }) => (
                   <FormItem>
                     <TooltipProvider> <Tooltip> <TooltipTrigger asChild><FormLabel htmlFor="config.loopExitToolName" className="cursor-help">Loop Exit Tool</FormLabel></TooltipTrigger> <TooltipContent><p>This tool, upon its successful execution, will terminate the loop. Select from the available tools for this agent.</p></TooltipContent> </Tooltip> </TooltipProvider>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl><SelectTrigger id="config.loopExitToolName"><SelectValue placeholder="Select the tool that signals loop termination" /></SelectTrigger></FormControl>
-                      <SelectContent> {/* TODO: Populate with actual agent tools */} <SelectItem value="placeholder-tool">Placeholder: Tool Name (e.g., data_validator)</SelectItem> </SelectContent>
+                      <SelectContent>
+                        {(agentToolsDetails && agentToolsDetails.length > 0) ? (
+                          agentToolsDetails.map(tool => (
+                            <SelectItem key={tool.id} value={tool.id}>
+                              {tool.label || tool.name || tool.id}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-tools" disabled>No tools available. Add tools in the 'Tools' tab.</SelectItem>
+                        )}
+                      </SelectContent>
                     </Select>
                     <FormDescription>The loop will end if this tool executes successfully.</FormDescription>
                     <FormMessage />
@@ -448,6 +595,30 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
                 Subagents in a parallel workflow must be independent and should not rely on shared state or sequential execution order from other parallel branches. Each subagent will operate in isolation.
               </AlertDescription>
             </Alert>
+
+            {/* START: Parallel Execution Visualization */}
+            <div className="p-3 border rounded-md my-4 bg-slate-100 dark:bg-slate-800 shadow-sm space-y-3">
+              <h5 className="text-lg font-medium text-slate-700 dark:text-slate-300">Parallel Execution Overview:</h5>
+              {(!configParallelSubagentIds || configParallelSubagentIds.length === 0) ? (
+                <Alert variant="info" className="bg-white dark:bg-slate-700/80">
+                  <AlertTitle>No Sub-agents Configured</AlertTitle>
+                  <AlertDescription>
+                    No sub-agent IDs configured to run in parallel. Add sub-agent IDs in the field below.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-2">
+                  {configParallelSubagentIds.map((agentId, index) => (
+                    <div key={index} className="flex items-center p-2.5 border rounded-md bg-white dark:bg-slate-700/80 shadow-sm">
+                      <GitFork className="h-5 w-5 mr-2.5 text-green-500 dark:text-green-400 flex-shrink-0" />
+                      <span className="font-mono text-sm text-slate-800 dark:text-slate-200">{agentId || `(empty ID at index ${index})`}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* END: Parallel Execution Visualization */}
+            
             <FormField
               control={control}
               name="config.parallelSubagentIds"
