@@ -317,7 +317,7 @@ export default function AgentMonitorPage() {
       }
       const data: AvgResponseTimesData[] = await response.json();
       setAvgResponseTimesData(data);
-    } catch (error)
+    } catch (error) {
       console.error("Error fetching average response times:", error);
       setAvgResponseTimesError(error instanceof Error ? error.message : String(error));
       setAvgResponseTimesData([]);

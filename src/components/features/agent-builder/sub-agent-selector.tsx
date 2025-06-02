@@ -93,7 +93,7 @@ export function SubAgentSelector({
             role="combobox"
             aria-expanded={open}
             className="w-full justify-between"
-            disabled={disabled || (maxSelection && selectedAgents.length >= maxSelection)}
+            disabled={disabled || (typeof maxSelection === 'number' && selectedAgents.length >= maxSelection)}
           >
             <span>Selecionar sub-agentes</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -109,8 +109,9 @@ export function SubAgentSelector({
                   <CommandItem
                     key={agent.id}
                     value={agent.id}
-                    onSelect={() => handleSelect(agent.id)}
-                    disabled={disabled}
+                    onSelect={disabled ? undefined : () => handleSelect(agent.id)}
+                    aria-disabled={disabled}
+                    className={cn(disabled && "opacity-50 cursor-not-allowed")}
                   >
                     <Check
                       className={cn(

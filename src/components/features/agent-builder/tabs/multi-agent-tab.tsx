@@ -111,7 +111,7 @@ export default function MultiAgentTab({
               render={({ field }) => (
                 <Textarea
                   id="config.globalInstruction"
-                  placeholder="e.g., 'You are part of a team. Collaborate effectively...'"
+                  placeholder="Enter specific instructions for this agent..."
                   value={field.value || ""}
                   onChange={field.onChange}
                   rows={4}

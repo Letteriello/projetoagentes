@@ -11,6 +11,16 @@ import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCirc
 import { useToast } from "@/hooks/use-toast";
 import { SavedAgentConfiguration, AvailableTool, ToolConfigData } from '@/types/agent-configs';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent
+} from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+
 // Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
 // For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
 
@@ -28,6 +38,8 @@ interface ToolsTabProps {
 }
 
 type FormContextType = SavedAgentConfiguration;
+
+export { SuggestedToolSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
 
 export default function ToolsTab({
   availableTools,
@@ -193,7 +205,7 @@ export default function ToolsTab({
         <CardContent>
           <ScrollArea className="h-[400px] pr-4"> {/* Added ScrollArea */}
             <div className="space-y-4">
-              {availableTools.map((tool) => {
+              {availableTools.map((tool, index) => {
                 const isSelected = currentSelectedTools.includes(tool.id);
                 const hasConfig = tool.hasConfig; // From AvailableTool definition
                 const isConfigured = hasConfig && toolConfigsApplied[tool.id] && Object.keys(toolConfigsApplied[tool.id]).length > 0;
@@ -222,18 +234,15 @@ export default function ToolsTab({
                             {!isConfigured && <AlertTriangle className="w-4 h-4 ml-2 text-orange-500" />}
                           </Button>
                         )}
-                         <Controller
-                            name={`tools`} // This controller is for the switch state, actual array update is manual
-                            control={control}
-                            render={({ field }) // field here isn't directly used for array, but for triggering re-renders if needed
-                            }) => (
-                              <Switch
-                                id={`tool-select-${tool.id}`}
-                                checked={isSelected}
-                                onCheckedChange={(checked) => handleToolSelectionChange(tool.id, checked)}
-                              />
-                            )}
-                          />
+                        <Controller
+                          name={`toolsDetails.${index}.enabled`}
+                          render={({ field }) => (
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          )}
+                        />
                       </div>
                     </div>
                   </Card>

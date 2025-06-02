@@ -28,18 +28,18 @@ export const AiConfigurationAssistantInputSchema = z.object({
 /**
  * Represents a single suggested tool.
  */
-const SuggestedToolSchema = z.object({
+export interface SuggestedToolSchema {
   /** The unique identifier of the suggested tool. */
-  id: z.string(),
+  id: string;
   /** The name of the suggested tool. */
-  name: z.string(),
+  name: string;
   /** A brief description of the suggested tool's function. */
-  description: z.string(),
+  description: string;
   /** Optional name of an icon to represent the tool. */
-  iconName: z.string().optional(),
+  iconName?: string;
   /** Optional Genkit tool name, if applicable. */
-  genkitToolName: z.string().optional(),
-});
+  genkitToolName?: string;
+}
 
 /**
  * Defines the output structure for the AI Configuration Assistant flow.
@@ -52,7 +52,14 @@ export const AiConfigurationAssistantOutputSchema = z.object({
    * May be an empty array if tool suggestion failed, no relevant tools were found,
    * or the LLM returned an empty list, even if other suggestions were successful.
    */
-  suggestedTools: z.array(SuggestedToolSchema).optional().describe("A list of suggested tools. May be empty if tool suggestion failed or no relevant tools were found, even if other suggestions were successful."),
+  // Define a Zod schema for suggested tool (must match SuggestedToolSchema interface)
+  suggestedTools: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    iconName: z.string().optional(),
+    genkitToolName: z.string().optional(),
+  })).optional().describe("A list of suggested tools. May be empty if tool suggestion failed or no relevant tools were found, even if other suggestions were successful."),
   /**
    * A suggested personality or tone for the agent.
    * May be undefined if personality suggestion failed, even if other parts succeeded.
@@ -118,7 +125,15 @@ export const aiConfigurationAssistantFlow = defineFlow(
 
 
     // Initialize parts of the output
-    let suggestedToolObjects: z.infer<typeof SuggestedToolSchema>[] = [];
+    // Use type matching the Zod schema, not the interface
+type SuggestedTool = {
+  id: string;
+  name: string;
+  description: string;
+  iconName?: string;
+  genkitToolName?: string;
+};
+let suggestedToolObjects: SuggestedTool[] = [];
     let suggestedPersonalityText: string | undefined = undefined;
     let suggestedRestrictionsList: string[] | undefined = undefined;
     let suggestedWorkflowTypeResult: z.infer<typeof AiConfigurationAssistantOutputSchema>['suggestedWorkflowType'] = undefined;
@@ -192,7 +207,7 @@ Do not include any explanatory text or markdown formatting around the JSON.`;
               suggestedToolObjects = validationResult.data.suggestedToolIds.map(id => {
               const foundTool = allTools.find(t => t.id === id);
               return foundTool ? { id: foundTool.id, name: foundTool.name, description: foundTool.description, iconName: (foundTool.icon as any)?.displayName || (typeof foundTool.icon === 'string' ? foundTool.icon : undefined) || 'HelpCircle', genkitToolName: foundTool.genkitToolName } : null;
-              }).filter(t => t !== null) as z.infer<typeof SuggestedToolSchema>[];
+              }).filter(t => t !== null) as SuggestedTool[];
           } else if (!validationResult.success) {
               console.error("LLM tool suggestions JSON did not match intermediate schema:", validationResult.error.flatten(), "Original JSON attempt:", parsedToolJson);
           }
@@ -244,7 +259,7 @@ Based on these tasks, suggest the most appropriate workflow type. The allowed ty
 
 Respond ONLY with a valid JSON object with a single key "suggestedWorkflowType", whose value is one of the allowed types.
 For example: {"suggestedWorkflowType": "sequential"}.
-Do not include any explanatory text or markdown formatting around the JSON.`;
+Do not include any other text or markdown formatting around the JSON.`;
         try {
             const llmWorkflowResponse = await generate({ model: gemini15Pro, prompt: workflowTypePrompt, config: { temperature: 0.1 } });
             const parsedWorkflowJson = parseLlmJsonResponse(llmWorkflowResponse.text(), ["suggestedWorkflowType"]);
@@ -469,3 +484,30 @@ async function testFlow() {
 }
 // testFlow();
 */
+
+export const getWorkflowType = async (query: string): Promise<WorkflowType> => {
+  const workflowTypePrompt = `Analyze the following user query to determine the most appropriate workflow type:
+
+${query}
+
+Workflow types:
+1. sequential - Tasks must be completed in a strict order
+2. parallel - Tasks can be completed simultaneously
+3. conditional - Tasks depend on certain conditions
+
+Respond ONLY with a valid JSON object with a single key "suggestedWorkflowType", whose value is one of the allowed types.
+For example: {"suggestedWorkflowType": "sequential"}.`;
+
+  try {
+    const llmWorkflowResponse = await generate({ 
+      model: gemini15Pro, 
+      prompt: workflowTypePrompt, 
+      config: { temperature: 0.1 } 
+    });
+    const parsedWorkflowJson = parseLlmJsonResponse(llmWorkflowResponse.text(), ["suggestedWorkflowType"]);
+    return parsedWorkflowJson.suggestedWorkflowType;
+  } catch (error) {
+    console.error("Error determining workflow type:", error);
+    return "sequential"; // Default fallback
+  }
+};

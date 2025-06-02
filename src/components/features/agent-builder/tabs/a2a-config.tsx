@@ -93,7 +93,7 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
               <div className="space-y-3">
                 {channelFields.map((field, index) => (
                   <Card key={field.id} className="p-3 bg-muted/30 space-y-2">
-                    <Input {...register(`config.a2a.communicationChannels.${index}.name`)} placeholder="Channel Name (e.g., order_updates_topic)" />
+                    <Input {...register(`config.a2a.communicationChannels.${index}.name`)} defaultValue="" placeholder="Channel Name (e.g., order_updates_topic)" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                        <Controller
                           name={`config.a2a.communicationChannels.${index}.direction`}
@@ -125,10 +125,10 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
                             </Select>
                           )}
                         />
-                        <Input type="number" {...register(`config.a2a.communicationChannels.${index}.timeout`)} placeholder="Timeout (ms, optional)" />
+                        <Input type="number" {...register(`config.a2a.communicationChannels.${index}.timeout`)} defaultValue={0} placeholder="Timeout (ms, optional)" />
                     </div>
                     {watch(`config.a2a.communicationChannels.${index}.direction`) === 'outbound' && (
-                         <Input {...register(`config.a2a.communicationChannels.${index}.targetAgentId`)} placeholder="Target Agent ID (for outbound)" />
+                         <Input {...register(`config.a2a.communicationChannels.${index}.targetAgentId`)} defaultValue="" placeholder="Target Agent ID (for outbound)" />
                     )}
                     <Controller
                       name={`config.a2a.communicationChannels.${index}.schema`}
@@ -191,7 +191,7 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
             {securityPolicy === 'api_key' && (
                  <div className="space-y-2">
                     <Label htmlFor="config.a2a.apiKeyHeaderName" className="flex items-center">API Key Header Name <InfoIconComponent tooltipText={agentBuilderHelpContent.a2aTab.apiKeyHeaderName.tooltip} onClick={() => showHelpModal({ tab: 'a2aTab', field: 'apiKeyHeaderName' })} className="ml-2" /></Label>
-                    <Input id="config.a2a.apiKeyHeaderName" {...register('config.a2a.apiKeyHeaderName')} placeholder="e.g., X-Agent-API-Key" />
+                    <Input id="config.a2a.apiKeyHeaderName" {...register('config.a2a.apiKeyHeaderName')} defaultValue="" placeholder="e.g., X-Agent-API-Key" />
                 </div>
             )}
 

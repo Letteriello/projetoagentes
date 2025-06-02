@@ -22,6 +22,14 @@ interface AgentCreatorChatUIProps {
   initialAgentConfig?: SavedAgentConfiguration | null;
 }
 
+interface AssistantResponse {
+  success: boolean;
+  suggestions?: {
+    suggestedAgentDescription?: string;
+  };
+  updatedConfig?: SavedAgentConfiguration;
+}
+
 export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIProps) {
   const [conversation, setConversation] = React.useState<CreatorChatMessage[]>([]);
   const [userInput, setUserInput] = React.useState<string>("");
@@ -55,29 +63,32 @@ export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIPro
     setIsLoading(true);
 
     try {
-      const result = await getAiConfigurationSuggestionsAction({
-        userNaturalLanguageInput: userMessageText,
-        currentAgentConfig: currentAgentConfig,
+      const result: AssistantResponse = await getAiConfigurationSuggestionsAction({
         chatHistory: currentConversationHistory
       });
 
-      if (result.error) {
-        toast({ title: "Erro do Assistente", description: result.error, variant: "destructive" });
+      if (!result.success) {
+        toast({ title: "Erro do Assistente", description: "Ocorreu um erro ao processar sua solicitação.", variant: "destructive" });
         const errorResponse: CreatorChatMessage = {
           id: (Date.now() + 1).toString(),
-          text: `Erro: ${result.error}`,
+          text: "Erro: Ocorreu um erro ao processar sua solicitação.",
           sender: "assistant",
         };
         setConversation(prev => [...prev, errorResponse]);
-      } else if (result.assistantResponse && result.updatedAgentConfigJson) {
+      } else if (result.suggestions?.suggestedAgentDescription && result.updatedConfig) {
         const assistantResponse: CreatorChatMessage = {
           id: (Date.now() + 1).toString(),
-          text: result.assistantResponse,
+          text: result.suggestions.suggestedAgentDescription,
           sender: "assistant",
         };
         setConversation(prev => [...prev, assistantResponse]);
         try {
-          const updatedConfig = JSON.parse(result.updatedAgentConfigJson);
+          const updatedConfig: SavedAgentConfiguration = {
+            ...result.updatedConfig,
+            internalVersion: result.updatedConfig.internalVersion || 1,
+            isLatest: true,
+            originalAgentId: result.updatedConfig.originalAgentId || result.updatedConfig.id
+          };
           setCurrentAgentConfig(updatedConfig);
         } catch (parseError) {
           console.error("Error parsing updatedAgentConfigJson:", parseError);

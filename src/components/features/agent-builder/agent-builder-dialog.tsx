@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useForm, FormProvider, useFormContext, Controller } from 'react-hook-form';
+import { useForm, FormProvider, useFormContext, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -73,6 +73,7 @@ import {
   ArtifactsConfig,
   A2AConfig as AgentA2AConfig // Renaming to avoid conflict with the component
 } from '@/types/agent-configs';
+import { AvailableTool } from '@/types/agent-configs';
 
 // Local AgentConfig type is removed.
 
@@ -177,7 +178,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     }
   }, [editingAgent, methods]);
 
-  const handleSaveAgent = methods.handleSubmit((data) => {
+  const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (data) => {
     // Ensure timestamps and versions are correctly handled before saving
     const now = new Date().toISOString();
     data.updatedAt = now;
@@ -186,7 +187,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     }
     // internalVersion could be incremented here if logic requires
     onSave(data);
-  });
+  };
 
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -216,11 +217,21 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     return null;
   };
 
+  const options = availableTools.map(item => ({ value: item.id, label: item.name }));
+
+  const tools: AvailableTool[] = availableTools.map(tool => ({
+    ...tool,
+    label: tool.name,
+    type: tool.type || 'default',
+    requiresAuth: tool.requiresAuth || false,
+    serviceTypeRequired: tool.serviceTypeRequired || undefined
+  }));
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange as (open: boolean) => void}>
       <DialogContent className="max-w-4xl p-0">
         <FormProvider {...methods}>
-          <form onSubmit={methods.handleSubmit(handleSaveAgent)}>
+          <form onSubmit={methods.handleSubmit(onSubmit)}>
             <DialogHeader className="p-6 pb-4 border-b">
               <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
               <DialogDescription>
