@@ -7,9 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle, Cpu, Edit3 } from "lucide-react"; // Added Cpu, Edit3
 import { useToast } from "@/hooks/use-toast";
+import { v4 as uuidv4 } from 'uuid';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"; // Added AlertDialog
 import { SavedAgentConfiguration, AvailableTool, ToolConfigData } from '@/types/agent-configs';
+import CustomToolDialog, { CustomToolData } from '../custom-tool-dialog'; 
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import {
   Card,
@@ -58,6 +71,9 @@ export default function ToolsTab({
   const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
   const [aiSuggestedTools, setAiSuggestedTools] = React.useState<SuggestedToolType[]>([]);
   const [isSuggestionsDialogOpen, setIsSuggestionsDialogOpen] = React.useState(false);
+  const [isCustomToolDialogOpen, setIsCustomToolDialogOpen] = React.useState(false);
+  const [editingCustomToolData, setEditingCustomToolData] = React.useState<CustomToolData | undefined>(undefined);
+  const [toolToDelete, setToolToDelete] = React.useState<string | null>(null); // For delete confirmation
 
   type SuggestedToolType = z.infer<typeof SuggestedToolSchema>;
 
@@ -113,13 +129,106 @@ export default function ToolsTab({
     setValue('tools', newToolIds, { shouldDirty: true, shouldValidate: true });
   };
 
+  const handleSaveCustomTool = (data: CustomToolData, toolId?: string) => {
+    const currentConfigs = getValues('toolConfigsApplied') || {};
+    const currentTools = getValues('tools') || [];
+
+    if (toolId) { // Editing existing tool
+      setValue('toolConfigsApplied', {
+        ...currentConfigs,
+        [toolId]: {
+          name: data.name, // Ensure name/description are part of stored config for custom tools
+          description: data.description,
+          inputSchema: data.inputSchema,
+          outputSchema: data.outputSchema,
+        }
+      }, { shouldDirty: true, shouldValidate: true });
+
+      // If the name (which is used as label) changed, the UI might need an update.
+      // This is tricky if availableTools is a prop. For now, we assume the ID remains the primary key.
+      // The label in the UI for this tool might become stale if not refreshed from a source that sees this update.
+      // However, `availableTools` prop is typically static definitions. Custom tool display names
+      // might need to be sourced from `toolConfigsApplied[toolId].name` if they are to be dynamic.
+
+      toast({
+        title: "Ferramenta Customizada Atualizada",
+        description: `A ferramenta "${data.name}" foi atualizada.`,
+      });
+    } else { // Creating new tool
+      const newToolId = `custom_${uuidv4()}`;
+      // Create a minimal AvailableTool object for the form context.
+      // The full AvailableTool object might be managed elsewhere if needed.
+      // For the purpose of selection and configuration, this is what's needed in form context.
+      setValue('tools', [...currentTools, newToolId], { shouldDirty: true, shouldValidate: true });
+      setValue('toolConfigsApplied', {
+        ...currentConfigs,
+        [newToolId]: {
+          name: data.name,
+          description: data.description,
+          inputSchema: data.inputSchema,
+          outputSchema: data.outputSchema,
+        }
+      }, { shouldDirty: true, shouldValidate: true });
+
+      toast({
+        title: "Ferramenta Customizada Criada",
+        description: `A ferramenta "${data.name}" foi adicionada e selecionada.`,
+      });
+    }
+    setIsCustomToolDialogOpen(false);
+    setEditingCustomToolData(undefined);
+  };
+  
+  const handleDeleteCustomTool = (toolId: string) => {
+    const currentSelected = getValues('tools') || [];
+    setValue('tools', currentSelected.filter(id => id !== toolId), { shouldDirty: true, shouldValidate: true });
+
+    const currentConfigs = getValues('toolConfigsApplied') || {};
+    const { [toolId]: _, ...remainingConfigs } = currentConfigs;
+    setValue('toolConfigsApplied', remainingConfigs, { shouldDirty: true, shouldValidate: true });
+
+    toast({
+      title: "Ferramenta Customizada Excluída",
+      description: "A ferramenta foi removida da sua configuração.",
+    });
+    setToolToDelete(null);
+  };
+
   const getToolIcon = (tool: AvailableTool) => {
+    // For custom tools, if icon is not set, use a default like SettingsIcon or Cpu
+    if (tool.type === 'custom' && !tool.icon) {
+      const CustomIcon = SettingsIcon || Settings; // Fallback to direct import if prop not there
+      return <CustomIcon className="w-5 h-5 mr-3 text-muted-foreground" />;
+    }
     const IconComponent = iconComponents[tool.icon as string || tool.id] || iconComponents.default || Settings;
     return <IconComponent className="w-5 h-5 mr-3 text-muted-foreground" />;
   };
 
   return (
     <div className="space-y-6">
+      <CustomToolDialog
+        isOpen={isCustomToolDialogOpen}
+        onOpenChange={(open) => {
+          setIsCustomToolDialogOpen(open);
+          if (!open) setEditingCustomToolData(undefined); // Clear editing data when dialog closes
+        }}
+        onSave={handleSaveCustomTool}
+        initialData={editingCustomToolData}
+      />
+      <AlertDialog open={!!toolToDelete} onOpenChange={() => setToolToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta ferramenta customizada? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setToolToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => toolToDelete && handleDeleteCustomTool(toolIdToDelete)}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Dialog open={isSuggestionsDialogOpen} onOpenChange={setIsSuggestionsDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
@@ -196,10 +305,24 @@ export default function ToolsTab({
                 />
               </CardDescription>
             </div>
-            <Button onClick={fetchToolSuggestions} disabled={isLoadingSuggestions} variant="outline" size="sm">
-              {isLoadingSuggestions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4 text-yellow-500" />}
-              Sugerir Ferramentas
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button onClick={fetchToolSuggestions} disabled={isLoadingSuggestions} variant="outline" size="sm" className="flex-grow sm:flex-grow-0">
+                {isLoadingSuggestions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4 text-yellow-500" />}
+                Sugerir Ferramentas
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setEditingCustomToolData(undefined);
+                  setIsCustomToolDialogOpen(true);
+                }}
+                className="flex-grow sm:flex-grow-0"
+              >
+                <PlusCircleIcon className="mr-2 h-4 w-4" /> {/* Using PlusCircleIcon prop */}
+                Criar Ferramenta Customizada
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -210,30 +333,64 @@ export default function ToolsTab({
                 const hasConfig = tool.hasConfig; // From AvailableTool definition
                 const isConfigured = hasConfig && toolConfigsApplied[tool.id] && Object.keys(toolConfigsApplied[tool.id]).length > 0;
 
+                // For custom tools, name and description might be in toolConfigsApplied
+                const toolDisplayName = (tool.type === 'custom' && toolConfigsApplied[tool.id]?.name) ? toolConfigsApplied[tool.id].name : tool.label;
+                const toolDisplayDescription = (tool.type === 'custom' && toolConfigsApplied[tool.id]?.description) ? toolConfigsApplied[tool.id].description : tool.description;
+
                 return (
                   <Card key={tool.id} className="p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-grow">
+                      <div className="flex items-center flex-grow min-w-0"> 
                         {getToolIcon(tool)}
-                        <div className="flex-grow">
-                          <Label htmlFor={`tool-select-${tool.id}`} className="text-base font-semibold">{tool.label}</Label>
-                          <p className="text-sm text-muted-foreground">{tool.description}</p>
+                        <div className="flex-grow min-w-0"> 
+                          <Label htmlFor={`tool-select-${tool.id}`} className="text-base font-semibold truncate" title={toolDisplayName}> 
+                            {toolDisplayName}
+                          </Label>
+                          <p className="text-sm text-muted-foreground truncate" title={toolDisplayDescription}>{toolDisplayDescription}</p> 
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        {hasConfig && isSelected && (
+                      <div className="flex items-center space-x-2 flex-shrink-0"> {/* Reduced space-x-3 to space-x-2 */}
+                        {(hasConfig || tool.type === 'custom') && isSelected && (
                           <Button
                             variant="outline"
-                            size="sm"
-                            onClick={() => onToolConfigure(tool.id)}
-                            className="flex items-center"
+                            size="icon" // Changed to icon button
+                            onClick={() => {
+                              if (tool.type === 'custom') {
+                                const config = toolConfigsApplied[tool.id] || {}; // Get current config
+                                // For custom tools, populate initialData for editing
+                                setEditingCustomToolData({
+                                  id: tool.id, // Important: pass ID for editing
+                                  name: config.name || tool.name, // Prefer name from config if available
+                                  description: config.description || tool.description, // Prefer desc from config
+                                  inputSchema: config.inputSchema || tool.inputSchema || '{}',
+                                  outputSchema: config.outputSchema || tool.outputSchema || '{}',
+                                });
+                                setIsCustomToolDialogOpen(true);
+                              } else {
+                                onToolConfigure(tool.id); // For non-custom tools with config
+                              }
+                            }}
+                            className="h-8 w-8" // Adjusted size for icon button
+                            title={tool.type === 'custom' ? "Editar Ferramenta Customizada" : "Configurar Ferramenta"}
                           >
-                            <SettingsIcon className={`w-4 h-4 mr-2 ${isConfigured ? 'text-green-500' : 'text-orange-500'}`} />
-                            {isConfigured ? 'Configured' : 'Configure'}
-                            {isConfigured && <CheckIcon className="w-4 h-4 ml-2 text-green-500" />}
-                            {!isConfigured && <AlertTriangle className="w-4 h-4 ml-2 text-orange-500" />}
+                            {tool.type === 'custom' ? <Edit3 className="h-4 w-4" /> : <SettingsIcon className={`h-4 w-4 ${isConfigured ? 'text-green-500' : 'text-orange-500'}`} />}
+                            {/* Display configuration status for non-custom tools */}
+                            {tool.type !== 'custom' && isConfigured && <CheckIcon className="absolute top-0 right-0 h-3 w-3 text-green-500 transform translate-x-1/2 -translate-y-1/2" />}
+                            {tool.type !== 'custom' && !isConfigured && <AlertTriangle className="absolute top-0 right-0 h-3 w-3 text-orange-500 transform translate-x-1/2 -translate-y-1/2" />}
                           </Button>
                         )}
+                        {tool.type === 'custom' && (
+                           <Button
+                            variant="destructive"
+                            size="icon" // Changed to icon button
+                            onClick={() => setToolToDelete(tool.id)} // Set tool to delete for confirmation
+                            className="h-8 w-8" // Adjusted size for icon button
+                            title="Excluir Ferramenta Customizada"
+                          >
+                            <Trash2Icon className="h-4 w-4" />
+                          </Button>
+                        )}
+<<<<<<< HEAD
                         <Controller
                           name={`toolsDetails.${index}.enabled`}
                           render={({ field }) => (
@@ -243,6 +400,20 @@ export default function ToolsTab({
                             />
                           )}
                         />
+=======
+                         <Controller
+                            name={`tools`} 
+                            control={control}
+                            render={({ field }) // field here isn't directly used for array
+                            }) => (
+                              <Switch
+                                id={`tool-select-${tool.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked) => handleToolSelectionChange(tool.id, checked)}
+                              />
+                            )}
+                          />
+>>>>>>> ef3635d464ff311df41a780234788271d933d8ab
                       </div>
                     </div>
                   </Card>
