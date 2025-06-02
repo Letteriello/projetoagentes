@@ -65,7 +65,8 @@ export interface ToolConfigData {
   allowedSqlOperations?: string[];
   allowedHttpMethods?: string[];
 
-  [key: string]: any; // Keep for flexibility
+  // Keep for flexibility, but with more specific types than 'any'
+  [key: string]: string | number | boolean | string[] | undefined;
 }
 
 export interface CommunicationChannel {

@@ -58,40 +58,29 @@ import A2AConfig from './tabs/a2a-config';
 import MultiAgentTab from './tabs/multi-agent-tab';
 import ReviewTab from './tabs/review-tab';
 import { SubAgentSelector } from './sub-agent-selector';
+import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
 
-type AgentConfig = {
-  agentName: string;
-  description: string;
-  agentTone: string;
-  tools: Array<{ id: string; name: string; configured: boolean }>;
-  statePersistence: {
-    enabled: boolean;
-    persistenceType: 'session' | 'local' | 'indexedDB';
-    initialStateValues: string;
-  };
-  rag: {
-    enabled: boolean;
-    vectorStoreUrl: string;
-    collectionName: string;
-    queryParams: string;
-  };
-  artifacts: {
-    storageType: 'local' | 'cloud';
-    localStoragePath?: string;
-    cloudStorageBucket?: string;
-    definitions: string[];
-  };
-  a2a: {
-    enabled: boolean;
-    subAgentIds: string[];
-  };
-};
+import {
+  SavedAgentConfiguration,
+  AgentConfig as AgentConfigUnion, // Renaming to avoid conflict if local AgentConfig is temporarily needed
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig,
+  A2AAgentSpecialistConfig,
+  ToolConfigData,
+  StatePersistenceConfig, // Assuming these are exported from agent-configs.ts
+  RagMemoryConfig,
+  ArtifactsConfig,
+  A2AConfig as AgentA2AConfig // Renaming to avoid conflict with the component
+} from '@/types/agent-configs';
+
+// Local AgentConfig type is removed.
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  editingAgent?: AgentConfig;
-  onSave: (config: AgentConfig) => void;
+  editingAgent?: SavedAgentConfiguration | null;
+  onSave: (config: SavedAgentConfiguration) => void;
   availableTools: Array<{ id: string; name: string; description: string }>;
   agentTypeOptions: string[];
   agentToneOptions: string[];
@@ -131,38 +120,71 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     }
   };
 
-  const methods = useForm<AgentConfig>({
-    defaultValues: editingAgent || {
+  const createDefaultSavedAgentConfiguration = (): SavedAgentConfiguration => {
+    const newId = uuidv4();
+    const now = new Date().toISOString();
+    return {
+      id: newId,
       agentName: '',
-      description: '',
-      agentTone: 'professional',
-      tools: [],
+      agentDescription: '',
+      agentVersion: '1.0.0',
+      icon: '', // Default icon
+      templateId: '',
+      isTemplate: false,
+      isFavorite: false,
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+      userId: '', // This might be set by the backend or context
       config: {
-        statePersistence: {
-          enabled: false,
-          persistenceType: 'session',
-          initialStateValues: '{}'
-        },
-        rag: {
-          enabled: false,
-          vectorStoreUrl: '',
-          collectionName: '',
-          queryParams: '{}'
-        },
-        artifacts: {
-          storageType: 'local',
-          definitions: []
-        },
-        a2a: {
-          enabled: false,
-          subAgentIds: []
-        }
-      }
-    },
-    resolver: zodResolver(/* your zod schema */)
+        type: 'llm', // Default agent type
+        framework: 'genkit', // Default framework
+        agentGoal: '',
+        agentTasks: [],
+        agentPersonality: 'neutral', // Default personality
+        agentRestrictions: [],
+        agentModel: 'gemini-1.5-flash-latest', // Default model
+        agentTemperature: 0.7,
+        systemPromptGenerated: '', // Will be generated based on fields
+        safetySettings: [],
+        // Initialize other optional base fields with default 'disabled' states
+        statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
+        rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
+        artifacts: { enabled: false, storageType: 'memory', definitions: [] },
+        a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', maxMessageSize: 1024, loggingEnabled: false },
+        adkCallbacks: {}, // Initialize empty ADK callbacks
+      } as LLMAgentConfig, // Type assertion for the default config
+      tools: [],
+      toolConfigsApplied: {},
+      toolsDetails: [],
+      internalVersion: 1,
+      isLatest: true,
+      originalAgentId: newId, // For new agents, originalId is the same as id
+    };
+  };
+
+  const methods = useForm<SavedAgentConfiguration>({
+    defaultValues: editingAgent || createDefaultSavedAgentConfiguration(),
+    // resolver: zodResolver(/* your zod schema */) // Temporarily remove or simplify resolver
+    resolver: undefined, // No Zod schema for now
   });
 
+  React.useEffect(() => {
+    if (editingAgent) {
+      methods.reset(editingAgent);
+    } else {
+      methods.reset(createDefaultSavedAgentConfiguration());
+    }
+  }, [editingAgent, methods]);
+
   const handleSaveAgent = methods.handleSubmit((data) => {
+    // Ensure timestamps and versions are correctly handled before saving
+    const now = new Date().toISOString();
+    data.updatedAt = now;
+    if (!data.createdAt) { // If it's a new agent (though default function sets it)
+      data.createdAt = now;
+    }
+    // internalVersion could be incremented here if logic requires
     onSave(data);
   });
 
@@ -315,17 +337,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     </AlertDescription>
                   </Alert>
                   <StateMemoryTab
-                    // Props will be replaced by useFormContext in StateMemoryTab
-                    enableStatePersistence={methods.watch("config.statePersistence.enabled") || false}
-                    setEnableStatePersistence={(val) => methods.setValue("config.statePersistence.enabled", val)}
-                    statePersistenceType={methods.watch("config.statePersistence.persistenceType") || "session"}
-                    setStatePersistenceType={(val) => methods.setValue("config.statePersistence.persistenceType", val as 'session' | 'local' | 'indexedDB')}
-                    initialStateValues={methods.watch("config.statePersistence.initialStateValues") || []}
-                    setInitialStateValues={(val) => methods.setValue("config.statePersistence.initialStateValues", val)}
-                    SaveIcon={Save}
-                    ListChecksIcon={ListChecks}
-                    PlusIcon={Plus}
-                    Trash2Icon={Trash2}
+                    // Form-related props removed. StateMemoryTab will use useFormContext.
+                    // It needs to be updated to watch "config.statePersistence.enabled",
+                    // and use Controller for fields like "config.statePersistence.type",
+                    // "config.statePersistence.initialStateValues" etc.
+                    // The types for persistenceType 'local' | 'indexedDB' also need to align with StatePersistenceType ('session' | 'memory' | 'database')
+                    // from agent-configs.ts. This will be part of StateMemoryTab's own refactoring.
                     SaveIcon={Save}
                     ListChecksIcon={ListChecks}
                     PlusIcon={Plus}
@@ -335,11 +352,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                   />
                   <Separator className="my-6" />
                   <RagTab
-                    // Props will be replaced by useFormContext in RagTab
-                    enableRAG={methods.watch("config.rag.enabled") || false}
-                    setEnableRAG={(val) => methods.setValue("config.rag.enabled", val)}
-                    ragMemoryConfig={methods.watch("config.rag") as { enabled: boolean; vectorStoreUrl: string; collectionName: string; queryParams: string } || methods.defaultValues?.config?.rag!}
-                    setRagMemoryConfig={(config) => methods.setValue("config.rag", config)}
+                    // Form-related props removed. RagTab will use useFormContext.
+                    // It needs to be updated to watch "config.rag.enabled" and use Controller
+                    // for fields within "config.rag.*".
+                    // The structure of ragMemoryConfig also needs to align with RagMemoryConfig from agent-configs.ts.
                     SearchIcon={Search}
                     UploadCloudIcon={UploadCloud}
                     FileTextIcon={FileText}
@@ -353,17 +369,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 {/* Artifacts Tab */}
                 <TabsContent value="artifacts">
                   <ArtifactsTab
-                    // Props will be replaced by useFormContext in ArtifactsTab
-                    // enableArtifacts={methods.watch("config.artifacts.enabled") || false} // Prop seems missing in ArtifactsTab definition
-                    // setEnableArtifacts={(val) => methods.setValue("config.artifacts.enabled", val)} // Prop seems missing
-                    artifactStorageType={methods.watch("config.artifacts.storageType") || "memory"}
-                    setArtifactStorageType={(val) => methods.setValue("config.artifacts.storageType", val as 'local' | 'cloud')}
-                    artifacts={methods.watch("config.artifacts.definitions") || []}
-                    setArtifacts={(val) => methods.setValue("config.artifacts.definitions", val)}
-                    cloudStorageBucket={methods.watch("config.artifacts.cloudStorageBucket") || ""}
-                    setCloudStorageBucket={(val) => methods.setValue("config.artifacts.cloudStorageBucket", val)}
-                    localStoragePath={methods.watch("config.artifacts.localStoragePath") || ""}
-                    setLocalStoragePath={(val) => methods.setValue("config.artifacts.localStoragePath", val)}
+                    // Form-related props removed. ArtifactsTab will use useFormContext.
+                    // It needs to be updated to use Controller for fields like "config.artifacts.enabled",
+                    // "config.artifacts.storageType", "config.artifacts.definitions", etc.
+                    // The type for artifactStorageType ('local' | 'cloud') needs to align with
+                    // ArtifactStorageType ('local' | 'cloud' | 'memory' | 'filesystem') from agent-configs.ts.
                     FileJsonIcon={FileJson}
                     UploadCloudIcon={UploadCloud}
                     BinaryIcon={Binary}
@@ -413,11 +423,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <MultiAgentTab
-                        // Props will be replaced by useFormContext in MultiAgentTab
-                        isRootAgent={methods.watch("config.a2a.enabled") || false}
-                        setIsRootAgent={(val) => methods.setValue("config.a2a.enabled", val)}
-                        subAgentIds={methods.watch("config.a2a.subAgentIds") || []}
-                        setSubAgentIds={(val) => methods.setValue("config.a2a.subAgentIds", val)}
+                        // Form-related props removed. MultiAgentTab will use useFormContext.
+                        // It needs to be updated to use Controller for "config.isRootAgent", "config.subAgentIds".
+                        // The previous mapping of isRootAgent to "config.a2a.enabled" was incorrect for SavedAgentConfiguration.
                         availableAgentsForSubSelector={availableAgentsForSubSelector}
                         SubAgentSelectorComponent={SubAgentSelector} // Keep passing component
                         UsersIcon={Users}
@@ -433,13 +441,13 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                           {/* ... Tooltip for global instruction ... */}
                         </TooltipProvider>
                         <Controller
-                          name="config.globalInstruction"
+                          name="config.globalInstruction" // This path is correct for SavedAgentConfiguration.config
                           control={methods.control}
                           render={({ field }) => (
                             <Textarea
                               id="globalSubAgentInstructionRHF"
                               placeholder="Ex: 'Você é um assistente especialista...'"
-                              value={field.value || ""}
+                              value={field.value || ""} // Ensure field.value is not null/undefined before passing to textarea
                               onChange={field.onChange}
                               rows={3}
                             />
@@ -451,6 +459,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                       </div>
                     </CardContent>
                   </Card>
+                  {/* This section seems to be a placeholder, no RHF fields to change here yet */}
                   <Card className="mt-6">
                     <CardHeader>
                       <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
