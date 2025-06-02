@@ -7,6 +7,7 @@ import {
   Menu,
   Save,
   Trash2,
+  Settings2, // Or another icon
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -103,7 +104,8 @@ import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
 import { Message } from "@/types/chat";
-import { Conversation, ChatMessageUI } from "@/types/chat";
+import { Conversation, ChatMessageUI, TestRunConfig } from "@/types/chat"; // Added TestRunConfig
+import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Added TestRunConfigPanel
 import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -195,6 +197,13 @@ export function ChatUI() {
   const [isPending, setIsPending] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isADKInitializing, setIsADKInitializing] = useState<boolean>(false);
+
+  // Test Run Config State
+  const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
+    temperature: undefined, // Or a default like 0.7
+    streamingEnabled: true, // Or a default
+  });
+  const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
 
   // Message and Conversation State
   const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]);
@@ -542,18 +551,27 @@ export function ChatUI() {
           const llmConfig = agentCfg.config as LLMAgentConfig;
           requestBody.modelName = llmConfig.agentModel;
           requestBody.systemPrompt = agentCfg.agentDescription || llmConfig.globalInstruction;
-          requestBody.temperature = llmConfig.agentTemperature;
+        // Apply overridden temperature
+        requestBody.temperature = testRunConfig.temperature !== undefined
+                                      ? testRunConfig.temperature
+                                      : llmConfig.agentTemperature;
         } else {
           // Caso contrário, usamos as propriedades de fallback no nível superior
           requestBody.modelName = agentCfg.agentModel;
           requestBody.systemPrompt = agentCfg.agentDescription || agentCfg.globalInstruction;
-          requestBody.temperature = agentCfg.agentTemperature;
+        // Apply overridden temperature
+        requestBody.temperature = testRunConfig.temperature !== undefined
+                                      ? testRunConfig.temperature
+                                      : agentCfg.agentTemperature;
         }
       } else {
         // Fallback para propriedades de nível superior
         requestBody.modelName = agentCfg.agentModel;
         requestBody.systemPrompt = agentCfg.agentDescription || agentCfg.globalInstruction;
-        requestBody.temperature = agentCfg.agentTemperature;
+      // Apply overridden temperature
+      requestBody.temperature = testRunConfig.temperature !== undefined
+                                    ? testRunConfig.temperature
+                                    : agentCfg.agentTemperature;
       }
       requestBody.agentToolsDetails = agentCfg.toolsDetails?.map(tool => ({ 
         id: tool.id, 
@@ -565,7 +583,10 @@ export function ChatUI() {
       const adkCfg = activeChatTarget.config as ADKAgentConfig;
       requestBody.modelName = adkCfg.model?.name;
       requestBody.systemPrompt = adkCfg.description;
-      requestBody.temperature = adkCfg.model?.temperature;
+      // Apply overridden temperature
+      requestBody.temperature = testRunConfig.temperature !== undefined
+                                  ? testRunConfig.temperature
+                                  : adkCfg.model?.temperature;
       // Mapeamento seguro sem depender do tipo ADKTool
       requestBody.agentToolsDetails = adkCfg.tools?.map((t) => ({
         id: t.name, 
@@ -1150,8 +1171,27 @@ export function ChatUI() {
     // This block can be simplified if loading state from useAuth is used
   }
 
+  const handleTestConfigChange = (newConfig: Partial<TestRunConfig>) => {
+    setTestRunConfig(prev => ({ ...prev, ...newConfig }));
+  };
+
+  const handleApplyTestConfig = () => {
+    // Logic to apply the config if needed immediately, or just close
+    setIsTestConfigPanelOpen(false);
+    toast({ title: "Test Settings Applied", description: "Temporary settings will be used for the next interaction." });
+  };
+
   return (
     <div className="flex h-screen w-full overflow-hidden">
+      {isTestConfigPanelOpen && (
+        <TestRunConfigPanel
+          isOpen={isTestConfigPanelOpen}
+          onClose={() => setIsTestConfigPanelOpen(false)}
+          config={testRunConfig}
+          onConfigChange={handleTestConfigChange}
+          onApply={handleApplyTestConfig}
+        />
+      )}
       {/* Sidebar - fixed positioning with z-index */}
       <div 
         className={cn(
@@ -1210,7 +1250,17 @@ export function ChatUI() {
             handleNewConversation={() => handleNewConversation()}
             isADKInitializing={isADKInitializing}
             onExportChatLog={handleExportChatLog} // Add this new prop
-          />
+          >
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsTestConfigPanelOpen(true)}
+              title="Test Settings"
+              className="ml-2" // Added margin for spacing
+            >
+              <Settings2 className="h-5 w-5" />
+            </Button>
+          </ChatHeader>
         </div>
         <div className="flex-1 flex flex-col relative overflow-hidden">
           <div className="flex-1 overflow-hidden">
@@ -1274,7 +1324,8 @@ export function ChatUI() {
         </div>
 
         <div className="sticky bottom-0 w-full bg-background border-t p-2 z-10">
-          <div className="mx-auto max-w-4xl">
+          {/* Container for MessageInputArea and Test Settings Button */}
+          <div className="mx-auto max-w-4xl flex items-end gap-2">
             <MessageInputArea
               formRef={useRef<HTMLFormElement>(null)} // This ref is local to MessageInputArea, not needed from ChatUI state
               inputRef={inputRef} // Pass the shared inputRef
@@ -1289,6 +1340,17 @@ export function ChatUI() {
               inputValue={inputValue}
               onInputChange={handleInputChange}
             />
+            {/* Test Settings button was moved to ChatHeader, if preferred here, uncomment and adjust styling
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsTestConfigPanelOpen(true)}
+              title="Test Settings"
+              className="mb-3" // Align with send button if textarea is single line
+            >
+              <Settings2 className="h-5 w-5" />
+            </Button>
+            */}
           </div>
         </div>
       </div>

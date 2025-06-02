@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, Plus, Bug } from "lucide-react"; // Removed SparklesIcon if not used
+import { Menu, Plus, Bug, Settings2 } from "lucide-react"; // Added Settings2
 import { useAgents } from "@/contexts/AgentsContext";
 import { v4 as uuidv4 } from "uuid";
 import { useGenkitSession, UseGenkitSessionOptions } from "@/hooks/useGenkitSession";
@@ -12,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 // import { GenkitSessionService } from "@/services/GenkitSessionService"; // Not directly used
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import type { TestRunConfig } from "@/types/chat-types"; // Added TestRunConfig
+import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Added TestRunConfigPanel
 import { StreamingMessageList } from "@/components/features/chat/streaming/StreamingMessageList";
 import { StreamingInputArea } from "@/components/features/chat/streaming/StreamingInputArea";
 import { EventDebugPanel } from "@/components/features/chat/streaming/EventDebugPanel";
@@ -30,6 +32,11 @@ export function ChatUIStreaming() {
   const [currentConversationId, setCurrentConversationId] = useState<string>(uuidv4());
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
+  const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
+    temperature: undefined, // Or a default like 0.7
+    streamingEnabled: true, // Default to true for streaming UI
+  });
+  const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -86,15 +93,25 @@ export function ChatUIStreaming() {
   const getAgentConfigForMessage = () => {
     let modelId = "googleai/gemini-1.5-flash-latest";
     let systemPrompt = "Você é um assistente útil.";
-    let temperature = 0.7;
+    // Use temperature from testRunConfig if available, otherwise agent's, then default
+    let temperature = testRunConfig.temperature !== undefined
+                      ? testRunConfig.temperature
+                      : 0.7; // Default if not in testRunConfig or agent config
+
     const currentAgentTools = getConfiguredTools();
 
     if (selectedAgent?.config?.type === "llm") {
       const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>;
       modelId = llmConfig.agentModel || modelId;
       systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
-      temperature = llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature;
+      // Prioritize testRunConfig, then agent config, then default
+      temperature = testRunConfig.temperature !== undefined
+                    ? testRunConfig.temperature
+                    : (llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature);
     }
+    // Note: The streamingEnabled from testRunConfig is not directly used here yet,
+    // as useGenkitSession inherently streams. This would be part of Step 5 if we were to
+    // dynamically switch streaming behavior.
     return { modelId, systemPrompt, tools: currentAgentTools, temperature };
   };
 
@@ -127,22 +144,24 @@ export function ChatUIStreaming() {
       ]);
 
       let modelId = "googleai/gemini-1.5-flash-latest";
-      let systemPrompt = "Você é um assistente útil.";
-      let temperature = 0.7;
-      const currentAgentTools = getConfiguredTools();
+      // let systemPrompt = "Você é um assistente útil.";
+      // let temperature = 0.7;
+      // const currentAgentTools = getConfiguredTools();
 
-      if (selectedAgent?.config?.type === "llm") {
-        const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>; // Type assertion
-        modelId = llmConfig.agentModel || modelId;
-        systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
-        temperature = llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature;
-      }
+      // if (selectedAgent?.config?.type === "llm") {
+      //   const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>; // Type assertion
+      //   modelId = llmConfig.agentModel || modelId;
+      //   systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
+      //   temperature = llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature;
+      // }
+      const agentConfigForMessage = getAgentConfigForMessage(); // Call it once
       
       await sendMessage(messageText, {
-        modelId,
-        systemPrompt,
-        tools: currentAgentTools,
-        temperature,
+        // modelId, // from agentConfigForMessage
+        // systemPrompt, // from agentConfigForMessage
+        // tools, // from agentConfigForMessage
+        // temperature, // from agentConfigForMessage
+        ...agentConfigForMessage, // Spread the config object
         fileDataUri: fileDataUri || undefined,
       });
 
@@ -257,8 +276,32 @@ export function ChatUIStreaming() {
     }
   };
 
+  const handleTestConfigChange = (newConfig: Partial<TestRunConfig>) => {
+    setTestRunConfig(prev => ({ ...prev, ...newConfig }));
+  };
+
+  const handleApplyTestConfig = () => {
+    setIsTestConfigPanelOpen(false);
+    toast({ title: "Test Settings Applied", description: "Temporary settings will be used for the next interaction." });
+    // Potentially inform useGenkitSession or re-evaluate options if streamingEnabled changed
+    if (testRunConfig.streamingEnabled === false) {
+        // Handle logic for disabling streaming if possible,
+        // or inform user they might need to switch to non-streaming chat.
+        toast({ title: "Streaming Disabled", description: "Consider switching to the non-streaming chat if issues occur.", variant: "default"});
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-background">
+      {isTestConfigPanelOpen && (
+        <TestRunConfigPanel
+          isOpen={isTestConfigPanelOpen}
+          onClose={() => setIsTestConfigPanelOpen(false)}
+          config={testRunConfig}
+          onConfigChange={handleTestConfigChange}
+          onApply={handleApplyTestConfig}
+        />
+      )}
       <ConversationSidebar
         selectedAgentId={selectedAgentId}
         setSelectedAgentId={setSelectedAgentId}
@@ -293,6 +336,14 @@ export function ChatUIStreaming() {
                     title="Painel de depuração"
                 >
                     <Bug className="w-4 h-4" />
+                </Button>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsTestConfigPanelOpen(true)}
+                    title="Test Settings"
+                >
+                    <Settings2 className="w-4 h-4" />
                 </Button>
                 <Button 
                     variant="outline" 
