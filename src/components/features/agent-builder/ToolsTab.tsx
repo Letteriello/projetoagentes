@@ -105,6 +105,8 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
             isLastSelectedTool = selectedToolIndex === selectedTools.length - 1;
           }
 
+            const apiKeyRequiredButMissing = tool.requiresAuth && !toolConfigurations[tool.id]?.selectedApiKeyId;
+
           return (
             <ToolCard
               key={tool.id}
@@ -113,6 +115,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
               onSelectTool={handleSelectTool}
               onConfigureTool={handleToolConfigure}
               toolConfig={toolConfigurations[tool.id]}
+                apiKeyRequiredButMissing={apiKeyRequiredButMissing} // New prop
               iconComponents={iconComponents}
               Wand2IconComponent={Wand2Icon}
               SettingsIconComponent={SettingsIcon}

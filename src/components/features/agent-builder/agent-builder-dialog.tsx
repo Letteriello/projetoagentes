@@ -531,7 +531,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   // Popula os campos do modal com a configuração existente da ferramenta, se houver (data from RHF).
   const handleToolConfigure = (tool: AvailableTool) => {
     setConfiguringTool(tool);
-    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {}; // Get from RHF
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
     const existingConfig = currentToolConfigs[tool.id] || {};
 
     // Reset all modal fields before populating
@@ -574,10 +574,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
     const updatedToolConfigs = { ...currentToolConfigs, [toolId]: configData };
     methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
-    // The local `toolConfigurations` state was removed. RHF is the source of truth.
 
     setIsToolConfigModalOpen(false);
-    setConfiguringTool(null); // Clear the tool being configured
+    setConfiguringTool(null);
     toast({
       title: "Configuração Salva",
       description: `A configuração para a ferramenta foi salva com sucesso.`,
@@ -585,8 +584,23 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     });
   };
 
+  const handleApiKeyIdChange = (toolId: string, apiKeyId?: string) => {
+    if (!toolId) return;
+    const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+    const existingToolConfig = currentToolConfigs[toolId] || {};
+    const updatedToolConfig = { ...existingToolConfig, selectedApiKeyId: apiKeyId };
+    const updatedToolConfigs = { ...currentToolConfigs, [toolId]: updatedToolConfig };
+    methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
+
+    // Additionally, if a new API key ID is selected, we might want to clear out any old direct-input key
+    // that might have been stored previously for that tool, though this is less critical now.
+    // For example, if existingToolConfig had 'googleApiKey', we could set it to undefined.
+    // This depends on how strictly we want to manage old data.
+    // For now, just updating selectedApiKeyId is the primary goal.
+  };
+
 // MODIFY handleSaveAgent
-const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = (data) => {
+const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = async (data) => {
   // Data is now the validated form data from react-hook-form
   // The logic to construct coreConfig based on selectedAgentType (data.config.type)
   // needs to be done using the `data` object.
@@ -632,7 +646,33 @@ const handleSaveAgent: SubmitHandler<SavedAgentConfiguration> = (data) => {
   };
 
   // console.log("Agent data to save (from RHF):", JSON.stringify(agentDataToSave, null, 2));
-  onSave(agentDataToSave);
+  onSave(agentDataToSave); // This likely calls the context update/add function
+
+  // After the primary onSave logic (which might be asynchronous itself if onSave performs API calls)
+  // Update lastUsed for selected API keys
+  if (agentDataToSave.toolConfigsApplied) {
+    Object.values(agentDataToSave.toolConfigsApplied).forEach(async (toolConfig) => {
+      if (toolConfig.selectedApiKeyId) {
+        try {
+          const response = await fetch(`/api/apikeys/${toolConfig.selectedApiKeyId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lastUsed: new Date().toISOString() }),
+          });
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error(`Failed to update lastUsed for API key ${toolConfig.selectedApiKeyId}: ${errorData.error || response.statusText}`);
+            // Non-critical, so don't block UI, just log
+          } else {
+            console.log(`Successfully updated lastUsed for API key ${toolConfig.selectedApiKeyId}`);
+          }
+        } catch (error) {
+          console.error(`Error updating lastUsed for API key ${toolConfig.selectedApiKeyId}:`, error);
+        }
+      }
+    });
+  }
+
   toast({ title: "Agente Salvo", description: `${data.agentName} foi salvo com sucesso.`, variant: "default" });
   onOpenChange(false);
 };
@@ -1015,11 +1055,13 @@ return (
         onOpenChange={(open) => {
           setIsToolConfigModalOpen(open);
           if (!open) {
-            setConfiguringTool(null); // Limpa a ferramenta em configuração se o modal for fechado
+            setConfiguringTool(null);
           }
         }}
         configuringTool={configuringTool}
         onSave={handleSaveToolConfiguration}
+        currentSelectedApiKeyId={configuringTool ? methods.watch(`toolConfigsApplied.${configuringTool.id}.selectedApiKeyId`) : undefined}
+        onApiKeyIdChange={handleApiKeyIdChange}
         modalGoogleApiKey={modalGoogleApiKey} setModalGoogleApiKey={setModalGoogleApiKey}
         modalGoogleCseId={modalGoogleCseId} setModalGoogleCseId={setModalGoogleCseId}
         modalOpenapiSpecUrl={modalOpenapiSpecUrl} setModalOpenapiSpecUrl={setModalOpenapiSpecUrl}
