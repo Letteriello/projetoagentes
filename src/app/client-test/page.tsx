@@ -1,6 +1,11 @@
 import TestClientComponent from '../test-client';
+import JsonEditorField from '@/components/ui/JsonEditorField'; // Assuming @ is src path alias
 
 export default function ClientTestPage() {
+  const handleJsonChange = (value: string) => {
+    console.log("JSON Editor (Test):", value);
+  };
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-4">Client Environment Test</h1>
@@ -10,6 +15,17 @@ export default function ClientTestPage() {
       
       <div className="mt-8">
         <TestClientComponent />
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-2">JSON Editor Test</h2>
+        <JsonEditorField
+          id="test-json-editor"
+          value=""
+          onChange={handleJsonChange}
+          placeholder="Enter JSON here..."
+          height="300px"
+        />
       </div>
       
       <div className="mt-8 p-4 bg-gray-100 rounded-md">

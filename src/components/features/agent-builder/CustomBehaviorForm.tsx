@@ -5,7 +5,8 @@ import * as React from "react";
 import { useFormContext, Controller } from "react-hook-form"; // MODIFIED
 // import { Label } from "@/components/ui/label"; // No longer directly used if FormLabel is used consistently
 import { Input } from "@/components/ui/input"; // Added Input import
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "@/components/ui/textarea"; // Textarea IS needed for customLogicDescription
+import JsonEditorField from '@/components/ui/JsonEditorField'; // IMPORTED JsonEditorField
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
@@ -37,7 +38,7 @@ const CustomBehaviorForm: React.FC<CustomBehaviorFormProps> = () => {
                   <TooltipContent className="w-80"><p>Describe the main functionality. If this agent invokes a specific Genkit flow, mention the flow name. Detail how it orchestrates other agents or tools, if applicable.</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <FormControl><Textarea id="config.customLogicDescription" placeholder="Describe the custom logic..." {...field} rows={5}/></FormControl>
+              <FormControl><Textarea id="config.customLogicDescription" placeholder="Describe the custom logic..." {...field} rows={5}/></FormControl> 
               <FormDescription className="pt-2">Detail the specific behavior implemented.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -65,17 +66,27 @@ const CustomBehaviorForm: React.FC<CustomBehaviorFormProps> = () => {
         <FormField
           control={control}
           name="config.inputSchema"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem>
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild><FormLabel htmlFor="config.inputSchema" className="cursor-help">Input Schema (Optional)</FormLabel></TooltipTrigger>
+                  <TooltipTrigger asChild><FormLabel htmlFor={field.name} className="cursor-help">Input Schema (Optional)</FormLabel></TooltipTrigger>
                   <TooltipContent className="w-80"><p>Define the JSON schema for the expected input of this agent or Genkit flow. This helps with validation and documentation.</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <FormControl><Textarea id="config.inputSchema" placeholder={'{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string" }\n  },\n  "required": ["query"]\n}'} {...field} rows={5}/></FormControl>
+              <FormControl>
+                <JsonEditorField
+                  id={field.name}
+                  value={field.value || ""}
+                  onChange={field.onChange}
+                  // onBlur={field.onBlur} // JsonEditorField does not currently use onBlur
+                  placeholder={'{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string" }\n  },\n  "required": ["query"]\n}'}
+                  height="200px"
+                  error={fieldState.error?.message}
+                />
+              </FormControl>
               <FormDescription className="pt-2">JSON schema for the agent's input. Leave blank if not applicable.</FormDescription>
-              <FormMessage />
+              {/* <FormMessage /> FormMessage can be kept if Zod errors are distinct from JSON syntax errors */}
             </FormItem>
           )}
         />
@@ -83,17 +94,27 @@ const CustomBehaviorForm: React.FC<CustomBehaviorFormProps> = () => {
         <FormField
           control={control}
           name="config.outputSchema"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem>
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild><FormLabel htmlFor="config.outputSchema" className="cursor-help">Output Schema (Optional)</FormLabel></TooltipTrigger>
+                  <TooltipTrigger asChild><FormLabel htmlFor={field.name} className="cursor-help">Output Schema (Optional)</FormLabel></TooltipTrigger>
                   <TooltipContent className="w-80"><p>Define the JSON schema for the expected output of this agent or Genkit flow. This helps with validation and data handling.</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <FormControl><Textarea id="config.outputSchema" placeholder={'{\n  "type": "object",\n  "properties": {\n    "summary": { "type": "string" }\n  },\n  "required": ["summary"]\n}'} {...field} rows={5}/></FormControl>
+              <FormControl>
+                <JsonEditorField
+                  id={field.name}
+                  value={field.value || ""}
+                  onChange={field.onChange}
+                  // onBlur={field.onBlur} // JsonEditorField does not currently use onBlur
+                  placeholder={'{\n  "type": "object",\n  "properties": {\n    "summary": { "type": "string" }\n  },\n  "required": ["summary"]\n}'}
+                  height="200px"
+                  error={fieldState.error?.message}
+                />
+              </FormControl>
               <FormDescription className="pt-2">JSON schema for the agent's output. Leave blank if not applicable.</FormDescription>
-              <FormMessage />
+              {/* <FormMessage /> */}
             </FormItem>
           )}
         />
