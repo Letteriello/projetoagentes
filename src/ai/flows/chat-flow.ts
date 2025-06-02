@@ -20,6 +20,8 @@ import { codeExecutorTool } from '@/ai/tools/code-executor-tool';
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
 import { Tool } from '@genkit-ai/sdk'; // Import Tool type for casting
+import { createLoggableFlow } from '@/lib/logger'; // Import the wrapper
+import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed within
 
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
 // Stores factory functions for configurable tools and direct tool objects for static ones.
@@ -40,6 +42,7 @@ export interface BasicChatInput {
   modelName?: string;
   systemPrompt?: string;
   temperature?: number;
+  agentId?: string; // Added agentId for logging
   agentToolsDetails?: { id: string; name: string; description: string; enabled: boolean }[];
   toolConfigsApplied?: Record<string, any>; // Added for dynamic tool configuration
 }
@@ -89,8 +92,14 @@ function configureModel(input: BasicChatInput) {
   };
 }
 
-// Main chat function - simplified without flow definitions
-export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (chunk: any) => void): Promise<BasicChatOutput> {
+// Original basicChatFlow implementation
+async function basicChatFlowInternal(input: BasicChatInput, streamingCallback?: (chunk: any) => void): Promise<BasicChatOutput> {
+  const flowName = "basicChatFlow"; // Define flowName for logging
+  const agentId = input.agentId || "unknown_agent"; // Get agentId from input or use a default
+
+  // Note: enhancedLogger.logStart and logEnd/logError will be handled by createLoggableFlow wrapper
+  // However, if specific error logging within the flow is needed, enhancedLogger can be used.
+
   try {
     // Ensure toolConfigsApplied is initialized if not provided, for configureModel
     const fullInput = {
@@ -202,7 +211,32 @@ export async function basicChatFlow(input: BasicChatInput, streamingCallback?: (
       toolResults: [], // Placeholder, as toolResults() is not standard on initial response
     };
   } catch (e: any) {
-    console.error("Error in basicChatFlow:", e);
+    console.error(`Error in ${flowName} (Agent: ${agentId}):`, e);
+    // enhancedLogger.logError is good here if createLoggableFlow doesn't capture enough detail or if error is caught before re-throwing
+    // For now, createLoggableFlow will handle the primary error logging.
     return { error: e.message || 'An unexpected error occurred' };
   }
 }
+
+// Wrap the internal function with createLoggableFlow
+export const basicChatFlow = createLoggableFlow(
+  "basicChatFlow", // Flow name
+  basicChatFlowInternal, // The actual function to wrap
+  (input: BasicChatInput) => ({ // Input transformer for logging
+    agentId: input.agentId || "unknown_agent",
+    // Log only essential parts of input, not potentially large userMessage or history
+    userMessageLength: input.userMessage.length,
+    hasFileDataUri: !!input.fileDataUri,
+    modelName: input.modelName,
+    systemPromptLength: input.systemPrompt?.length,
+    temperature: input.temperature,
+    toolCount: input.agentToolsDetails?.filter(t => t.enabled).length || 0,
+  }),
+  (output: BasicChatOutput) => ({ // Output transformer for logging
+    hasOutputMessage: !!output.outputMessage,
+    hasStream: !!output.stream,
+    hasError: !!output.error,
+    toolRequestCount: output.toolRequests?.length || 0,
+  }),
+  (input: BasicChatInput) => input.agentId || "unknown_agent" // Function to extract agentId
+);

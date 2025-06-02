@@ -9,6 +9,7 @@
 import { SavedAgentConfiguration } from '@/types/agent-configs';
 import { firestore } from '@/lib/firebaseClient';
 import { collection, doc, setDoc, addDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { enhancedLogger } from '@/lib/logger'; // Import the logger
 
 /**
  * Salva uma configuração de agente no Firestore.
@@ -61,8 +62,15 @@ export async function saveAgentConfiguration(agentConfig: SavedAgentConfiguratio
       // Caso não exista ou não tenhamos userId, criamos um novo documento
       await addDoc(agentsCollection, firestoreData);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao salvar a configuração do agente:", error);
+    enhancedLogger.logError({
+        message: "Error saving agent configuration to Firestore",
+        error: error,
+        details: { agentName: agentConfig.agentName, agentId: agentConfig.id, userId },
+        flowName: "agentServices", // Generic flow/context name
+        agentId: userId || "unknown_user_as_agent", // Use userId if available
+    });
     throw error; // Propaga o erro para ser tratado pelo chamador
   }
 }
@@ -83,8 +91,15 @@ export async function getAgentConfiguration(agentId: string): Promise<SavedAgent
     }
     
     return null;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao recuperar a configuração do agente:", error);
+    enhancedLogger.logError({
+        message: "Error retrieving agent configuration from Firestore",
+        error: error,
+        details: { agentIdQuery: agentId },
+        flowName: "agentServices",
+        agentId: "system_operation", // Or pass userId if this operation is user-specific
+    });
     throw error;
   }
 }
@@ -120,8 +135,15 @@ export async function saveAgentTemplate(templateConfig: SavedAgentConfiguration,
       docRef = await addDoc(templatesCollection, dataWithoutId);
       return docRef.id;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao salvar o template do agente:", error);
+    enhancedLogger.logError({
+        message: "Error saving agent template to Firestore",
+        error: error,
+        details: { templateName: templateConfig.agentName, templateId: templateConfig.id, userId },
+        flowName: "agentServices",
+        agentId: userId || "unknown_user_as_agent",
+    });
     throw error;
   }
 }
@@ -137,8 +159,15 @@ export async function getAgentTemplate(templateId: string): Promise<SavedAgentCo
     }
 
     return null;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao recuperar o template do agente:", error);
+    enhancedLogger.logError({
+        message: "Error retrieving agent template from Firestore",
+        error: error,
+        details: { templateIdQuery: templateId },
+        flowName: "agentServices",
+        agentId: "system_operation",
+    });
     throw error;
   }
 }
@@ -156,8 +185,15 @@ export async function getUserAgentTemplates(userId: string): Promise<SavedAgentC
       ...doc.data(),
       id: doc.id
     } as SavedAgentConfiguration));
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao recuperar os templates de agente do usuário:", error);
+    enhancedLogger.logError({
+        message: "Error retrieving user's agent templates from Firestore",
+        error: error,
+        details: { userIdQuery: userId },
+        flowName: "agentServices",
+        agentId: userId, // userId is the agentId in this context
+    });
     throw error;
   }
 }
@@ -172,8 +208,15 @@ export async function getCommunityAgentTemplates(): Promise<SavedAgentConfigurat
       ...doc.data(),
       id: doc.id
     } as SavedAgentConfiguration));
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao recuperar os templates de agente da comunidade:", error);
+    enhancedLogger.logError({
+        message: "Error retrieving community agent templates from Firestore",
+        error: error,
+        details: {},
+        flowName: "agentServices",
+        agentId: "system_operation",
+    });
     throw error;
   }
 }
@@ -193,8 +236,15 @@ export async function getUserAgentConfigurations(userId: string): Promise<SavedA
       ...doc.data(),
       id: doc.id
     } as SavedAgentConfiguration));
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao recuperar as configurações de agente do usuário:", error);
+    enhancedLogger.logError({
+        message: "Error retrieving user's agent configurations from Firestore",
+        error: error,
+        details: { userIdQuery: userId },
+        flowName: "agentServices",
+        agentId: userId, // userId is the agentId in this context
+    });
     throw error;
   }
 }
