@@ -124,10 +124,11 @@ export const indexDocumentFlow = defineFlow(
       };
     } catch (error: any) {
       console.error('Error during embedding or simulated indexing:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         documentId: fileName, // Fallback ID
-        status: 'failure',
-        message: error.message || 'An unexpected error occurred during processing.',
+        status: 'failure' as const, // Ensure it's treated as the literal type
+        message: errorMessage || 'An unexpected error occurred during processing.',
       };
     }
   }
