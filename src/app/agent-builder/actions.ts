@@ -15,6 +15,7 @@ import {
   AiConfigurationAssistantInputSchema,
   AiConfigurationAssistantOutputSchema
 } from "@/ai/flows/aiConfigurationAssistantFlow"; // Added OutputSchema import
+import { SavedAgentConfiguration } from '@/types/agent-configs';
 
 // Action for suggesting agent name and description
 export async function suggestAgentNameAndDescriptionAction(
@@ -47,67 +48,36 @@ export async function suggestAgentNameAndDescriptionAction(
 
 // New action for AI Configuration Assistant
 export async function getAiConfigurationSuggestionsAction(
-  input: z.infer<typeof AiConfigurationAssistantInputSchema>
-): Promise<
-  | { success: true; suggestions: z.infer<typeof AiConfigurationAssistantOutputSchema> }
-  | { success: false; error: string }
-> {
+  currentConfig: SavedAgentConfiguration,
+  suggestionContext?: z.infer<typeof AiConfigurationAssistantInputSchema>['suggestionContext'] // Add optional context
+): Promise<{ success: boolean; suggestions?: z.infer<typeof AiConfigurationAssistantOutputSchema>; error?: string }> {
+  'use server';
   try {
-    // Validate input
-    const parsedInput = AiConfigurationAssistantInputSchema.safeParse(input);
-    if (!parsedInput.success) {
-      return { success: false, error: "Invalid input: " + JSON.stringify(parsedInput.error.flatten().fieldErrors) };
-    }
-
-    const suggestions = await runFlow(aiConfigurationAssistantFlow, parsedInput.data);
-
-    // Ensure the output from the flow matches the schema (it should, as flow validates its own output)
-    // This is an additional check for robustness before sending to client.
-    const parsedSuggestions = AiConfigurationAssistantOutputSchema.safeParse(suggestions);
-    if (!parsedSuggestions.success) {
-        console.error("Flow output validation failed in action:", parsedSuggestions.error);
-        return { success: false, error: "Flow returned data in an unexpected format." };
-    }
-
-    return {
-      success: true,
-      suggestions: parsedSuggestions.data,
+    // Construct the input for the flow, including the context if provided
+    const flowInput: z.infer<typeof AiConfigurationAssistantInputSchema> = {
+      fullAgentConfig: currentConfig,
     };
+    if (suggestionContext) {
+      flowInput.suggestionContext = suggestionContext;
+    }
+
+    // Optional: Validate the constructed flowInput before calling the flow
+    // This provides an early exit if the input is malformed.
+    const parsedFlowInput = AiConfigurationAssistantInputSchema.safeParse(flowInput);
+    if (!parsedFlowInput.success) {
+      console.error("Invalid input for aiConfigurationAssistantFlow:", parsedFlowInput.error.flatten());
+      return { success: false, error: "Invalid input data for AI suggestions: " + parsedFlowInput.error.message };
+    }
+
+    const suggestions = await runFlow(aiConfigurationAssistantFlow, parsedFlowInput.data);
+    
+    return { success: true, suggestions };
   } catch (e: any) {
     console.error("Error in getAiConfigurationSuggestionsAction:", e);
-    return {
-      success: false,
-      error: e.message || "An unexpected error occurred while fetching AI configuration suggestions.",
-    };
+    return { success: false, error: e.message || "Failed to get suggestions from AI assistant." };
   }
 }
 
 // Placeholder for a more specific action if needed for LLM Behavior suggestions
 // This can be expanded or used by a more specific UI component later.
 // For now, the AiConfigurationAssistantOutputSchema includes personality and restrictions.
-/*
-import {
-  llmBehaviorSuggesterFlow,
-  LlmBehaviorSuggesterInputSchema,
-  LlmBehaviorSuggesterOutputSchema
-} from "@/ai/flows/llmBehaviorSuggesterFlow";
-
-export async function suggestLlmBehaviorAction(
-  input: z.infer<typeof LlmBehaviorSuggesterInputSchema>
-): Promise<
-  | { success: true; suggestions: z.infer<typeof LlmBehaviorSuggesterOutputSchema> }
-  | { success: false; error: string }
-> {
-  try {
-    const parsedInput = LlmBehaviorSuggesterInputSchema.safeParse(input);
-    if (!parsedInput.success) {
-      return { success: false, error: "Invalid input for LLM behavior suggester." };
-    }
-    const result = await runFlow(llmBehaviorSuggesterFlow, parsedInput.data);
-    return { success: true, suggestions: result };
-  } catch (e: any) {
-    console.error("Error in suggestLlmBehaviorAction:", e);
-    return { success: false, error: e.message || "Failed to fetch LLM behavior suggestions." };
-  }
-}
-*/
