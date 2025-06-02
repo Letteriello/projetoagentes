@@ -6,9 +6,13 @@
  */
 import { defineTool } from 'genkit';
 import { z } from 'zod';
+import { enhancedLogger } from '@/lib/logger'; // Import the logger
 
 export const CalculatorInputSchema = z.object({
   expression: z.string().describe("The mathematical expression to evaluate. E.g., '2 + 2 * 10 / 4 - 1'"),
+  // Optional fields for enhanced logging if provided by caller
+  flowName: z.string().optional().describe("Name of the calling flow, for logging."),
+  agentId: z.string().optional().describe("ID of the calling agent, for logging."),
 });
 
 export const CalculatorOutputSchema = z.object({
@@ -23,10 +27,16 @@ export const calculatorTool = defineTool(
     inputSchema: CalculatorInputSchema,
     outputSchema: CalculatorOutputSchema,
   },
-  async ({ expression }) => {
-    // Simple expression evaluator
-    // This is a basic implementation and might not cover all edge cases or complex scenarios.
-    // It prioritizes safety over feature completeness for this example.
+  async (input) => {
+    const { expression, flowName, agentId } = input;
+    const toolName = 'calculator';
+    let toolOutput: any;
+    let errorOccurred = false;
+
+    try {
+      // Simple expression evaluator
+      // This is a basic implementation and might not cover all edge cases or complex scenarios.
+      // It prioritizes safety over feature completeness for this example.
 
     // Sanitize and validate input further if necessary, though Zod handles basic type.
     // For now, we assume the expression is somewhat well-behaved.
@@ -138,9 +148,36 @@ export const calculatorTool = defineTool(
     }
 
     if (typeof resultAcc !== 'number' || isNaN(resultAcc)) {
-        return { result: "Error: Could not compute the final result. Invalid expression." };
+        toolOutput = { result: "Error: Could not compute the final result. Invalid expression." };
+        errorOccurred = true;
+    } else {
+        toolOutput = { result: resultAcc };
     }
 
-    return { result: resultAcc };
+    // Log the tool call using enhancedLogger
+    // flowName and agentId are dependent on being passed in the input,
+    // which is not standard for Genkit tools but added here for illustration.
+    // Genkit's default trace will capture tool_call and tool_return from the flow's perspective.
+    // This explicit call here would be if more detailed/custom logging by the tool itself is desired.
+    if (errorOccurred) {
+        enhancedLogger.logError({
+            flowName: flowName || "unknown_flow",
+            agentId: agentId || "unknown_agent",
+            message: `Error in ${toolName} tool`,
+            error: new Error(String(toolOutput.result)), // Create an Error object from the error message
+            details: { input: expression, output: toolOutput },
+            toolName: toolName,
+        });
+    } else {
+        enhancedLogger.logToolCall({
+            flowName: flowName || "unknown_flow", // Or derive from Genkit context if possible
+            agentId: agentId || "unknown_agent",  // Or derive from Genkit context if possible
+            toolName: toolName,
+            input: { expression }, // Log the original expression
+            output: toolOutput,
+        });
+    }
+    
+    return toolOutput;
   }
 );

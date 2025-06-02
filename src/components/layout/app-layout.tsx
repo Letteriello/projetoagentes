@@ -11,6 +11,7 @@ import {
   UserCircle,
   ChevronsLeft,
   ChevronsRight,
+  Activity, // Added for Agent Monitor
   // Home, // Unused
 } from "lucide-react";
 // import { MainLayout } from "@/components/layout/main-layout"; // This line was commented out in original
@@ -48,6 +49,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/agent-builder", icon: Cpu, label: "Agentes" },
   { href: "/chat", icon: MessageSquare, label: "Chat" },
+  { href: "/agent-monitor", icon: Activity, label: "Monitor" }, // Added Agent Monitor
 ];
 
 // Componente interno para o toggle da sidebar, usando o contexto
