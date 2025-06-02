@@ -250,4 +250,7 @@ export interface SavedAgentConfiguration {
     hasConfig?: boolean;
     genkitToolName?: string;
   }>;
+  internalVersion: number;
+  isLatest: boolean;
+  originalAgentId: string;
 }
