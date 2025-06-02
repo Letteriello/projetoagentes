@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react'; // Ensure React is imported
 import { useFormContext, Controller } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,7 +6,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration } from '@/types/agent-configs'; // Import the main type
+import { SavedAgentConfiguration } from '@/types/agent-configs';
+import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
+import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from '@/components/ui/button';
+import { Loader2 } from "lucide-react"; // SparklesIcon (Wand2) removed, AISuggestionIcon will provide it
+import { useToast } from "@/hooks/use-toast";
+import { z } from 'zod';
+import AISuggestionIcon from '@/components/features/agent-builder/AISuggestionIcon'; // Added
 
 interface GeneralTabProps {
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
@@ -24,21 +32,81 @@ export default function GeneralTab({
   agentTypeOptions,
   agentFrameworkOptions
 }: GeneralTabProps) {
-  const { register, control, watch } = useFormContext<FormContextType>();
+  const { register, control, watch, getValues, setValue } = useFormContext<FormContextType>(); // Added getValues, setValue
+  const { toast } = useToast(); // Added
 
   const agentType = watch('config.type');
+
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [allSuggestions, setAllSuggestions] = React.useState<z.infer<typeof AiConfigurationAssistantOutputSchema> | undefined>(undefined);
+  const [showNameSuggestionPopover, setShowNameSuggestionPopover] = React.useState(false);
+  const [showDescriptionSuggestionPopover, setShowDescriptionSuggestionPopover] = React.useState(false);
+
+  const fetchSuggestionsForGeneralTab = async (
+    popoverSetter: React.Dispatch<React.SetStateAction<boolean>>,
+    context: "agentName" | "agentDescription"
+  ) => {
+    setIsLoadingSuggestions(true);
+    popoverSetter(false); // Close popover before fetch
+    const currentConfig = getValues(); // Get the whole form data
+    try {
+      // Pass the context to the action
+      const result = await getAiConfigurationSuggestionsAction(currentConfig, context);
+      if (result.success && result.suggestions) {
+        setAllSuggestions(result.suggestions);
+        popoverSetter(true); // Open the relevant popover
+        toast({ title: "Sugestão Carregada" });
+      } else {
+        toast({ title: "Falha ao Carregar Sugestão", description: result.error, variant: "destructive" });
+        // Clear specific suggestion on error
+        setAllSuggestions(current => ({ ...current, [context === 'agentName' ? 'suggestedAgentName' : 'suggestedAgentDescription']: undefined }));
+      }
+    } catch (e: any) {
+      toast({ title: "Erro ao Buscar Sugestão", description: e.message, variant: "destructive" });
+      setAllSuggestions(current => ({ ...current, [context === 'agentName' ? 'suggestedAgentName' : 'suggestedAgentDescription']: undefined }));
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
   
   return (
     <div className="space-y-6"> {/* Increased spacing */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> {/* Grid layout */}
         {/* Agent Name */}
         <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="agentName">Agent Name</Label>
-            <InfoIcon
-              tooltipText={agentBuilderHelpContent.generalTab.agentName.tooltip!}
-              onClick={() => showHelpModal({ tab: 'generalTab', field: 'agentName' })}
-            />
+          <div className="flex items-center justify-between"> {/* Use flex to align label and button */}
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="agentName">Agent Name</Label>
+              <InfoIcon
+                tooltipText={agentBuilderHelpContent.generalTab.agentName.tooltip!}
+                onClick={() => showHelpModal({ tab: 'generalTab', field: 'agentName' })}
+              />
+            </div>
+            <Popover open={showNameSuggestionPopover} onOpenChange={setShowNameSuggestionPopover}>
+              <PopoverTrigger asChild>
+                {/* Replace Button with AISuggestionIcon */}
+                <AISuggestionIcon
+                  onClick={() => fetchSuggestionsForGeneralTab(setShowNameSuggestionPopover, "agentName")}
+                  isLoading={isLoadingSuggestions}
+                  tooltipText="Sugerir nome do agente"
+                  size={16} // Corresponds to h-4 w-4
+                />
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                {isLoadingSuggestions && <Loader2 className="h-4 w-4 animate-spin mx-auto" />}
+                {!isLoadingSuggestions && allSuggestions?.suggestedAgentName ? (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-2">Nome Sugerido:</p>
+                    <p className="mb-4 font-semibold">{allSuggestions.suggestedAgentName}</p>
+                    <Button onClick={() => {
+                      setValue("agentName", allSuggestions.suggestedAgentName!, { shouldValidate: true, shouldDirty: true });
+                      setShowNameSuggestionPopover(false);
+                      toast({ title: "Nome do Agente atualizado." });
+                    }} size="sm">Aplicar</Button>
+                  </>
+                ) : (!isLoadingSuggestions && <p>Nenhuma sugestão para o nome.</p>)}
+              </PopoverContent>
+            </Popover>
           </div>
           <Input
             id="agentName"
@@ -66,15 +134,42 @@ export default function GeneralTab({
 
       {/* Description */}
       <div className="space-y-2">
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="agentDescription">Description</Label>
-          <InfoIcon
-            tooltipText={agentBuilderHelpContent.generalTab.description.tooltip!}
-            onClick={() => showHelpModal({ tab: 'generalTab', field: 'description' })}
-          />
+        <div className="flex items-center justify-between"> {/* Use flex to align label and button */}
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="agentDescription">Description</Label>
+            <InfoIcon
+              tooltipText={agentBuilderHelpContent.generalTab.description.tooltip!}
+              onClick={() => showHelpModal({ tab: 'generalTab', field: 'description' })}
+            />
+          </div>
+          <Popover open={showDescriptionSuggestionPopover} onOpenChange={setShowDescriptionSuggestionPopover}>
+            <PopoverTrigger asChild>
+              {/* Replace Button with AISuggestionIcon */}
+              <AISuggestionIcon
+                onClick={() => fetchSuggestionsForGeneralTab(setShowDescriptionSuggestionPopover, "agentDescription")}
+                isLoading={isLoadingSuggestions}
+                tooltipText="Sugerir descrição do agente"
+                size={16} // Corresponds to h-4 w-4
+              />
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px]"> {/* Wider for description */}
+              {isLoadingSuggestions && <Loader2 className="h-4 w-4 animate-spin mx-auto" />}
+              {!isLoadingSuggestions && allSuggestions?.suggestedAgentDescription ? (
+                <>
+                  <p className="text-sm text-muted-foreground mb-2">Descrição Sugerida:</p>
+                  <p className="mb-4 text-sm">{allSuggestions.suggestedAgentDescription}</p>
+                  <Button onClick={() => {
+                    setValue("agentDescription", allSuggestions.suggestedAgentDescription!, { shouldValidate: true, shouldDirty: true });
+                    setShowDescriptionSuggestionPopover(false);
+                    toast({ title: "Descrição do Agente atualizada." });
+                  }} size="sm">Aplicar</Button>
+                </>
+              ) : (!isLoadingSuggestions && <p>Nenhuma sugestão para a descrição.</p>)}
+            </PopoverContent>
+          </Popover>
         </div>
         <Textarea 
-          id="agentDescription" // Changed from "description" to match label htmlFor
+          id="agentDescription"
           {...register('agentDescription')}
           placeholder="Describe your agent's purpose"
           rows={3}

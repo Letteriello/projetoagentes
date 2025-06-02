@@ -12,8 +12,10 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, Wand2 } from "lucide-react";
-import { suggestLlmBehaviorAction } from "@/app/agent-builder/actions";
+import { Loader2, Wand2 } from "lucide-react"; // SparklesIcon removed
+import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
+import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow'; // For typing suggestions
+import AISuggestionIcon from './AISuggestionIcon'; // Added
 import { useToast } from "@/hooks/use-toast";
 import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
@@ -25,29 +27,26 @@ import { Trash2 } from "lucide-react"; // ADDED for remove button icon
 // MODIFIED: Simplified props
 interface LLMBehaviorFormProps {
   agentToneOptions: Array<{ id: string; label: string; }>;
-  SparklesIcon?: React.FC<React.SVGProps<SVGSVGElement>>;
+  // SparklesIcon prop is no longer needed as AISuggestionIcon handles its own icon (Wand2)
 }
 
 const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
   agentToneOptions,
-  SparklesIcon = Wand2,
 }) => {
-  const { control, setValue, watch, formState: { errors } } = useFormContext<SavedAgentConfiguration>(); // MODIFIED
+  const { control, setValue, watch, getValues, formState: { errors } } = useFormContext<SavedAgentConfiguration>();
   const { toast } = useToast();
 
-  const [isSuggestingPersonality, setIsSuggestingPersonality] = React.useState(false);
-  const [isSuggestingRestrictions, setIsSuggestingRestrictions] = React.useState(false);
-  const [personalitySuggestions, setPersonalitySuggestions] = React.useState<string[]>([]);
-  const [restrictionSuggestions, setRestrictionSuggestions] = React.useState<string[]>([]);
-  const [showPersonalityPopover, setShowPersonalityPopover] = React.useState(false);
-  const [showRestrictionPopover, setShowRestrictionPopover] = React.useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [allSuggestions, setAllSuggestions] = React.useState<z.infer<typeof AiConfigurationAssistantOutputSchema> | undefined>(undefined);
 
-  const watchedAgentGoal = watch("config.agentGoal");
-  const watchedAgentTasks = watch("config.agentTasks");
-  const watchedAgentPersonality = watch("config.agentPersonality");
-  const watchedAgentRestrictions = watch("config.agentRestrictions");
-  const watchedSystemPromptGenerated = watch("config.systemPromptGenerated");
-  const watchedAgentTemperature = watch("config.agentTemperature");
+  // States for individual popover visibility
+  const [showGoalSuggestionPopover, setShowGoalSuggestionPopover] = React.useState(false);
+  const [showTasksSuggestionPopover, setShowTasksSuggestionPopover] = React.useState(false);
+  const [showPersonalitySuggestionPopover, setShowPersonalitySuggestionPopover] = React.useState(false);
+  const [showRestrictionsSuggestionPopover, setShowRestrictionsSuggestionPopover] = React.useState(false);
+
+  const watchedSystemPromptGenerated = watch("config.systemPromptGenerated"); // Keep relevant watches
+  const watchedAgentTemperature = watch("config.agentTemperature"); // Keep relevant watches
 
   // ADDED: useFieldArray for safetySettings
   const { fields: safetySettingFields, append: appendSafetySetting, remove: removeSafetySetting } = useFieldArray({
@@ -72,55 +71,43 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
     // TODO: Confirm these with actual Genkit documentation
   ];
 
-  const handleSuggestPersonality = async () => {
-    setIsSuggestingPersonality(true); setShowPersonalityPopover(false);
+  const fetchSuggestionsForContext = async (
+    popoverSetter: React.Dispatch<React.SetStateAction<boolean>>,
+    context: "goal" | "tasks" | "personality" | "restrictions"
+  ) => {
+    setIsLoadingSuggestions(true);
+    popoverSetter(false); // Close popover before fetch
+    const currentConfig = getValues();
     try {
-      const result = await suggestLlmBehaviorAction({
-        suggestionType: 'personality',
-        agentGoal: watchedAgentGoal || "",
-        agentTasks: watchedAgentTasks || [],
-        currentRestrictions: watchedAgentRestrictions || [],
-      });
+      const result = await getAiConfigurationSuggestionsAction(currentConfig, context); // Pass context
       if (result.success && result.suggestions) {
-        setPersonalitySuggestions(result.suggestions); setShowPersonalityPopover(true);
-        toast({ title: "Sugestões de Personalidade Carregadas"});
+        setAllSuggestions(result.suggestions); // Store potentially partial suggestions
+        popoverSetter(true); // Open the relevant popover
+        toast({ title: "Sugestão Carregada" });
       } else {
-        toast({ title: "Falha ao Sugerir Personalidade", description: result.error, variant: "destructive" });
+        toast({ title: "Falha ao Carregar Sugestão", description: result.error, variant: "destructive" });
+        // Clear specific suggestion field on error
+        let fieldToClear: keyof AiConfigurationAssistantOutputSchema | undefined = undefined;
+        if (context === "goal") fieldToClear = "suggestedGoal";
+        else if (context === "tasks") fieldToClear = "suggestedTasks";
+        else if (context === "personality") fieldToClear = "suggestedPersonality";
+        else if (context === "restrictions") fieldToClear = "suggestedRestrictions";
+        if (fieldToClear) {
+          setAllSuggestions(prev => ({ ...prev, [fieldToClear!]: undefined }));
+        }
       }
-    } catch (e:any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
-    finally { setIsSuggestingPersonality(false); }
-  };
-
-  const applyPersonalitySuggestion = (suggestion: string) => {
-    setValue("config.agentPersonality", suggestion, { shouldValidate: true, shouldDirty: true }); // MODIFIED
-    setShowPersonalityPopover(false);
-  };
-
-  const handleSuggestRestrictions = async () => {
-    setIsSuggestingRestrictions(true); setShowRestrictionPopover(false);
-    try {
-      const result = await suggestLlmBehaviorAction({
-        suggestionType: 'restrictions',
-        agentGoal: watchedAgentGoal || "",
-        agentTasks: watchedAgentTasks || [],
-        currentPersonality: watchedAgentPersonality || "",
-      });
-      if (result.success && result.suggestions) {
-        setRestrictionSuggestions(result.suggestions); setShowRestrictionPopover(true);
-        toast({ title: "Sugestões de Restrições Carregadas" });
-      } else {
-        toast({ title: "Falha ao Sugerir Restrições", description: result.error, variant: "destructive" });
-      }
-    } catch (e:any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
-    finally { setIsSuggestingRestrictions(false); }
-  };
-
-  const applyRestrictionSuggestion = (suggestion: string) => {
-    const currentRestrictions = watchedAgentRestrictions || [];
-    if (!currentRestrictions.includes(suggestion)) {
-      setValue("config.agentRestrictions", [...currentRestrictions, suggestion], { shouldValidate: true, shouldDirty: true }); // MODIFIED
+    } catch (e: any) {
+      toast({ title: "Erro ao Buscar Sugestão", description: e.message, variant: "destructive" });
+      setAllSuggestions(prev => ({ // Clear all on general error or decide based on context
+        ...prev,
+        suggestedGoal: context === "goal" ? undefined : prev?.suggestedGoal,
+        suggestedTasks: context === "tasks" ? undefined : prev?.suggestedTasks,
+        suggestedPersonality: context === "personality" ? undefined : prev?.suggestedPersonality,
+        suggestedRestrictions: context === "restrictions" ? undefined : prev?.suggestedRestrictions,
+      }));
+    } finally {
+      setIsLoadingSuggestions(false);
     }
-    toast({ title: "Restrição Adicionada" });
   };
 
   return (
@@ -135,8 +122,34 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
             control={control}
             name="config.agentGoal"
             render={({ field }) => (
-              <FormItem> {/* Removed space-y-2, relying on CardContent padding */}
-                <FormLabel htmlFor="config.agentGoal">Agent Goal (LLM)</FormLabel>
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel htmlFor="config.agentGoal">Agent Goal (LLM)</FormLabel>
+                  <Popover open={showGoalSuggestionPopover} onOpenChange={setShowGoalSuggestionPopover}>
+                    <PopoverTrigger asChild>
+                      <AISuggestionIcon
+                        onClick={() => fetchSuggestionsForContext(setShowGoalSuggestionPopover, "goal")}
+                        isLoading={isLoadingSuggestions}
+                        tooltipText="Sugerir objetivo do agente"
+                        size={16}
+                      />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                      {isLoadingSuggestions && <Loader2 className="h-4 w-4 animate-spin mx-auto my-4" />}
+                      {!isLoadingSuggestions && allSuggestions?.suggestedGoal ? (
+                        <>
+                          <p className="text-sm text-muted-foreground mb-2">Sugestão de Objetivo:</p>
+                          <p className="mb-4">{allSuggestions.suggestedGoal}</p>
+                          <Button onClick={() => {
+                            setValue("config.agentGoal", allSuggestions.suggestedGoal!, { shouldValidate: true, shouldDirty: true });
+                            setShowGoalSuggestionPopover(false);
+                            toast({ title: "Objetivo atualizado." });
+                          }} size="sm">Aplicar</Button>
+                        </>
+                      ) : <p>Nenhuma sugestão para o objetivo.</p>}
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <FormControl><Textarea id="config.agentGoal" placeholder="Describe the main objective..." {...field} rows={3}/></FormControl>
                 <FormDescription>What is the central purpose of this LLM agent?</FormDescription>
                 <FormMessage />
@@ -151,7 +164,35 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
               const stringToTasks = (value: string) => value.split("\n").filter(task => task.trim() !== "");
               return (
                 <FormItem>
-                  <FormLabel htmlFor="config.agentTasks">Main Tasks (LLM)</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel htmlFor="config.agentTasks">Main Tasks (LLM)</FormLabel>
+                    <Popover open={showTasksSuggestionPopover} onOpenChange={setShowTasksSuggestionPopover}>
+                      <PopoverTrigger asChild>
+                        <AISuggestionIcon
+                          onClick={() => fetchSuggestionsForContext(setShowTasksSuggestionPopover, "tasks")}
+                          isLoading={isLoadingSuggestions}
+                          tooltipText="Sugerir tarefas principais"
+                          size={16}
+                        />
+                      </PopoverTrigger>
+                      <PopoverContent className="w-96">
+                        {isLoadingSuggestions && <Loader2 className="h-4 w-4 animate-spin mx-auto my-4" />}
+                        {!isLoadingSuggestions && allSuggestions?.suggestedTasks && allSuggestions.suggestedTasks.length > 0 ? (
+                          <>
+                            <p className="text-sm text-muted-foreground mb-2">Sugestões de Tarefas:</p>
+                            <ul className="list-disc pl-5 mb-4 space-y-1">
+                              {allSuggestions.suggestedTasks.map((task, index) => <li key={index}>{task}</li>)}
+                            </ul>
+                            <Button onClick={() => {
+                              setValue("config.agentTasks", allSuggestions.suggestedTasks!, { shouldValidate: true, shouldDirty: true });
+                              setShowTasksSuggestionPopover(false);
+                              toast({ title: "Tarefas atualizadas." });
+                            }} size="sm">Aplicar Todas</Button>
+                          </>
+                        ) : <p>Nenhuma sugestão para tarefas.</p>}
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   <FormControl>
                     <Textarea
                       id="config.agentTasks"
@@ -183,13 +224,29 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
               <FormItem>
                 <div className="flex items-center justify-between">
                   <FormLabel htmlFor="config.agentPersonality">Personality/Tone (LLM)</FormLabel>
-                  <Popover open={showPersonalityPopover} onOpenChange={setShowPersonalityPopover}>
+                  <Popover open={showPersonalitySuggestionPopover} onOpenChange={setShowPersonalitySuggestionPopover}>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="ghost" size="sm" onClick={handleSuggestPersonality} disabled={isSuggestingPersonality}>
-                        {isSuggestingPersonality ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
-                      </Button>
+                      <AISuggestionIcon
+                        onClick={() => fetchSuggestionsForContext(setShowPersonalitySuggestionPopover, "personality")}
+                        isLoading={isLoadingSuggestions}
+                        tooltipText="Sugerir personalidade/tom"
+                        size={16}
+                      />
                     </PopoverTrigger>
-                    <PopoverContent className="w-80"> {/* Content as before */} </PopoverContent>
+                    <PopoverContent className="w-80">
+                      {isLoadingSuggestions && <Loader2 className="h-4 w-4 animate-spin mx-auto my-4" />}
+                      {!isLoadingSuggestions && allSuggestions?.suggestedPersonality ? (
+                        <>
+                          <p className="text-sm text-muted-foreground mb-2">Personalidade Sugerida:</p>
+                          <p className="mb-4">{allSuggestions.suggestedPersonality}</p>
+                          <Button onClick={() => {
+                            setValue("config.agentPersonality", allSuggestions.suggestedPersonality!, { shouldValidate: true, shouldDirty: true });
+                            setShowPersonalitySuggestionPopover(false);
+                            toast({ title: "Personalidade atualizada." });
+                          }} size="sm">Aplicar</Button>
+                        </>
+                      ) : <p>Nenhuma sugestão para personalidade.</p>}
+                    </PopoverContent>
                   </Popover>
                 </div>
                 <Select onValueChange={field.onChange} value={field.value}>
@@ -211,13 +268,39 @@ const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
                 <FormItem>
                   <div className="flex items-center justify-between">
                     <FormLabel htmlFor="config.agentRestrictions">Restrictions (LLM)</FormLabel>
-                    <Popover open={showRestrictionPopover} onOpenChange={setShowRestrictionPopover}>
+                    <Popover open={showRestrictionsSuggestionPopover} onOpenChange={setShowRestrictionsSuggestionPopover}>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="ghost" size="sm" onClick={handleSuggestRestrictions} disabled={isSuggestingRestrictions}>
-                          {isSuggestingRestrictions ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
-                        </Button>
+                        <AISuggestionIcon
+                          onClick={() => fetchSuggestionsForContext(setShowRestrictionsSuggestionPopover, "restrictions")}
+                          isLoading={isLoadingSuggestions}
+                          tooltipText="Sugerir restrições"
+                          size={16}
+                        />
                       </PopoverTrigger>
-                      <PopoverContent className="w-80">{/* Content as before */}</PopoverContent>
+                      <PopoverContent className="w-96">
+                        {isLoadingSuggestions && <Loader2 className="h-4 w-4 animate-spin mx-auto my-4" />}
+                        {!isLoadingSuggestions && allSuggestions?.suggestedRestrictions && allSuggestions.suggestedRestrictions.length > 0 ? (
+                          <>
+                            <p className="text-sm text-muted-foreground mb-2">Restrições Sugeridas:</p>
+                            <div className="space-y-2">
+                              {allSuggestions.suggestedRestrictions.map((restriction, index) => (
+                                <div key={index} className="flex items-center justify-between">
+                                  <span>{restriction}</span>
+                                  <Button variant="outline" size="xs" onClick={() => {
+                                    const currentRestrictions = getValues("config.agentRestrictions") || [];
+                                    if (!currentRestrictions.includes(restriction)) {
+                                      setValue("config.agentRestrictions", [...currentRestrictions, restriction], { shouldValidate: true, shouldDirty: true });
+                                      toast({ title: "Restrição Adicionada" });
+                                    } else {
+                                      toast({ title: "Restrição já existe", variant: "default" });
+                                    }
+                                  }}>Adicionar</Button>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : <p>Nenhuma sugestão para restrições.</p>}
+                      </PopoverContent>
                     </Popover>
                   </div>
                   <FormControl>

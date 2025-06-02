@@ -1,15 +1,18 @@
-import React from 'react';
+import * as React from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
+import { z } from 'zod';
+import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
+import { AiConfigurationAssistantOutputSchema, SuggestedToolSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { InfoIcon } from '@/components/ui/InfoIcon'; // Assuming InfoIcon is a standard component
-import { Settings, Check, PlusCircle, Trash2, AlertTriangle } from 'lucide-react'; // Example icons
-
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { SavedAgentConfiguration, AvailableTool, ToolConfigData } from '@/types/agent-configs';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
+// Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
+// For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
 
 interface ToolsTabProps {
   availableTools: AvailableTool[];
@@ -36,8 +39,46 @@ export default function ToolsTab({
   onToolConfigure,
 }: ToolsTabProps) {
   const { control, watch, setValue, getValues } = useFormContext<FormContextType>();
-  const selectedToolIds = watch('tools') || [];
+  const { toast } = useToast();
+  const currentSelectedTools = watch('tools') || [];
   const toolConfigsApplied = watch('toolConfigsApplied') || {};
+
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [aiSuggestedTools, setAiSuggestedTools] = React.useState<SuggestedToolType[]>([]);
+  const [isSuggestionsDialogOpen, setIsSuggestionsDialogOpen] = React.useState(false);
+
+  type SuggestedToolType = z.infer<typeof SuggestedToolSchema>;
+
+  const fetchToolSuggestions = async () => {
+    setIsLoadingSuggestions(true);
+    const currentConfig = getValues(); // Get the complete current agent configuration
+    try {
+      // MODIFICATION: Pass "tools" context
+      const result = await getAiConfigurationSuggestionsAction(currentConfig, "tools"); 
+      
+      if (result.success && result.suggestions?.suggestedTools && result.suggestions.suggestedTools.length > 0) {
+        // Filter out tools that are already selected to avoid suggesting them again if the backend doesn't do this.
+        // The backend aiConfigurationAssistantFlow for tools already has logic to avoid suggesting already selected tools.
+        // So, this client-side filter might be redundant if the backend is robust.
+        // For now, let's assume backend handles it. If not, this is where to filter:
+        // const newSuggestedTools = result.suggestions.suggestedTools.filter(st => !currentSelectedTools.includes(st.id));
+        // setAiSuggestedTools(newSuggestedTools);
+        setAiSuggestedTools(result.suggestions.suggestedTools);
+        setIsSuggestionsDialogOpen(true);
+        toast({ title: "Sugestões de Ferramentas Carregadas" });
+      } else if (result.success) {
+           setAiSuggestedTools([]);
+           setIsSuggestionsDialogOpen(true); 
+           toast({ title: "Nenhuma nova sugestão de ferramenta encontrada.", description: "Seu conjunto de ferramentas atual parece adequado." });
+      } else {
+        toast({ title: "Falha ao Carregar Sugestões de Ferramentas", description: result.error, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro ao Buscar Sugestões", description: e.message, variant: "destructive" });
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
 
   const handleToolSelectionChange = (toolId: string, isSelected: boolean) => {
     const currentToolIds = getValues('tools') || [];
@@ -67,23 +108,93 @@ export default function ToolsTab({
 
   return (
     <div className="space-y-6">
+      <Dialog open={isSuggestionsDialogOpen} onOpenChange={setIsSuggestionsDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Sugestões de Ferramentas por IA</DialogTitle>
+            <DialogDescription>
+              Com base na configuração atual do seu agente, estas ferramentas podem ser úteis.
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingSuggestions ? (
+            <div className="flex justify-center items-center h-32"> {/* Increased height for loader */}
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : aiSuggestedTools.length > 0 ? (
+            <ScrollArea className="max-h-[300px] p-1">
+              <div className="space-y-3 pr-2">
+                {aiSuggestedTools.map((tool) => {
+                  const isAlreadySelected = currentSelectedTools.includes(tool.id);
+                  return (
+                    <div key={tool.id} className="p-3 border rounded-md flex items-center justify-between hover:bg-muted/50">
+                      <div>
+                        <h4 className="font-semibold">{tool.name}</h4>
+                        <p className="text-xs text-muted-foreground break-words">{tool.description}</p> {/* Added break-words */}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={isAlreadySelected ? "ghost" : "default"}
+                        onClick={() => {
+                          if (!isAlreadySelected) {
+                            // Use setValue from useFormContext to update the 'tools' array
+                            setValue("tools", [...currentSelectedTools, tool.id], { shouldValidate: true, shouldDirty: true });
+                            toast({ title: `${tool.name} adicionada.` });
+                          } else {
+                             toast({ title: `${tool.name} já está selecionada.`, variant: "default"});
+                          }
+                        }}
+                        disabled={isAlreadySelected}
+                        className="ml-4 flex-shrink-0 px-3 py-1 h-auto" // Adjusted padding and height
+                      >
+                        {isAlreadySelected ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : "Adicionar"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          ) : (
+            <Alert className="mt-4"> {/* Added margin top */}
+              <SparklesIcon className="h-4 w-4" />
+              <AlertTitle>Tudo Certo!</AlertTitle>
+              <AlertDescription>
+                Nenhuma sugestão de ferramenta adicional no momento, ou as sugestões já estão selecionadas.
+              </AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter className="mt-4"> {/* Added margin top */}
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Fechar</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
-          <CardTitle>Manage Agent Tools</CardTitle>
-          <CardDescription>
-            Select and configure the tools this agent can use.
-            <InfoIconComponent
-                tooltipText={agentBuilderHelpContent.toolsTab.main.tooltip}
-                onClick={() => showHelpModal({ tab: 'toolsTab', field: 'main' })}
-                className="ml-2"
-            />
-          </CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Manage Agent Tools</CardTitle>
+              <CardDescription className="flex items-center">
+                Select and configure the tools this agent can use.
+                <InfoIconComponent
+                    tooltipText={agentBuilderHelpContent.toolsTab.main.tooltip}
+                    onClick={() => showHelpModal({ tab: 'toolsTab', field: 'main' })}
+                    className="ml-2" // Ensure InfoIconComponent accepts className
+                />
+              </CardDescription>
+            </div>
+            <Button onClick={fetchToolSuggestions} disabled={isLoadingSuggestions} variant="outline" size="sm">
+              {isLoadingSuggestions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4 text-yellow-500" />}
+              Sugerir Ferramentas
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[400px] pr-4"> {/* Added ScrollArea */}
             <div className="space-y-4">
               {availableTools.map((tool) => {
-                const isSelected = selectedToolIds.includes(tool.id);
+                const isSelected = currentSelectedTools.includes(tool.id);
                 const hasConfig = tool.hasConfig; // From AvailableTool definition
                 const isConfigured = hasConfig && toolConfigsApplied[tool.id] && Object.keys(toolConfigsApplied[tool.id]).length > 0;
 

@@ -8,24 +8,74 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { SavedAgentConfiguration, WorkflowDetailedType, TerminationConditionType } from "@/types/agent-configs"; // MODIFIED
-import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
+import { SavedAgentConfiguration, WorkflowDetailedType, TerminationConditionType } from "@/types/agent-configs";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
-import { Separator } from "@/components/ui/separator"; // Added Separator
-import { Button } from "@/components/ui/button"; // Added Button
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// import { Separator } from "@/components/ui/separator"; // Separator might not be needed
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Added
+import { Loader2 } from "lucide-react"; // Added
+import { useToast } from "@/hooks/use-toast"; // Added
+import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions'; // Added
+import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow'; // Added
+import AISuggestionIcon from './AISuggestionIcon'; // Added
+import { z } from 'zod'; // Added
 
 // MODIFIED: No props needed now
 interface WorkflowBehaviorFormProps {}
 
 const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
-  const { control, formState: { errors }, watch, setValue } = useFormContext<SavedAgentConfiguration>(); // MODIFIED
+  const { control, formState: { errors }, watch, setValue, getValues } = useFormContext<SavedAgentConfiguration>(); // Added getValues
+  const { toast } = useToast(); // Added
 
   const detailedWorkflowType = watch("config.detailedWorkflowType");
   const loopTerminationConditionType = watch("config.loopTerminationConditionType");
+
+  // State for AI Suggestions
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [suggestions, setSuggestions] = React.useState<z.infer<typeof AiConfigurationAssistantOutputSchema> | undefined>(undefined);
+  const [showWorkflowTypeSuggestionPopover, setShowWorkflowTypeSuggestionPopover] = React.useState(false);
+  const [showInconsistencyAlertsPopover, setShowInconsistencyAlertsPopover] = React.useState(false);
+  const [currentLoadingContext, setCurrentLoadingContext] = React.useState<"workflowType" | "inconsistencyAlerts" | null>(null);
   const agentTools = watch("tools");
   const agentToolsDetails = watch("toolsDetails");
   const previousDetailedWorkflowType = React.useRef<WorkflowDetailedType | undefined>(detailedWorkflowType);
+
+  const fetchWorkflowSuggestions = async (
+    popoverSetter: React.Dispatch<React.SetStateAction<boolean>>,
+    context: "workflowType" | "inconsistencyAlerts"
+  ) => {
+    setCurrentLoadingContext(context);
+    setIsLoadingSuggestions(true);
+    popoverSetter(false); // Close before fetch
+    const currentConfig = getValues();
+    try {
+      const result = await getAiConfigurationSuggestionsAction(currentConfig, context);
+      if (result.success && result.suggestions) {
+        setSuggestions(result.suggestions);
+        popoverSetter(true); // Open the relevant popover/modal
+        toast({ title: "Análise da IA Concluída" });
+      } else {
+        toast({ title: "Falha na Análise da IA", description: result.error, variant: "destructive" });
+        // Clear specific suggestion field on error
+        let fieldToClear: keyof AiConfigurationAssistantOutputSchema | undefined = undefined;
+        if (context === "workflowType") fieldToClear = "suggestedWorkflowType";
+        else if (context === "inconsistencyAlerts") fieldToClear = "inconsistencyAlerts";
+        if (fieldToClear) {
+          setSuggestions(prev => ({ ...prev, [fieldToClear!]: undefined }));
+        } else {
+          setSuggestions(undefined);
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Erro na Análise da IA", description: e.message, variant: "destructive" });
+      setSuggestions(undefined);
+    } finally {
+      setIsLoadingSuggestions(false);
+      setCurrentLoadingContext(null);
+    }
+  };
 
   const { fields, append, remove, update, move } = useFieldArray({ // Added move
     control,
@@ -106,16 +156,43 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
             name="config.detailedWorkflowType"
             render={({ field }) => (
               <FormItem>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild><FormLabel htmlFor="config.detailedWorkflowType" className="cursor-help">Workflow Type</FormLabel></TooltipTrigger>
-                    <TooltipContent className="w-80"><ul className="list-disc space-y-1 pl-4">
-                    <li><strong>Sequential:</strong> Steps executed in linear order.</li>
-                    <li><strong>Loop:</strong> Executes a series of tools repeatedly until an exit condition is met or a maximum number of iterations is reached.</li>
-                    <li><strong>Parallel:</strong> Allows simultaneous execution of multiple tools or tasks, useful for independent operations.</li>
-                  </ul></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <div className="flex items-center justify-between">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild><FormLabel htmlFor="config.detailedWorkflowType" className="cursor-help">Workflow Type</FormLabel></TooltipTrigger>
+                      <TooltipContent className="w-80"><ul className="list-disc space-y-1 pl-4">
+                      <li><strong>Sequential:</strong> Steps executed in linear order.</li>
+                      <li><strong>Loop:</strong> Executes a series of tools repeatedly until an exit condition is met or a maximum number of iterations is reached.</li>
+                      <li><strong>Parallel:</strong> Allows simultaneous execution of multiple tools or tasks, useful for independent operations.</li>
+                    </ul></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Popover open={showWorkflowTypeSuggestionPopover} onOpenChange={setShowWorkflowTypeSuggestionPopover}>
+                    <PopoverTrigger asChild>
+                      <AISuggestionIcon
+                        onClick={() => fetchWorkflowSuggestions(setShowWorkflowTypeSuggestionPopover, "workflowType")}
+                        isLoading={isLoadingSuggestions && currentLoadingContext === "workflowType"}
+                        tooltipText="Sugerir tipo de workflow"
+                        size={16}
+                      />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                      {isLoadingSuggestions && currentLoadingContext === "workflowType" ? (
+                        <div className="flex justify-center items-center p-4"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                      ) : suggestions?.suggestedWorkflowType ? (
+                        <>
+                          <p className="text-sm text-muted-foreground mb-1">Sugestão da IA:</p>
+                          <p className="font-semibold mb-3">{suggestions.suggestedWorkflowType.charAt(0).toUpperCase() + suggestions.suggestedWorkflowType.slice(1)}</p>
+                          <Button onClick={() => {
+                            setValue("config.detailedWorkflowType", suggestions.suggestedWorkflowType as WorkflowDetailedType, { shouldValidate: true, shouldDirty: true });
+                            setShowWorkflowTypeSuggestionPopover(false);
+                            toast({title: "Tipo de workflow aplicado!"})
+                          }} size="sm">Aplicar Sugestão</Button>
+                        </>
+                      ) : <p className="text-sm py-2">Nenhuma sugestão disponível ou falha ao carregar.</p>}
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <Select onValueChange={field.onChange} value={field.value as WorkflowDetailedType}>
                   <FormControl><SelectTrigger id="config.detailedWorkflowType"><SelectValue placeholder="Select workflow type" /></SelectTrigger></FormControl>
                   <SelectContent>
@@ -148,12 +225,34 @@ const WorkflowBehaviorForm: React.FC<WorkflowBehaviorFormProps> = () => {
       {detailedWorkflowType === "sequential" && (
         <Card>
           <CardHeader>
-            <CardTitle>Sequential Workflow Configuration</CardTitle>
-            <CardDescription>
-              Define the order and output handling for tools in a sequential workflow.
-              Each tool will execute one after another. Use the "Move Up" and "Move Down" buttons to reorder the steps.
-              You can specify an "Output Key" for each tool if you need to reference its output in subsequent tools or steps (e.g., using {'{{stepName.outputKey}}'} in prompts).
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle>Sequential Workflow Configuration</CardTitle>
+                <CardDescription>
+                  Define the order and output handling for tools in a sequential workflow.
+                  Each tool will execute one after another. Use the "Move Up" and "Move Down" buttons to reorder the steps.
+                  You can specify an "Output Key" for each tool if you need to reference its output in subsequent tools or steps (e.g., using {'{{stepName.outputKey}}'} in prompts).
+                </CardDescription>
+              </div>
+              <Popover open={showInconsistencyAlertsPopover} onOpenChange={setShowInconsistencyAlertsPopover}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => fetchWorkflowSuggestions(setShowInconsistencyAlertsPopover, "inconsistencyAlerts")} disabled={isLoadingSuggestions && currentLoadingContext === "inconsistencyAlerts"}>
+                    {(isLoadingSuggestions && currentLoadingContext === "inconsistencyAlerts") ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                    Analisar Etapas
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96 max-h-80 overflow-y-auto">
+                  <h4 className="font-medium text-sm mb-2">Alertas de Inconsistência das Etapas</h4>
+                  {(isLoadingSuggestions && currentLoadingContext === "inconsistencyAlerts") ? (
+                     <div className="flex justify-center items-center p-4"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                  ) : suggestions?.inconsistencyAlerts && suggestions.inconsistencyAlerts.length > 0 ? (
+                    <ul className="list-disc pl-5 space-y-1">
+                      {suggestions.inconsistencyAlerts.map((alert, index) => <li key={index} className="text-xs">{alert}</li>)}
+                    </ul>
+                  ) : <p className="text-xs py-2">Nenhum alerta de inconsistência encontrado ou falha ao carregar.</p>}
+                </PopoverContent>
+              </Popover>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {fields.length === 0 && detailedWorkflowType === "sequential" && (
