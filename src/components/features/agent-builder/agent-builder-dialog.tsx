@@ -57,7 +57,7 @@ import {
 import { HelpModal } from '@/components/ui/HelpModal';
 import { aiConfigurationAssistantFlow, AiConfigurationAssistantOutput } from '@/ai/flows/aiConfigurationAssistantFlow';
 import AISuggestionDisplay from './AISuggestionDisplay';
-import { runFlow } from 'genkit/flow';
+import { runFlow } from 'genkit';
 import { InfoIcon } from '@/components/ui/InfoIcon'; // Though used in tabs, modal logic is here
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 

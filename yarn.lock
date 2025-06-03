@@ -822,55 +822,19 @@
     zod "^3.23.8"
     zod-to-json-schema "^3.22.4"
 
-"@genkit-ai/core@0.5.17":
-  version "0.5.17"
-  resolved "https://registry.npmjs.org/@genkit-ai/core/-/core-0.5.17.tgz"
-  integrity sha512-o8aEIFjQ4FugS5w5XK1c6hmiX6bqx7u+UuikARJPMhqOek7aovcXXdYj2zbVmX2/4c94aXerSokB0vD59Pj3GQ==
-  dependencies:
-    "@opentelemetry/api" "^1.9.0"
-    "@opentelemetry/context-async-hooks" "^1.25.0"
-    "@opentelemetry/core" "^1.25.0"
-    "@opentelemetry/sdk-metrics" "^1.25.0"
-    "@opentelemetry/sdk-node" "^0.52.0"
-    "@opentelemetry/sdk-trace-base" "^1.25.0"
-    ajv "^8.12.0"
-    ajv-formats "^3.0.1"
-    async-mutex "^0.5.0"
-    express "^4.21.0"
-    json-schema "^0.4.0"
-    zod "^3.22.4"
-    zod-to-json-schema "^3.22.4"
-
-"@genkit-ai/flow@^0.5.17":
-  version "0.5.17"
-  resolved "https://registry.npmjs.org/@genkit-ai/flow/-/flow-0.5.17.tgz"
-  integrity sha512-+P2VGfa5z2e9VzjAJysLAw0oHuPv02UEj/z4Csxuurv2xgL3CQCZ9DV81i+14/ybp5LJ8waPSFsrJ29ffQCPwg==
-  dependencies:
-    "@genkit-ai/core" "0.5.17"
-    "@google-cloud/firestore" "^7.6.0"
-    "@opentelemetry/api" "^1.9.0"
-    "@types/cors" "^2.8.17"
-    body-parser "^1.20.3"
-    cors "^2.8.5"
-    express "^4.21.0"
-    firebase-admin ">=12.2"
-    firebase-functions ">=4.8"
-    uuid "^9.0.1"
-    zod "^3.22.4"
-
-"@genkit-ai/googleai@latest":
-  version "1.8.0"
-  resolved "https://registry.npmjs.org/@genkit-ai/googleai/-/googleai-1.8.0.tgz"
-  integrity sha512-1XzH5hSiQ1HFEm0V8YuRlL90YIRBLVNjs+rOpGqeflecmP2kNBq9+wnBwGzvQl7vHpF5DOC9MjJRMFwrOZWhgg==
+"@genkit-ai/googleai@^1.11.0":
+  version "1.11.1"
+  resolved "https://registry.npmjs.org/@genkit-ai/googleai/-/googleai-1.11.1.tgz"
+  integrity sha512-qRvOlcn3pRXl3V6qlH1+jQTNtd2r2fKpanC+mfwUfrEB1vI257I9GHH7tIxb8y7+5sJQ5lETr+T2WWf6vDznmQ==
   dependencies:
     "@google/generative-ai" "^0.24.0"
     google-auth-library "^9.6.3"
     node-fetch "^3.3.2"
 
-"@genkit-ai/next@latest":
-  version "1.8.0"
-  resolved "https://registry.npmjs.org/@genkit-ai/next/-/next-1.8.0.tgz"
-  integrity sha512-IdIaLVePYc58p5mFtjhpsF5U+al/hQLKDszcXoLOkolCf3uxjJv4o21iWl2I0JLgvaMNZru+wbyWpgYUmY0xWw==
+"@genkit-ai/next@^1.11.0":
+  version "1.11.1"
+  resolved "https://registry.npmjs.org/@genkit-ai/next/-/next-1.11.1.tgz"
+  integrity sha512-oThuogRtc+BOWJCusyIKxctFKDU+a9gpDGW1y9g+ych3YS5TiuOmoBkI4wQzPIi0F+JT0anX0EcqGqGg8bXpSw==
 
 "@genkit-ai/telemetry-server@1.8.0":
   version "1.8.0"
@@ -1356,18 +1320,8 @@
 
 "@next/swc-win32-x64-msvc@15.3.3":
   version "15.3.3"
-<<<<<<< HEAD
-  resolved "https://registry.npmjs.org/@next/swc-linux-x64-gnu/-/swc-linux-x64-gnu-15.3.3.tgz"
-  integrity sha512-jJ8HRiF3N8Zw6hGlytCj5BiHyG/K+fnTKVDEKvUCyiQ/0r5tgwO7OgaRiOjjRoIx2vwLR+Rz8hQoPrnmFbJdfw==
-
-"@next/swc-linux-x64-musl@15.3.3":
-  version "15.3.3"
-  resolved "https://registry.npmjs.org/@next/swc-linux-x64-musl/-/swc-linux-x64-musl-15.3.3.tgz"
-  integrity sha512-HrUcTr4N+RgiiGn3jjeT6Oo208UT/7BuTr7K0mdKRBtTbT4v9zJqCDKO97DUqqoBK1qyzP1RwvrWTvU6EPh/Cw==
-=======
   resolved "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-15.3.3.tgz"
   integrity sha512-4QZG6F8enl9/S2+yIiOiju0iCTFd93d8VC1q9LZS4p/Xuk81W2QDjCFeoogmrWWkAD59z8ZxepBQap2dKS5ruw==
->>>>>>> develop
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
@@ -2399,13 +2353,6 @@
   dependencies:
     "@types/node" "*"
 
-"@types/cors@^2.8.17", "@types/cors@^2.8.5":
-  version "2.8.18"
-  resolved "https://registry.npmjs.org/@types/cors/-/cors-2.8.18.tgz"
-  integrity sha512-nX3d0sxJW41CqQvfOzVG1NCTXfFDrDWIghCZncpHeWlVFd81zxB/DLhg7avFg6eHLCRX7ckBmoIIcqa++upvJA==
-  dependencies:
-    "@types/node" "*"
-
 "@types/d3-array@^3.0.3":
   version "3.2.1"
   resolved "https://registry.npmjs.org/@types/d3-array/-/d3-array-3.2.1.tgz"
@@ -2486,7 +2433,7 @@
     "@types/range-parser" "*"
     "@types/send" "*"
 
-"@types/express@^4.17.20", "@types/express@^4.17.21":
+"@types/express@^4.17.20":
   version "4.17.22"
   resolved "https://registry.npmjs.org/@types/express/-/express-4.17.22.tgz"
   integrity sha512-eZUmSnhRX9YRSkplpz0N+k6NljUUn5l3EWZIKZvYzhvMphEuNiyyy1viH/ejgt66JWgALwC/gtSUAeQKtSwW/w==
@@ -4442,7 +4389,7 @@ find-yarn-workspace-root@^2.0.0:
   dependencies:
     micromatch "^4.0.2"
 
-firebase-admin@^13.4.0, firebase-admin@>=12.2:
+firebase-admin@^13.4.0:
   version "13.4.0"
   resolved "https://registry.npmjs.org/firebase-admin/-/firebase-admin-13.4.0.tgz"
   integrity sha512-Y8DcyKK+4pl4B93ooiy1G8qvdyRMkcNFfBSh+8rbVcw4cW8dgG0VXCCTp5NUwub8sn9vSPsOwpb9tE2OuFmcfQ==
@@ -4460,17 +4407,6 @@ firebase-admin@^13.4.0, firebase-admin@>=12.2:
   optionalDependencies:
     "@google-cloud/firestore" "^7.11.0"
     "@google-cloud/storage" "^7.14.0"
-
-firebase-functions@>=4.8:
-  version "6.3.2"
-  resolved "https://registry.npmjs.org/firebase-functions/-/firebase-functions-6.3.2.tgz"
-  integrity sha512-FC3A1/nhqt1ZzxRnj5HZLScQaozAcFSD/vSR8khqSoFNOfxuXgwJS6ZABTB7+v+iMD5z6Mmxw6OfqITUBuI7OQ==
-  dependencies:
-    "@types/cors" "^2.8.5"
-    "@types/express" "^4.17.21"
-    cors "^2.8.5"
-    express "^4.21.0"
-    protobufjs "^7.2.2"
 
 firebase@^11.8.1:
   version "11.8.1"
@@ -4671,17 +4607,17 @@ genkit@^1.11.0:
     "@genkit-ai/core" "1.11.0"
     uuid "^10.0.0"
 
-genkitx-ollama@latest:
-  version "1.10.0"
-  resolved "https://registry.npmjs.org/genkitx-ollama/-/genkitx-ollama-1.10.0.tgz"
-  integrity sha512-KplrROJW9PSIbMIwTLem3Lz6YExAKqF3v9s+Qy0bAJbYszn/MKOW2ezjHfigs64eDIURt+UOTwFAMbzRUbNdyg==
+genkitx-ollama@^1.11.0:
+  version "1.11.1"
+  resolved "https://registry.npmjs.org/genkitx-ollama/-/genkitx-ollama-1.11.1.tgz"
+  integrity sha512-sj6PfyQKTfMzGigEheyX77vXpc97oTt1ag809CfyUayV9ulnQGtxnVvUSklUJYW5HUJHn1ui7NOLZb/v+7uAwA==
   dependencies:
     ollama "^0.5.9"
 
-genkitx-openai@latest:
-  version "0.22.3"
-  resolved "https://registry.npmjs.org/genkitx-openai/-/genkitx-openai-0.22.3.tgz"
-  integrity sha512-g+4I2QOHfBcHz6R9N/z5mqXsMNc7+jtF258jwBOi1X5YuJ7hFIpbTxF8QktfUdH8w440t7s7Upa0aZRw+JhfsA==
+genkitx-openai@^0.20.1:
+  version "0.20.3"
+  resolved "https://registry.npmjs.org/genkitx-openai/-/genkitx-openai-0.20.3.tgz"
+  integrity sha512-v4ROqxCHchZwJfbIvmjK7F1UwgCueq0ODJME9OooGGfBYxCpGiXLHH8wVANr/B1qGYamM0EooRsWUxgLW/qjqA==
   dependencies:
     openai "^4.95.0"
 
@@ -7419,7 +7355,7 @@ proto3-json-serializer@^2.0.2:
   dependencies:
     protobufjs "^7.2.5"
 
-protobufjs@^7.2.2, protobufjs@^7.2.5, protobufjs@^7.2.6, protobufjs@^7.3.0, protobufjs@^7.3.2:
+protobufjs@^7.2.5, protobufjs@^7.2.6, protobufjs@^7.3.0, protobufjs@^7.3.2:
   version "7.4.0"
   resolved "https://registry.npmjs.org/protobufjs/-/protobufjs-7.4.0.tgz"
   integrity sha512-mRUWCc3KUU4w1jU8sGxICXH/gNS94DvI1gxqDvBzhj1JpcsimQkYiOJfwsPUykUI5ZaspFbSgmBLER8IrQ3tqw==

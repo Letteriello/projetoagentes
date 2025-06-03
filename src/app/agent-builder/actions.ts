@@ -2,7 +2,7 @@
 
 import { generate } from "@genkit-ai/ai";
 import { gemini15Pro } from "@genkit-ai/googleai"; // Ensure this is the correct model
-import { runFlow } from "@genkit-ai/flow";
+import { runFlow } from "genkit";
 import {
   AgentNameDescriptionSuggesterInputSchema,
   agentNameDescriptionSuggesterFlow,

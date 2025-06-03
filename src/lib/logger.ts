@@ -114,34 +114,17 @@ export function createLoggableFlow<Request, Response>(
     }) as unknown as (input: Request, context?: any) => Promise<Response>;
   }
 
-  // Importação dinâmica apenas no servidor
-  const { genkitFlow } = require('@genkit-ai/flow');
-  
-  return genkitFlow(
-    { name: name },
-    async (input: Request, context?: any) => {
-      const agentId = (input as any)?.agentId || 'unknown_agent';
-      
-      try {
-        await enhancedLogger.logStart(name, agentId, input);
-        
-        // Executa o fluxo original
-        const result = await flow(input, context);
-        
-        // Registra o término bem-sucedido
-        await enhancedLogger.logEnd(name, agentId, result);
-        
-        return result;
-      } catch (error) {
-        // Registra o erro
-        await enhancedLogger.logError(
-          name, 
-          agentId, 
-          error as Error, 
-          { input }
-        );
-        throw error; // Re-lança o erro para o chamador
-      }
+  // Execução direta do fluxo, sem dependência de '@genkit-ai/flow'.
+  return async (input: Request, context?: any): Promise<Response> => {
+    const agentId = (input as any)?.agentId || 'unknown_agent';
+    try {
+      await enhancedLogger.logStart(name, agentId, input);
+      const result = await flow(input, context);
+      await enhancedLogger.logEnd(name, agentId, result);
+      return result;
+    } catch (error) {
+      await enhancedLogger.logError(name, agentId, error as Error, { input });
+      throw error;
     }
-  );
+  };
 }

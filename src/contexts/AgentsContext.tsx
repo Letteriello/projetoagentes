@@ -26,13 +26,18 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   const fetchAgents = React.useCallback(async () => {
     setIsLoadingAgents(true);
     try {
-      // Replace API call with localStorage load
-      const agentsFromStorage = loadAgents();
-      // Ensure sorting is maintained if needed (loadAgents already handles date conversion)
-      const processedAgents = agentsFromStorage.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      // Carregar agentes de forma assíncrona e segura
+      const agentsFromStorage = await loadAgents();
+      const processedAgents = Array.isArray(agentsFromStorage)
+        ? agentsFromStorage.filter(Boolean).sort((a, b) => {
+            if (!a.updatedAt || !b.updatedAt) return 0;
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          })
+        : [];
       setSavedAgents(processedAgents);
     } catch (error) {
       console.error("Erro ao buscar agentes do localStorage:", error);
+      setSavedAgents([]);
       toast({
         title: "Erro ao Carregar Agentes",
         description: `Não foi possível buscar os agentes salvos localmente. ${error instanceof Error ? error.message : ''}`,

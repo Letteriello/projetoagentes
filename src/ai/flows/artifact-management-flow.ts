@@ -1,4 +1,4 @@
-import { defineFlow } from '../../core/flow';
+import { defineFlow } from 'genkit';
 import { z } from 'zod';
 import { ArtifactStorageType } from '../../types/agent-configs-new'; // Ensured path is correct
 import path from 'path'; // Import path for joining paths
