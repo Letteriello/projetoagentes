@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
+import { toast } from "@/hooks/use-toast"; // Import toast
 import { Cpu, Wand2, Info, AlertCircle, ChevronLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,45 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
       status: "connected",
     },
   ]);
+
+  useEffect(() => {
+    const mockServerId = "local-mcp"; // ID of the server to mock status for
+
+    const intervalId = setInterval(() => {
+      const statuses: MCPServerConfig['status'][] = ["connected", "disconnected", "error", "loading"];
+      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+      setMcpServers(prevServers =>
+        prevServers.map(server =>
+          server.id === mockServerId
+            ? { ...server, status: randomStatus }
+            : server
+        )
+      );
+
+      let variant: 'default' | 'destructive' = 'default';
+      let title = "MCP Server Status Update";
+      if (randomStatus === 'error') {
+        variant = 'destructive';
+        title = "MCP Server Error";
+      } else if (randomStatus === 'disconnected') {
+        title = "MCP Server Disconnected";
+      } else if (randomStatus === 'loading') {
+        title = "MCP Server Loading";
+      }
+
+      toast({
+        title: title,
+        description: `Server 'Servidor Local MCP' is now ${randomStatus}.`,
+        variant: variant,
+      });
+
+    }, 10000); // Every 10 seconds
+
+    return () => clearInterval(intervalId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount and clean up on unmount
+
 
   // Separar as ferramentas em regulares e MCP
   const { regularTools, mcpTools } = useMemo(() => {

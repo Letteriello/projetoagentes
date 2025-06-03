@@ -8,7 +8,7 @@ export interface MCPServerConfig {
   name: string;
   url: string;
   description?: string;
-  status?: 'connected' | 'disconnected' | 'error';
+  status?: 'connected' | 'disconnected' | 'error' | 'loading';
 }
 
 /**
