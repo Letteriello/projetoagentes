@@ -16,3 +16,9 @@
 - Correções garantem funcionamento correto e previnem recarregamentos constantes do servidor.
 
 ---
+
+
+## [0.1.0] - 2025-06-03
+
+### Corrigido
+- Corrigido erro de sintaxe no polyfill de `setImmediate` em `src/components/logger-provider.tsx`. Alterado `global.setImmediate` para `(window as any).setImmediate` e ajustada a sintaxe da asserção de tipo e retorno da função.

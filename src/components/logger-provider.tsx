@@ -5,9 +5,9 @@ import { createLogger, format, transports } from 'winston';
 
 // Polyfill para setImmediate no navegador
 if (typeof setImmediate === 'undefined') {
-  global.setImmediate = (callback: (...args: any[]) => void, ...args: any[]) => {
+  (window as any).setImmediate = (callback: (...args: any[]) => void, ...args: any[]): number => {
     return setTimeout(callback, 0, ...args);
-  } as any;
+  };
 }
 
 // Cria uma instância do logger otimizada para o navegador
