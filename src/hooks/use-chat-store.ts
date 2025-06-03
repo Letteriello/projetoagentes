@@ -381,7 +381,37 @@ export function useChatStore(): ChatStore {
         console.error("Error during agent response:", error);
         const errorMsg = error.message || "Agent response error.";
         addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "error", isStreaming: false, newContent: errorMsg });
-        // No need to update `setMessages` for the error state unless we persist it
+
+        // Persist the agent error message
+        if (currentConvId) {
+          const agentErrorMessageObject: ExtendedChatMessageUI = {
+            id: agentMessageId,
+            text: errorMsg,
+            sender: "agent",
+            status: "error",
+            isStreaming: false,
+            isError: true,
+            timestamp: agentMessageTimestamp, // Ensure this is available in scope
+            conversationId: currentConvId,
+          };
+          setMessages(prev => [...prev, agentErrorMessageObject]);
+
+          const agentErrorFirestoreObject: Message = {
+            id: agentMessageId,
+            content: errorMsg,
+            isUser: false,
+            timestamp: Timestamp.fromDate(agentMessageTimestamp), // Ensure this is available
+            conversationId: currentConvId,
+            // Firestore Message type might not have isError or status,
+            // error state is represented by the content and potentially how UI treats it.
+          };
+          addMessageToConversation(currentConvId, agentErrorFirestoreObject)
+            .catch(err => {
+              console.error("Failed to persist agent error message to Firestore:", err);
+              // Optionally, toast another error or handle this failure
+            });
+        }
+
         toast({title: "Error", description: errorMsg, variant: "destructive"});
     } finally {
       setIsPending(false);
