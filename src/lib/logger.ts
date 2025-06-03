@@ -1,13 +1,23 @@
 // src/lib/logger.ts
-import { genkitFlow, WrappedFlow } from '@genkit-ai/flow';
 import { instrumentation } from '@genkit-ai/core';
-// Importação corrigida do firebaseAdmin
-import admin, { firestore } from './firebaseAdmin';
+
+// Definição do tipo Flow para uso no logger
+type Flow<Req, Res> = (input: Req, context?: any) => Promise<Res>;
+// Importação condicional do firebaseAdmin (apenas no servidor)
+let admin: any;
+let firestore: any;
+
+// Verifica se estamos no servidor
+if (typeof window === 'undefined') {
+  const firebaseAdmin = require('./firebaseAdmin');
+  admin = firebaseAdmin.default;
+  firestore = firebaseAdmin.firestore;
+}
 
 const LOGS_COLLECTION = 'agent_logs_v3'; // Nome da coleção incrementado
 
 interface LogEntry {
-  timestamp: admin.firestore.Timestamp;
+  timestamp: any; // Alterado para any para evitar erros no cliente
   agentId?: string;
   flowName: string;
   type: 'start' | 'end' | 'tool_call' | 'error' | 'info';
@@ -112,31 +122,47 @@ export const enhancedLogger = {
   ),
 };
 
+// Função auxiliar para criar um fluxo logável
 export function createLoggableFlow<Request, Response>(
   name: string,
-  flow: WrappedFlow<Request, Response>
-): WrappedFlow<Request, Response> {
+  flow: FlowType<Request, Response>
+): FlowType<Request, Response> {
+  // Verifica se estamos no servidor
+  if (typeof window !== 'undefined') {
+    // No cliente, retornamos uma função vazia que lança um erro
+    return (() => {
+      throw new Error('createLoggableFlow should only be used on the server side');
+    }) as unknown as Flow<Request, Response>;
+  }
+
+  // Importação dinâmica apenas no servidor
+  const { genkitFlow } = require('@genkit-ai/flow');
+  
   return genkitFlow(
-    {
-      name,
-      // Considere adicionar schemas de entrada/saída para validação e observabilidade
-      // inputSchema: z.any(), 
-      // outputSchema: z.any(),
-    },
-    async (input: Request, streamingCallback?: (chunk: Response) => void) => {
+    { name },
+    async (input: Request, context?: any) => {
       const agentId = (input as any)?.agentId || 'unknown_agent';
       
-      await enhancedLogger.logStart(name, agentId, input);
       try {
-        const result = await flow(input, streamingCallback);
+        await enhancedLogger.logStart(name, agentId, input);
+        
+        // Executa o fluxo original
+        const result = await flow(input, context);
+        
+        // Registra o término bem-sucedido
         await enhancedLogger.logEnd(name, agentId, result);
+        
         return result;
-      } catch (error: any) {
-        await enhancedLogger.logError(name, agentId, error, { input });
-        throw error;
+      } catch (error) {
+        // Registra o erro
+        await enhancedLogger.logError(
+          name, 
+          agentId, 
+          error as Error, 
+          { input }
+        );
+        throw error; // Re-lança o erro para o chamador
       }
     }
   );
 }
-
-// NOTA: Nenhuma exportação padrão aqui, enhancedLogger já é exportado como uma constante nomeada.

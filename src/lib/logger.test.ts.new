@@ -1,5 +1,4 @@
-import { enhancedLogger, createLoggableFlow, LogEntryV2 } from './logger';
-import { WrappedFlow } from '@genkit-ai/flow';
+import { enhancedLogger, createLoggableFlow } from './logger';
 
 // Mock Firestore
 const mockAdd = jest.fn();
@@ -33,7 +32,7 @@ jest.mock('./firebaseAdmin', () => ({
   firestore: { // Firestore service instance
     collection: (collectionName: string) => mockCollection(collectionName)
   }
-}), { virtual: true });
+}));
 
 // Mock Genkit Core
 const mockInstrument = jest.fn((opts, fn) => fn); // Actual fn is called
@@ -52,7 +51,6 @@ const mockGenkitFlow = jest.fn((config, flow) => flow as Flow<any, any>);
 jest.mock('@genkit-ai/flow', () => ({
   flow: (config: any, flow: any) => mockGenkitFlow(config, flow),
 }));
-
 
 describe('Enhanced Logger', () => {
   beforeEach(() => {
@@ -78,7 +76,7 @@ describe('Enhanced Logger', () => {
 
     expect(mockCollection).toHaveBeenCalledWith('agent_flow_logs');
     expect(mockAdd).toHaveBeenCalledTimes(1);
-    const logCall = mockAdd.mock.calls[0][0] as Omit<LogEntryV2, 'timestamp'>;
+    const logCall = mockAdd.mock.calls[0][0] as any;
     expect(logCall.agentId).toBe(agentId);
     expect(logCall.flowName).toBe(flowName);
     expect(logCall.type).toBe('start');
@@ -91,7 +89,7 @@ describe('Enhanced Logger', () => {
     await enhancedLogger.logEnd(flowName, agentId, output);
 
     expect(mockAdd).toHaveBeenCalledTimes(1);
-    const logCall = mockAdd.mock.calls[0][0] as Omit<LogEntryV2, 'timestamp'>;
+    const logCall = mockAdd.mock.calls[0][0] as any;
     expect(logCall.type).toBe('end');
     expect(logCall.data.output).toEqual(output);
   });
@@ -103,7 +101,7 @@ describe('Enhanced Logger', () => {
     await enhancedLogger.logToolCall(flowName, agentId, toolName, input, output);
 
     expect(mockAdd).toHaveBeenCalledTimes(1);
-    const logCall = mockAdd.mock.calls[0][0] as Omit<LogEntryV2, 'timestamp'>;
+    const logCall = mockAdd.mock.calls[0][0] as any;
     expect(logCall.type).toBe('tool_call');
     expect(logCall.data.toolName).toBe(toolName);
     expect(logCall.data.input).toEqual(input);
@@ -117,7 +115,7 @@ describe('Enhanced Logger', () => {
     await enhancedLogger.logError(flowName, agentId, error, details);
 
     expect(mockAdd).toHaveBeenCalledTimes(1);
-    const logCall = mockAdd.mock.calls[0][0] as Omit<LogEntryV2, 'timestamp'>;
+    const logCall = mockAdd.mock.calls[0][0] as any;
     expect(logCall.type).toBe('error');
     expect(logCall.data.error.name).toBe('Error');
     expect(logCall.data.error.message).toBe('Test error');
@@ -131,13 +129,12 @@ describe('Enhanced Logger', () => {
     await enhancedLogger.logInfo(flowName, agentId, message, data);
 
     expect(mockAdd).toHaveBeenCalledTimes(1);
-    const logCall = mockAdd.mock.calls[0][0] as Omit<LogEntryV2, 'timestamp'>;
+    const logCall = mockAdd.mock.calls[0][0] as any;
     expect(logCall.type).toBe('info');
     expect(logCall.data.message).toBe(message);
     expect(logCall.data.custom).toBe('data');
   });
 });
-
 
 describe('createLoggableFlow', () => {
   const mockFlowLogic = jest.fn();
@@ -207,28 +204,3 @@ describe('createLoggableFlow', () => {
     expect(logEndSpy).toHaveBeenCalledWith(flowName, 'unknown_agent', output);
   });
 });
-
-// _MOD_MOCK_REPLACEMENT_ is a placeholder that I used to manually fix a detail in the complex mock setup.
-// It ensures that the mockTimestampNow function inside the dynamic import mock for './firebaseAdmin'
-// correctly updates the jest.fn() instance that is defined in the outer scope.
-// This is a nuance of how Jest handles mocks of dynamically imported modules vs. static ones.
-// The actual replacement was: `() => { const mockT = { seconds: Date.now()/1000, nanos:0 }; mockTimestampNow.mockReturnValue(mockT); return mockT; }`
-// But for the final output, it's better to simplify the mock structure if possible or ensure the mock captures calls correctly.
-// The key is that `admin.firestore.Timestamp.now()` called by the logger eventually calls the spied/mocked `mockTimestampNow`.
-// The corrected mock for firebaseAdmin:
-// jest.mock('./firebaseAdmin', () => ({
-//   __esModule: true,
-//   default: { // admin namespace
-//     firestore: {
-//       Timestamp: {
-//         now: () => mockTimestampNow(), // Ensures the outer mock is called
-//       },
-//     },
-//   },
-//   firestore: { // Firestore service instance
-//     collection: (collectionName: string) => mockCollection(collectionName),
-//   },
-// }), { virtual: true });
-// This structure should ensure that when the logger calls `(await getFirebaseInstances()).default.firestore.Timestamp.now()`,
-// it resolves to the `mockTimestampNow` function that is spied upon.
-// And when it calls `(await getFirebaseInstances()).firestore.collection()`, it hits `mockCollection`.
