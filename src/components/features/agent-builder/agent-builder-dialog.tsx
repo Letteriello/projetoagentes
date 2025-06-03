@@ -61,20 +61,25 @@ import DeployTab from './tabs/DeployTab'; // Import DeployTab
 import { SubAgentSelector } from './sub-agent-selector';
 import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
 
-import {
+import type {
   SavedAgentConfiguration,
-  AgentConfig as AgentConfigUnion, // Renaming to avoid conflict if local AgentConfig is temporarily needed
+  AgentConfig as AgentConfigUnion, // Keep alias
   LLMAgentConfig,
   WorkflowAgentConfig,
   CustomAgentConfig,
   A2AAgentSpecialistConfig,
   ToolConfigData,
-  StatePersistenceConfig, // Assuming these are exported from agent-configs.ts
+  StatePersistenceConfig,
   RagMemoryConfig,
   ArtifactsConfig,
-  A2AConfig as AgentA2AConfig // Renaming to avoid conflict with the component
-} from '@/types/agent-configs-fixed';
-import { AvailableTool } from '@/types/agent-configs-fixed';
+  A2AConfig as AgentA2AConfig, // Keep alias
+  AvailableTool, // Now from agent-types
+  AgentType, // Added as per subtask example
+  AgentFramework // Added as per subtask example
+  // Add any other specific config types that were imported from agent-configs-fixed if they were missed
+  // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
+  // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
+} from '@/types/agent-types';
 
 // Local AgentConfig type is removed.
 
@@ -219,9 +224,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     // Handle export logic
   };
 
-  const handleToolConfigure = (toolId: string) => {
-    // Handle tool configuration
-  };
+  // const handleToolConfigure = (toolId: string) => { // REMOVED
+  //   // Handle tool configuration
+  // };
 
   const getTabStatusIcon = (tab: string) => {
     // Return appropriate icon based on tab status
@@ -330,7 +335,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     selectedTools={methods.watch("tools") || []} // RHF state
                     setSelectedTools={(tools) => methods.setValue("tools", tools, {shouldValidate: true, shouldDirty: true})} // RHF action
                     // toolConfigurations={methods.watch("toolConfigsApplied") || {}} // This prop seems to be missing in ToolsTab's definition
-                    onToolConfigure={handleToolConfigure} // Still uses local modal state management for now
+                    // onToolConfigure={handleToolConfigure} // REMOVED
                     iconComponents={iconComponents}
                     InfoIcon={InfoIcon} // Pass the imported InfoIcon
                     SettingsIcon={Settings}

@@ -19,20 +19,21 @@ export interface ToolConfigField {
   description?: string;
 }
 
-export interface AvailableTool {
-  id: string;
-  label: string;
-  name: string;
-  type: "genkit_native" | "openapi" | "mcp" | "custom_script";
-  icon?: ReactNode | string;
-  description: string;
-  hasConfig?: boolean;
-  genkitToolName?: string;
-  configFields?: ToolConfigField[];
-  category?: string;
-  requiresAuth: boolean;
-  serviceTypeRequired: string;
-}
+// AvailableTool interface removed from here. It's now sourced from ./tool-types.ts via agent-types.ts
+// export interface AvailableTool {
+//   id: string;
+//   label: string;
+//   name: string;
+//   type: "genkit_native" | "openapi" | "mcp" | "custom_script";
+//   icon?: ReactNode | string;
+//   description: string;
+//   hasConfig?: boolean;
+//   genkitToolName?: string;
+//   configFields?: ToolConfigField[];
+//   category?: string;
+//   requiresAuth: boolean;
+//   serviceTypeRequired: string;
+// }
 
 export interface LLMAgentConfig {
   type: "llm";

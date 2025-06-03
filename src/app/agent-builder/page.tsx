@@ -28,7 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjusted path
+// import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjusted path - REMOVED
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
@@ -175,42 +175,43 @@ import {
 // }
 
 // Imports from the new data file
-import {
-  // Tipos exportados
-  AvailableTool,
-  ToolConfigData,
-  AgentTemplate,
-  SavedAgentConfiguration,
-  // Dados exportados
-  availableTools,
-  agentToneOptions,
-  agentTypeOptions,
-  iconComponents,
-  agentTemplates,
-  // Tipos adicionais
-  AgentFramework,
-  AgentType,
-  WorkflowDetailedType,
-  TerminationConditionType,
-  StatePersistenceType,
-  ArtifactStorageType,
-  StateScope,
-  ToolConfigField,
-  CommunicationChannel,
-  A2AConfig,
-  ArtifactDefinition,
-  ArtifactsConfig,
-  InitialStateValue,
-  StateValidationRule,
-  StatePersistenceConfig,
-  KnowledgeSource,
-  RagMemoryConfig,
+import type {
   AgentConfigBase,
   LLMAgentConfig,
   WorkflowAgentConfig,
   CustomAgentConfig,
   A2AAgentSpecialistConfig,
-  AgentConfig
+  A2AConfig,
+  ToolConfigData,
+  SavedAgentConfiguration,
+  AgentFramework,
+  AgentType,
+  // WorkflowDetailedType, // Assuming not directly used in page.tsx based on initial assessment
+  // TerminationConditionType,
+  // StatePersistenceType,
+  // ArtifactStorageType,
+  // StateScope,
+  // ToolConfigField,
+  // CommunicationChannel,
+  // ArtifactDefinition,
+  // ArtifactsConfig,
+  // InitialStateValue,
+  // StateValidationRule,
+  // StatePersistenceConfig,
+  // KnowledgeSource,
+  // RagMemoryConfig,
+  AgentConfig,
+  AvailableTool // Added here
+} from '@/types/agent-types';
+
+import {
+  // Data exports
+  availableTools,
+  agentToneOptions,
+  agentTypeOptions,
+  iconComponents
+  // agentTemplates, // Removed as it's not used in this file
+  // AgentTemplate // Removed as it's not used in this file
 } from "@/data/agentBuilderConfig";
 import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui"; // Nova UI
 import { MessageSquareText, Edit3 } from "lucide-react"; // Ícones para alternar
