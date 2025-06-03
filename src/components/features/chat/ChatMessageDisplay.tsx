@@ -2,7 +2,17 @@
 // garantindo que as mensagens não ocupem a largura total em telas maiores e se ajustem bem em telas menores.
 // Imagens também usam max-w-full para não excederem o contêiner.
 // Importações de bibliotecas e componentes necessários.
-import { Bot, User, Paperclip as PaperclipIcon, Download } from "lucide-react";
+import {
+  Bot,
+  User,
+  Paperclip as PaperclipIcon, // Kept for potential future use or as a fallback if needed differently
+  Download,
+  FileText,
+  FileJson,
+  FileBadge, // Using FileBadge for CSV/Spreadsheet as per previous subtask consistency
+  FileCode2,
+  FileType as FileIcon, // Default file icon
+} from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,6 +34,28 @@ const BlinkingCursor = () => (
 
 // Componente principal para exibir uma única mensagem de chat.
 // Responsável por renderizar o conteúdo da mensagem, incluindo texto, imagens e anexos de arquivo.
+
+// Helper function to get the appropriate attachment icon
+const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
+  if (fileType) {
+    if (fileType === "application/pdf") return FileText;
+    if (fileType === "text/csv" || fileType === "application/vnd.ms-excel" || fileType.includes("spreadsheet")) return FileBadge; // Using FileBadge
+    if (fileType === "application/json") return FileJson;
+    if (fileType === "text/plain") return FileText;
+    if (fileType === "text/markdown") return FileCode2;
+    if (fileType.startsWith("text/") || fileType.includes("script") || fileType.includes("code")) return FileCode2;
+  }
+  // Fallback based on extension if fileType is generic or missing
+  if (fileName) {
+    if (fileName.endsWith(".pdf")) return FileText;
+    if (fileName.endsWith(".csv")) return FileBadge; // Using FileBadge
+    if (fileName.endsWith(".json")) return FileJson;
+    if (fileName.endsWith(".txt")) return FileText;
+    if (fileName.endsWith(".md")) return FileCode2;
+  }
+  return FileIcon; // Default icon
+};
+
 export default function ChatMessageDisplay({
   message,
 }: ChatMessageDisplayProps) {
@@ -120,12 +152,12 @@ export default function ChatMessageDisplay({
               isUser ? "bg-primary/80" : "bg-muted/50 border border-border/30",
             )}
           >
-            <PaperclipIcon
-              className={cn(
-                "h-4 w-4 flex-shrink-0",
+            {React.createElement(getAttachmentIcon(message.fileType, message.fileName), {
+              className: cn(
+                "h-5 w-5 flex-shrink-0", // Slightly larger icon for better visibility
                 isUser ? "text-primary-foreground/80" : "text-muted-foreground",
-              )}
-            />
+              ),
+            })}
             <span className="truncate flex-1" title={message.fileName}>
               {message.fileName}
             </span>

@@ -214,10 +214,10 @@ export function ChatUI() {
   // const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   // const [inputContinuation, setInputContinuation] = useState<any>(null);
 
-  // File Handling State - MOVED TO useChatStore
-  // const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  // const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  // const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+  // File Handling State - REMOVED as it's now in MessageInputArea.tsx
+  // const [selectedFile, setSelectedFile] = useState<File | null>(null); // REMOVED
+  // const [selectedFileName, setSelectedFileName] = useState<string | null>(null); // REMOVED
+  // const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); // REMOVED
 
   // Agent and Gem Selection State
   const [selectedGemId, setSelectedGemId] = useState<string | null>(
@@ -309,18 +309,20 @@ export function ChatUI() {
     }
   };
 
-  // handleFileChange is now store.handleFileChange (assuming it's implemented in the store)
-  // removeSelectedFile is now store.clearSelectedFile
+  // handleFileChange is now INTERNAL to MessageInputArea.tsx
+  // removeSelectedFile is now INTERNAL to MessageInputArea.tsx
 
   // handleFormSubmit is now largely store.submitMessage
-  const handleFormSubmitWrapper = async (event: React.FormEvent<HTMLFormElement>) => {
+  // It now needs to accept the file from MessageInputArea
+  const handleFormSubmitWrapper = async (event: React.FormEvent<HTMLFormElement>, file?: File | null) => {
     event.preventDefault();
     if (pendingAgentConfig && store.isPending) { // Check store.isPending
       toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
       return;
     }
     setPendingAgentConfig(null); // UI specific state for agent creator
-    await store.submitMessage(store.inputValue, activeChatTarget, testRunConfig);
+    // Pass the file to submitMessage. The store will need to handle it.
+    await store.submitMessage(store.inputValue, activeChatTarget, testRunConfig, file);
     inputRef.current?.focus(); // Keep UI focus logic
   };
 
@@ -489,18 +491,18 @@ export function ChatUI() {
   // For now, assuming store.handleFileChange exists. If it's just simple state updates,
   // store.setSelectedFile, store.setSelectedFileName, store.setSelectedFileDataUri can be used.
   // Let's assume a simple version for now if handleFileChange is not in the store:
-  const handleFileChangeForStore = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      store.setSelectedFile(file);
-      store.setSelectedFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => store.setSelectedFileDataUri(reader.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      store.clearSelectedFile();
-    }
-  };
+  // const handleFileChangeForStore = (event: ChangeEvent<HTMLInputElement>) => { // REMOVED
+  //   const file = event.target.files?.[0];
+  //   if (file) {
+  //     store.setSelectedFile(file);
+  //     store.setSelectedFileName(file.name);
+  //     const reader = new FileReader();
+  //     reader.onloadend = () => store.setSelectedFileDataUri(reader.result as string);
+  //     reader.readAsDataURL(file);
+  //   } else {
+  //     store.clearSelectedFile();
+  //   }
+  // };
 
 
   return (
@@ -634,13 +636,9 @@ export function ChatUI() {
               formRef={useRef<HTMLFormElement>(null)}
               inputRef={inputRef}
               fileInputRef={fileInputRef}
-              onSubmit={handleFormSubmitWrapper}
+              onSubmit={handleFormSubmitWrapper} // Pass the updated wrapper
               isPending={store.isPending || !!pendingAgentConfig} // Combine store pending with UI pending for agent creator
-              selectedFile={store.selectedFile}
-              selectedFileName={store.selectedFileName ?? ""}
-              selectedFileDataUri={store.selectedFileDataUri}
-              onRemoveAttachment={store.clearSelectedFile} // Use store's clear method
-              handleFileChange={handleFileChangeForStore} // Use the wrapper or store's own if available
+              // selectedFile, selectedFileName, selectedFileDataUri, onRemoveAttachment, handleFileChange props are removed
               inputValue={store.inputValue}
               onInputChange={(e) => store.setInputValue(typeof e === 'string' ? e : e.target.value)}
             />

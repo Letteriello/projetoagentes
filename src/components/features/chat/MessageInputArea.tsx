@@ -1,6 +1,6 @@
 // Componente MessageInputArea: Responsivo através de flexbox e classes de tamanho/padding.
 // O Textarea se ajusta dinamicamente em altura (max-h-36) e os botões mantêm tamanho fixo.
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, ChangeEvent } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,20 @@ import {
 import { Paperclip, SendHorizontal, Loader2 as Loader, Search, Sparkles, Code, Database, Globe, Bot } from "lucide-react";
 import AttachmentPopoverContent from "./AttachmentPopoverContent";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast"; // Import toast
+
+// Define validation constants
+const ALLOWED_FILE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/json',
+  'image/gif', // Example: add more types if needed
+  'text/markdown',
+];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 interface Tool {
   id: string;
@@ -23,15 +37,11 @@ interface MessageInputAreaProps {
   formRef: React.RefObject<HTMLFormElement>;
   inputRef: React.RefObject<HTMLTextAreaElement>;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>, file?: File | null) => void; // Modified onSubmit
   isPending: boolean;
-  selectedFile: File | null;
-  selectedFileName: string;
-  selectedFileDataUri: string | null;
-  onRemoveAttachment: () => void;
-  handleFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  // selectedFile, selectedFileName, selectedFileDataUri, onRemoveAttachment, handleFileChange are now internal
   inputValue: string;
-  onInputChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onInputChange: (event: React.ChangeEvent<HTMLTextAreaElement> | string) => void; // Modified onInputChange
 }
 
 // Lista de ferramentas disponíveis
@@ -80,11 +90,11 @@ export default function MessageInputArea({
   fileInputRef,
   onSubmit,
   isPending,
-  selectedFile,
-  selectedFileName,
-  selectedFileDataUri,
-  onRemoveAttachment,
-  handleFileChange,
+  // selectedFile prop removed
+  // selectedFileName prop removed
+  // selectedFileDataUri prop removed
+  // onRemoveAttachment prop removed
+  // handleFileChange prop removed
   inputValue,
   onInputChange,
 }: MessageInputAreaProps) {
@@ -92,6 +102,73 @@ export default function MessageInputArea({
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const MAX_TEXTAREA_ROWS = 6; // Define max rows for textarea
+
+  // Internal state for attachments
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string>("");
+  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+
+  const handleFileChangeInternal = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setSelectedFile(null);
+      setSelectedFileName("");
+      setSelectedFileDataUri(null);
+      return;
+    }
+
+    // Type Validation
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      toast({
+        title: 'Invalid File Type',
+        description: `Please select a valid file type. Allowed: ${ALLOWED_FILE_TYPES.join(', ')}.`,
+        variant: 'destructive',
+      });
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      onRemoveAttachmentInternal(); // Clear any existing valid attachment
+      return;
+    }
+
+    // Size Validation
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: 'File Too Large',
+        description: `Please select a file smaller than ${MAX_FILE_SIZE / (1024 * 1024)}MB.`,
+        variant: 'destructive',
+      });
+      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      onRemoveAttachmentInternal(); // Clear any existing valid attachment
+      return;
+    }
+
+    // If validations pass
+    setSelectedFile(file);
+    setSelectedFileName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedFileDataUri(reader.result as string);
+    };
+    reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+      toast({
+        title: 'Error Reading File',
+        description: 'Could not read the selected file.',
+        variant: 'destructive',
+      });
+      onRemoveAttachmentInternal(); // Clear attachment state on error
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onRemoveAttachmentInternal = () => {
+    setSelectedFile(null);
+    setSelectedFileName("");
+    setSelectedFileDataUri(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Reset file input
+    }
+  };
 
   useEffect(() => {
     if (selectedFile) {
@@ -101,13 +178,20 @@ export default function MessageInputArea({
     }
   }, [selectedFile]);
 
+  const handleFormSubmitInternal = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSubmit(event, selectedFile);
+  };
+
   const handleTextareaKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
     if (event.key === "Enter" && !event.shiftKey && !isPending) {
       event.preventDefault();
       if (formRef.current) {
-        formRef.current.requestSubmit();
+        // Instead of requestSubmit, directly call our internal submit handler
+        // or ensure the form's onSubmit calls handleFormSubmitInternal
+        handleFormSubmitInternal(event as unknown as React.FormEvent<HTMLFormElement>);
       }
     }
   };
@@ -115,7 +199,6 @@ export default function MessageInputArea({
   const internalHandleChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
-    // Call the parent's handler to update inputValue
     onInputChange(event);
 
     // Dynamic height adjustment
@@ -169,7 +252,7 @@ export default function MessageInputArea({
   return (
     <form
       ref={formRef}
-      onSubmit={onSubmit}
+      onSubmit={handleFormSubmitInternal} // Use internal submit handler
       className="sticky bottom-0 flex items-end gap-2 p-3 border-t bg-background z-10"
     >
       {/* Menu de ferramentas */}
@@ -244,8 +327,8 @@ export default function MessageInputArea({
             <AttachmentPopoverContent
               fileName={selectedFileName}
               fileDataUri={selectedFileDataUri}
-              fileType={selectedFile.type}
-              onRemoveAttachment={onRemoveAttachment}
+              fileType={selectedFile?.type || ""}
+              onRemoveAttachment={onRemoveAttachmentInternal}
             />
           </PopoverContent>
         )}
@@ -254,9 +337,9 @@ export default function MessageInputArea({
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChange}
+        onChange={handleFileChangeInternal} // Use internal file change handler
         className="hidden"
-        accept="image/*,application/pdf,.txt,.csv,.json,.xml,.md,text/plain"
+        accept={ALLOWED_FILE_TYPES.join(",")} // Update accept attribute
         disabled={isPending}
       />
 
