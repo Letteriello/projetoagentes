@@ -1,4 +1,5 @@
 // src/lib/logger.ts
+import { winstonLogger } from './winston-logger';
 
 // Definição do tipo Flow para uso no logger
 type Flow<Req, Res> = (input: Req, context?: any) => Promise<Res>;
@@ -78,19 +79,22 @@ export const enhancedLogger = {
   },
   
   logError: async (flowName: string, agentId?: string, error?: Error, details?: any) => {
+    const errorInfo = error ? { name: error.name, message: error.message, stack: error.stack } : 'Unknown error';
+    winstonLogger.error(`Error in flow: ${flowName}`, { agentId, error: errorInfo, details });
     await writeLogToFirestore({
       flowName,
       agentId,
       type: 'error',
       traceId: undefined,
       data: {
-        error: error ? { name: error.name, message: error.message, stack: error.stack } : 'Unknown error',
+        error: errorInfo,
         details,
       },
     });
   },
   
   logInfo: async (flowName: string, agentId?: string, message?: string, data?: any) => {
+    winstonLogger.info(`Info for flow: ${flowName}`, { agentId, message, data });
     await writeLogToFirestore({
       flowName,
       agentId,

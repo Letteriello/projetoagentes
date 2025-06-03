@@ -1,6 +1,7 @@
 import { StreamingTextResponse, streamToResponse } from 'ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { basicChatFlow, BasicChatInput } from '@/ai/flows/chat-flow';
+import { winstonLogger } from '../../../lib/winston-logger';
 import { constructSystemPromptForGenkit, AgentConfigForPrompt } from '@/lib/agent-genkit-utils';
 import { ReadableStream } from 'node:stream/web';
 
@@ -164,6 +165,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[Chat API Error]', error);
+    winstonLogger.error('Error in chat-stream API:', { error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error) });
     return NextResponse.json(
       { error: error.message || 'An unexpected error occurred in chat API.' },
       { status: 500 }

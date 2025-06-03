@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Inter } from 'next/font/google';
 import { AppLayout } from "@/components/layout/app-layout";
+import { ErrorBoundaryClient } from '@/components/error-boundary-client';
 import { Toaster } from "@/components/ui/toaster";
 import { AgentsProvider } from '@/contexts/AgentsContext';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -72,7 +73,7 @@ export default function RootLayout({
               <AgentsProvider>
                 <SidebarProvider defaultOpen>
                   <AppLayout>
-                    {children}
+                    <ErrorBoundaryClient>{children}</ErrorBoundaryClient>
                   </AppLayout>
                 </SidebarProvider>
               </AgentsProvider>
