@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { lazy, Suspense } from 'react';
 import { useForm, FormProvider, useFormContext, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -63,15 +64,17 @@ import { InfoIcon } from '@/components/ui/InfoIcon'; // Though used in tabs, mod
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 
 import GeneralTab from './tabs/general-tab';
-import ToolsTab from './tabs/tools-tab';
-import BehaviorTab from './tabs/behavior-tab';
-import StateMemoryTab from './tabs/state-memory-tab';
-import RagTab from './tabs/rag-tab';
-import ArtifactsTab from './tabs/artifacts-tab';
-import A2AConfig from './tabs/a2a-config';
-import MultiAgentTab from './tabs/multi-agent-tab';
-import ReviewTab from './tabs/review-tab';
-import DeployTab from './tabs/DeployTab'; // Import DeployTab
+// Lazy load tab components
+const ToolsTab = lazy(() => import('./tabs/tools-tab'));
+const BehaviorTab = lazy(() => import('./tabs/behavior-tab'));
+const StateMemoryTab = lazy(() => import('./tabs/state-memory-tab'));
+const RagTab = lazy(() => import('./tabs/rag-tab'));
+const ArtifactsTab = lazy(() => import('./tabs/artifacts-tab'));
+const A2AConfig = lazy(() => import('./tabs/a2a-config'));
+const MultiAgentTab = lazy(() => import('./tabs/multi-agent-tab'));
+const ReviewTab = lazy(() => import('./tabs/review-tab'));
+const DeployTab = lazy(() => import('./tabs/DeployTab')); // Import DeployTab
+
 import { SubAgentSelector } from './sub-agent-selector';
 import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
 import useApiKeyVault from '../../../hooks/use-api-key-vault';
@@ -96,6 +99,9 @@ import type {
   // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
   // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
 } from '@/types/agent-types';
+
+// Fallback component for lazy loading
+const LoadingFallback = () => <div>Loading tab...</div>;
 
 // Define a default for ArtifactsConfig to ensure it's always present
 const DEFAULT_ARTIFACTS_CONFIG: ArtifactsConfig = {
@@ -473,9 +479,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
                 {/* Tools Tab */}
                 <TabsContent value="tools">
-                  <ToolsTab
-                    availableTools={availableTools}
-                    selectedTools={methods.watch("tools") || []} // RHF state
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ToolsTab
+                      availableTools={availableTools}
+                      selectedTools={methods.watch("tools") || []} // RHF state
                     setSelectedTools={(tools) => methods.setValue("tools", tools, {shouldValidate: true, shouldDirty: true})} // RHF action
                     iconComponents={iconComponents}
                     InfoIcon={InfoIcon} // Pass the imported InfoIcon
@@ -490,24 +497,28 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                       methods.setValue("toolConfigsApplied", { ...currentConfigs, [toolId]: config }, { shouldValidate: true, shouldDirty: true });
                     }}
                     toolConfigurations={methods.watch("toolConfigsApplied") || {}} // Still pass current configs for reading
-                  />
+                    />
+                  </Suspense>
                 </TabsContent>
 
                 {/* Behavior Tab - Now uses RHF context */}
                 <TabsContent value="behavior">
-                  <BehaviorTab
-                    agentToneOptions={agentToneOptions} // Pass only necessary static options
-                    showHelpModal={showHelpModal}
+                  <Suspense fallback={<LoadingFallback />}>
+                    <BehaviorTab
+                      agentToneOptions={agentToneOptions} // Pass only necessary static options
+                      showHelpModal={showHelpModal}
                     onGetAiSuggestions={handleGetAiSuggestions}
                     isSuggesting={isSuggesting}
-                  />
+                    />
+                  </Suspense>
                 </TabsContent>
 
                 {/* Memory & Knowledge Tab */}
                 <TabsContent value="memory_knowledge" className="space-y-6 mt-4">
-                  <Alert>
-                    <Brain className="h-4 w-4" />
-                    <AlertTitle>Memória & Conhecimento</AlertTitle>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Alert>
+                      <Brain className="h-4 w-4" />
+                      <AlertTitle>Memória & Conhecimento</AlertTitle>
                     <AlertDescription>
                       Configure a persistência de estado do agente e a capacidade de usar RAG (Retrieval Augmented Generation) para acesso a conhecimento externo.
                     </AlertDescription>
@@ -526,10 +537,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     InfoIcon={InfoIcon} // Pass the imported InfoIcon
                     showHelpModal={showHelpModal}
                   />
-                  <Separator className="my-6" />
-                  <RagTab
-                    // Form-related props removed. RagTab will use useFormContext.
-                    // It needs to be updated to watch "config.rag.enabled" and use Controller
+                    <Separator className="my-6" />
+                    <RagTab
+                      // Form-related props removed. RagTab will use useFormContext.
+                      // It needs to be updated to watch "config.rag.enabled" and use Controller
                     // for fields within "config.rag.*".
                     // The structure of ragMemoryConfig also needs to align with RagMemoryConfig from agent-configs.ts.
                     SearchIcon={Search}
@@ -539,14 +550,16 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     Trash2Icon={Trash2}
                     InfoIcon={InfoIcon} // Pass the imported InfoIcon
                     showHelpModal={showHelpModal}
-                  />
+                    />
+                  </Suspense>
                 </TabsContent>
 
                 {/* Artifacts Tab */}
                 <TabsContent value="artifacts">
-                  <ArtifactsTab
-                    // Form-related props removed. ArtifactsTab will use useFormContext.
-                    // It needs to be updated to use Controller for fields like "config.artifacts.enabled",
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ArtifactsTab
+                      // Form-related props removed. ArtifactsTab will use useFormContext.
+                      // It needs to be updated to use Controller for fields like "config.artifacts.enabled",
                     // "config.artifacts.storageType", "config.artifacts.definitions", etc.
                     // The type for artifactStorageType ('local' | 'cloud') needs to align with
                     // ArtifactStorageType ('local' | 'cloud' | 'memory' | 'filesystem') from agent-configs.ts.
@@ -557,14 +570,16 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     Trash2Icon={Trash2}
                     InfoIcon={InfoIcon} // Pass the imported InfoIcon
                     showHelpModal={showHelpModal}
-                  />
+                    />
+                  </Suspense>
                 </TabsContent>
 
                 {/* A2A Communication Tab */}
                 <TabsContent value="a2a" className="space-y-6 mt-4">
-                  <Alert>
-                    <Share2 className="h-4 w-4" />
-                    <AlertTitle>Comunicação Agente-Agente (A2A)</AlertTitle>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Alert>
+                      <Share2 className="h-4 w-4" />
+                      <AlertTitle>Comunicação Agente-Agente (A2A)</AlertTitle>
                     <AlertDescription>
                       Configure como este agente se comunica com outros agentes no sistema, incluindo canais e protocolos.
                     </AlertDescription>
@@ -576,16 +591,18 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     <CardContent className="space-y-4">
                       {/* The A2AConfigComponent will have its own internal switch for enabling/disabling */}
                       {/* It will use useFormContext to manage config.a2a directly */}
-                      <A2AConfig savedAgents={availableAgentsForSubSelector} showHelpModal={showHelpModal} />
+                        <A2AConfig savedAgents={availableAgentsForSubSelector} showHelpModal={showHelpModal} />
                     </CardContent>
-                  </Card>
+                    </Card>
+                  </Suspense>
                 </TabsContent>
 
                 {/* Multi-Agent & Advanced Tab */}
                 <TabsContent value="multi_agent_advanced" className="space-y-6 mt-4">
-                  <Alert>
-                    <Users className="h-4 w-4" />
-                    <AlertTitle>Multi-Agente & Configurações Avançadas</AlertTitle>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Alert>
+                      <Users className="h-4 w-4" />
+                      <AlertTitle>Multi-Agente & Configurações Avançadas</AlertTitle>
                     <AlertDescription>
                       Defina o papel deste agente em uma colaboração (raiz ou sub-agente), configure sub-agentes e outras configurações avançadas do sistema.
                     </AlertDescription>
@@ -634,33 +651,46 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         </p>
                       </div>
                     </CardContent>
-                  </Card>
-                  {/* This section seems to be a placeholder, no RHF fields to change here yet */}
-                  <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Configurações adicionais...
-                      </p>
-                    </CardContent>
-                  </Card>
+                    </Card>
+                    {/* This section seems to be a placeholder, no RHF fields to change here yet */}
+                    <Card className="mt-6">
+                      <CardHeader>
+                        <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                          Configurações adicionais...
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Suspense>
                 </TabsContent>
 
                 {/* Review Tab */}
                 <TabsContent value="review">
-                  <ReviewTab setActiveEditTab={setActiveEditTab} showHelpModal={showHelpModal} />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ReviewTab setActiveEditTab={setActiveEditTab} showHelpModal={showHelpModal} />
+                  </Suspense>
                 </TabsContent>
 
                 {/* Deploy Tab */}
                 <TabsContent value="deploy">
-                  <DeployTab />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <DeployTab />
+                  </Suspense>
                 </TabsContent>
 
                 {/* Advanced Tab (ADK Callbacks) */}
                 <TabsContent value="advanced" className="space-y-6 mt-4">
                   <Alert>
+                    {/* Note: This tab does not seem to use a lazy-loaded component directly at its root.
+                        If specific components *within* this tab were to be lazy-loaded, they would need
+                        their own Suspense boundaries. For now, assuming the content is static or
+                        already handled if it were a separate component. The prompt asked for specific
+                        components like ToolsTab, BehaviorTab etc. to be lazy loaded.
+                        If 'Advanced' itself was a component like 'AdvancedTab', it would be lazy loaded.
+                        Since it's direct JSX, no Suspense is added here unless a sub-component needs it.
+                    */}
                     <Settings2 className="h-4 w-4" />
                     <AlertTitle>Configurações Avançadas</AlertTitle>
                     <AlertDescription>
