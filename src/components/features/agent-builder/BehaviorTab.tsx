@@ -85,6 +85,7 @@ const BehaviorTab: React.FC<BehaviorTabProps> = ({ agentToneOptions, showHelpMod
           </AlertDescription>
         </Alert>
       )}
+      </div> {/* Closing tag for the div started at line 34 */}
     </TabsContent>
   );
 };
