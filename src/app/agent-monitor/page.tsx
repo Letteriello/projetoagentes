@@ -38,6 +38,16 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  type AgentStatus,
+  type ExecutionHistory,
+  type AverageResponseTime,
+  type ToolUsage as ToolUsageMetric, // Renamed to avoid conflict
+  generateAgentStatusData,
+  generateExecutionHistoryData,
+  generateAverageResponseTimeData,
+  generateToolUsageData,
+} from "@/services/mockAgentData";
 
 
 interface Filters {
@@ -151,6 +161,23 @@ export default function AgentMonitorPage() {
   const [avgResponseTimesLoading, setAvgResponseTimesLoading] = useState<boolean>(false);
   const [avgResponseTimesError, setAvgResponseTimesError] = useState<string | null>(null);
 
+  // New states for mock data
+  const [agentStatusData, setAgentStatusData] = useState<AgentStatus[]>([]);
+  const [agentStatusLoading, setAgentStatusLoading] = useState<boolean>(false);
+  const [agentStatusError, setAgentStatusError] = useState<string | null>(null);
+
+  const [executionHistoryData, setExecutionHistoryData] = useState<ExecutionHistory[]>([]);
+  const [executionHistoryLoading, setExecutionHistoryLoading] = useState<boolean>(false);
+  const [executionHistoryError, setExecutionHistoryError] = useState<string | null>(null);
+
+  const [averageResponseTimeData, setAverageResponseTimeData] = useState<AverageResponseTime[]>([]);
+  const [averageResponseTimeLoading, setAverageResponseTimeLoading] = useState<boolean>(false);
+  const [averageResponseTimeError, setAverageResponseTimeError] = useState<string | null>(null);
+
+  const [toolUsageMetricsData, setToolUsageMetricsData] = useState<ToolUsageMetric[]>([]);
+  const [toolUsageMetricsLoading, setToolUsageMetricsLoading] = useState<boolean>(false);
+  const [toolUsageMetricsError, setToolUsageMetricsError] = useState<string | null>(null);
+
   // State for Trace Details
   const [traceData, setTraceData] = useState<ClientLogEntry[]>([]);
   const [traceLoading, setTraceLoading] = useState<boolean>(false);
@@ -186,6 +213,22 @@ export default function AgentMonitorPage() {
   const avgResponseTimesChartConfig = {
     averageDurationMs: { label: "Avg. Duration (ms)", color: "hsl(var(--chart-5))" },
     groupKey: { label: "Group" }
+  } satisfies ChartConfig;
+
+  // Chart configs for new mock data
+  const executionHistoryChartConfig = {
+    count: { label: "Count", color: "hsl(var(--chart-1))" }, // Using chart-1 for consistency, can be changed
+    status: { label: "Status" },
+  } satisfies ChartConfig;
+
+  const averageResponseTimeChartConfig = {
+    averageTime: { label: "Avg. Response Time (ms)", color: "hsl(var(--chart-2))" }, // Using chart-2
+    agentId: { label: "Agent ID" },
+  } satisfies ChartConfig;
+
+  const toolUsageMetricsChartConfig = {
+    usageCount: { label: "Usage Count", color: "hsl(var(--chart-3))" }, // Using chart-3
+    toolName: { label: "Tool Name" },
   } satisfies ChartConfig;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -395,7 +438,59 @@ export default function AgentMonitorPage() {
     setTraceData([]);
     setCurrentTraceId('');
     setTraceError(null);
+    // Clear new mock data states
+    setAgentStatusData([]);
+    setExecutionHistoryData([]);
+    setAverageResponseTimeData([]);
+    setToolUsageMetricsData([]);
+    setAgentStatusError(null);
+    setExecutionHistoryError(null);
+    setAverageResponseTimeError(null);
+    setToolUsageMetricsError(null);
   };
+
+  // useEffect for mock data generation on component mount
+  useEffect(() => {
+    setAgentStatusLoading(true);
+    setAverageResponseTimeLoading(true); // Combined for efficiency with agentIds
+    try {
+      // Generate 5 agent IDs for mock data consistency
+      const mockAgentIds = Array.from({ length: 5 }, (_, i) => `agent-${i}`);
+
+      setAgentStatusData(generateAgentStatusData(mockAgentIds.length));
+      // Pass the generated agent IDs to the response time generator
+      setAverageResponseTimeData(generateAverageResponseTimeData(mockAgentIds));
+    } catch (err) {
+      setAgentStatusError('Failed to load agent status data.');
+      setAverageResponseTimeError('Failed to load average response time data.');
+      console.error("Error in agent status/avg response time data generation:", err);
+    } finally {
+      setAgentStatusLoading(false);
+      setAverageResponseTimeLoading(false);
+    }
+
+    setExecutionHistoryLoading(true);
+    try {
+      setExecutionHistoryData(generateExecutionHistoryData(50)); // Example count
+    } catch (err) {
+      setExecutionHistoryError('Failed to load execution history data.');
+      console.error("Error in execution history data generation:", err);
+    } finally {
+      setExecutionHistoryLoading(false);
+    }
+
+    setToolUsageMetricsLoading(true);
+    try {
+      const tools = ['ToolReader', 'ToolWriter', 'ToolAPI', 'ToolDB', 'ToolAnalysis']; // Example tool names
+      setToolUsageMetricsData(generateToolUsageData(tools, 100)); // Example max usage
+    } catch (err) {
+      setToolUsageMetricsError('Failed to load tool usage metrics data.');
+      console.error("Error in tool usage metrics data generation:", err);
+    } finally {
+      setToolUsageMetricsLoading(false);
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
 
   const logTypeOptions = [
     { value: 'all', label: 'All Types' },
@@ -491,9 +586,113 @@ export default function AgentMonitorPage() {
           <Button onClick={handleApplyFilters}>Apply Filters</Button>
         </div>
       </div>
+      {/* END OF FILTERS SECTION */}
 
-      {/* Placeholder sections from previous step */}
-      {/* Placeholder sections from previous step, Chart will go into Overview or a new Chart section */}
+
+      {/* Agent Status Summary */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Agent Status Overview</h2>
+        {agentStatusLoading && <p className="text-center py-4 text-muted-foreground">Loading agent status...</p>}
+        {agentStatusError && <p className="text-red-500 text-center py-4">{agentStatusError}</p>}
+        {!agentStatusLoading && !agentStatusError && agentStatusData.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div>
+              <p className="text-3xl font-bold text-green-500">{agentStatusData.filter(a => a.isActive).length}</p>
+              <p className="text-sm text-muted-foreground">Active Agents</p>
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-red-500">{agentStatusData.filter(a => !a.isActive).length}</p>
+              <p className="text-sm text-muted-foreground">Inactive Agents</p>
+            </div>
+          </div>
+        )}
+         {!agentStatusLoading && !agentStatusError && agentStatusData.length === 0 && (
+          <p className="text-center py-4 text-muted-foreground">No agent status data available.</p>
+        )}
+      </div>
+
+      {/* Execution History Chart */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Execution History (Mock Data)</h2>
+        {executionHistoryLoading && <p className="text-center py-10 text-muted-foreground">Loading chart...</p>}
+        {executionHistoryError && <p className="text-red-500 text-center py-10">{executionHistoryError}</p>}
+        {!executionHistoryLoading && !executionHistoryError && executionHistoryData.length > 0 && (
+          <ChartContainer config={executionHistoryChartConfig} className="min-h-[200px] w-full">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={[
+                  { status: 'Success', count: executionHistoryData.filter(e => e.status === 'success').length, fill: "var(--color-count)" },
+                  { status: 'Failure', count: executionHistoryData.filter(e => e.status === 'failure').length, fill: "hsl(var(--chart-4))" /* Using chart-4 for errors */ }
+                ]}
+                margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                <XAxis dataKey="status" tickLine={false} axisLine={false} />
+                <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} allowDecimals={false}/>
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dashed" />} />
+                {/* No legend needed for this simple chart */}
+                <Bar dataKey="count" radius={4} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        )}
+        {!executionHistoryLoading && !executionHistoryError && executionHistoryData.length === 0 && (
+          <p className="text-center py-10 text-muted-foreground">No execution history data available.</p>
+        )}
+      </div>
+
+      {/* Average Response Time Chart (Mock) */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Average Response Times (Mock Data)</h2>
+        {averageResponseTimeLoading && <p className="text-center py-10 text-muted-foreground">Loading chart...</p>}
+        {averageResponseTimeError && <p className="text-red-500 text-center py-10">{averageResponseTimeError}</p>}
+        {!averageResponseTimeLoading && !averageResponseTimeError && averageResponseTimeData.length > 0 && (
+          <ChartContainer config={averageResponseTimeChartConfig} className="min-h-[200px] w-full">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={averageResponseTimeData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                <XAxis dataKey="agentId" tickLine={false} axisLine={false} />
+                <YAxis dataKey="averageTime" strokeDasharray="3 3" tickLine={false} axisLine={false} unit="ms" />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent indicator="dashed" valueFormatter={(value) => `${value} ms`} />}
+                />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Bar dataKey="averageTime" fill="var(--color-averageTime)" radius={4} name="Avg. Response Time" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        )}
+        {!averageResponseTimeLoading && !averageResponseTimeError && averageResponseTimeData.length === 0 && (
+          <p className="text-center py-10 text-muted-foreground">No average response time data available.</p>
+        )}
+      </div>
+
+      {/* Tool Usage Metrics Chart (Mock) */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Tool Usage Metrics (Mock Data)</h2>
+        {toolUsageMetricsLoading && <p className="text-center py-10 text-muted-foreground">Loading chart...</p>}
+        {toolUsageMetricsError && <p className="text-red-500 text-center py-10">{toolUsageMetricsError}</p>}
+        {!toolUsageMetricsLoading && !toolUsageMetricsError && toolUsageMetricsData.length > 0 && (
+          <ChartContainer config={toolUsageMetricsChartConfig} className="min-h-[200px] w-full">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={toolUsageMetricsData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                <XAxis dataKey="toolName" tickLine={false} axisLine={false} />
+                <YAxis dataKey="usageCount" strokeDasharray="3 3" tickLine={false} axisLine={false} allowDecimals={false} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dashed" />} />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Bar dataKey="usageCount" fill="var(--color-usageCount)" radius={4} name="Usage Count"/>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        )}
+        {!toolUsageMetricsLoading && !toolUsageMetricsError && toolUsageMetricsData.length === 0 && (
+          <p className="text-center py-10 text-muted-foreground">No tool usage metrics data available.</p>
+        )}
+      </div>
+
+      {/* Existing charts below - these are driven by API and filters */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Agent Usage Frequency</h2>
         {agentUsageLoading && <p className="text-center py-10">Loading chart...</p>}
@@ -696,9 +895,14 @@ export default function AgentMonitorPage() {
         <p>Raw logs with filtering and pagination will be displayed here.</p>
       </div>
 
+      <div className="bg-card p-6 rounded-lg shadow mb-8"> {/* Added mb-8 for spacing */}
+        <h2 className="text-xl font-semibold mb-4">Log Viewer</h2>
+        <p className="text-muted-foreground">Raw logs with filtering and pagination will be displayed here. (Functionality to be fully implemented based on API)</p>
+      </div>
+
       <div className="bg-card p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Detailed Statistics</h2>
-        <p>Specific metrics like usage frequency, error rates, and response times will be shown here.</p>
+        <h2 className="text-xl font-semibold mb-4">Detailed Statistics (API Driven)</h2>
+        <p className="text-muted-foreground">Specific metrics like usage frequency, error rates, and response times based on actual log data will be shown here once API calls are fully filtered and connected to these charts.</p>
       </div>
     </div>
   );
