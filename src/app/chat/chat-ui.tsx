@@ -113,7 +113,7 @@ import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label"; 
-import { AgentSelector } from "@/components/agent-selector";
+import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
 // import * as cs from "@/lib/firestoreConversationStorage"; // No longer directly used here
 import { useRouter, useParams } from "next/navigation";
 import { useChatStore, ActiveChatTarget } from '@/hooks/use-chat-store'; // IMPORT THE STORE
@@ -574,7 +574,7 @@ export function ChatUI() {
         <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <ChatHeader
             isSidebarOpen={isSidebarOpen}
-            activeChatTarget={activeChatTargetName}
+            activeChatTargetDetails={activeChatTarget}
             onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             handleLogin={handleLogin}
             handleLogout={handleLogout}
