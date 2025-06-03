@@ -40,6 +40,8 @@ import { Switch } from '@/components/ui/switch';
 
 // Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
 // For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
+import ToolConfigModal from '../ToolConfigModal'; // Added import
+import type { ToolConfigData } from '@/types/agent-types'; // Added import
 
 interface ToolsTabProps {
   availableTools: AvailableTool[];
@@ -51,17 +53,18 @@ interface ToolsTabProps {
   PlusCircleIcon: React.ElementType;
   Trash2Icon: React.ElementType;
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
-  onToolConfigure: (toolId: string) => void; // Function to open configuration modal for a tool
+  // onToolConfigure: (toolId: string) => void; // REMOVED: Function to open configuration modal for a tool
 }
 
 // Definindo o tipo para o contexto do formulário
-type FormContextType = {
-  tools?: string[];
-  toolConfigsApplied?: Record<string, any>;
-  chatHistory?: Array<{role: string; content: string}>;
-  userInput?: string;
-  [key: string]: any;
-};
+// Using SavedAgentConfiguration directly with useFormContext as it's the root form type
+// type FormContextType = {
+//   tools?: string[];
+//   toolConfigsApplied?: Record<string, ToolConfigData>; // Changed 'any' to 'ToolConfigData'
+//   chatHistory?: Array<{role: string; content: string}>;
+//   userInput?: string;
+//   [key: string]: any;
+// };
 
 // Definindo o tipo para as ferramentas sugeridas
 type SuggestedToolType = {
@@ -77,14 +80,16 @@ export default function ToolsTab({
   SettingsIcon,
   CheckIcon,
   showHelpModal,
-  onToolConfigure,
+  // onToolConfigure, // REMOVED
 }: ToolsTabProps) {
-  const { control, watch, setValue, getValues } = useFormContext<FormContextType>();
+  const { control, watch, setValue, getValues } = useFormContext<SavedAgentConfiguration>(); // Changed FormContextType to SavedAgentConfiguration
   const { toast } = useToast();
   const currentSelectedTools = watch('tools') || [];
-  const toolConfigsApplied = watch('toolConfigsApplied') || {};
+  const toolConfigsApplied = watch('toolConfigsApplied') || {} as Record<string, ToolConfigData>; // Ensure type
 
   const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false); // Added state
+  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null); // Added state
   const [aiSuggestedTools, setAiSuggestedTools] = React.useState<SuggestedToolType[]>([]);
   const [isSuggestionsDialogOpen, setIsSuggestionsDialogOpen] = React.useState(false);
   const [isCustomToolDialogOpen, setIsCustomToolDialogOpen] = React.useState(false);
@@ -95,25 +100,19 @@ export default function ToolsTab({
 
   const fetchToolSuggestions = async () => {
     setIsLoadingSuggestions(true);
-    const currentConfig = getValues(); // Get the complete current agent configuration
+    // const currentConfig = getValues(); // Get the complete current agent configuration
+    // For suggestions, we might only need high-level goals or descriptions, not the whole config.
+    // For now, let's assume getValues() is okay, but this could be refined.
+    const agentGoal = getValues('config.agentGoal'); // Example of specific field
+    const agentDescription = getValues('agentDescription'); // Example of specific field
+
     try {
-      // MODIFICATION: Pass "tools" context
-      // Criando um objeto com as propriedades necessárias para a ação
-      const requestData = {
-        chatHistory: [],
-        userInput: "",
-        ...currentConfig
-      };
-      
-      // Chamando a ação com os dados formatados
-      // Usando type assertion para garantir a tipagem correta
       const result = await getAiConfigurationSuggestionsAction(
-        requestData as any, 
-        "tools" as any
+        { agentGoal, agentDescription, currentTools: currentSelectedTools } as any, // Pass relevant info
+        "tools"
       ); 
       
       if (result.success && result.suggestions && Array.isArray(result.suggestions) && result.suggestions.length > 0) {
-        // Garantir que cada item no array tenha o formato correto
         const suggestedTools: SuggestedToolType[] = result.suggestions.map((tool: any) => ({
           id: tool.id || '',
           name: tool.name || 'Ferramenta sem nome',
@@ -236,8 +235,29 @@ export default function ToolsTab({
     return <IconComponent className="w-5 h-5 mr-3 text-muted-foreground" />;
   };
 
+  const handleSaveToolConfiguration = (toolId: string, configData: ToolConfigData) => {
+    const currentConfigs = getValues('toolConfigsApplied') || {};
+    setValue('toolConfigsApplied', { ...currentConfigs, [toolId]: configData }, { shouldDirty: true, shouldValidate: true });
+    setIsToolConfigModalOpen(false);
+    setConfiguringTool(null);
+    const toolName = availableTools.find(t => t.id === toolId)?.name || toolId;
+    toast({ title: "Configuração da Ferramenta Salva", description: `Configuração salva para ${toolName}.` });
+  };
+
   return (
     <div className="space-y-6">
+      {configuringTool && (
+        <ToolConfigModal
+          isOpen={isToolConfigModalOpen}
+          onOpenChange={setIsToolConfigModalOpen}
+          tool={configuringTool}
+          // Assuming allTools might be needed if the modal needs to reference other tool definitions
+          // For now, passing only the specific tool. If modal needs more, this can be adjusted.
+          // allTools={availableTools}
+          onSave={(configData) => handleSaveToolConfiguration(configuringTool.id, configData)}
+          existingConfig={toolConfigsApplied[configuringTool.id]}
+        />
+      )}
       <CustomToolDialog
         isOpen={isCustomToolDialogOpen}
         onOpenChange={(open) => {
@@ -402,8 +422,9 @@ export default function ToolsTab({
                                   outputSchema: config.outputSchema || tool.outputSchema || '{}',
                                 });
                                 setIsCustomToolDialogOpen(true);
-                              } else {
-                                onToolConfigure(tool.id); // For non-custom tools with config
+                              } else if (hasConfig) { // Non-custom tool with config
+                                setConfiguringTool(tool);
+                                setIsToolConfigModalOpen(true);
                               }
                             }}
                             className="h-8 w-8" // Adjusted size for icon button

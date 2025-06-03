@@ -40,7 +40,7 @@ import {
     ArtifactStorageType,
     StateScope,
     ToolConfigField,
-    AvailableTool,
+    // AvailableTool, // Removed from this import block
     ToolConfigData,
     CommunicationChannel,
     A2AConfig,
@@ -59,6 +59,9 @@ import {
     AgentConfig,
     SavedAgentConfiguration
 } from '@/types/agent-configs-fixed';
+
+// Import AvailableTool from its single source of truth
+import type { AvailableTool } from '@/types/tool-types';
 
 // From Updated Upstream (Chosen version)
 // From Updated Upstream (Chosen version, matching above interface)

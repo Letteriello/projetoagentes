@@ -8,7 +8,7 @@ export type {
   ArtifactStorageType,
   StateScope,
   ToolConfigField,
-  AvailableTool,
+  // AvailableTool, // Removed from here
   ToolConfigData,
   CommunicationChannel,
   A2AConfig,
@@ -27,3 +27,6 @@ export type {
   AgentConfig,
   SavedAgentConfiguration
 } from './agent-configs';
+
+// Re-export AvailableTool from its new single source of truth
+export type { AvailableTool } from './tool-types';
