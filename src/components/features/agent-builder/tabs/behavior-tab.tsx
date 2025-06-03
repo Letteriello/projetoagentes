@@ -7,11 +7,13 @@ import {
   FormControl,
   FormMessage,
 } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { SavedAgentConfiguration } from '@/types/agent-types'; // Changed import
+import { aiModels, AIModel } from '@/data/ai-models'; // Import AI Models
 import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for now, verify if needed
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
@@ -133,9 +135,49 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
                     onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'agentModel' })}
                   />
                 </div>
-                <FormControl>
-                  <Input {...field} placeholder="e.g., gemini-1.5-flash-latest" />
-                </FormControl>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an AI model" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent className="max-h-[400px] overflow-y-auto"> {/* Added max-height and scroll */}
+                    {Object.entries(
+                      aiModels.reduce((acc, model) => {
+                        if (!acc[model.provider]) {
+                          acc[model.provider] = [];
+                        }
+                        acc[model.provider].push(model);
+                        return acc;
+                      }, {} as Record<string, AIModel[]>)
+                    ).map(([provider, models]) => (
+                      <SelectGroup key={provider}>
+                        <SelectLabel>{provider}</SelectLabel>
+                        {models.map((model) => (
+                          <TooltipProvider key={model.id} delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <SelectItem value={model.id}>
+                                  {model.name}
+                                </SelectItem>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" align="start" className="w-80 z-50"> {/* Added z-index */}
+                                <div className="font-bold text-lg mb-2">{model.name}</div>
+                                <div className="text-sm space-y-1">
+                                  <p><span className="font-semibold">Provider:</span> {model.provider}</p>
+                                  <p><span className="font-semibold">Price:</span> {model.price}</p>
+                                  <p><span className="font-semibold">Use Cases:</span> {model.useCases}</p>
+                                  {model.strengths && <p><span className="font-semibold">Strengths:</span> {model.strengths}</p>}
+                                  {model.limitations && <p><span className="font-semibold">Limitations:</span> {model.limitations}</p>}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

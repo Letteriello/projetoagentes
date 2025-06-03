@@ -20,6 +20,9 @@ import {
   MessageSquareText,
   Edit3,
   Ghost, // Added Ghost icon
+  Users, // For Total Agents
+  Wrench, // For Agents with Tools (alternative: PuzzlePiece)
+  Route, // For Root Agents (alternative: Network, GitFork)
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
@@ -54,10 +57,16 @@ import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-buil
 import { FeedbackButton } from "@/components/features/agent-builder/feedback-button";
 import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal"; // Import ConfirmationModal
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
   const { savedAgents, addAgent: addAgentViaContext, updateAgent: updateAgentViaContext, deleteAgent: deleteAgentViaContext, isLoadingAgents } = useAgents();
+
+  // Calculate statistics
+  const totalAgents = savedAgents.length;
+  const agentsWithTools = savedAgents.filter(agent => agent.tools && agent.tools.length > 0).length;
+  const rootAgents = savedAgents.filter(agent => agent.config && agent.config.isRootAgent).length;
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgent, setEditingAgent] =
@@ -74,6 +83,10 @@ export default function AgentBuilderPage() {
   const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = React.useState(false);
+
+  // State for delete confirmation modal
+  const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = React.useState(false);
+  const [agentToDelete, setAgentToDelete] = React.useState<SavedAgentConfiguration | null>(null);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -199,19 +212,33 @@ export default function AgentBuilderPage() {
     }
   };
 
-  const handleDeleteAgent = async (agentIdToDelete: string) => {
-    if (selectedAgentForMonitoring?.id === agentIdToDelete) {
-      setSelectedAgentForMonitoring(null);
-    }
-    if (currentAgentForTemplating?.id === agentIdToDelete) {
-      setCurrentAgentForTemplating(null);
-      setIsSaveAsTemplateDialogOpen(false);
-    }
-    const success = await deleteAgentViaContext(agentIdToDelete);
-    if (success) {
-      toast({ title: "Agente Excluído" });
+  const handleDeleteAgent = (agentIdToDelete: string) => {
+    const agentObject = savedAgents.find(agent => agent.id === agentIdToDelete);
+    if (agentObject) {
+      setAgentToDelete(agentObject);
+      setIsConfirmDeleteAgentOpen(true);
     } else {
-      toast({ title: "Erro ao Excluir", variant: "destructive" });
+      toast({ title: "Erro", description: "Agente não encontrado para exclusão.", variant: "destructive" });
+    }
+  };
+
+  const onConfirmDeleteAgent = async () => {
+    if (agentToDelete) {
+      if (selectedAgentForMonitoring?.id === agentToDelete.id) {
+        setSelectedAgentForMonitoring(null);
+      }
+      if (currentAgentForTemplating?.id === agentToDelete.id) {
+        setCurrentAgentForTemplating(null);
+        setIsSaveAsTemplateDialogOpen(false);
+      }
+      const success = await deleteAgentViaContext(agentToDelete.id);
+      if (success) {
+        toast({ title: "Agente Excluído", description: `O agente "${agentToDelete.agentName}" foi excluído.` });
+      } else {
+        toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o agente "${agentToDelete.agentName}".`, variant: "destructive" });
+      }
+      setIsConfirmDeleteAgentOpen(false);
+      setAgentToDelete(null);
     }
   };
 
@@ -302,6 +329,44 @@ export default function AgentBuilderPage() {
         </div>
       </header>
 
+      {/* Dashboard Section */}
+      {!isLoadingAgents && savedAgents && savedAgents.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Agentes</CardTitle>
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalAgents}</div>
+              {/* <p className="text-xs text-muted-foreground">+20.1% from last month</p> */}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Agentes com Ferramentas</CardTitle>
+              <Wrench className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{agentsWithTools}</div>
+              {/* <p className="text-xs text-muted-foreground">+180.1% from last month</p> */}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Agentes Raiz</CardTitle>
+              <Route className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{rootAgents}</div>
+              {/* <p className="text-xs text-muted-foreground">+19% from last month</p> */}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {/* End Dashboard Section */}
+
+
       {buildMode === 'chat' ? (
         <AgentCreatorChatUI
             initialAgentConfig={editingAgent}
@@ -316,8 +381,24 @@ export default function AgentBuilderPage() {
           </div>
           {isLoadingAgents && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {Array.from({ length: 3 }).map((_, index) => ( // Skeleton for Dashboard cards if needed, or for agent cards
+                <Card key={`skeleton-card-${index}`}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <Skeleton className="h-4 w-[150px]" />
+                    <Skeleton className="h-5 w-5" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-1/4 mb-1" />
+                    {/* <Skeleton className="h-3 w-1/2" /> */}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          {isLoadingAgents && ( // Keep skeleton for agent list separate
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="p-4 rounded-lg border border-border bg-card space-y-4 h-[210px] flex flex-col justify-between">
+                <div key={`skeleton-agent-${index}`} className="p-4 rounded-lg border border-border bg-card space-y-4 h-[210px] flex flex-col justify-between">
                   <div>
                     <div className="flex items-center space-x-3 mb-3">
                       <Skeleton className="h-10 w-10 rounded-md" />
@@ -331,7 +412,7 @@ export default function AgentBuilderPage() {
               ))}
             </div>
           )}
-          {!isLoadingAgents && savedAgents.length > 0 ? (
+          {!isLoadingAgents && savedAgents && savedAgents.length > 0 ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {savedAgents.map((agent) => (
@@ -469,6 +550,23 @@ export default function AgentBuilderPage() {
         isOpen={isFeedbackModalOpen}
         onOpenChange={setIsFeedbackModalOpen}
       />
+
+      {agentToDelete && (
+        <ConfirmationModal
+          isOpen={isConfirmDeleteAgentOpen}
+          onOpenChange={(isOpen) => {
+            setIsConfirmDeleteAgentOpen(isOpen);
+            if (!isOpen) {
+              setAgentToDelete(null);
+            }
+          }}
+          title="Confirmar Exclusão de Agente"
+          description={`Tem certeza que deseja excluir o agente "${agentToDelete?.agentName}"? Esta ação não pode ser desfeita.`}
+          onConfirm={onConfirmDeleteAgent}
+          confirmButtonVariant="destructive"
+          confirmText="Excluir Agente"
+        />
+      )}
     </div>
   );
 }

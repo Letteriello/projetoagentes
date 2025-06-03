@@ -57,10 +57,9 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"; // Keep AlertDialog imports if other parts of the app use it, or remove if unused.
+// For this specific task, AlertDialog components (Action, Cancel, Content, Description, Footer, Header, Title) are replaced by ConfirmationModal.
+import { ConfirmationModal } from "@/components/ui/confirmation-modal"; // Import ConfirmationModal
 import {
   Select,
   SelectContent,
@@ -72,6 +71,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ApiKeyVaultEntry } from "@/types/apiKeyVaultTypes"; // Import the main type
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import withAuth from '@/components/auth/withAuth';
 
 // Use ApiKeyVaultEntry directly
 const initialApiKeys: ApiKeyVaultEntry[] = [];
@@ -88,7 +88,7 @@ const SERVICE_TYPE_OPTIONS = [
   "Other",
 ];
 
-export default function ApiKeyVaultPage() {
+function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC convention
   const [apiKeys, setApiKeys] = React.useState<ApiKeyVaultEntry[]>(initialApiKeys);
   const [isLoadingApiKeys, setIsLoadingApiKeys] = React.useState(true); // Added loading state
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
@@ -113,9 +113,10 @@ export default function ApiKeyVaultPage() {
 
   const { toast } = useToast();
 
-  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = React.useState(false);
-  const [deletingApiKey, setDeletingApiKey] = React.useState<ApiKeyVaultEntry | null>(null);
-  const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
+  // Renaming for clarity, though ConfirmationModal doesn't mandate this.
+  const [isConfirmDeleteApiKeyOpen, setIsConfirmDeleteApiKeyOpen] = React.useState(false);
+  const [apiKeyToDelete, setApiKeyToDelete] = React.useState<ApiKeyVaultEntry | null>(null);
+  // deleteConfirmText is no longer needed with ConfirmationModal
 
   // State for "Edit Key" Dialog
   const [editingApiKey, setEditingApiKey] = React.useState<ApiKeyVaultEntry | null>(null);
@@ -193,15 +194,15 @@ export default function ApiKeyVaultPage() {
   };
 
   const handleTriggerDeleteDialog = (key: ApiKeyVaultEntry) => {
-    setDeletingApiKey(key);
-    setIsConfirmDeleteDialogOpen(true);
-    setDeleteConfirmText("");
+    setApiKeyToDelete(key); // Use renamed state setter
+    setIsConfirmDeleteApiKeyOpen(true); // Use renamed state setter
+    // setDeleteConfirmText(""); // Not needed anymore
   };
 
-  const confirmDeleteApiKey = async () => {
-    if (deletingApiKey && deleteConfirmText.toLowerCase() === "deletar") {
+  const onConfirmDeleteApiKey = async () => { // Renamed and simplified
+    if (apiKeyToDelete) {
       try {
-        const response = await fetch(`/api/apikeys/${deletingApiKey.id}`, {
+        const response = await fetch(`/api/apikeys/${apiKeyToDelete.id}`, {
           method: "DELETE",
         });
 
@@ -210,13 +211,11 @@ export default function ApiKeyVaultPage() {
           throw new Error(errorData.error || `Failed to delete service: ${response.statusText}`);
         }
 
-        setApiKeys(apiKeys.filter((key) => key.id !== deletingApiKey.id));
+        setApiKeys(apiKeys.filter((key) => key.id !== apiKeyToDelete.id));
         toast({
           title: "Serviço Excluído",
-          description: `O registro para "${deletingApiKey.serviceName}" foi excluído.`,
+          description: `O registro para "${apiKeyToDelete.serviceName}" foi excluído.`,
         });
-        setIsConfirmDeleteDialogOpen(false);
-        setDeletingApiKey(null);
       } catch (error: any) {
         console.error("Error deleting API key reference:", error);
         toast({
@@ -224,14 +223,12 @@ export default function ApiKeyVaultPage() {
           description: error.message || "Não foi possível excluir o serviço.",
           variant: "destructive",
         });
+      } finally {
+        setIsConfirmDeleteApiKeyOpen(false); // Close modal
+        setApiKeyToDelete(null); // Clear the key
       }
-    } else {
-      toast({
-        title: "Erro na Exclusão",
-        description: "Texto de confirmação inválido.",
-        variant: "destructive",
-      });
     }
+    // No 'else' part for invalid confirm text, as it's removed.
   };
 
   const handleOpenEditDialog = (key: ApiKeyVaultEntry) => {
@@ -630,49 +627,31 @@ export default function ApiKeyVaultPage() {
         </Dialog>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      {deletingApiKey && (
-        <AlertDialog
-          open={isConfirmDeleteDialogOpen}
-          onOpenChange={setIsConfirmDeleteDialogOpen}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center">
-                <AlertTriangle className="w-5 h-5 mr-2 text-destructive" />
-                Confirmar Exclusão
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Você tem certeza que deseja excluir a configuração para
-                <strong> {deletingApiKey.serviceName}</strong> (Tipo: {deletingApiKey.serviceType})?
-                Esta ação não pode ser desfeita. Para confirmar, digite "<strong>deletar</strong>" abaixo.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="py-4">
-              <Input
-                type="text"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder='Digite "deletar" para confirmar'
-                className="border-destructive focus-visible:ring-destructive"
-              />
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsConfirmDeleteDialogOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDeleteApiKey}
-                disabled={deleteConfirmText.toLowerCase() !== "deletar"}
-                className={cn(
-                  "bg-destructive hover:bg-destructive/90",
-                  deleteConfirmText.toLowerCase() !== "deletar" && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                Confirmar Exclusão
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      {/* Delete Confirmation Dialog using ConfirmationModal */}
+      {apiKeyToDelete && (
+        <ConfirmationModal
+          isOpen={isConfirmDeleteApiKeyOpen}
+          onOpenChange={(isOpen) => {
+            setIsConfirmDeleteApiKeyOpen(isOpen);
+            if (!isOpen) {
+              setApiKeyToDelete(null);
+            }
+          }}
+          title="Confirmar Exclusão de Chave API"
+          description={
+            <>
+              Tem certeza que deseja excluir a configuração para
+              <strong> {apiKeyToDelete.serviceName}</strong> (Tipo: {apiKeyToDelete.serviceType})?
+              Esta ação não pode ser desfeita.
+            </>
+          }
+          onConfirm={onConfirmDeleteApiKey}
+          confirmButtonVariant="destructive"
+          confirmText="Excluir Chave API"
+        />
       )}
     </div>
   );
 }
+
+export default withAuth(ApiKeyVaultPage);
