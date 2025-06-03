@@ -25,9 +25,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { profileFormSchema, ProfileFormData } from "@/lib/zod-schemas";
+import withAuth from '@/components/auth/withAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
-export default function ProfilePage() {
+function ProfilePage() { // Renamed to start with uppercase for HOC convention
   const { toast } = useToast();
+  const { saveProfile, loadProfile } = useUserProfile();
 
   const methods = useForm<ProfileFormData>({
     resolver: zodResolver(profileFormSchema),
@@ -41,23 +44,20 @@ export default function ProfilePage() {
     },
   });
 
-  // TODO: Fetch initial data in a useEffect and use methods.reset(fetchedData)
-  // React.useEffect(() => {
-  //   const fetchProfile = async () => {
-  //     // const profileData = await yourApi.fetchUserProfile();
-  //     // methods.reset(profileData);
-  //   };
-  //   fetchProfile();
-  // }, [methods]);
+  React.useEffect(() => {
+    const loadedData = loadProfile();
+    if (loadedData) {
+      methods.reset(loadedData);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [methods.reset]); // methods.reset is stable, but good to include if linting
 
   const handleProfileSubmit: SubmitHandler<ProfileFormData> = (data) => {
-    console.log("Validated profile data:", data);
-    // Actual save logic would go here (e.g., API call)
-    // Example: await saveUserProfile(data);
-
+    saveProfile(data);
+    console.log("Validated profile data:", data); // Keep for debugging or remove
     toast({
       title: "Perfil Atualizado!",
-      description: "Suas informações foram salvas (simulado com dados validados).",
+      description: "Suas informações foram salvas com sucesso no localStorage.",
     });
   };
 
@@ -228,3 +228,5 @@ export default function ProfilePage() {
     </FormProvider>
   );
 }
+
+export default withAuth(ProfilePage);

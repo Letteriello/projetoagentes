@@ -1,8 +1,10 @@
 // Componente WelcomeScreen: Responsivo através do uso de grid responsivo (sm:grid-cols-2) para sugestões e classes de max-width para o texto.
 // O layout é centralizado e se adapta bem a diferentes larguras de tela.
-import { Bot, Sparkles, Lightbulb, Code, Search, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Sparkles, Lightbulb, Code, Search, Pencil } from "lucide-react";
+// Button was unused, Bot was unused
+// import { Bot, Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Suggestion {
   id: string;
@@ -15,7 +17,7 @@ interface Suggestion {
 interface WelcomeScreenProps {
   onSuggestionClick: (suggestionText: string) => void;
   suggestions?: Suggestion[];
-  userName?: string;
+  // userName prop is no longer needed, will be derived from useAuth
 }
 
 const defaultSuggestions: Suggestion[] = [
@@ -52,8 +54,12 @@ const defaultSuggestions: Suggestion[] = [
 export default function WelcomeScreen({
   onSuggestionClick,
   suggestions = defaultSuggestions,
-  userName,
 }: WelcomeScreenProps) {
+  const { user } = useAuth(); // Get user from AuthContext
+
+  // Determine userName based on user context
+  const userName = user ? user.username : "";
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 text-center">
       <div className="mb-8">
