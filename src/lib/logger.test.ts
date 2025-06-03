@@ -1,39 +1,47 @@
 import { enhancedLogger, createLoggableFlow, LogEntryV2 } from './logger';
 import { WrappedFlow } from '@genkit-ai/flow';
 
-// Mock Firestore
+// Mocks para o Firestore
 const mockAdd = jest.fn();
 const mockCollection = jest.fn(() => ({ add: mockAdd }));
-const mockTimestampNow = jest.fn(() => ({ seconds: 12345, nanos: 67890 })); // Mock Timestamp structure
-
-jest.mock('firebase-admin', () => ({
-  ...jest.requireActual('firebase-admin'), // Import and retain default exports
-  firestore: {
-    Timestamp: {
-      now: () => mockTimestampNow(),
-      fromDate: (date: Date) => ({ seconds: date.getTime() / 1000, nanos: 0 }), // Simplified mock
-    },
-  },
-}));
+const mockTimestampNow = jest.fn(() => ({ seconds: 12345, nanos: 67890 }));
 
 // Mock firebaseAdmin dynamic import as used in logger.ts
-jest.mock('./firebaseAdmin', () => ({
-  __esModule: true, // This is important for ES modules
-  default: { // admin namespace
-    firestore: {
-      Timestamp: {
-        now: () => {
-          const mockTimestamp = { seconds: Date.now() / 1000, nanos: 0 };
-          mockTimestampNow.mockReturnValue(mockTimestamp);
-          return mockTimestamp;
-        },
-      },
+jest.mock('./firebaseAdmin', () => {
+  const mockTimestamp = { seconds: Date.now() / 1000, nanos: 0 };
+  
+  return {
+    __esModule: true,
+    default: {
+      firestore: {
+        Timestamp: {
+          now: () => mockTimestamp,
+          fromDate: (date: Date) => ({ seconds: date.getTime() / 1000, nanos: 0 })
+        }
+      }
     },
-  },
-  firestore: { // Firestore service instance
-    collection: (collectionName: string) => mockCollection(collectionName)
-  }
-}), { virtual: true });
+    firestore: {
+      collection: (collectionName: string) => mockCollection(collectionName)
+    }
+  };
+});
+
+// Mock do console para evitar poluição nos logs durante os testes
+const originalConsole = { ...console };
+beforeAll(() => {
+  global.console = {
+    ...originalConsole,
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  } as any;
+});
+
+afterAll(() => {
+  global.console = originalConsole;
+});
 
 // Mock Genkit Core
 const mockInstrument = jest.fn((opts, fn) => fn); // Actual fn is called
@@ -46,13 +54,17 @@ jest.mock('@genkit-ai/core', () => ({
 }));
 
 // Mock Genkit Flow
-type Flow<Req, Res> = (input: Req) => Promise<Res>;
+type Flow<Req, Res> = (input: Req, context?: any) => Promise<Res>;
 const mockGenkitFlow = jest.fn((config, flow) => flow as Flow<any, any>);
 
 jest.mock('@genkit-ai/flow', () => ({
-  flow: (config: any, flow: any) => mockGenkitFlow(config, flow),
+  genkitFlow: (config: any, flow: any) => {
+    return mockGenkitFlow(config, flow);
+  },
+  flow: (config: any, flow: any) => {
+    return mockGenkitFlow(config, flow);
+  }
 }));
-
 
 describe('Enhanced Logger', () => {
   beforeEach(() => {
