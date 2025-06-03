@@ -18,8 +18,16 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// Label replaced by FormLabel where appropriate
+import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
 import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form"; // Import Form components
 import {
   UploadCloud,
   Wand2,
@@ -82,6 +90,8 @@ import type {
 } from '@/types/agent-types';
 
 // Local AgentConfig type is removed.
+// Import the Zod schema
+import { savedAgentConfigurationSchema } from '../../../lib/zod-schemas'; // Adjusted path
 
 interface AgentBuilderDialogProps {
   isOpen: boolean;
@@ -182,8 +192,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   const methods = useForm<SavedAgentConfiguration>({
     defaultValues: editingAgent || createDefaultSavedAgentConfiguration(),
-    // resolver: zodResolver(/* your zod schema */) // Temporarily remove or simplify resolver
-    resolver: undefined, // No Zod schema for now
+    resolver: zodResolver(savedAgentConfigurationSchema), // Use Zod schema for validation
   });
 
   React.useEffect(() => {
@@ -534,22 +543,26 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         { name: "beforeTool", label: "Callback Before Tool", description: "Invocado antes da execução de uma ferramenta. Permite inspecionar/modificar argumentos, **validar permissões ou cancelar a execução por razões de segurança (ex: usando um fluxo Genkit de validação)**." },
                         { name: "afterTool", label: "Callback After Tool", description: "Invocado após uma ferramenta ser executada. Permite inspecionar/modificar o resultado da ferramenta ou **realizar verificações de segurança nos dados retornados pela ferramenta antes de serem usados em etapas subsequentes**." },
                       ].map(callback => (
-                        <div key={callback.name} className="space-y-1">
-                          <Label htmlFor={`config.adkCallbacks.${callback.name}`}>{callback.label}</Label>
-                          <Controller
-                            name={`config.adkCallbacks.${callback.name}` as const}
-                            control={methods.control}
-                            render={({ field }) => (
-                              <Input
-                                {...field}
-                                id={`config.adkCallbacks.${callback.name}`}
-                                placeholder="Nome do fluxo Genkit ou ref da função"
-                                value={field.value || ""}
-                              />
-                            )}
-                          />
-                          <p className="text-xs text-muted-foreground">{callback.description}</p>
-                        </div>
+                        <FormField
+                          key={callback.name}
+                          control={methods.control}
+                          name={`config.adkCallbacks.${callback.name}` as const}
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel htmlFor={field.name}>{callback.label}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  id={field.name}
+                                  placeholder="Nome do fluxo Genkit ou ref da função"
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                              <p className="text-xs text-muted-foreground pt-1">{callback.description}</p>
+                            </FormItem>
+                          )}
+                        />
                       ))}
                     </CardContent>
                   </Card>

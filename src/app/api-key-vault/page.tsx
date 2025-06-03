@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useForm, FormProvider, SubmitHandler } from "react-hook-form"; // Added RHF
+import { zodResolver } from "@hookform/resolvers/zod"; // Added Zod resolver
+import { z } from "zod"; // Added Zod
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +14,16 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// Label will be replaced by FormLabel
+import { Label } from "@/components/ui/label"; // Keep for existing direct uses if any outside the form
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form"; // Added Form components
+import { apiKeyFormSchema, ApiKeyFormData } from "@/lib/zod-schemas"; // Added Zod schema
 import {
   Table,
   TableBody,
@@ -79,11 +91,23 @@ export default function ApiKeyVaultPage() {
   const [apiKeys, setApiKeys] = React.useState<ApiKeyVaultEntry[]>(initialApiKeys);
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
 
-  // State for "Add New Key" Dialog
-  const [addServiceName, setAddServiceName] = React.useState<string>(""); // New: for service name in add dialog
-  const [selectedServiceType, setSelectedServiceType] = React.useState<string>("");
-  const [customServiceType, setCustomServiceType] = React.useState<string>("");
-  const [associatedAgentsInput, setAssociatedAgentsInput] = React.useState<string>("");
+  // RHF for "Add New Key" Dialog
+  const addKeyMethods = useForm<ApiKeyFormData>({
+    resolver: zodResolver(apiKeyFormSchema),
+    defaultValues: {
+      serviceName: "",
+      selectedServiceType: undefined,
+      customServiceType: "",
+      associatedAgentsInput: "",
+    },
+  });
+  const { watch: watchAddKeyForm } = addKeyMethods; // For conditional rendering
+
+  // Remove old local state for "Add New Key" Dialog
+  // const [addServiceName, setAddServiceName] = React.useState<string>("");
+  // const [selectedServiceType, setSelectedServiceType] = React.useState<string>("");
+  // const [customServiceType, setCustomServiceType] = React.useState<string>("");
+  // const [associatedAgentsInput, setAssociatedAgentsInput] = React.useState<string>("");
 
   const { toast } = useToast();
 
@@ -98,14 +122,15 @@ export default function ApiKeyVaultPage() {
   const [editSelectedServiceType, setEditSelectedServiceType] = React.useState<string>("");
   const [editCustomServiceType, setEditCustomServiceType] = React.useState<string>("");
   const [editAssociatedAgentsInput, setEditAssociatedAgentsInput] = React.useState<string>("");
-  const [editLastUsed, setEditLastUsed] = React.useState<string>(""); // For potentially editing lastUsed
+  const [editLastUsed, setEditLastUsed] = React.useState<string>("");
 
-  const resetAddKeyForm = () => {
-    setAddServiceName(""); // Reset service name
-    setSelectedServiceType("");
-    setCustomServiceType("");
-    setAssociatedAgentsInput("");
-  };
+  // resetAddKeyForm is replaced by addKeyMethods.reset()
+  // const resetAddKeyForm = () => {
+  //   setAddServiceName("");
+  //   setSelectedServiceType("");
+  //   setCustomServiceType("");
+  //   setAssociatedAgentsInput("");
+  // };
 
   const resetEditKeyForm = () => {
     setEditingApiKey(null);
@@ -116,47 +141,29 @@ export default function ApiKeyVaultPage() {
     setEditLastUsed("");
   };
 
-  const handleAddApiKey = async () => {
-    if (!addServiceName.trim()) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira um nome para o serviço.",
-        variant: "destructive",
-      });
-      return;
+  const handleAddNewKeySubmit: SubmitHandler<ApiKeyFormData> = async (data) => {
+    // Manual validations for serviceName, selectedServiceType, customServiceType
+    // are now handled by Zod.
+
+    let finalServiceType = data.selectedServiceType;
+    // The superRefine in Zod schema already ensures customServiceType is present if 'Other' is selected.
+    if (data.selectedServiceType === "Other") {
+      finalServiceType = data.customServiceType!;
     }
 
-    let finalServiceType = selectedServiceType;
-    if (selectedServiceType === "Other" && customServiceType.trim()) {
-      finalServiceType = customServiceType.trim();
-    } else if (selectedServiceType === "Other" && !customServiceType.trim()) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira um tipo de serviço personalizado.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!finalServiceType) {
-      toast({
-        title: "Erro",
-        description: "Por favor, selecione um tipo de serviço.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const associatedAgents = associatedAgentsInput.split(",").map(s => s.trim()).filter(s => s);
+    const associatedAgents = data.associatedAgentsInput
+      ? data.associatedAgentsInput.split(",").map(s => s.trim()).filter(s => s)
+      : [];
 
     try {
       const response = await fetch("/api/apikeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          serviceName: addServiceName.trim(),
+          serviceName: data.serviceName, // Zod ensures min(1)
           serviceType: finalServiceType,
           associatedAgents,
+          // apiKey: data.apiKeyInputValue // Would be added here if the field existed
         }),
       });
 
@@ -165,13 +172,13 @@ export default function ApiKeyVaultPage() {
         throw new Error(errorData.error || `Failed to register service: ${response.statusText}`);
       }
 
-      const newKey = await response.json();
-      setApiKeys([...apiKeys, newKey]);
+      const newKeyEntry = await response.json(); // Assuming API returns full ApiKeyVaultEntry
+      setApiKeys(prevKeys => [...prevKeys, newKeyEntry]);
       setIsAddKeyDialogOpen(false);
-      resetAddKeyForm();
+      // addKeyMethods.reset(); // Reset is handled by onOpenChange or DialogTrigger
       toast({
         title: "Sucesso!",
-        description: `Serviço "${newKey.serviceName}" (Tipo: ${newKey.serviceType}) registrado.`,
+        description: `Serviço "${newKeyEntry.serviceName}" (Tipo: ${newKeyEntry.serviceType}) registrado.`,
       });
     } catch (error: any) {
       console.error("Error adding API key reference:", error);
@@ -337,82 +344,94 @@ export default function ApiKeyVaultPage() {
           open={isAddKeyDialogOpen}
           onOpenChange={(isOpen) => {
             setIsAddKeyDialogOpen(isOpen);
-            if (!isOpen) resetAddKeyForm();
+            if (!isOpen) addKeyMethods.reset(); // Reset form on close
           }}
         >
           <DialogTrigger asChild>
-            <Button className="button-live-glow">
+            <Button className="button-live-glow" onClick={() => addKeyMethods.reset()}>
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Nova Chave API
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[525px]"> {/* Increased width slightly */}
+          <DialogContent className="sm:max-w-[525px]">
             <DialogHeader>
               <DialogTitle>Adicionar Nova Configuração de Chave API</DialogTitle>
               <DialogDescription>
                 Configure um novo serviço para gerenciamento de chave API.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="addServiceName" className="text-right">
-                  Nome do Serviço
-                </Label>
-                <Input
-                  id="addServiceName"
-                  placeholder="Ex: Minha Chave OpenAI Pessoal"
-                  className="col-span-3"
-                  value={addServiceName}
-                  onChange={(e) => setAddServiceName(e.target.value)}
+            <FormProvider {...addKeyMethods}>
+              <form onSubmit={addKeyMethods.handleSubmit(handleAddNewKeySubmit)} className="grid gap-4 py-4">
+                <FormField
+                  control={addKeyMethods.control}
+                  name="serviceName"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Nome do Serviço</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: Minha Chave OpenAI Pessoal" className="col-span-3" />
+                      </FormControl>
+                      <FormMessage className="col-span-4 text-right -mt-2" />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="addServiceType" className="text-right">
-                  Tipo de Serviço
-                </Label>
-                <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
-                  <SelectTrigger id="addServiceType" className="col-span-3">
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SERVICE_TYPE_OPTIONS.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedServiceType === "Other" && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="addCustomServiceType" className="text-right">
-                    Tipo Personalizado
-                  </Label>
-                  <Input
-                    id="addCustomServiceType"
-                    placeholder="Especifique o tipo"
-                    className="col-span-3"
-                    value={customServiceType}
-                    onChange={(e) => setCustomServiceType(e.target.value)}
+                <FormField
+                  control={addKeyMethods.control}
+                  name="selectedServiceType"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Tipo de Serviço</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SERVICE_TYPE_OPTIONS.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="col-span-4 text-right -mt-2" />
+                    </FormItem>
+                  )}
+                />
+                {watchAddKeyForm("selectedServiceType") === "Other" && (
+                  <FormField
+                    control={addKeyMethods.control}
+                    name="customServiceType"
+                    render={({ field }) => (
+                      <FormItem className="grid grid-cols-4 items-center gap-4">
+                        <FormLabel className="text-right">Tipo Personalizado</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Especifique o tipo" className="col-span-3" />
+                        </FormControl>
+                        <FormMessage className="col-span-4 text-right -mt-2" />
+                      </FormItem>
+                    )}
                   />
-                </div>
-              )}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="addAssociatedAgents" className="text-right">
-                  Agentes (IDs)
-                </Label>
-                <Input
-                  id="addAssociatedAgents"
-                  placeholder="agente1, agente2 (opcional)"
-                  className="col-span-3"
-                  value={associatedAgentsInput}
-                  onChange={(e) => setAssociatedAgentsInput(e.target.value)}
+                )}
+                <FormField
+                  control={addKeyMethods.control}
+                  name="associatedAgentsInput"
+                  render={({ field }) => (
+                    <FormItem className="grid grid-cols-4 items-center gap-4">
+                      <FormLabel className="text-right">Agentes (IDs)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="agente1, agente2 (opcional)" className="col-span-3" />
+                      </FormControl>
+                      <FormMessage className="col-span-4 text-right -mt-2" />
+                    </FormItem>
+                  )}
                 />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddKeyDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit" onClick={handleAddApiKey} className="button-live-glow">
-                Registrar Serviço
-              </Button>
-            </DialogFooter>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddKeyDialogOpen(false)}>Cancelar</Button>
+                  <Button type="submit" className="button-live-glow">
+                    Registrar Serviço
+                  </Button>
+                </DialogFooter>
+              </form>
+            </FormProvider>
           </DialogContent>
         </Dialog>
       </header>

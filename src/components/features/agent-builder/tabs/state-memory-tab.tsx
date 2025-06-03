@@ -1,16 +1,29 @@
 import React from 'react';
 import { useFormContext, Controller, useFieldArray } from 'react-hook-form';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+// Label will be replaced by FormLabel
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon'; // Renamed to avoid conflict
+import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration, StatePersistenceType, StateScope, InitialStateValue, StateValidationRule } from '@/types/agent-configs-fixed';
+import {
+  SavedAgentConfiguration,
+  StatePersistenceType,
+  StateScope,
+  // InitialStateValue, // Type for items in useFieldArray will be inferred or use Controller's render prop
+  // StateValidationRule // Same as above
+} from '@/types/agent-configs-new'; // Updated import
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from '@/components/ui/form';
 
 // Props passed from AgentBuilderDialog
 interface StateMemoryTabProps {
@@ -18,7 +31,7 @@ interface StateMemoryTabProps {
   ListChecksIcon: React.ElementType;
   PlusIcon: React.ElementType;
   Trash2Icon: React.ElementType;
-  InfoIcon: React.ElementType; // This is the InfoIcon component passed as a prop
+  InfoIcon: React.ElementType;
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
 }
 
@@ -27,9 +40,9 @@ type FormContextType = SavedAgentConfiguration;
 export default function StateMemoryTab({
   SaveIcon, ListChecksIcon, PlusIcon, Trash2Icon, InfoIcon, showHelpModal
 }: StateMemoryTabProps) {
-  const { control, watch, register, setValue } = useFormContext<FormContextType>();
+  const { control, watch, setValue, formState: { errors } } = useFormContext<FormContextType>(); // Removed register, added errors
   const statePersistenceEnabled = watch('config.statePersistence.enabled');
-  const defaultScope = watch('config.statePersistence.defaultScope');
+  const defaultScopeWatched = watch('config.statePersistence.defaultScope'); // Renamed to avoid conflict
 
   const { fields: initialValueFields, append: appendInitialValue, remove: removeInitialValue } = useFieldArray({
     control,
@@ -53,126 +66,134 @@ export default function StateMemoryTab({
     { value: 'TEMPORARY', label: 'Temporary (Time-limited)' },
   ];
 
-  const validationRuleTypeOptions: Array<{value: 'JSON_SCHEMA' | 'REGEX', label: string}> = [
+  // Make sure these enum values are from your types, e.g. StateValidationRule['type']
+  const validationRuleTypeOptions: Array<{value: "JSON_SCHEMA" | "REGEX", label: string}> = [
     { value: 'JSON_SCHEMA', label: 'JSON Schema' },
     { value: 'REGEX', label: 'Regular Expression' },
   ];
 
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-2">
-        <Controller
-          name="config.statePersistence.enabled"
-          control={control}
-          render={({ field }) => (
-            <Switch
-              id="state-persistence-enabled"
-              checked={field.value}
-              onCheckedChange={field.onChange}
-            />
-          )}
-        />
-        <Label htmlFor="state-persistence-enabled" className="flex items-center">
+      <FormItem className="flex flex-row items-center space-x-2">
+        <FormControl>
+          <Controller
+            name="config.statePersistence.enabled"
+            control={control}
+            render={({ field }) => (
+              <Switch
+                id="state-persistence-enabled"
+                checked={field.value || false}
+                onCheckedChange={field.onChange}
+              />
+            )}
+          />
+        </FormControl>
+        <FormLabel htmlFor="state-persistence-enabled" className="!mt-0 flex items-center"> {/* !mt-0 to override default FormItem label spacing */}
           Enable State Persistence
           <InfoIconComponent
             tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.enableStatePersistence.tooltip}
             onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'enableStatePersistence' })}
             className="ml-2"
           />
-        </Label>
-      </div>
+        </FormLabel>
+      </FormItem>
 
       {statePersistenceEnabled && (
         <Card className="p-4 md:p-6">
-          <CardContent className="space-y-6 pt-6"> {/* Added pt-6 for padding after header removed */}
-            {/* Persistence Type */}
-            <div className="space-y-2">
-              <Label htmlFor="config.statePersistence.type" className="flex items-center">
-                Persistence Type
-                <InfoIconComponent
-                  tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.statePersistenceType.tooltip}
-                  onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'statePersistenceType' })}
-                  className="ml-2"
-                />
-              </Label>
-              <Controller
-                name="config.statePersistence.type"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger id="config.statePersistence.type">
-                      <SelectValue placeholder="Select persistence type" />
-                    </SelectTrigger>
+          <CardContent className="space-y-6 pt-6">
+            <FormField
+              control={control}
+              name="config.statePersistence.type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    Persistence Type
+                    <InfoIconComponent
+                      tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.statePersistenceType.tooltip}
+                      onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'statePersistenceType' })}
+                      className="ml-2"
+                    />
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select persistence type" />
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
                       {statePersistenceTypeOptions.map(option => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                )}
-              />
-            </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            {/* Default State Scope */}
-            <div className="space-y-2">
-              <Label htmlFor="config.statePersistence.defaultScope" className="flex items-center">
-                Default State Scope
-                <InfoIconComponent
-                  tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.defaultStateScope.tooltip}
-                  onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'defaultStateScope' })}
-                  className="ml-2"
-                />
-              </Label>
-              <Controller
-                name="config.statePersistence.defaultScope"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger id="config.statePersistence.defaultScope">
-                      <SelectValue placeholder="Select default scope" />
-                    </SelectTrigger>
+            <FormField
+              control={control}
+              name="config.statePersistence.defaultScope"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    Default State Scope
+                    <InfoIconComponent
+                      tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.defaultStateScope.tooltip}
+                      onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'defaultStateScope' })}
+                      className="ml-2"
+                    />
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select default scope" />
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
                       {stateScopeOptions.map(option => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {defaultScopeWatched === 'TEMPORARY' && (
+              <FormField
+                control={control}
+                name="config.statePersistence.timeToLiveSeconds"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center">
+                      TTL for Temporary Scope (seconds)
+                      <InfoIconComponent
+                        tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.timeToLiveSeconds.tooltip}
+                        onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'timeToLiveSeconds' })}
+                        className="ml-2"
+                      />
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 3600 (1 hour)"
+                        value={field.value || ''}
+                        onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
-            </div>
-
-            {/* Time To Live (TTL) - Conditional */}
-            {defaultScope === 'TEMPORARY' && (
-              <div className="space-y-2">
-                <Label htmlFor="config.statePersistence.timeToLiveSeconds" className="flex items-center">
-                  TTL for Temporary Scope (seconds)
-                  <InfoIconComponent
-                    tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.timeToLiveSeconds.tooltip}
-                    onClick={() => showHelpModal({ tab: 'memoryKnowledgeTab', field: 'timeToLiveSeconds' })}
-                    className="ml-2"
-                  />
-                </Label>
-                <Controller
-                  name="config.statePersistence.timeToLiveSeconds"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      id="config.statePersistence.timeToLiveSeconds"
-                      type="number"
-                      placeholder="e.g., 3600 (1 hour)"
-                      value={field.value || ''}
-                      onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)}
-                    />
-                  )}
-                />
-              </div>
             )}
 
             <Separator />
 
-            {/* Initial State Values */}
             <div>
-              <h4 className="text-lg font-medium mb-2 flex items-center">
+              <h4 className="text-lg font-medium mb-3 flex items-center">
                 Initial State Values
                 <InfoIconComponent
                   tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.initialStateValues.tooltip}
@@ -180,22 +201,58 @@ export default function StateMemoryTab({
                   className="ml-2"
                 />
               </h4>
-              {initialValueFields.map((field, index) => (
-                <Card key={field.id} className="p-3 mb-3 space-y-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-                    <Input {...register(`config.statePersistence.initialStateValues.${index}.key`)} placeholder="Key (e.g., userRole)" />
-                    <Select
-                      onValueChange={(value) => setValue(`config.statePersistence.initialStateValues.${index}.scope`, value as StateScope)}
-                      defaultValue={field.scope || defaultScope || 'AGENT'}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Select scope" /></SelectTrigger>
-                      <SelectContent>
-                        {stateScopeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Textarea {...register(`config.statePersistence.initialStateValues.${index}.value`)} placeholder='Value (JSON string, e.g., "admin" or {"theme":"dark"})' rows={2} />
-                  <Input {...register(`config.statePersistence.initialStateValues.${index}.description`)} placeholder="Description (optional)" />
+              {initialValueFields.map((item, index) => (
+                <Card key={item.id} className="p-3 mb-3 space-y-3">
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.initialStateValues.${index}.key`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Key</FormLabel>
+                        <FormControl><Input {...field} placeholder="e.g., userRole" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.initialStateValues.${index}.value`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Value (JSON string)</FormLabel>
+                        <FormControl><Textarea {...field} placeholder='"admin" or {"theme":"dark"}' rows={2} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.initialStateValues.${index}.scope`}
+                    defaultValue={item.scope || defaultScopeWatched || 'AGENT'}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Scope</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select scope" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {stateScopeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.initialStateValues.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormControl><Input {...field} placeholder="Describe this initial value" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <Button type="button" variant="destructive" size="sm" onClick={() => removeInitialValue(index)} className="mt-1">
                     <Trash2Icon className="mr-2 h-4 w-4" />Remove Value
                   </Button>
@@ -205,7 +262,7 @@ export default function StateMemoryTab({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => appendInitialValue({ key: '', value: '', scope: defaultScope || 'AGENT', description: '' })}
+                onClick={() => appendInitialValue({ key: '', value: '', scope: defaultScopeWatched || 'AGENT', description: '' })}
                 className="mt-2"
               >
                 <PlusIcon className="mr-2 h-4 w-4" />Add Initial Value
@@ -214,9 +271,8 @@ export default function StateMemoryTab({
 
             <Separator />
 
-            {/* State Validation Rules */}
             <div>
-              <h4 className="text-lg font-medium mb-2 flex items-center">
+              <h4 className="text-lg font-medium mb-3 flex items-center">
                 State Validation Rules
                  <InfoIconComponent
                   tooltipText={agentBuilderHelpContent.memoryKnowledgeTab.validationRules.tooltip}
@@ -224,23 +280,47 @@ export default function StateMemoryTab({
                   className="ml-2"
                 />
               </h4>
-              {validationRuleFields.map((field, index) => (
-                <Card key={field.id} className="p-3 mb-3 space-y-2">
-                   <Input {...register(`config.statePersistence.validationRules.${index}.name`)} placeholder="Rule Name (e.g., UserInputSchema)" />
-                   <Controller
-                      name={`config.statePersistence.validationRules.${index}.type`}
-                      control={control}
-                      defaultValue={field.type || 'JSON_SCHEMA'}
-                      render={({ field: typeField }) => (
-                        <Select onValueChange={typeField.onChange} value={typeField.value}>
-                          <SelectTrigger><SelectValue placeholder="Select rule type" /></SelectTrigger>
+              {validationRuleFields.map((item, index) => (
+                <Card key={item.id} className="p-3 mb-3 space-y-3">
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.validationRules.${index}.name`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rule Name</FormLabel>
+                        <FormControl><Input {...field} placeholder="e.g., UserInputSchema" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.validationRules.${index}.type`}
+                    defaultValue={item.type || 'JSON_SCHEMA'}
+                    render={({ field }) => (
+                     <FormItem>
+                        <FormLabel>Rule Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select rule type" /></SelectTrigger></FormControl>
                           <SelectContent>
                             {validationRuleTypeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                      )}
-                    />
-                  <Textarea {...register(`config.statePersistence.validationRules.${index}.rule`)} placeholder={watch(`config.statePersistence.validationRules.${index}.type`) === 'JSON_SCHEMA' ? "JSON Schema definition..." : "Regular expression..."} rows={3} />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`config.statePersistence.validationRules.${index}.rule`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rule Definition</FormLabel>
+                        <FormControl><Textarea {...field} placeholder={watch(`config.statePersistence.validationRules.${index}.type`) === 'JSON_SCHEMA' ? "JSON Schema definition..." : "Regular expression..."} rows={3} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <Button type="button" variant="destructive" size="sm" onClick={() => removeValidationRule(index)} className="mt-1">
                     <Trash2Icon className="mr-2 h-4 w-4" />Remove Rule
                   </Button>
@@ -250,7 +330,7 @@ export default function StateMemoryTab({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => appendValidationRule({ id: `rule_${Date.now()}`, name: '', type: 'JSON_SCHEMA', rule: '' })}
+                onClick={() => appendValidationRule({ id: `rule_${Date.now()}`, name: '', type: 'JSON_SCHEMA', rule: '' } as any)} // Added `as any` to satisfy stricter type check if `id` is not in defaultValues of Zod schema.
                 className="mt-2"
               >
                 <PlusIcon className="mr-2 h-4 w-4" />Add Validation Rule
