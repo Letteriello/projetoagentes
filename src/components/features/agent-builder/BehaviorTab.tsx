@@ -15,16 +15,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import LLMBehaviorForm from "./LLMBehaviorForm";
 import WorkflowBehaviorForm from "./WorkflowBehaviorForm";
 import CustomBehaviorForm from "./CustomBehaviorForm";
-import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 
 // MODIFIED: Simplified props
 interface BehaviorTabProps {
   agentToneOptions: Array<{ id: string; label: string; }>; // Still needed for LLMBehaviorForm
+  showHelpModal: (args: { tab: string; field: string; contentKey?: string }) => void;
   // Add any other static options if sub-forms need them
 }
 
-const BehaviorTab: React.FC<BehaviorTabProps> = ({ agentToneOptions }) => {
+const BehaviorTab: React.FC<BehaviorTabProps> = ({ agentToneOptions, showHelpModal }) => {
   // MODIFIED: Get RHF methods from context
   const { control, watch, formState: { errors } } = useFormContext<SavedAgentConfiguration>();
   const selectedAgentType = watch("config.type");
@@ -66,13 +67,13 @@ const BehaviorTab: React.FC<BehaviorTabProps> = ({ agentToneOptions }) => {
 
         {/* Specific behavior forms will be direct children of space-y-6, allowing them to be wrapped in their own Cards if needed internally */}
         {selectedAgentType === 'llm' && (
-          <LLMBehaviorForm agentToneOptions={agentToneOptions} />
+          <LLMBehaviorForm agentToneOptions={agentToneOptions} showHelpModal={showHelpModal} />
       )}
       {selectedAgentType === 'workflow' && (
-        <WorkflowBehaviorForm />
+        <WorkflowBehaviorForm showHelpModal={showHelpModal} />
       )}
       {selectedAgentType === 'custom' && (
-        <CustomBehaviorForm />
+        <CustomBehaviorForm showHelpModal={showHelpModal} />
       )}
       {selectedAgentType === 'a2a' && (
         <Alert>

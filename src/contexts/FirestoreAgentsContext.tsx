@@ -1,6 +1,6 @@
 "use client";
 
-import type { SavedAgentConfiguration } from '@/types/agent-configs'; // Adjust path if necessary
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjust path if necessary
 import * as React from 'react';
 import { firestore } from '@/lib/firebaseClient';
 import {

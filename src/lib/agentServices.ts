@@ -6,7 +6,7 @@
 //            incluindo salvamento, recuperação e atualização de configurações de agentes.
 // ----------------------------------------------------------------------
 
-import { SavedAgentConfiguration } from '@/types/agent-configs';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { firestore } from '@/lib/firebaseClient';
 import { collection, doc, setDoc, addDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { enhancedLogger } from '@/lib/logger'; // Import the logger

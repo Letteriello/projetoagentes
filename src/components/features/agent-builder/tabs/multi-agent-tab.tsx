@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration } from '@/types/agent-configs';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 
 // Assuming SubAgentSelector is imported correctly if used directly
 // For this refactor, we assume SubAgentSelectorComponent is passed as a prop

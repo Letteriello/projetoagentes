@@ -6,8 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/comp
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AvailableTool } from "@/types/agent-configs"; // Corrected path
-import type { ToolConfigData } from "@/types/agent-configs";
+import type { AvailableTool } from '@/types/agent-configs-fixed'; // Corrected path
+import type { ToolConfigData } from '@/types/agent-configs-fixed';
 import { ArrowUpIcon, ArrowDownIcon, AlertTriangle } from "lucide-react"; // Added AlertTriangle
 
 // Props para o componente ToolCard.

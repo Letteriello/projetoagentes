@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon'; // Renamed
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration, ArtifactStorageType, ArtifactDefinition } from '@/types/agent-configs';
+import { SavedAgentConfiguration, ArtifactStorageType, ArtifactDefinition } from '@/types/agent-configs-fixed';
 
 // Props passed from AgentBuilderDialog
 interface ArtifactsTabProps {

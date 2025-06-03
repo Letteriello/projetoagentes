@@ -19,196 +19,315 @@ import { codeExecutorTool } from '@/ai/tools/code-executor-tool';
 
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
-import { Tool } from '@genkit-ai/sdk'; // Import Tool type for casting
+import { GenerateRequest, Part, ToolRequest, ToolResponse, Tool } from '@genkit-ai/ai';
+import type { MessageData } from '@/types/chat-types';
 import { createLoggableFlow } from '@/lib/logger'; // Import the wrapper
 import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed within
+import { z } from 'zod';
+import { ActionContext } from 'genkit';
 
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
 // Stores factory functions for configurable tools and direct tool objects for static ones.
-const allAvailableTools: Record<string, (() => Tool) | Tool | any> = { // Added 'any' for factory signatures
-  performWebSearch: createPerformWebSearchTool,
-  calculator: calculatorTool, // Static tool
-  knowledgeBase: createKnowledgeBaseTool,
-  customApiIntegration: createCustomApiTool,
-  calendarAccess: createCalendarAccessTool,
-  databaseAccess: createDatabaseAccessTool,
-  codeExecutor: codeExecutorTool, // Static tool
-};
-
-export interface BasicChatInput {
-  userMessage: string;
-  history?: Array<{role: string; content: any}>;
-  fileDataUri?: string;
-  modelName?: string;
-  systemPrompt?: string;
-  temperature?: number;
-  agentId?: string; // Added agentId for logging
-  agentToolsDetails?: { id: string; name: string; description: string; enabled: boolean }[];
-  toolConfigsApplied?: Record<string, any>; // Added for dynamic tool configuration
+interface AppTool extends Tool {
+  func: (input: any) => Promise<any>;
+  inputSchema?: z.ZodSchema;
+  description?: string;
+  metadata?: Record<string, any>;
 }
 
+// Definir tipo explícito para tool requests
+type ChatToolRequest = {
+  name: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  ref?: string;
+};
+
+interface ToolResponsePart {
+  toolRequest: ToolRequest;
+  output: unknown;
+}
+
+const allAvailableTools: Record<string, AppTool> = { 
+  performWebSearch: createPerformWebSearchTool({
+    apiKey: process.env.SEARCH_API_KEY
+  }),
+  calculator: calculatorTool(),
+  knowledgeBase: createKnowledgeBaseTool({
+    serviceEndpoint: process.env.KB_ENDPOINT,
+    knowledgeBaseId: process.env.KB_ID || 'default'
+  }),
+  customApiIntegration: createCustomApiTool({
+    baseUrl: process.env.API_BASE_URL
+  }),
+  calendarAccess: createCalendarAccessTool({
+    apiKey: process.env.CALENDAR_TOKEN
+  }),
+  databaseAccess: createDatabaseAccessTool({
+    dbConnectionString: process.env.DB_CONNECTION,
+    dbType: 'postgresql' // Definindo um tipo padrão, ajuste conforme necessário
+  }),
+  codeExecutor: codeExecutorTool()
+};
+
+/**
+ * Detailed configuration for agent tools
+ */
+interface ToolDetail {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  config?: Record<string, unknown>; // Mais seguro que 'any'
+}
+
+/**
+ * Parameters for the chat flow
+ */
+interface ChatFlowParams {
+  fileDataUri?: string;
+  history?: MessageData[];
+  modelName: 'geminiPro' | 'gemini15Pro' | string;
+  systemPrompt?: string;
+  temperature?: number;
+  topK?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  stopSequences?: string[];
+  agentToolsDetails?: ToolDetail[];
+}
+
+// Zod validation schemas
+const ToolDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  enabled: z.boolean(),
+  config: z.record(z.unknown()).optional()
+});
+
+const ChatFlowParamsSchema = z.object({
+  fileDataUri: z.string().optional(),
+  history: z.array(z.unknown()).optional(),
+  modelName: z.string(),
+  systemPrompt: z.string().optional(),
+  temperature: z.number().optional(),
+  topK: z.number().optional(),
+  topP: z.number().optional(),
+  maxOutputTokens: z.number().optional(),
+  stopSequences: z.array(z.string()).optional(),
+  agentToolsDetails: z.array(ToolDetailSchema).optional()
+});
+
+/**
+ * Entrada para o fluxo de chat básico
+ */
+export interface BasicChatInput extends ChatFlowParams {
+  agentId?: string; // Optional agentId for logging/context
+  userMessage: string;
+}
+
+/**
+ * Saída do fluxo de chat básico
+ */
 export interface BasicChatOutput {
   outputMessage?: string;
   stream?: ReadableStream<any>;
-  error?: string;
-  toolRequests?: any[]; 
+  toolRequests?: ChatToolRequest[];
   toolResults?: any[];
+  error?: string;
 }
 
-// Configure the model and tools for the request
-function configureModel(input: BasicChatInput) {
-  const modelId = input.modelName || process.env.GENKIT_MODEL_NAME || 'googleai/gemini-1.5-flash-latest';
-  const activeTools: Tool[] = [];
+// Definir tipo completo para mensagens
+type ChatMessage = {
+  role: 'system' | 'user' | 'model' | 'tool';
+  content: Part[];
+  metadata?: Record<string, unknown>;
+};
 
-  if (input.agentToolsDetails && input.toolConfigsApplied) {
-    input.agentToolsDetails.forEach(toolDetail => {
-      if (toolDetail.enabled) {
-        const toolProvider = allAvailableTools[toolDetail.id as keyof typeof allAvailableTools];
-        if (toolProvider) {
-          if (typeof toolProvider === 'function') {
-            // It's a factory function, call it with config
-            const toolConfig = input.toolConfigsApplied![toolDetail.id] || {};
-            try {
-              activeTools.push(toolProvider(toolConfig));
-            } catch (e: any) {
-              console.error(`Error instantiating tool '${toolDetail.id}' with factory:`, e);
-            }
-          } else {
-            // It's a static tool object
-            activeTools.push(toolProvider as Tool);
-          }
-        } else {
-          console.warn(`Tool ID '${toolDetail.id}' not found in allAvailableTools map.`);
-        }
-      }
-    });
-  }
-
-  return {
-    modelId,
-    tools: activeTools.length > 0 ? activeTools : undefined,
-    config: input.temperature ? { temperature: input.temperature } : undefined,
-    systemPrompt: input.systemPrompt, // Directly use the systemPrompt from input
-  };
-}
-
-// Original basicChatFlow implementation
-async function basicChatFlowInternal(input: BasicChatInput, streamingCallback?: (chunk: any) => void): Promise<BasicChatOutput> {
-  const flowName = "basicChatFlow"; // Define flowName for logging
-  const agentId = input.agentId || "unknown_agent"; // Get agentId from input or use a default
-
-  // Note: enhancedLogger.logStart and logEnd/logError will be handled by createLoggableFlow wrapper
-  // However, if specific error logging within the flow is needed, enhancedLogger can be used.
+// Internal function that contains the core logic
+async function basicChatFlowInternal(
+  input: BasicChatInput,
+  flowContext: ActionContext
+): Promise<BasicChatOutput> {
+  const flowName = 'basicChatFlowInternal'; // For logging context
+  const agentId = input.agentId || 'unknown_agent'; // For logging context
 
   try {
-    // Ensure toolConfigsApplied is initialized if not provided, for configureModel
-    const fullInput = {
-      ...input,
-      toolConfigsApplied: input.toolConfigsApplied || {},
-    };
-    const { modelId, tools, config, systemPrompt } = configureModel(fullInput);
-
-    const history = input.history ? [...input.history] : [];
-    
-    // Add system prompt if provided
-    if (systemPrompt) {
-      // Check if the last system message is already the one we want to set.
-      // Avoids adding duplicate system prompts if history is re-sent.
-      const lastSystemMessageIndex = history.findLastIndex(m => m.role === 'system');
-      if (lastSystemMessageIndex !== -1 && history[lastSystemMessageIndex].content &&
-          typeof history[lastSystemMessageIndex].content[0]?.text === 'string' &&
-          history[lastSystemMessageIndex].content[0].text === systemPrompt) {
-        // System prompt is already correctly set as the last system message.
-      } else {
-         // Remove any previous system message to ensure the new one is the definitive one.
-         const filteredHistory = history.filter(m => m.role !== 'system');
-         history.length = 0; // Clear original history
-         history.push(...filteredHistory); // Push back non-system messages
-         history.unshift({ role: 'system', content: [{text: systemPrompt}] }); // Add new system prompt at the beginning
-      }
+    const messages: ChatMessage[] = [];
+    if (input.systemPrompt) {
+      messages.push({ role: 'system', content: [{ text: input.systemPrompt }] });
     }
-
-
-    // Prepare user message with any attachments
-    let userMessageContent: any[] = [{ text: input.userMessage }];
+    if (input.history) {
+      messages.push(...input.history.map(msg => ({
+        role: msg.role as ChatMessage['role'],
+        content: Array.isArray(msg.content) ? 
+          msg.content.map(c => typeof c === 'string' ? {text: c} : c) : 
+          [{text: String(msg.content)}],
+        ...('metadata' in msg && {metadata: msg.metadata as Record<string, unknown>})
+      })));
+    }
+    const userMessageContent: Part[] = [{ text: input.userMessage }];
     if (input.fileDataUri) {
-      // This parsing logic might need adjustment based on actual DataURI format from frontend
-      const [header, base64Data] = input.fileDataUri.split(',');
-      const mimeTypeMatch = header?.match(/:(.*?);/);
-      const mimeType = mimeTypeMatch?.[1];
-      if (mimeType && base64Data) {
-        userMessageContent = [
-          { text: input.userMessage },
-          // Genkit expects inlineData: { mimeType, data } for file inputs.
-          { inlineData: { mimeType, data: base64Data } }
-        ];
-      } else {
-        console.warn("Could not parse fileDataUri correctly. Sending only text message.");
-      }
-    }
-    history.push({ role: 'user', content: userMessageContent });
-    
-    console.log('Generating content with model:', modelId, 'config:', config, 'tools:', tools ? tools.map(t => t.name) : 'none');
-
-    // Call the AI generation
-    const parts = history.map(msg => {
-      return {
-        role: msg.role as 'user' | 'model' | 'system' | 'tool', // Cast role to expected types
-        parts: Array.isArray(msg.content) 
-          ? msg.content.map(c => (c.text ? { text: c.text } : c.inlineData ? {inlineData: c.inlineData} : c )) // Handle text and inlineData
-          : (typeof msg.content === 'string' ? [{ text: msg.content }] : []) // Handle simple string content
-      };
-    });
-    
-    const generateOptions = {
-      model: modelId,
-      prompt: { messages: parts }, // Use the new prompt structure with messages
-      tools: tools,
-      config: config, // Renamed from generationConfig to config
-      stream: !!streamingCallback, // Simplified stream boolean
-    };
-    
-    const response = await ai.generate(generateOptions); // ai.generate instead of ai.generateContent
-
-    // Handle streaming response if callback provided
-    if (streamingCallback && generateOptions.stream) {
-      const outputStream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const chunk of response.stream()) { // Call stream() method
-              if (chunk) {
-                streamingCallback(chunk);
-                controller.enqueue(chunk); // Enqueue the raw chunk
-              }
-            }
-          } catch (e: any) {
-            console.error('Streaming error:', e);
-            controller.error(e);
-          } finally {
-            controller.close();
-          }
-        },
+      userMessageContent.push({
+        media: {
+          url: input.fileDataUri,
+          contentType: 'auto'
+        }
       });
-      return { stream: outputStream };
-    } 
-    
-    // Handle non-streaming response
-    const responseText = response.text() ?? ''; // Use text() method
-    
-    const toolCalls = response.toolCalls() ?? []; // Use toolCalls() method
-    const toolResults = response.toolResults() ?? []; // Not directly available, toolCalls implies requests
-                                                      // toolResults are usually built from subsequent calls
+    }
+    messages.push({ role: 'user', content: userMessageContent });
+
+    // Dynamically prepare tools for the current agent based on agentToolsDetails
+    const genkitTools: AppTool[] = [];
+    if (input.agentToolsDetails && input.agentToolsDetails.length > 0) {
+      input.agentToolsDetails.forEach(toolDetail => {
+        if (toolDetail.enabled) {
+          const toolObj = allAvailableTools[toolDetail.id];
+          if (toolObj) {
+            // Todas as ferramentas já são instâncias de AppTool
+            genkitTools.push(toolObj);
+          }
+        }
+      });
+    }
+
+    const request: GenerateRequest = {
+      messages: messages,
+      config: {
+        temperature: input.temperature,
+        topK: input.topK,
+        topP: input.topP,
+        maxOutputTokens: input.maxOutputTokens,
+        stopSequences: input.stopSequences
+      },
+      tools: genkitTools.length > 0 ? genkitTools.map(tool => ({
+        name: tool.name,
+        description: tool.description || '',
+        inputSchema: tool.inputSchema ? tool.inputSchema : null,
+        outputSchema: null,
+        metadata: tool.metadata
+      })) : undefined, // Only pass tools if there are any
+    };
+    // Loop for handling tool requests and responses
+    let finalOutputText = '';
+    let executedToolRequests: ChatToolRequest[] = [];
+    let executedToolResults: any[] = [];
+    let currentMessages = [...messages]; // Start with the initial set of messages
+
+    const MAX_TOOL_ITERATIONS = 5; // Prevent infinite loops
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      const llmResponse = await ai.generate({
+        ...request,
+        messages: currentMessages, // Use updated messages in each iteration
+      });
+
+      const choice = llmResponse.candidates[0];
+      if (!choice || !choice.message || !choice.message.content) {
+        // No response or empty content, break or handle as error
+        finalOutputText = choice?.finishReason === 'stop' ? finalOutputText : 'No response from model.';
+        break;
+      }
+
+      const contentParts = choice.message.content;
+      let hasToolRequest = false;
+
+      for (const part of contentParts) {
+        if (part.text) {
+          finalOutputText += part.text; // Accumulate text parts
+        }
+        if (part.toolRequest) {
+          hasToolRequest = true;
+          executedToolRequests.push(part.toolRequest); // Store for output
+          // The actual tool execution will happen outside this loop based on these requests
+          // For simplicity in this example, we'll assume Genkit's `generate` handles the tool execution
+          // if the tool is defined and its `func` is called by Genkit internally.
+          // If Genkit `generate` doesn't auto-execute and just returns requests,
+          // then explicit tool execution logic would be needed here.
+          // However, standard Genkit flow with tools in `generateOptions` implies Genkit handles this.
+        }
+      }
+
+      if (!hasToolRequest || choice.finishReason === 'stop') {
+        // If no tool requests in this response, or if LLM decided to stop, then we are done.
+        break; 
+      }
+
+      // If there were tool requests, Genkit's `generate` (when tools are provided)
+      // should ideally return tool responses if it executed them.
+      // If `generate` only returns requests, we'd need to simulate or call tools here.
+      // For this example, we'll assume `generate` returns responses if tools were called.
+      // Let's check if the response contains tool_response parts (this part is tricky as Genkit might handle it)
+
+      // This part needs to align with how Genkit actually processes tools.
+      // If Genkit's `generate` with `tools` parameter automatically handles the execution and
+      // provides `tool_response` parts in a subsequent call or within the same response,
+      // this loop structure might need adjustment.
+
+      // Let's assume for now that if `toolRequest` was present, we need to construct `tool_response` parts
+      // and send them back to the LLM in the next iteration.
+      // This requires actually calling the tools.
+
+      const toolResponseParts: ToolResponsePart[] = [];
+      for (const toolRequest of executedToolRequests.slice(executedToolRequests.length - choice.message.content.filter((p: Part) => p.toolRequest).length)) { // Process only new requests
+        // This is a simplified placeholder for actual tool execution.
+        // In a real scenario, you'd look up `toolRequest.name` in your `genkitTools`
+        // and execute its `func` with `toolRequest.input`.
+        // For now, let's assume a dummy result.
+        // This part is CRITICAL and needs to match your actual tool execution strategy.
+        // The `ai.runTool()` or similar utility might be needed if not handled by `ai.generate()` itself.
+        
+        // Placeholder: Simulate finding and running the tool
+        const toolToRun = genkitTools.find(t => t.name === toolRequest.name) as AppTool | undefined;
+        
+        if (!toolToRun) {
+          throw new Error(`Ferramenta ${toolRequest.name} não encontrada`);
+        }
+
+        // Validar input se schema existir
+        if (toolToRun.inputSchema) {
+          const validation = toolToRun.inputSchema.safeParse(toolRequest.input);
+          if (!validation.success) {
+            throw new Error(`Input inválido para ${toolRequest.name}: ${validation.error}`);
+          }
+          if (toolToRun && typeof toolToRun.func === 'function') {
+            const result = await toolToRun.func(validation.data);
+            toolResponseParts.push({ toolRequest, output: result });
+          } else {
+            throw new Error(`Ferramenta ${toolRequest.name} não possui função executável`);
+          }
+        } else {
+          if (toolToRun && typeof toolToRun.func === 'function') {
+            const result = await toolToRun.func(toolRequest.input);
+            toolResponseParts.push({ toolRequest, output: result });
+          } else {
+            throw new Error(`Ferramenta ${toolRequest.name} não possui função executável`);
+          }
+        }
+        // Storing results for BasicChatOutput
+        executedToolResults.push({name: toolRequest.name, result: toolResponseParts[toolResponseParts.length - 1].output});
+      }
+
+      // Add tool responses to messages for the next iteration
+      currentMessages.push({
+        role: 'tool',
+        content: toolResponseParts.map(part => ({
+          text: JSON.stringify({
+            name: part.toolRequest.name,
+            output: part.output,
+            ref: part.toolRequest.ref
+          })
+        }))
+      });
+    } // End of while loop
+
+    // const stream = llmResponse.stream ? llmResponse.stream() : null; // Stream handling would need rework with this loop
+    // if (stream) { return { stream }; }
 
     return {
-      outputMessage: responseText,
-      toolRequests: toolCalls.map(tc => ({ // Adapt to expected structure if necessary
-        name: tc.name,
-        args: tc.args
-      })),
-      // toolResults might need to be sourced differently if they represent executed tool responses
-      // For now, assuming toolResults from input might be more relevant if this flow manages tool execution.
-      // Or, if the model itself can return tool results (less common for initial request).
-      toolResults: [], // Placeholder, as toolResults() is not standard on initial response
+      outputMessage: finalOutputText,
+      toolRequests: executedToolRequests, 
+      toolResults: executedToolResults, 
     };
   } catch (e: any) {
     console.error(`Error in ${flowName} (Agent: ${agentId}):`, e);
@@ -221,22 +340,28 @@ async function basicChatFlowInternal(input: BasicChatInput, streamingCallback?: 
 // Wrap the internal function with createLoggableFlow
 export const basicChatFlow = createLoggableFlow(
   "basicChatFlow", // Flow name
-  basicChatFlowInternal, // The actual function to wrap
-  (input: BasicChatInput) => ({ // Input transformer for logging
-    agentId: input.agentId || "unknown_agent",
-    // Log only essential parts of input, not potentially large userMessage or history
-    userMessageLength: input.userMessage.length,
-    hasFileDataUri: !!input.fileDataUri,
-    modelName: input.modelName,
-    systemPromptLength: input.systemPrompt?.length,
-    temperature: input.temperature,
-    toolCount: input.agentToolsDetails?.filter(t => t.enabled).length || 0,
-  }),
-  (output: BasicChatOutput) => ({ // Output transformer for logging
-    hasOutputMessage: !!output.outputMessage,
-    hasStream: !!output.stream,
-    hasError: !!output.error,
-    toolRequestCount: output.toolRequests?.length || 0,
-  }),
-  (input: BasicChatInput) => input.agentId || "unknown_agent" // Function to extract agentId
+  {
+    flow: basicChatFlowInternal, // The actual function to wrap
+    inputTransformer: (input: BasicChatInput) => ({
+      agentId: input.agentId || "unknown_agent",
+      userMessageLength: input.userMessage.length,
+      hasFileDataUri: !!input.fileDataUri,
+      modelName: input.modelName,
+      systemPromptLength: input.systemPrompt?.length,
+      temperature: input.temperature,
+      toolCount: input.agentToolsDetails?.filter(t => t.enabled).length || 0,
+    }),
+    outputTransformer: (output: BasicChatOutput) => ({
+      hasOutputMessage: !!output.outputMessage,
+      hasStream: !!output.stream,
+      hasError: !!output.error,
+      toolRequestCount: output.toolRequests?.length || 0,
+    }),
+    agentIdExtractor: (input: BasicChatInput) => input.agentId || "unknown_agent"
+  }
 );
+
+// Definir tipo extendido para MessageData
+interface ChatMessageData extends MessageData {
+  metadata?: Record<string, unknown>;
+}

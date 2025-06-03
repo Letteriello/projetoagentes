@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { SavedAgentConfiguration } from "@/types/agent-configs";
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import {
   getUserAgentTemplates,
   getCommunityAgentTemplates,

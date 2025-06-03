@@ -4,7 +4,7 @@ import {
   getUserAgentTemplates,
   getCommunityAgentTemplates,
 } from './agentServices'; // Adjust path as necessary
-import { SavedAgentConfiguration } from '@/types/agent-configs'; // Adjust path as necessary
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjust path as necessary
 import { Timestamp } from 'firebase/firestore'; // For mocking date fields if needed
 
 // Mock Firestore functions

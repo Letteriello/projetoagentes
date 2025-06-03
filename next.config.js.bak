@@ -8,6 +8,15 @@ const nextConfig = {
   // Configurações importantes para produção
   output: 'standalone', // Modo standalone para melhor isolamento
   
+  // Configuração do Turbopack (estável)
+  turbopack: {
+    // Configurações do Turbopack
+  },
+  
+  // Configuração de módulos externos no servidor
+  experimental: {
+    // Configurações experimentais podem ser adicionadas aqui
+  },
   // Configuração de módulos externos no servidor
   serverExternalPackages: [
     'google-auth-library',
@@ -15,7 +24,10 @@ const nextConfig = {
     'gtoken',
     'agent-base',
     'https-proxy-agent',
-    '@opentelemetry/exporter-jaeger'
+    '@opentelemetry/exporter-jaeger',
+    'firebase-functions',
+    '@google-cloud/firestore',
+    '@opentelemetry/sdk-trace-node'
   ],
   
   // Configuração para melhor compatibilidade com Genkit e Firebase
@@ -26,19 +38,47 @@ const nextConfig = {
   
   eslint: {
     // Ignorar erros durante o desenvolvimento
-    // ignoreDuringBuilds: true,
+    ignoreDuringBuilds: true,
   },
   
-  // Melhorias para chunks e cache
-  webpack: (config, { isServer, dev }) => {
+  // Configuração para ignorar erros de tipagem em módulos de terceiros
+  transpilePackages: [
+    '@opentelemetry',
+    '@google-cloud',
+    'firebase-admin',
+    'genkit',
+    '@genkit-ai',
+    'firebase',
+    'buffer',
+    'process',
+    'stream-browserify',
+    'util',
+    'path-browserify',
+    'os-browserify',
+    'crypto-browserify',
+    'stream-http',
+    'https-browserify',
+    'querystring-es3',
+    'browserify-zlib',
+    'assert'
+  ],
+  
+  // Configuração personalizada do Webpack
+  webpack: (config, { isServer, dev, webpack }) => {
+    // Importar a configuração personalizada
+    const customConfig = require('./webpack-node-polyfills');
+    
+    // Aplicar a configuração personalizada
+    customConfig(config, { isServer, dev, webpack });
+    
     // Adicionar loader para Handlebars
     config.module.rules.push({
       test: /\.hbs$/,
       use: 'handlebars-loader',
     });
-
+    
     // Configuração para ignorar avisos de require.extensions
-    config.module.noParse = /(node_modules\/|\\.hbs$)/;
+    config.module.noParse = /(node_modules\/|\.hbs$)/;
     
     // Melhoria cruzada para TODOS os chunks para evitar ChunkLoadError
     config.optimization = {
@@ -84,29 +124,8 @@ const nextConfig = {
       },
     };
     
-    // Resolver fallbacks para bibliotecas de browser para os agentes AI
+    // Configurações específicas para o cliente
     if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        events: require.resolve('events'),
-        process: require.resolve('process/browser'),
-        util: require.resolve('util'),
-        stream: require.resolve('stream-browserify'),
-        crypto: require.resolve('crypto-browserify'),
-        zlib: require.resolve('browserify-zlib'),
-        querystring: require.resolve('querystring-es3'),
-        assert: require.resolve('assert'),
-        url: require.resolve('url'),
-        http: require.resolve('stream-http'),
-        https: require.resolve('https-browserify'),
-        os: require.resolve('os-browserify/browser'),
-        path: require.resolve('path-browserify'),
-        fs: false,
-        child_process: false,
-        net: false,
-        tls: false
-      };
-      
       // Cache busting para evitar problemas de ChunkLoadError após atualizações
       config.output.filename = dev
         ? 'static/chunks/[name].js'
@@ -114,20 +133,14 @@ const nextConfig = {
       config.output.chunkFilename = dev
         ? 'static/chunks/[name].js'
         : 'static/chunks/[name].[contenthash].js';
-    }
-    
-    // Plugins cruciais para estabilidade de carregamento
-    if (!isServer) {
-      const webpack = require('webpack');
+      
+      // Plugins adicionais para o cliente
       config.plugins.push(
         new webpack.ProvidePlugin({
           process: 'process/browser',
           Buffer: ['buffer', 'Buffer'],
         }),
-        new webpack.ContextReplacementPlugin(/keyv/),
-        new webpack.IgnorePlugin({
-          resourceRegExp: /\.md$/,
-        })
+        new webpack.ContextReplacementPlugin(/keyv/)
       );
     }
     

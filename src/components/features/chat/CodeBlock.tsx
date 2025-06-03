@@ -1,4 +1,3 @@
-import { useState } from "react";
 // Use PrismLight for smaller bundle size and explicit language registration
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
 // Corrected import path for okaidia style (ESM)

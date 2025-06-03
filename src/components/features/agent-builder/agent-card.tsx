@@ -56,7 +56,7 @@ import type {
   CustomAgentConfig, // For casting agent.config
   // ToolConfigData is not directly used in props but good for context if needed later
   AvailableTool, // Added AvailableTool here
-} from "@/types/agent-configs";
+} from '@/types/agent-configs-fixed';
 
 // Definindo iconComponents aqui, para mapear os nomes de string para os componentes de ícone importados
 const iconComponents: Record<

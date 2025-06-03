@@ -28,7 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
-import type { SavedAgentConfiguration } from "@/types/agent-configs"; // Adjusted path
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjusted path
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
@@ -176,17 +176,41 @@ import {
 
 // Imports from the new data file
 import {
-  // AvailableTool, // This specific type might be needed if AgentCard or AgentBuilderDialog expect it directly via props from this page.
-                 // However, the constant availableTools (which is a list of AvailableTool) is what's passed.
-                 // The type for the prop in AgentCard/AgentBuilderDialog should ideally also point to the new file.
-                 // For now, assuming page.tsx doesn't need to destructure or type local vars with AvailableTool itself.
-  // No longer importing AvailableTool type directly here, relying on type inference or types in consumed components.
-  availableTools, // This is the data
-  agentToneOptions, // This is the data
-  agentTypeOptions, // This is the data
-  // SavedAgentConfiguration is now imported from agent-configs.ts
-  iconComponents, // This is the data for icons
-  agentTemplates // Used by AgentBuilderDialog
+  // Tipos exportados
+  AvailableTool,
+  ToolConfigData,
+  AgentTemplate,
+  SavedAgentConfiguration,
+  // Dados exportados
+  availableTools,
+  agentToneOptions,
+  agentTypeOptions,
+  iconComponents,
+  agentTemplates,
+  // Tipos adicionais
+  AgentFramework,
+  AgentType,
+  WorkflowDetailedType,
+  TerminationConditionType,
+  StatePersistenceType,
+  ArtifactStorageType,
+  StateScope,
+  ToolConfigField,
+  CommunicationChannel,
+  A2AConfig,
+  ArtifactDefinition,
+  ArtifactsConfig,
+  InitialStateValue,
+  StateValidationRule,
+  StatePersistenceConfig,
+  KnowledgeSource,
+  RagMemoryConfig,
+  AgentConfigBase,
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig,
+  A2AAgentSpecialistConfig,
+  AgentConfig
 } from "@/data/agentBuilderConfig";
 import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui"; // Nova UI
 import { MessageSquareText, Edit3 } from "lucide-react"; // Ícones para alternar
@@ -196,7 +220,6 @@ import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetri
 import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
 import { HelpModal } from '@/components/ui/HelpModal';
 import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-builder-help-content';
-import { Layers } from 'lucide-react'; // Ensure Layers is imported if used for the new button
 import { FeedbackButton } from "@/components/features/agent-builder/feedback-button"; // Added
 import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal"; // Added
 

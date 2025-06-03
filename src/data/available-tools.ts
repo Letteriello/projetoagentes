@@ -1,4 +1,4 @@
-import type { AvailableTool } from '@/types/agent-configs'; // Corrected import path
+import type { AvailableTool } from '@/types/agent-configs-fixed'; // Corrected import path
 import { Search, Database, CloudCog, Code2, MessageSquare } from 'lucide-react';
 
 export const availableTools: AvailableTool[] = [

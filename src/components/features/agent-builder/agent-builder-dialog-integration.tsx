@@ -6,7 +6,7 @@ import * as React from "react";
 import { ToolsTab } from "./tools-tab";
 // import { allTools } from "@/app/agent-builder/available-tools"; // Unused import
 import { AvailableTool } from "@/types/tool-types";
-import type { ToolConfigData } from "@/types/agent-configs"; // Import the new type
+import type { ToolConfigData } from '@/types/agent-configs-fixed'; // Import the new type
 
 // Tipos e importações adicionais necessários para a integração
 // Estes serão utilizados para adaptar o componente ToolsTab à estrutura existente

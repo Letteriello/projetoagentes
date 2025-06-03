@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ToolConfigModal from './ToolConfigModal';
-import { AvailableTool, ToolConfigData } from '@/types/agent-configs';
+import { AvailableTool, ToolConfigData } from '@/types/agent-configs-fixed';
 import { InfoIcon } from 'lucide-react'; // Using a real icon component
 
 // Mock useToast

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TagInput } from '@/components/ui/tag-input'; // Import TagInput
-import { SavedAgentConfiguration } from '@/types/agent-configs';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 
 interface SaveAsTemplateDialogProps {
   isOpen: boolean;

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import '@testing-library/jest-dom';
 import { FormProvider, useForm } from 'react-hook-form';
 import ToolsTab from './tools-tab'; // Adjust path as needed
-import { SavedAgentConfiguration, AvailableTool, ToolConfigData } from '@/types/agent-configs'; // Adjust path
+import { SavedAgentConfiguration, AvailableTool, ToolConfigData } from '@/types/agent-configs-fixed'; // Adjust path
 import { iconComponents as actualIconComponents } from '@/data/agentBuilderConfig'; // For real icons if not all mocked
 
 // --- Mocks ---

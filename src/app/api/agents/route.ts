@@ -1,59 +1,56 @@
 // src/app/api/agents/route.ts
 import { NextResponse } from "next/server";
-import { createAgent, listAgents } from "@/app/agent-builder/actions";
-import { SavedAgentConfiguration } from "@/types/agent-configs";
+import * as AgentActions from "@/app/agent-builder/actions";
+import { SavedAgentConfiguration } from "@/types/agent-configs-fixed";
+import type { ApiResponse } from "@/types/api-types";
 
 // TODO: Replace with actual authentication mechanism to get userId
 const PLACEHOLDER_USER_ID = "test-user-id";
 
+/**
+ * Endpoint para criar/configurar agentes
+ */
 export async function POST(request: Request) {
   try {
-    const agentConfigData = (await request.json()) as Omit<
-      SavedAgentConfiguration,
-      "id" | "createdAt" | "updatedAt" | "userId"
-    >;
+    const agentConfigData = await request.json();
+    
+    const fullAgentConfig: SavedAgentConfiguration = {
+      ...agentConfigData,
+      id: `temp-${Date.now()}`,
+      userId: PLACEHOLDER_USER_ID,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isTemplate: false
+    };
 
-    // Input validation (basic example)
-    if (!agentConfigData || !agentConfigData.name) {
-      return NextResponse.json(
-        { error: "Invalid agent data provided. Name is required." },
-        { status: 400 }
-      );
-    }
+    // Chamada para criar o agente
+    const result = await AgentActions.createAgent(fullAgentConfig);
 
-    const result = await createAgent(agentConfigData, PLACEHOLDER_USER_ID);
-
-    if ("error" in result) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
-    return NextResponse.json(result, { status: 201 }); // 201 Created
-  } catch (e: any) {
-    console.error("Error in POST /api/agents:", e);
-    // Check for specific error types if needed, e.g., JSON parsing errors
-    if (e instanceof SyntaxError) {
-      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-    }
-    return NextResponse.json(
-      { error: e.message || "Failed to create agent." },
-      { status: 500 }
-    );
+    return NextResponse.json(result, { 
+      status: result.success ? 200 : 500 
+    });
+  } catch (error: any) {
+    console.error("[AgentsAPI] POST error:", error);
+    const response: ApiResponse = {
+      success: false,
+      error: error.message || "Internal Server Error",
+      timestamp: new Date().toISOString()
+    };
+    return NextResponse.json(response, { status: 500 });
   }
 }
 
+/**
+ * Endpoint para listar agentes
+ */
 export async function GET() {
   try {
-    const result = await listAgents(PLACEHOLDER_USER_ID);
-
-    if ("error" in result) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
-    return NextResponse.json(result, { status: 200 });
-  } catch (e: any) {
-    console.error("Error in GET /api/agents:", e);
+    // Chamada para listar agentes
+    const agents = await AgentActions.listAgents(PLACEHOLDER_USER_ID);
+    return NextResponse.json(agents);
+  } catch (error: any) {
     return NextResponse.json(
-      { error: e.message || "Failed to list agents." },
+      { error: error.message || "Internal Server Error" },
       { status: 500 }
     );
   }

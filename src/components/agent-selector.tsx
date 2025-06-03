@@ -40,7 +40,7 @@ interface AgentData {
   capabilities?: string[];
 }
 
-import type { SavedAgentConfiguration } from "@/types/agent-configs";
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import type { Gem } from "@/data/agentBuilderConfig"; // Added Gem import
 
 // TODO: Move AgentSelectItem to a shared types file

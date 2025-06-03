@@ -20,12 +20,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
-import {
 import { useFormContext } from "react-hook-form"; // Added import
 import {
   A2AConfig as A2AConfigType,
   CommunicationChannel,
-} from "@/types/agent-configs";
+} from '@/types/agent-configs-fixed';
 import { SavedAgentConfiguration } from "@/types/agent-types";
 
 interface A2AConfigProps {

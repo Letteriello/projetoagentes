@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FormProvider, useForm, UseFormReturn } from 'react-hook-form';
 import WorkflowBehaviorForm from './WorkflowBehaviorForm';
-import { SavedAgentConfiguration, WorkflowDetailedType } from '@/types/agent-configs';
+import { SavedAgentConfiguration, WorkflowDetailedType } from '@/types/agent-configs-fixed';
 import { TooltipProvider } from '@/components/ui/tooltip'; // Required by the component
 
 // Helper component to wrap WorkflowBehaviorForm with FormProvider

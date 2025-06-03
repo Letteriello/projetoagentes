@@ -1,7 +1,7 @@
 // src/contexts/AgentsContext.tsx
 "use client";
 
-import { SavedAgentConfiguration } from '@/types/agent-configs'; // Usar os tipos unificados
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Usar os tipos unificados
 import * as React from 'react';
 import { useToast } from '@/hooks/use-toast';
 

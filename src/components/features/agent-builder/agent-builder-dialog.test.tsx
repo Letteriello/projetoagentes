@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { FormProvider, useForm } from 'react-hook-form'; // For wrapping and getting methods if needed
 
 import AgentBuilderDialog from './agent-builder-dialog'; // The component to test
-import { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-configs';
+import { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-configs-fixed';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content'; // Actual help content
 
 // --- Mocks ---
@@ -40,7 +40,7 @@ jest.mock('./tabs/DeployTab', () => () => <div data-testid="deploy-tab-mock">Dep
 // Mock HelpModal to verify its props and visibility
 jest.mock('@/components/ui/HelpModal', () => ({ isOpen, onClose, title, children }: {isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode}) => isOpen ? (
     <div data-testid="help-modal-mock">
-      <h1data-testid="help-modal-title">{title}</h1data-testid="help-modal-title">
+      <h1 data-testid="help-modal-title">{title}</h1>
       <div data-testid="help-modal-content">{children}</div>
       <button onClick={onClose}>CloseHelpModal</button>
     </div>

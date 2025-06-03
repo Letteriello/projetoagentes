@@ -4,7 +4,7 @@
  * basic order of operations, and returns the result or an error message.
  * It's designed to avoid direct use of `eval()` for security.
  */
-import { defineTool } from 'genkit';
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
 import { z } from 'zod';
 import { enhancedLogger } from '@/lib/logger'; // Import the logger
 
@@ -19,7 +19,7 @@ export const CalculatorOutputSchema = z.object({
   result: z.union([z.number(), z.string()]).describe("The result of the calculation or an error message."),
 });
 
-export const calculatorTool = defineTool(
+export const calculatorTool = ai.defineTool(
   {
     name: 'calculator',
     description:
@@ -27,155 +27,121 @@ export const calculatorTool = defineTool(
     inputSchema: CalculatorInputSchema,
     outputSchema: CalculatorOutputSchema,
   },
-  async (input) => {
+  async (input: z.infer<typeof CalculatorInputSchema>) => {
     const { expression, flowName, agentId } = input;
     const toolName = 'calculator';
-    let toolOutput: any;
-    let errorOccurred = false;
+    let toolOutput: { result: number | string };
 
     try {
       // Simple expression evaluator
-      // This is a basic implementation and might not cover all edge cases or complex scenarios.
-      // It prioritizes safety over feature completeness for this example.
-
-    // Sanitize and validate input further if necessary, though Zod handles basic type.
-    // For now, we assume the expression is somewhat well-behaved.
-    const sanitizedExpression = expression.replace(/\s+/g, ''); // Remove all whitespace
-
-    // Regex to tokenize the expression. It captures numbers and operators.
-    const tokens = sanitizedExpression.match(/(\d+\.?\d*|[\+\-\*\/])/g);
-
-    if (!tokens) {
-      return { result: "Error: Invalid expression format or empty expression." };
-    }
-
-    // Helper to perform an operation
-    const applyOp = (a: number, b: number, op: string): number | string => {
-      switch (op) {
-        case '+': return a + b;
-        case '-': return a - b;
-        case '*': return a * b;
-        case '/':
-          if (b === 0) return "Error: Division by zero.";
-          return a / b;
-        default: return `Error: Unknown operator ${op}`;
+      const sanitizedExpression = expression.replace(/\s+/g, ''); // Remove all whitespace
+      if (!/^[\d\.\+\-\*\/\(\)]+$/.test(sanitizedExpression)) {
+        // Note: Parentheses are checked in regex but not handled by this simplified evaluator
+        throw new Error("Expression contains invalid characters or unsupported parentheses.");
       }
-    };
 
-    const numbers: number[] = [];
-    const ops: string[] = [];
-
-    // Operator precedence
-    const precedence: { [key: string]: number } = { '+': 1, '-': 1, '*': 2, '/': 2 };
-
-    // Shunting-yard inspired logic (simplified for immediate execution of higher precedence)
-    // This implementation will directly calculate * and / first, then + and -
-
-    let currentNumberString = "";
-    const processedTokens: (number | string)[] = [];
-
-    for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-        if (!isNaN(parseFloat(token))) { // Is a number
-            currentNumberString += token;
-            // If next token is an operator or end of expression, push the number
-            if (i === tokens.length - 1 || isNaN(parseFloat(tokens[i+1]))) {
-                processedTokens.push(parseFloat(currentNumberString));
-                currentNumberString = "";
+      const tokens: (number | string)[] = [];
+      let currentNumber = '';
+      for (let i = 0; i < sanitizedExpression.length; i++) {
+        const char = sanitizedExpression[i];
+        if (/[\d\.]/.test(char)) {
+          currentNumber += char;
+        } else if (/[\+\-\*\/]/.test(char)) {
+          if (currentNumber) {
+            tokens.push(parseFloat(currentNumber));
+            currentNumber = '';
+          }
+          if (char === '-' || char === '+') {
+            if (tokens.length === 0 || typeof tokens[tokens.length - 1] === 'string') {
+              currentNumber += char;
+              continue;
             }
-        } else if (['+', '-', '*', '/'].includes(token)) { // Is an operator
-            if (currentNumberString !== "") { // Handles cases like "2*-1" if we allowed unary minus explicitly
-                 processedTokens.push(parseFloat(currentNumberString));
-                 currentNumberString = "";
-            }
-            // Handle unary minus at the beginning of an expression or after another operator
-            if (token === '-' && (processedTokens.length === 0 || typeof processedTokens[processedTokens.length -1] === 'string')) {
-                currentNumberString = "-"; // Start accumulating a negative number
-                continue;
-            }
-            processedTokens.push(token);
+          }
+          tokens.push(char);
         } else {
-            return { result: `Error: Invalid token '${token}' in expression.` };
+          // This path should ideally not be reached if regex is comprehensive for supported chars
+          throw new Error(`Unsupported character '${char}' in expression.`);
         }
-    }
-     if (currentNumberString !== "") { // Possible trailing number
-        processedTokens.push(parseFloat(currentNumberString));
-    }
-
-
-    // Phase 1: Multiplication and Division
-    const pass1: (number | string)[] = [];
-    for (let i = 0; i < processedTokens.length; i++) {
-      const token = processedTokens[i];
-      if (typeof token === 'string' && (token === '*' || token === '/')) {
-        const left = pass1.pop();
-        const right = processedTokens[i + 1];
-        if (typeof left !== 'number' || typeof right !== 'number') {
-          return { result: "Error: Invalid sequence of operators and numbers." };
-        }
-        const opResult = applyOp(left, right, token);
-        if (typeof opResult === 'string') return { result: opResult }; // Error occurred
-        pass1.push(opResult);
-        i++; // Skip next token (right operand)
-      } else {
-        pass1.push(token);
       }
-    }
-
-    // Phase 2: Addition and Subtraction
-    let resultAcc = pass1[0];
-    if (typeof resultAcc !== 'number') {
-        // This can happen if the first token is an operator without a preceding number (e.g. "/2+3")
-        // or if the expression is just an operator.
-        if (pass1.length === 1 && typeof pass1[0] === 'string') {
-             return { result: `Error: Expression cannot be just an operator '${pass1[0]}'.`};
-        }
-        // If the first element is an operator but it's not a unary minus that got handled, it's an error.
-        // Unary minus should have been combined with the number already.
-        return { result: "Error: Expression must start with a number or a valid unary minus." };
-    }
-
-
-    for (let i = 1; i < pass1.length; i += 2) {
-      const op = pass1[i];
-      const right = pass1[i + 1];
-      if (typeof op !== 'string' || typeof right !== 'number') {
-        return { result: "Error: Invalid sequence of operators and numbers during addition/subtraction." };
+      if (currentNumber) {
+        tokens.push(parseFloat(currentNumber));
       }
-      const opResult = applyOp(resultAcc as number, right, op);
-      if (typeof opResult === 'string') return { result: opResult }; // Error occurred
-      resultAcc = opResult;
-    }
 
-    if (typeof resultAcc !== 'number' || isNaN(resultAcc)) {
-        toolOutput = { result: "Error: Could not compute the final result. Invalid expression." };
-        errorOccurred = true;
-    } else {
-        toolOutput = { result: resultAcc };
-    }
+      if (tokens.length === 0) {
+        throw new Error("Empty expression.");
+      }
 
-    // Log the tool call using enhancedLogger
-    // flowName and agentId are dependent on being passed in the input,
-    // which is not standard for Genkit tools but added here for illustration.
-    // Genkit's default trace will capture tool_call and tool_return from the flow's perspective.
-    // This explicit call here would be if more detailed/custom logging by the tool itself is desired.
-    if (errorOccurred) {
-        enhancedLogger.logError({
-            flowName: flowName || "unknown_flow",
-            agentId: agentId || "unknown_agent",
-            message: `Error in ${toolName} tool`,
-            error: new Error(String(toolOutput.result)), // Create an Error object from the error message
-            details: { input: expression, output: toolOutput },
-            toolName: toolName,
-        });
-    } else {
-        enhancedLogger.logToolCall({
-            flowName: flowName || "unknown_flow", // Or derive from Genkit context if possible
-            agentId: agentId || "unknown_agent",  // Or derive from Genkit context if possible
-            toolName: toolName,
-            input: { expression }, // Log the original expression
-            output: toolOutput,
-        });
+      const applyOp = (a: number, b: number, op: string): number => {
+        switch (op) {
+          case '+': return a + b;
+          case '-': return a - b;
+          case '*': return a * b;
+          case '/':
+            if (b === 0) throw new Error("Division by zero.");
+            return a / b;
+          default: throw new Error(`Unknown operator ${op}`);
+        }
+      };
+
+      // Order of operations: Multiplication and Division first
+      const pass1: (number | string)[] = [];
+      let i = 0;
+      while (i < tokens.length) {
+        const token = tokens[i];
+        if (typeof token === 'string' && (token === '*' || token === '/')) {
+          const left = pass1.pop();
+          const right = tokens[i + 1];
+          if (typeof left !== 'number' || typeof right !== 'number') {
+            throw new Error("Invalid expression format for multiplication/division.");
+          }
+          pass1.push(applyOp(left, right, token));
+          i += 2;
+        } else {
+          pass1.push(token);
+          i += 1;
+        }
+      }
+
+      // Addition and Subtraction next
+      let resultAcc = pass1[0];
+      if (typeof resultAcc !== 'number') {
+        throw new Error("Expression must start with a number or valid unary minus/plus.");
+      }
+
+      for (let i = 1; i < pass1.length; i += 2) {
+        const op = pass1[i];
+        const right = pass1[i + 1];
+        if (typeof op !== 'string' || typeof right !== 'number') {
+          throw new Error("Invalid sequence of operators and numbers during addition/subtraction.");
+        }
+        resultAcc = applyOp(resultAcc as number, right, op);
+      }
+
+      if (typeof resultAcc !== 'number' || isNaN(resultAcc)) {
+        throw new Error("Could not compute the final result. Invalid expression.");
+      }
+      
+      toolOutput = { result: resultAcc };
+      // Success logging within try block, after result is confirmed
+      enhancedLogger.logToolCall({
+        flowName: flowName || "unknown_flow",
+        agentId: agentId || "unknown_agent",
+        toolName: toolName,
+        input: { expression },
+        output: toolOutput,
+      });
+
+    } catch (error: any) {
+      // Error logging within catch block
+      toolOutput = { result: error.message || "An unexpected error occurred during calculation." };
+      enhancedLogger.logError({
+        flowName: flowName || "unknown_flow",
+        agentId: agentId || "unknown_agent",
+        message: `Error in ${toolName} tool`,
+        error: error instanceof Error ? error : new Error(String(error)), // Ensure it's an Error object
+        details: { input: expression, output: toolOutput },
+        toolName: toolName,
+      });
     }
     
     return toolOutput;

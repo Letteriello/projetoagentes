@@ -58,7 +58,7 @@ import {
     A2AAgentSpecialistConfig,
     AgentConfig,
     SavedAgentConfiguration
-} from "@/types/agent-configs";
+} from '@/types/agent-configs-fixed';
 
 // From Updated Upstream (Chosen version)
 // From Updated Upstream (Chosen version, matching above interface)
