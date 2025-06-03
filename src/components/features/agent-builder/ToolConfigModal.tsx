@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AvailableTool, ToolConfigData } from '@/types/agent-configs-fixed'; // Updated import path
-import { ApiKeyVaultEntry } from "@/types/apiKeyVaultTypes";
+import { ApiKeyEntry } from '../../../services/api-key-service';
 import { useToast } from "@/hooks/use-toast"; // For showing errors
 
 // Props para o componente ToolConfigModal.
@@ -30,18 +30,19 @@ interface ToolConfigModalProps {
   // Receive current selection and callback to update it in parent state
   currentSelectedApiKeyId?: string;
   onApiKeyIdChange: (toolId: string, apiKeyId?: string) => void;
+  availableApiKeys: ApiKeyEntry[]; // New prop
 
   // Existing state for direct input fields (some might become obsolete or conditional)
-  modalGoogleApiKey: string; setModalGoogleApiKey: (value: string) => void; // Potentially replaced by vault
+  // modalGoogleApiKey: string; setModalGoogleApiKey: (value: string) => void; // Replaced by vault
   modalGoogleCseId: string; setModalGoogleCseId: (value: string) => void;
   modalOpenapiSpecUrl: string; setModalOpenapiSpecUrl: (value: string) => void;
-  modalOpenapiApiKey: string; setModalOpenapiApiKey: (value: string) => void; // Potentially replaced by vault
+  // modalOpenapiApiKey: string; setModalOpenapiApiKey: (value: string) => void; // Replaced by vault
   modalDbType: string; setModalDbType: (value: string) => void;
   modalDbHost: string; setModalDbHost: (value: string) => void;
   modalDbPort: number; setModalDbPort: (value: number) => void;
   modalDbName: string; setModalDbName: (value: string) => void;
   modalDbUser: string; setModalDbUser: (value: string) => void;
-  modalDbPassword: string; setModalDbPassword: (value: string) => void; // Potentially replaced by vault
+  // modalDbPassword: string; setModalDbPassword: (value: string) => void; // Replaced by vault
   modalDbConnectionString: string; setModalDbConnectionString: (value: string) => void;
   modalDbDescription: string; setModalDbDescription: (value: string) => void;
   modalKnowledgeBaseId: string; setModalKnowledgeBaseId: (value: string) => void;
@@ -63,17 +64,18 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   onSave,
   currentSelectedApiKeyId,
   onApiKeyIdChange,
+  availableApiKeys, // New prop
   // Keep other state setters for non-auth fields or direct input fallback (though direct input is removed for auth fields)
-  modalGoogleApiKey, setModalGoogleApiKey, // Will be set by vault selection or remains empty
+  // modalGoogleApiKey, setModalGoogleApiKey, // Removed
   modalGoogleCseId, setModalGoogleCseId,
   modalOpenapiSpecUrl, setModalOpenapiSpecUrl,
-  modalOpenapiApiKey, setModalOpenapiApiKey, // Will be set by vault selection or remains empty
+  // modalOpenapiApiKey, setModalOpenapiApiKey, // Removed
   modalDbType, setModalDbType,
   modalDbHost, setModalDbHost,
   modalDbPort, setModalDbPort,
   modalDbName, setModalDbName,
   modalDbUser, setModalDbUser,
-  modalDbPassword, setModalDbPassword, // Will be set by vault selection or remains empty
+  // modalDbPassword, setModalDbPassword, // Removed
   modalDbConnectionString, setModalDbConnectionString,
   modalDbDescription, setModalDbDescription,
   modalKnowledgeBaseId, setModalKnowledgeBaseId,
@@ -84,39 +86,39 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   InfoIcon,
 }) => {
   const { toast } = useToast();
-  const [apiKeyVaultEntries, setApiKeyVaultEntries] = React.useState<ApiKeyVaultEntry[]>([]);
-  const [isLoadingVaultKeys, setIsLoadingVaultKeys] = React.useState(false);
+  // const [apiKeyVaultEntries, setApiKeyVaultEntries] = React.useState<ApiKeyVaultEntry[]>([]); // Removed
+  // const [isLoadingVaultKeys, setIsLoadingVaultKeys] = React.useState(false); // Removed
 
-  React.useEffect(() => {
-    if (isOpen && configuringTool?.requiresAuth) {
-      setIsLoadingVaultKeys(true);
-      fetch("/api/apikeys")
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`Failed to fetch API keys: ${res.statusText}`);
-          }
-          return res.json();
-        })
-        .then((data: ApiKeyVaultEntry[]) => {
-          setApiKeyVaultEntries(Array.isArray(data) ? data : []);
-        })
-        .catch((error) => {
-          console.error("Error fetching API keys from vault:", error);
-          toast({
-            title: "Erro ao Carregar Chaves API",
-            description: error.message || "Não foi possível buscar as chaves do cofre.",
-            variant: "destructive",
-          });
-          setApiKeyVaultEntries([]); // Ensure it's an empty array on error
-        })
-        .finally(() => {
-          setIsLoadingVaultKeys(false);
-        });
-    } else if (!isOpen) {
-      // Reset when modal closes
-      setApiKeyVaultEntries([]);
-    }
-  }, [isOpen, configuringTool, toast]);
+  // React.useEffect(() => { // Removed
+  //   if (isOpen && configuringTool?.requiresAuth) {
+  //     setIsLoadingVaultKeys(true);
+  //     fetch("/api/apikeys")
+  //       .then((res) => {
+  //         if (!res.ok) {
+  //           throw new Error(`Failed to fetch API keys: ${res.statusText}`);
+  //         }
+  //         return res.json();
+  //       })
+  //       .then((data: ApiKeyVaultEntry[]) => {
+  //         setApiKeyVaultEntries(Array.isArray(data) ? data : []);
+  //       })
+  //       .catch((error) => {
+  //         console.error("Error fetching API keys from vault:", error);
+  //         toast({
+  //           title: "Erro ao Carregar Chaves API",
+  //           description: error.message || "Não foi possível buscar as chaves do cofre.",
+  //           variant: "destructive",
+  //         });
+  //         setApiKeyVaultEntries([]); // Ensure it's an empty array on error
+  //       })
+  //       .finally(() => {
+  //         setIsLoadingVaultKeys(false);
+  //       });
+  //   } else if (!isOpen) {
+  //     // Reset when modal closes
+  //     setApiKeyVaultEntries([]);
+  //   }
+  // }, [isOpen, configuringTool, toast]);
 
 
   const handleInternalSave = () => {
@@ -197,20 +199,24 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
               <Select
                 value={currentSelectedApiKeyId || ""}
                 onValueChange={(value) => onApiKeyIdChange(configuringTool.id, value)}
-                disabled={isLoadingVaultKeys}
+                // disabled={isLoadingVaultKeys} // isLoadingVaultKeys is removed
               >
                 <SelectTrigger id="apiKeySelect">
-                  <SelectValue placeholder={isLoadingVaultKeys ? "Carregando chaves..." : "Selecione uma chave API do cofre"} />
+                  <SelectValue placeholder={"Selecione uma chave API do cofre"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {apiKeyVaultEntries
-                    .filter(key => key.serviceType === configuringTool.serviceTypeRequired || key.serviceType === "Generic")
+                  {availableApiKeys // Use availableApiKeys from props
+                    .filter(key => {
+                      // TODO: Ensure ApiKeyEntry includes a `serviceType` field or adapt this filter.
+                      // This assumes ApiKeyEntry has a 'serviceType' field.
+                      return key.serviceType === configuringTool.serviceTypeRequired || key.serviceType === "Generic";
+                    })
                     .map(key => (
                       <SelectItem key={key.id} value={key.id}>
                         {key.serviceName} ({key.serviceType}) - ID: ...{key.id.slice(-6)}
                       </SelectItem>
                     ))}
-                  {apiKeyVaultEntries.filter(key => key.serviceType === configuringTool.serviceTypeRequired || key.serviceType === "Generic").length === 0 && !isLoadingVaultKeys && (
+                  {availableApiKeys.filter(key => key.serviceType === configuringTool.serviceTypeRequired || key.serviceType === "Generic").length === 0 && (
                     <div className="px-2 py-1.5 text-sm text-muted-foreground">
                       Nenhuma chave compatível encontrada no cofre para o tipo '{configuringTool.serviceTypeRequired}' ou 'Generic'.
                       <Button variant="link" className="p-0 h-auto ml-1" onClick={() => { /* TODO: Link to vault page */ }}>Adicionar Chave</Button>

@@ -26,8 +26,9 @@ export default function ReviewTab(props: ReviewTabProps) {
   const agentName = watch('agentName');
   const description = watch('agentDescription');
   const agentTone = watch('config.agentPersonality'); // Corrected path based on LLMBehaviorForm
-  const tools = watch('tools') || [];
-  const config = watch('config') || {}; // This is the full config object
+  const tools = watch('tools') || []; // This is an array of tool IDs
+  const toolConfigsApplied = watch('toolConfigsApplied') || {}; // Watch this specifically
+  const config = watch('config') || {}; // This is the full config object (general config)
 
   const [isLoadingAlerts, setIsLoadingAlerts] = React.useState(false);
   const [inconsistencyAlerts, setInconsistencyAlerts] = React.useState<string[]>([]);
@@ -70,6 +71,41 @@ export default function ReviewTab(props: ReviewTabProps) {
     return { id: toolId, name: toolId }; // Placeholder
   };
 
+  const renderToolConfigsForReview = (configs: Record<string, any> | undefined, appliedToolIds: string[]) => {
+    if (!configs || Object.keys(configs).length === 0) {
+      // If no configs, but there are tools selected, mention they use default settings or no config needed.
+      if (appliedToolIds.length > 0) {
+        return <p className="text-sm text-muted-foreground">Selected tools are using default settings or require no specific configuration.</p>;
+      }
+      return <p className="text-sm text-muted-foreground">No tool configurations applied.</p>;
+    }
+
+    return (
+      <ul className="list-disc pl-5 space-y-2 text-sm">
+        {Object.entries(configs).map(([toolId, configData]) => {
+          let displayValue = JSON.stringify(configData, null, 2);
+          // Ensure configData is an object before checking properties
+          if (typeof configData === 'object' && configData !== null) {
+            if (configData.selectedApiKeyId) {
+              displayValue = `API Key configured via Vault (ID: ${configData.selectedApiKeyId})`;
+            } else if (configData.apiKeyId) {
+              displayValue = `API Key configured via Vault (ID: ${configData.apiKeyId})`;
+            }
+          }
+
+          return (
+            <li key={toolId}>
+              <span className="font-semibold">{getToolDisplayInfo(toolId).name}:</span> {/* Use getToolDisplayInfo for name */}
+              <pre className="whitespace-pre-wrap text-xs bg-muted p-1 rounded-md inline-block ml-2 mt-1">
+                <code>{displayValue}</code>
+              </pre>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
 
   return (
     <div className="space-y-6">
@@ -108,6 +144,11 @@ export default function ReviewTab(props: ReviewTabProps) {
               })}
               {tools.length === 0 && <span className="text-sm text-muted-foreground">No tools selected</span>}
             </div>
+          </div>
+
+          <div className="mt-3"> {/* Add some margin-top for separation */}
+            <h4 className="font-medium">Tool Configurations Applied</h4>
+            {renderToolConfigsForReview(toolConfigsApplied, tools)}
           </div>
 
           <div>

@@ -42,9 +42,11 @@ import { Switch } from '@/components/ui/switch';
 // For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
 import ToolConfigModal from '../ToolConfigModal'; // Added import
 import type { ToolConfigData } from '@/types/agent-types'; // Added import
+import { ApiKeyEntry } from '../../../../services/api-key-service';
 
 interface ToolsTabProps {
   availableTools: AvailableTool[];
+  availableApiKeys: ApiKeyEntry[]; // NEW
   // Props for icons and help modal, passed from AgentBuilderDialog
   iconComponents: Record<string, React.ComponentType<{ className?: string }>>;
   InfoIconComponent: React.ElementType; // Renamed to avoid conflict with local InfoIcon
@@ -75,6 +77,7 @@ type SuggestedToolType = {
 
 export default function ToolsTab({
   availableTools,
+  availableApiKeys, // NEW
   iconComponents,
   InfoIconComponent,
   SettingsIcon,
@@ -256,6 +259,7 @@ export default function ToolsTab({
           // allTools={availableTools}
           onSave={(configData) => handleSaveToolConfiguration(configuringTool.id, configData)}
           existingConfig={toolConfigsApplied[configuringTool.id]}
+          availableApiKeys={availableApiKeys} // Pass availableApiKeys
         />
       )}
       <CustomToolDialog
@@ -266,6 +270,7 @@ export default function ToolsTab({
         }}
         onSave={handleSaveCustomTool}
         initialData={editingCustomToolData}
+        availableApiKeys={availableApiKeys} // Pass availableApiKeys
       />
       <AlertDialog open={!!toolToDelete} onOpenChange={() => setToolToDelete(null)}>
         <AlertDialogContent>

@@ -68,6 +68,7 @@ import ReviewTab from './tabs/review-tab';
 import DeployTab from './tabs/DeployTab'; // Import DeployTab
 import { SubAgentSelector } from './sub-agent-selector';
 import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
+import useApiKeyVault from '../../../hooks/use-api-key-vault';
 
 import type {
   SavedAgentConfiguration,
@@ -116,6 +117,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   iconComponents,
   availableAgentsForSubSelector,
 }) => {
+  const { apiKeys: availableApiKeys, isLoading: apiKeysLoading, error: apiKeysError } = useApiKeyVault();
+  // TODO: Handle apiKeysLoading and apiKeysError appropriately
+  if (apiKeysLoading) console.log("API Keys Loading...");
+  if (apiKeysError) console.error("Error loading API Keys:", apiKeysError);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeEditTab, setActiveEditTab] = React.useState('general');
   const [currentStep, setCurrentStep] = React.useState(0);
@@ -343,8 +349,6 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     availableTools={availableTools}
                     selectedTools={methods.watch("tools") || []} // RHF state
                     setSelectedTools={(tools) => methods.setValue("tools", tools, {shouldValidate: true, shouldDirty: true})} // RHF action
-                    // toolConfigurations={methods.watch("toolConfigsApplied") || {}} // This prop seems to be missing in ToolsTab's definition
-                    // onToolConfigure={handleToolConfigure} // REMOVED
                     iconComponents={iconComponents}
                     InfoIcon={InfoIcon} // Pass the imported InfoIcon
                     SettingsIcon={Settings}
@@ -352,6 +356,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     PlusCircleIcon={PlusCircle}
                     Trash2Icon={Trash2}
                     showHelpModal={showHelpModal}
+                    availableApiKeys={availableApiKeys || []} // Pass the keys from the hook
+                    setToolConfiguration={(toolId, config) => {
+                      const currentConfigs = methods.getValues("toolConfigsApplied") || {};
+                      methods.setValue("toolConfigsApplied", { ...currentConfigs, [toolId]: config }, { shouldValidate: true, shouldDirty: true });
+                    }}
+                    toolConfigurations={methods.watch("toolConfigsApplied") || {}} // Still pass current configs for reading
                   />
                 </TabsContent>
 
