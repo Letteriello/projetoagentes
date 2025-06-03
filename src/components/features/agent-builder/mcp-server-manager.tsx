@@ -2,11 +2,22 @@
 
 import * as React from "react";
 import { useState } from "react";
+import { useForm, FormProvider, SubmitHandler } from "react-hook-form"; // Added RHF imports
+import { zodResolver } from "@hookform/resolvers/zod"; // Added Zod resolver
+import { z } from "zod"; // Added Zod
 import { Cpu, Plus, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// Label will be replaced by FormLabel
 import { Textarea } from "@/components/ui/textarea";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form"; // Added Form components
+import { mcpServerFormSchema } from "@/lib/zod-schemas"; // Added Zod schema import
 import {
   Dialog,
   DialogContent,
@@ -31,11 +42,36 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
   onUpdate,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newServer, setNewServer] = useState<Omit<MCPServerConfig, "id">>({
-    name: "",
-    url: "",
-    description: "",
+  // Remove old local state for newServer
+
+  const methods = useForm<z.infer<typeof mcpServerFormSchema>>({
+    resolver: zodResolver(mcpServerFormSchema),
+    defaultValues: {
+      name: "",
+      url: "",
+      description: "",
+    },
   });
+
+  const handleAddServerSubmit: SubmitHandler<z.infer<typeof mcpServerFormSchema>> = (data) => {
+    onAdd({
+      id: crypto.randomUUID(), // Generate ID here
+      ...data,
+      status: "connected", // Set default status, or as per your logic
+    });
+    setIsAddModalOpen(false); // Close modal
+    methods.reset(); // Reset form for next time
+  };
+
+  const handleOpenDialog = () => {
+    methods.reset(); // Reset form when dialog opens
+    setIsAddModalOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsAddModalOpen(false);
+    methods.reset();
+  }
 
   return (
     <div className="rounded-md border border-border p-4">
@@ -44,7 +80,7 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleOpenDialog}
           className="h-7 text-xs"
         >
           <Plus size={12} className="mr-1" />
@@ -79,7 +115,7 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => onUpdate(server)}
+                  onClick={() => onUpdate(server)} // Assuming onUpdate opens another modal or form
                 >
                   <Settings size={14} />
                 </Button>
@@ -106,7 +142,7 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
         </div>
       )}
 
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+      <Dialog open={isAddModalOpen} onOpenChange={handleCloseDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Adicionar Servidor MCP</DialogTitle>
@@ -114,68 +150,62 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
               Conecte-se a um servidor MCP para habilitar ferramentas avançadas.
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4 my-4">
-            <div className="space-y-2">
-              <Label htmlFor="server-name">Nome do Servidor</Label>
-              <Input
-                id="server-name"
-                value={newServer.name}
-                onChange={(e) =>
-                  setNewServer((prev) => ({ ...prev, name: e.target.value }))
-                }
-                placeholder="Ex: Servidor MCP Local"
+          <FormProvider {...methods}>
+            <form onSubmit={methods.handleSubmit(handleAddServerSubmit)} className="space-y-4 my-4">
+              <FormField
+                control={methods.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="server-name-rhf">Nome do Servidor</FormLabel>
+                    <FormControl>
+                      <Input id="server-name-rhf" {...field} placeholder="Ex: Servidor MCP Local" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="server-url">URL do Servidor</Label>
-              <Input
-                id="server-url"
-                value={newServer.url}
-                onChange={(e) =>
-                  setNewServer((prev) => ({ ...prev, url: e.target.value }))
-                }
-                placeholder="Ex: http://localhost:8000"
+              <FormField
+                control={methods.control}
+                name="url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="server-url-rhf">URL do Servidor</FormLabel>
+                    <FormControl>
+                      <Input id="server-url-rhf" {...field} placeholder="Ex: http://localhost:8000" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="server-description">Descrição (opcional)</Label>
-              <Textarea
-                id="server-description"
-                value={newServer.description}
-                onChange={(e) =>
-                  setNewServer((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                placeholder="Descreva o propósito deste servidor MCP"
-                rows={3}
+              <FormField
+                control={methods.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel htmlFor="server-description-rhf">Descrição (opcional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        id="server-description-rhf"
+                        {...field}
+                        placeholder="Descreva o propósito deste servidor MCP"
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                onAdd({
-                  id: crypto.randomUUID(),
-                  ...newServer,
-                  status: "connected",
-                });
-                setIsAddModalOpen(false);
-                setNewServer({ name: "", url: "", description: "" });
-              }}
-              className="button-live-glow"
-            >
-              Adicionar Servidor
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Cancelar
+                </Button>
+                <Button type="submit" className="button-live-glow">
+                  Adicionar Servidor
+                </Button>
+              </DialogFooter>
+            </form>
+          </FormProvider>
         </DialogContent>
       </Dialog>
     </div>
