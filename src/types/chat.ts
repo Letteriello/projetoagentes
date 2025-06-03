@@ -27,6 +27,7 @@ export interface ChatMessageUI {
   fileName?: string;
   fileDataUri?: string;
   isStreaming?: boolean; // Added for streaming
+  isError?: boolean; // Added/Ensured
   status?: 'pending' | 'completed' | 'error'; // Added status for UI
   toolUsed?: {
     name: string;
