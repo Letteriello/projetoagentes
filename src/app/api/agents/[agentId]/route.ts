@@ -5,7 +5,7 @@ import {
   updateAgent,
   deleteAgent,
 } from "@/app/agent-builder/actions";
-import { SavedAgentConfiguration } from "@/types/agent-configs";
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 
 // TODO: Replace with actual authentication mechanism to get userId
 const PLACEHOLDER_USER_ID = "test-user-id";

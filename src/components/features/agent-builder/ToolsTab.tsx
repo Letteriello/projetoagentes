@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
 import ToolCard from "./ToolCard";
 import type { AvailableTool } from "@/types/agent-types";
-import type { ToolConfigData } from "@/types/agent-configs";
+import type { ToolConfigData } from '@/types/agent-configs-fixed';
 
 // Props para o componente ToolsTab.
 interface ToolsTabProps {

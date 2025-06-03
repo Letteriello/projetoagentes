@@ -5,7 +5,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SavedAgentConfiguration, AgentConfig } from "@/types/agent-configs"; // Importar tipo unificado
+import { SavedAgentConfiguration, AgentConfig, LLMAgentConfig } from '@/types/agent-configs-fixed'; // Importar tipo unificado
 import { Send, Loader2 } from "lucide-react"; // Adicionado Loader2
 import { getAiConfigurationSuggestionsAction } from "@/app/agent-builder/actions";
 import { toast } from "@/hooks/use-toast";
@@ -34,7 +34,13 @@ export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIPro
   const [conversation, setConversation] = React.useState<CreatorChatMessage[]>([]);
   const [userInput, setUserInput] = React.useState<string>("");
   const [currentAgentConfig, setCurrentAgentConfig] = React.useState<Partial<SavedAgentConfiguration>>(
-    initialAgentConfig || { agentName: "", config: { type: 'llm', framework: 'genkit' } as any }
+    initialAgentConfig || { 
+      agentName: "", 
+      config: { 
+        type: 'llm', 
+        framework: 'genkit' 
+      } as LLMAgentConfig 
+    }
   );
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const agentsContext = useAgents();
@@ -46,7 +52,13 @@ export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIPro
       // setConversation([{id: 'init-edit', text: `Editing agent: ${initialAgentConfig.agentName}. How can I help?`, sender: 'assistant'}]);
     } else {
       // Reset for a new agent
-       setCurrentAgentConfig({ agentName: "", config: { type: 'llm', framework: 'genkit' } as any });
+       setCurrentAgentConfig({ 
+         agentName: "", 
+         config: { 
+           type: 'llm', 
+           framework: 'genkit' 
+         } as LLMAgentConfig 
+       });
        setConversation([]);
     }
   }, [initialAgentConfig]);
@@ -63,41 +75,54 @@ export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIPro
     setIsLoading(true);
 
     try {
-      const result: AssistantResponse = await getAiConfigurationSuggestionsAction({
-        chatHistory: currentConversationHistory
-      });
+      const result = await getAiConfigurationSuggestionsAction(
+        currentAgentConfig as SavedAgentConfiguration,
+        {
+          chatHistory: currentConversationHistory,
+          userInput: userMessageText
+        }
+      );
 
       if (!result.success) {
-        toast({ title: "Erro do Assistente", description: "Ocorreu um erro ao processar sua solicitação.", variant: "destructive" });
-        const errorResponse: CreatorChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: "Erro: Ocorreu um erro ao processar sua solicitação.",
-          sender: "assistant",
+        throw new Error(result.error || "Falha ao obter sugestões");
+      }
+
+      if (result.data) {
+        const responseData = result.data as {
+          suggestions?: string[];
+          updatedConfig?: Partial<SavedAgentConfiguration>;
         };
-        setConversation(prev => [...prev, errorResponse]);
-      } else if (result.suggestions?.suggestedAgentDescription && result.updatedConfig) {
-        const assistantResponse: CreatorChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: result.suggestions.suggestedAgentDescription,
-          sender: "assistant",
-        };
-        setConversation(prev => [...prev, assistantResponse]);
-        try {
-          const updatedConfig: SavedAgentConfiguration = {
-            ...result.updatedConfig,
-            internalVersion: result.updatedConfig.internalVersion || 1,
-            isLatest: true,
-            originalAgentId: result.updatedConfig.originalAgentId || result.updatedConfig.id
+
+        // Atualizar configuração se houver mudanças
+        if (responseData.updatedConfig) {
+          setCurrentAgentConfig(prev => ({
+            ...prev,
+            ...responseData.updatedConfig
+          }));
+        }
+
+        // Adicionar respostas ao chat
+        if (responseData.suggestions?.length) {
+          responseData.suggestions.forEach(suggestion => {
+            const assistantMessage: CreatorChatMessage = {
+              id: Date.now().toString(),
+              text: suggestion,
+              sender: "assistant"
+            };
+            setConversation(prev => [...prev, assistantMessage]);
+          });
+        } else {
+          const defaultResponse: CreatorChatMessage = {
+            id: Date.now().toString(),
+            text: "Aqui estão algumas sugestões para melhorar seu agente...",
+            sender: "assistant"
           };
-          setCurrentAgentConfig(updatedConfig);
-        } catch (parseError) {
-          console.error("Error parsing updatedAgentConfigJson:", parseError);
-          toast({ title: "Erro de Configuração", description: "O assistente retornou uma configuração inválida.", variant: "destructive" });
+          setConversation(prev => [...prev, defaultResponse]);
         }
       }
-    } catch (e: any) {
-      console.error("Failed to send message to creator flow:", e);
-      toast({ title: "Erro de Comunicação", description: e.message || "Não foi possível comunicar com o assistente.", variant: "destructive" });
+    } catch (error: any) {
+      console.error("Failed to send message to creator flow:", error);
+      toast({ title: "Erro de Comunicação", description: error.message || "Não foi possível comunicar com o assistente.", variant: "destructive" });
       const commErrorResponse: CreatorChatMessage = {
         id: (Date.now() + 1).toString(),
         text: "Desculpe, ocorreu um erro ao tentar processar sua solicitação.",
@@ -110,43 +135,38 @@ export function AgentCreatorChatUI({ initialAgentConfig }: AgentCreatorChatUIPro
   };
 
   const handleSaveAgentFromChat = async () => {
-    if (!currentAgentConfig.agentName?.trim()) {
-      toast({ title: "Nome Necessário", description: "Por favor, defina um nome para o agente antes de salvar.", variant: "destructive" });
-      return;
-    }
-    if (!currentAgentConfig.config?.type) {
-      toast({ title: "Tipo Necessário", description: "Por favor, defina um tipo para o agente (LLM, Workflow, etc.).", variant: "destructive" });
-      return;
-    }
-
-    setIsLoading(true); // Use a different loading state or disable send button too
     try {
-      const completeConfigToSave: SavedAgentConfiguration = {
-        id: currentAgentConfig.id || uuidv4(),
-        agentName: currentAgentConfig.agentName,
+      const fullAgentConfig: SavedAgentConfiguration = {
+        ...currentAgentConfig,
+        id: currentAgentConfig.id || `agent-${Date.now()}`,
+        agentName: currentAgentConfig.agentName || "Novo Agente",
         agentDescription: currentAgentConfig.agentDescription || "",
         agentVersion: currentAgentConfig.agentVersion || "1.0.0",
-        icon: currentAgentConfig.icon || (currentAgentConfig.config?.type ? `${currentAgentConfig.config.type}-agent-icon.svg` : 'Cpu'),
-        templateId: currentAgentConfig.templateId || 'chat_created',
+        icon: currentAgentConfig.icon || "default-icon.svg",
+        templateId: currentAgentConfig.templateId || "",
+        isTemplate: currentAgentConfig.isTemplate || false,
         isFavorite: currentAgentConfig.isFavorite || false,
         tags: currentAgentConfig.tags || [],
         createdAt: currentAgentConfig.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         userId: currentAgentConfig.userId || "defaultUser",
-        config: currentAgentConfig.config as AgentConfig,
+        config: currentAgentConfig.config || { type: 'llm', framework: 'genkit' } as LLMAgentConfig,
         tools: currentAgentConfig.tools || [],
         toolConfigsApplied: currentAgentConfig.toolConfigsApplied || {},
         toolsDetails: currentAgentConfig.toolsDetails || [],
+        internalVersion: 1,
+        isLatest: true,
+        originalAgentId: currentAgentConfig.id || `agent-${Date.now()}`
       };
 
       if (currentAgentConfig.id && initialAgentConfig && currentAgentConfig.id === initialAgentConfig.id) {
-        const updatedAgent = await agentsContext.updateAgent(currentAgentConfig.id, completeConfigToSave);
+        const updatedAgent = await agentsContext.updateAgent(currentAgentConfig.id, fullAgentConfig);
         if (updatedAgent) {
           setCurrentAgentConfig(updatedAgent);
           toast({ title: "Agente Atualizado", description: `O agente "${updatedAgent.agentName}" foi atualizado com sucesso.` });
         }
       } else {
-        const savedAgent = await agentsContext.addAgent(completeConfigToSave);
+        const savedAgent = await agentsContext.addAgent(fullAgentConfig);
         if (savedAgent) {
           setCurrentAgentConfig(savedAgent);
           toast({ title: "Agente Salvo", description: `Novo agente "${savedAgent.agentName}" criado com sucesso!` });

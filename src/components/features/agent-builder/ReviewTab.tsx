@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
-import type { SavedAgentConfiguration } from "@/types/agent-configs";
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { Button } from "@/components/ui/button"; // Added import
 
 interface ReviewTabProps {

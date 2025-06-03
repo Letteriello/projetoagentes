@@ -19,7 +19,7 @@ import {
   LogOut,
   DownloadCloud, // Added DownloadCloud
 } from "lucide-react"; // Added LogIn, LogOut
-import type { SavedAgentConfiguration } from "@/types/agent-configs";
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 

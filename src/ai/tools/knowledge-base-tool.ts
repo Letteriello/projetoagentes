@@ -4,7 +4,8 @@
  * of the knowledge base ID, API key, service endpoint, and default query parameters.
  * It simulates interaction with a RAG system.
  */
-import { defineTool, Tool } from 'genkit/tool';
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
+import { ToolDefinition } from '@genkit-ai/core'; // Import ToolDefinition
 import { z } from 'zod';
 
 // 1. Define Configuration Interface for the tool
@@ -25,6 +26,8 @@ export const KnowledgeBaseInputSchema = z.object({
   similarityTopK: z.number().optional().describe("Number of top K similar chunks to retrieve. Overrides instance default."),
   vectorDistanceThreshold: z.number().optional().describe("Optional threshold for vector distance. Overrides instance default."),
   // metadataFilters: z.record(z.any()).optional().describe("Filters to apply on metadata (e.g., {'category': 'X', 'year': 2023})") // Example for future extension
+  flowName: z.string().optional().describe("Name of the calling flow, for logging."),
+  agentId: z.string().optional().describe("ID of the calling agent, for logging."),
 });
 
 // 3. Define Output Schema for the tool's handler
@@ -33,86 +36,92 @@ export const KnowledgeBaseOutputSchema = z.object({
     z.object({
       id: z.string().optional().describe("Unique identifier for the chunk or document segment."),
       content: z.string().describe("The actual text content of the retrieved chunk."),
-      source: z.string().optional().describe("The original source of the content (e.g., file name, URL)."),
-      score: z.number().optional().describe("Relevance score of the chunk (e.g., similarity score)."),
-      // metadata: z.record(z.any()).optional().describe("Associated metadata with the chunk.") // Example for future extension
+      source: z.string().optional().describe("Source of the chunk (e.g., document name, URL)."),
+      score: z.number().optional().describe("Similarity score or relevance score of the chunk."),
+      metadata: z.record(z.any()).optional().describe("Any associated metadata with the chunk."),
     })
-  ).describe("Array of relevant information chunks retrieved from the knowledge base."), // Made array itself non-optional, can be empty
-  summary: z.string().optional().describe("Optional summary of the retrieved information, if generated."),
+  ).describe("Array of retrieved knowledge chunks."),
+  summary: z.string().optional().describe("Optional summary generated from the retrieved chunks (if supported by the RAG system)."),
   error: z.string().optional().describe("Error message if the query failed."),
-  debugInfo: z.object({ // Optional debug information
-    queryEmbeddingUsed: z.boolean().optional(),
-    searchPerformed: z.boolean().optional(),
-    configuredKbId: z.string(),
-    effectiveTopK: z.number(),
-    effectiveThreshold: z.number().optional(),
-  }).optional(),
+  debugInfo: z.record(z.any()).optional().describe("Optional debug information from the RAG system."),
 });
 
 // 4. Factory function to create the knowledgeBaseTool
 export function createKnowledgeBaseTool(
   config: KnowledgeBaseToolConfig
-): Tool<typeof KnowledgeBaseInputSchema, typeof KnowledgeBaseOutputSchema> {
-  const toolName = config.name || 'knowledgeBaseQuery';
-  const toolDescription = config.description ||
-    `Queries a configured knowledge base (ID: ${config.knowledgeBaseId}) to find relevant information.`;
+): ToolDefinition<typeof KnowledgeBaseInputSchema, typeof KnowledgeBaseOutputSchema> {
+  const toolName = config.name || 'knowledgeBaseQuery';  const toolDescription =
+    config.description ||
+    `Queries a configured knowledge base (ID: ${config.knowledgeBaseId}) using RAG principles.`;
 
-  console.log(`[${toolName}] Initialized for KB ID: ${config.knowledgeBaseId}`, {
-    serviceEndpoint: config.serviceEndpoint,
-    hasApiKey: !!config.apiKey,
-    defaults: {
-      topK: config.defaultSimilarityTopK,
-      threshold: config.defaultVectorDistanceThreshold
-    }
-  });
+  console.log(`[${toolName}] Initialized for KB ID: ${config.knowledgeBaseId}. Endpoint: ${config.serviceEndpoint || 'N/A'}`);
 
-  return defineTool(
+  return ai.defineTool(
     {
       name: toolName,
       description: toolDescription,
       inputSchema: KnowledgeBaseInputSchema,
       outputSchema: KnowledgeBaseOutputSchema,
     },
-    async ({ query, similarityTopK, vectorDistanceThreshold }) => {
+    async (input: z.infer<typeof KnowledgeBaseInputSchema>) => {
+      const { query, similarityTopK, vectorDistanceThreshold, flowName, agentId } = input;
+
       const effectiveTopK = similarityTopK ?? config.defaultSimilarityTopK ?? 3;
-      const effectiveThreshold = vectorDistanceThreshold ?? config.defaultVectorDistanceThreshold;
+      const effectiveThreshold = vectorDistanceThreshold ?? config.defaultVectorDistanceThreshold; // Can be undefined
 
-      console.log(`[${toolName}] Received query for KB ID '${config.knowledgeBaseId}':`, {
-        query,
-        effectiveTopK,
-        effectiveThreshold,
-        configuredServiceEndpoint: config.serviceEndpoint
-      });
+      console.log(
+        `[${toolName}] Received query for KB '${config.knowledgeBaseId}': "${query}". TopK: ${effectiveTopK}, Threshold: ${effectiveThreshold}. Flow: ${flowName}, Agent: ${agentId}`
+      );
 
-      // TODO: Implement actual RAG logic here using config.knowledgeBaseId, config.apiKey, config.serviceEndpoint
-      // This would involve:
-      // 1. Embedding the `query` (potentially using a Genkit embedder).
-      // 2. Connecting to the vector store/KB service (using `config.serviceEndpoint` and `config.apiKey`).
-      // 3. Performing the search with `effectiveTopK`, `effectiveThreshold`, and `config.knowledgeBaseId`.
-      // 4. Formatting results.
-      // 5. Optionally generating a summary.
+      // Simulate RAG system interaction
+      // In a real system, this would involve:
+      // 1. (Optional) Query expansion/rewriting.
+      // 2. Generating an embedding for the query.
+      // 3. Searching a vector database for similar document chunks.
+      // 4. Retrieving the original text of those chunks.
+      // 5. (Optional) Re-ranking the chunks.
+      // 6. (Optional) Passing the query and retrieved chunks to an LLM to generate a synthesized answer/summary.
+      // 7. Handling API calls, authentication (config.apiKey), errors, etc.
 
-      // Simulated RAG Logic:
-      // Use config.knowledgeBaseId to determine the response
-      if (config.knowledgeBaseId === 'test_kb_from_factory') {
-        console.log(`[${toolName}] Using simulated RAG for configured knowledgeBaseId: ${config.knowledgeBaseId}`);
-        const dummyContent = `This is a test document from the factory-configured knowledge base '${config.knowledgeBaseId}' specifically about '${query}'. Retrieved with topK=${effectiveTopK}.`;
+      if (config.apiKey) {
+        console.log(`[${toolName}] API key provided (simulated usage for KB: ${config.knowledgeBaseId}).`);
+      }
+
+      // Example simulation based on knowledgeBaseId
+      if (config.knowledgeBaseId === "product_manual_v3") {
+        let chunks = [];
+        if (query.toLowerCase().includes("setup")) {
+          chunks.push({
+            id: "doc1_chunk3",
+            content: "To set up the device, first connect the power cable, then press the power button. Refer to page 5 for diagrams.",
+            source: "product_manual_v3.pdf",
+            score: 0.92,
+            metadata: { page: 5, section: "2.1 Setup" },
+          });
+        }
+        if (query.toLowerCase().includes("troubleshooting") || query.toLowerCase().includes("issue")) {
+          chunks.push({
+            id: "doc1_chunk15",
+            content: "If the device does not power on, check the fuse and ensure the power outlet is working. Common issues are listed on page 25.",
+            source: "product_manual_v3.pdf",
+            score: 0.88,
+            metadata: { page: 25, section: "5.1 Troubleshooting" },
+          });
+        }
+        if (chunks.length === 0) {
+          chunks.push({
+            id: "doc1_generic_chunk",
+            content: `No specific information found for "${query}" in product_manual_v3. General information: This product is designed for ease of use.`,
+            source: "product_manual_v3.pdf",
+            score: 0.65,            metadata: { section: "General" },
+          });
+        }
+        // Simulate taking top K chunks
+        const finalChunks = chunks.slice(0, effectiveTopK);
+
         return {
-          retrievedChunks: [
-            {
-              id: 'doc1_chunk1_factory_simulated',
-              content: dummyContent,
-              source: `simulated_source_${config.knowledgeBaseId}.txt`,
-              score: 0.92
-            },
-            {
-              id: 'doc1_chunk2_factory_simulated',
-              content: `Another piece of information for query '${query}' from ${config.knowledgeBaseId}. Vector distance threshold was ${effectiveThreshold || 'not set'}.`,
-              source: `simulated_manual_${config.knowledgeBaseId}.md`,
-              score: 0.88
-            }
-          ],
-          summary: `Simulated summary: The knowledge base '${config.knowledgeBaseId}' (factory configured) contains test documents related to '${query}'.`,
+          retrievedChunks: finalChunks,
+          summary: `Based on product_manual_v3, for your query "${query}": ${finalChunks.map(c => c.content).join(' ')}`,
           debugInfo: {
             configuredKbId: config.knowledgeBaseId,
             effectiveTopK: effectiveTopK,

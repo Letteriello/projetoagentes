@@ -258,3 +258,38 @@ export const llmBehaviorSuggestionSchema = z.object({
   agentPersonality: z.string().optional(), // Assuming personality is optional for suggestion
   // No agentRestrictions or other fields needed for this specific suggestion flow
 });
+
+// Schemas para tipos de chat
+export const ToolDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  enabled: z.boolean()
+});
+
+export const ChatInputSchema = z.object({
+  userMessage: z.string().min(1),
+  history: z.array(z.object({
+    role: z.string(),
+    content: z.string(),
+    timestamp: z.date().optional()
+  })).optional(),
+  fileDataUri: z.string().optional(),
+  modelName: z.string(),
+  systemPrompt: z.string().optional(),
+  temperature: z.number().optional(),
+  agentToolsDetails: z.array(ToolDetailSchema).optional()
+});
+
+export const ChatOutputSchema = z.object({
+  outputMessage: z.string().optional(),
+  error: z.string().optional(),
+  toolRequests: z.array(z.object({
+    toolId: z.string(),
+    params: z.record(z.unknown())
+  })).optional(),
+  toolResults: z.array(z.object({
+    toolId: z.string(),
+    result: z.unknown()
+  })).optional()
+});

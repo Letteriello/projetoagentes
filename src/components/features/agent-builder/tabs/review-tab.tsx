@@ -1,6 +1,6 @@
 import * as React from 'react'; // Ensure React is imported
 import { useFormContext } from 'react-hook-form';
-import { SavedAgentConfiguration } from '@/types/agent-configs';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
 import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
 import { Button } from '@/components/ui/button';

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { FormProvider, useForm } from 'react-hook-form';
 import BehaviorTab from './behavior-tab'; // Adjust path as needed
-import { SavedAgentConfiguration, LLMAgentConfig, AgentType } from '@/types/agent-configs'; // Adjust path
+import { SavedAgentConfiguration, LLMAgentConfig, AgentType } from '@/types/agent-configs-fixed'; // Adjust path
 
 // --- Mocks ---
 const mockShowHelpModalGlobal = jest.fn();

@@ -2,12 +2,16 @@ import * as React from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
-import { AiConfigurationAssistantOutputSchema, SuggestedToolSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
+// Importação de tipos removida para evitar duplicação
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle, Cpu, Edit3 } from "lucide-react"; // Added Cpu, Edit3
+import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle, Cpu, Edit3 } from "lucide-react";
+
+// Definindo aliases para os ícones para evitar conflitos
+const PlusCircleIcon = PlusCircle;
+const Trash2Icon = Trash2;
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -19,9 +23,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"; // Added AlertDialog
-import { SavedAgentConfiguration, AvailableTool, ToolConfigData } from '@/types/agent-configs';
+} from "@/components/ui/alert-dialog";
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import type { AvailableTool } from '@/types/tool-types';
 import CustomToolDialog, { CustomToolData } from '../custom-tool-dialog'; 
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import {
@@ -50,9 +54,21 @@ interface ToolsTabProps {
   onToolConfigure: (toolId: string) => void; // Function to open configuration modal for a tool
 }
 
-type FormContextType = SavedAgentConfiguration;
+// Definindo o tipo para o contexto do formulário
+type FormContextType = {
+  tools?: string[];
+  toolConfigsApplied?: Record<string, any>;
+  chatHistory?: Array<{role: string; content: string}>;
+  userInput?: string;
+  [key: string]: any;
+};
 
-export { SuggestedToolSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
+// Definindo o tipo para as ferramentas sugeridas
+type SuggestedToolType = {
+  id: string;
+  name: string;
+  description: string;
+};
 
 export default function ToolsTab({
   availableTools,
@@ -75,27 +91,40 @@ export default function ToolsTab({
   const [editingCustomToolData, setEditingCustomToolData] = React.useState<CustomToolData | undefined>(undefined);
   const [toolToDelete, setToolToDelete] = React.useState<string | null>(null); // For delete confirmation
 
-  type SuggestedToolType = z.infer<typeof SuggestedToolSchema>;
+  // Usando o tipo definido acima
 
   const fetchToolSuggestions = async () => {
     setIsLoadingSuggestions(true);
     const currentConfig = getValues(); // Get the complete current agent configuration
     try {
       // MODIFICATION: Pass "tools" context
-      const result = await getAiConfigurationSuggestionsAction(currentConfig, "tools"); 
+      // Criando um objeto com as propriedades necessárias para a ação
+      const requestData = {
+        chatHistory: [],
+        userInput: "",
+        ...currentConfig
+      };
       
-      if (result.success && result.suggestions?.suggestedTools && result.suggestions.suggestedTools.length > 0) {
-        // Filter out tools that are already selected to avoid suggesting them again if the backend doesn't do this.
-        // The backend aiConfigurationAssistantFlow for tools already has logic to avoid suggesting already selected tools.
-        // So, this client-side filter might be redundant if the backend is robust.
-        // For now, let's assume backend handles it. If not, this is where to filter:
-        // const newSuggestedTools = result.suggestions.suggestedTools.filter(st => !currentSelectedTools.includes(st.id));
-        // setAiSuggestedTools(newSuggestedTools);
-        setAiSuggestedTools(result.suggestions.suggestedTools);
+      // Chamando a ação com os dados formatados
+      // Usando type assertion para garantir a tipagem correta
+      const result = await getAiConfigurationSuggestionsAction(
+        requestData as any, 
+        "tools" as any
+      ); 
+      
+      if (result.success && result.suggestions && Array.isArray(result.suggestions) && result.suggestions.length > 0) {
+        // Garantir que cada item no array tenha o formato correto
+        const suggestedTools: SuggestedToolType[] = result.suggestions.map((tool: any) => ({
+          id: tool.id || '',
+          name: tool.name || 'Ferramenta sem nome',
+          description: tool.description || 'Sem descrição disponível'
+        }));
+        
+        setAiSuggestedTools(suggestedTools);
         setIsSuggestionsDialogOpen(true);
         toast({ title: "Sugestões de Ferramentas Carregadas" });
       } else if (result.success) {
-           setAiSuggestedTools([]);
+           setAiSuggestedTools([] as SuggestedToolType[]);
            setIsSuggestionsDialogOpen(true); 
            toast({ title: "Nenhuma nova sugestão de ferramenta encontrada.", description: "Seu conjunto de ferramentas atual parece adequado." });
       } else {
@@ -200,7 +229,10 @@ export default function ToolsTab({
       const CustomIcon = SettingsIcon || Settings; // Fallback to direct import if prop not there
       return <CustomIcon className="w-5 h-5 mr-3 text-muted-foreground" />;
     }
-    const IconComponent = iconComponents[tool.icon as string || tool.id] || iconComponents.default || Settings;
+    
+    // Handle both string and LucideIcon cases
+    const iconKey = typeof tool.icon === 'string' ? tool.icon : tool.id;
+    const IconComponent = iconComponents[iconKey] || iconComponents.default || Settings;
     return <IconComponent className="w-5 h-5 mr-3 text-muted-foreground" />;
   };
 
@@ -319,7 +351,7 @@ export default function ToolsTab({
                 }}
                 className="flex-grow sm:flex-grow-0"
               >
-                <PlusCircleIcon className="mr-2 h-4 w-4" /> {/* Using PlusCircleIcon prop */}
+                <PlusCircleIcon className="mr-2 h-4 w-4" />
                 Criar Ferramenta Customizada
               </Button>
             </div>
@@ -334,8 +366,12 @@ export default function ToolsTab({
                 const isConfigured = hasConfig && toolConfigsApplied[tool.id] && Object.keys(toolConfigsApplied[tool.id]).length > 0;
 
                 // For custom tools, name and description might be in toolConfigsApplied
-                const toolDisplayName = (tool.type === 'custom' && toolConfigsApplied[tool.id]?.name) ? toolConfigsApplied[tool.id].name : tool.label;
-                const toolDisplayDescription = (tool.type === 'custom' && toolConfigsApplied[tool.id]?.description) ? toolConfigsApplied[tool.id].description : tool.description;
+                const toolDisplayName = (tool.type === 'custom' && toolConfigsApplied[tool.id]?.name) 
+                  ? toolConfigsApplied[tool.id].name 
+                  : tool.name; // Changed from tool.label to tool.name
+                const toolDisplayDescription = (tool.type === 'custom' && toolConfigsApplied[tool.id]?.description) 
+                  ? toolConfigsApplied[tool.id].description 
+                  : tool.description;
 
                 return (
                   <Card key={tool.id} className="p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -380,16 +416,17 @@ export default function ToolsTab({
                           </Button>
                         )}
                         {tool.type === 'custom' && (
-                           <Button
+                          <Button
                             variant="destructive"
-                            size="icon" // Changed to icon button
-                            onClick={() => setToolToDelete(tool.id)} // Set tool to delete for confirmation
-                            className="h-8 w-8" // Adjusted size for icon button
+                            size="icon"
+                            onClick={() => setToolToDelete(tool.id)}
+                            className="h-8 w-8"
                             title="Excluir Ferramenta Customizada"
                           >
                             <Trash2Icon className="h-4 w-4" />
                           </Button>
                         )}
+<<<<<<< HEAD
                          <Controller
                             name={`tools`} 
                             control={control}
@@ -401,6 +438,19 @@ export default function ToolsTab({
                               />
                             )}
                           />
+=======
+                        <Controller
+                          name="tools"
+                          control={control}
+                          render={() => (
+                            <Switch
+                              id={`tool-select-${tool.id}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handleToolSelectionChange(tool.id, checked)}
+                            />
+                          )}
+                        />
+>>>>>>> develop
                       </div>
                     </div>
                   </Card>

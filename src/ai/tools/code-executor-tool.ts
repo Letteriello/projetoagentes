@@ -6,7 +6,7 @@
  * CRITICAL: This is a simulation. A real-world implementation requires robust sandboxing
  * for security, which is extensively commented on within the tool's logic.
  */
-import { defineTool } from 'genkit/tool';
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
 import { z } from 'zod';
 
 // 1. Define Input Schema
@@ -26,7 +26,7 @@ export const CodeExecutorOutputSchema = z.object({
 });
 
 // 3. Create codeExecutorTool using defineTool
-export const codeExecutorTool = defineTool(
+export const codeExecutorTool = ai.defineTool(
   {
     name: 'codeExecutor',
     description:
@@ -36,7 +36,8 @@ export const codeExecutorTool = defineTool(
     inputSchema: CodeExecutorInputSchema,
     outputSchema: CodeExecutorOutputSchema,
   },
-  async ({ language, code, timeoutMs }) => {
+  async (input: z.infer<typeof CodeExecutorInputSchema>) => {
+    const { language, code, timeoutMs } = input;
     console.log('[CodeExecutorTool] Received parameters:', { language, code, timeoutMs });
 
     // CRITICAL SECURITY NOTE:

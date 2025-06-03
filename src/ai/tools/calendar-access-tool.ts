@@ -4,7 +4,7 @@
  * such as a default calendar ID, service endpoint, or API key.
  * It simulates interactions with a calendar API.
  */
-import { defineTool, Tool } from 'genkit/tool';
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
 import { z } from 'zod';
 
 // 1. Define Configuration Interface for the tool
@@ -63,14 +63,14 @@ export function createCalendarAccessTool(
     hasApiKey: !!config.apiKey,
   });
 
-  return defineTool(
+  return ai.defineTool(
     {
       name: toolName,
       description: toolDescription,
       inputSchema: CalendarAccessInputSchema,
       outputSchema: CalendarAccessOutputSchema,
     },
-    async (input) => {
+    async (input: z.infer<typeof CalendarAccessInputSchema>) => {
       const effectiveCalendarId = input.calendarId || config.defaultCalendarId || 'primary';
 
       console.log(`[${toolName}] Received action '${input.action}' for calendar '${effectiveCalendarId}'. Input:`, input);

@@ -5,7 +5,8 @@
  * It simulates database interaction, primarily supporting SELECT queries on
  * predefined tables for safety in this conceptual phase.
  */
-import { defineTool, Tool } from 'genkit/tool';
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
+import { ToolDefinition } from '@genkit-ai/core'; // Import ToolDefinition
 import { z } from 'zod';
 
 // Define supported database types (can be extended)
@@ -22,155 +23,155 @@ export type SupportedDbType = z.infer<typeof SupportedDbTypesSchema>;
 
 // 1. Define Configuration Interface for the tool
 export interface DatabaseAccessToolConfig {
-  name?: string; // Optional: to allow multiple instances with different names (e.g., 'userDbQuery', 'inventoryDbQuery')
-  description?: string; // Optional: to allow custom description per instance
+  name?: string;
+  description?: string;
   dbType: SupportedDbType;
-  dbHost?: string; // Optional if connectionString is used or for embedded DBs like SQLite
-  dbPort?: number; // Optional, defaults vary by dbType
-  dbName?: string; // Database name
-  dbUser?: string; // Username for authentication
-  dbPassword?: string; // Password for authentication - consider secure storage/retrieval for real scenarios
-  dbConnectionString?: string; // Full connection string (can override individual params)
+  dbHost?: string;
+  dbPort?: number;
+  dbName?: string;
+  dbUser?: string;
+  dbPassword?: string;
+  dbConnectionString?: string;
 }
 
 // 2. Define Input Schema for the tool's handler
-// dbId is removed as the tool instance itself is configured for a specific DB
 export const DatabaseAccessInputSchema = z.object({
   query: z.string()
     .describe("The query to execute (e.g., SQL for RDBMS, or a specific command/filter for NoSQL). IMPORTANT: This simulation primarily supports SELECT SQL queries for safety reasons."),
   parameters: z.record(z.any()).optional()
-    .describe("Key-value pairs for parameterized queries (e.g., { \"userId\": 123, \"status\": \"active\" }). These help prevent injection attacks."),
-  options: z.record(z.any()).optional()
-    .describe("Additional options for query execution (e.g., read preference for NoSQL, transaction control - highly dependent on DB type and client library).")
+    .describe("Key-value pairs for parameterized queries (e.g., { \"userId\": 123, \"status\": \"active\"})."),
+  // Added for logging context
+  flowName: z.string().optional().describe("Name of the calling flow, for logging."),
+  agentId: z.string().optional().describe("ID of the calling agent, for logging."),
 });
 
 // 3. Define Output Schema for the tool's handler
 export const DatabaseAccessOutputSchema = z.object({
-  success: z.boolean().describe("Indicates whether the database query execution was successful."),
-  rowCount: z.number().optional().describe("Number of rows affected or returned. For SELECT, it's the number of rows in the 'rows' array."),
-  rows: z.array(z.record(z.any())).optional()
-    .describe("An array of objects, where each object represents a row/document returned by a read query."),
-  columns: z.array(z.object({
-    name: z.string().describe("Name of the column/field."),
-    type: z.string().optional().describe("Data type of the column/field (e.g., 'integer', 'varchar', 'decimal', 'array', 'object').")
-  })).optional().describe("Information about the columns/fields returned by a read query."),
+  success: z.boolean().describe("Indicates whether the query execution was successful."),
+  rowCount: z.number().optional().describe("Number of rows affected or returned."),
+  rows: z.array(z.any()).optional().describe("An array of objects representing the rows returned by a SELECT query. Each object's keys are column names."),
+  columns: z.array(z.object({ name: z.string(), type: z.string() })).optional().describe("An array describing the columns returned, with name and type."),
   error: z.string().optional().describe("Error message if the query execution failed."),
-  executionTimeMs: z.number().optional().describe("Time taken to execute the query in milliseconds.")
+  executionTimeMs: z.number().optional().describe("Time taken for query execution in milliseconds."),
 });
+
+// Schema for simulated product data
+const ProductSchema = z.object({  id: z.number(),
+  name: z.string(),
+  category: z.string(),
+  price: z.number(),
+  stock: z.number(),
+});
+type Product = z.infer<typeof ProductSchema>;
+
+// Simulated product data and columns, now typed
+const productTableColumns: Array<{ name: keyof Product; type: string }> = [
+  { name: 'id', type: 'integer' },
+  { name: 'name', type: 'varchar' },
+  { name: 'category', type: 'varchar' },
+  { name: 'price', type: 'decimal' },
+  { name: 'stock', type: 'integer' },
+];
+
+const simulatedProducts: Product[] = [
+  { id: 1, name: 'Laptop Pro', category: 'Electronics', price: 1200.00, stock: 50 },
+  { id: 2, name: 'Smartphone X', category: 'Electronics', price: 800.00, stock: 150 },
+  { id: 3, name: 'Office Chair', category: 'Furniture', price: 150.00, stock: 300 },
+  { id: 4, name: 'Desk Lamp', category: 'Furniture', price: 45.00, stock: 500 },
+  { id: 5, name: 'Wireless Mouse', category: 'Electronics', price: 25.00, stock: 1000 },
+];
+
 
 // 4. Factory function to create the databaseAccessTool
 export function createDatabaseAccessTool(
   config: DatabaseAccessToolConfig
-): Tool<typeof DatabaseAccessInputSchema, typeof DatabaseAccessOutputSchema> {
+): ToolDefinition<typeof DatabaseAccessInputSchema, typeof DatabaseAccessOutputSchema> {
   const toolName = config.name || 'databaseAccess';
-  const toolDescription = config.description ||
-    `Executes a query against a configured ${config.dbType} database. ` +
-    (config.dbName ? `(DB: ${config.dbName}) ` : '') +
-    "This simulation primarily supports SELECT SQL-like queries.";
+  const toolDescription =
+    config.description ||
+    `Executes queries against a configured ${config.dbType} database (DB: ${config.dbName || 'N/A'}). Supports simulated SELECTs.`;
 
-  // Log configuration on tool creation (excluding sensitive parts like password in a real scenario)
-  console.log(`[${toolName}] Initialized with config:`, {
-    dbType: config.dbType,
-    dbHost: config.dbHost,
-    dbPort: config.dbPort,
-    dbName: config.dbName,
-    dbUser: config.dbUser,
-    hasPassword: !!config.dbPassword, // Log presence, not the password itself
-    hasConnectionString: !!config.dbConnectionString,
-  });
+  console.log(`[${toolName}] Initialized for ${config.dbType} DB: ${config.dbName || 'N/A'} on host ${config.dbHost || 'N/A'}`);
 
-  return defineTool(
+  return ai.defineTool(
     {
       name: toolName,
       description: toolDescription,
       inputSchema: DatabaseAccessInputSchema,
       outputSchema: DatabaseAccessOutputSchema,
     },
-    async ({ query, parameters /*, options */ }) => {
+    async (input: z.infer<typeof DatabaseAccessInputSchema>) => {
+      const { query, parameters, flowName, agentId } = input;
       const startTime = Date.now();
-      console.log(`[${toolName}] Received query:`, { query, parameters });
-      console.log(`[${toolName}] Tool using DB config: ${config.dbType} on ${config.dbHost || (config.dbConnectionString ? 'connection string' : 'N/A')}${config.dbName ? '/' + config.dbName : ''}`);
 
-      // TODO: Implement actual database interaction here based on config.dbType.
-      // This would involve:
-      // 1. Connection Management using config (dbType, dbHost, dbPort, dbUser, dbPassword, dbConnectionString):
-      //    - Choose client library (e.g., 'pg' for PostgreSQL, 'mysql2', 'mongodb driver', 'sqlite3').
-      //    - Establish connection (ideally from a pool).
-      //
-      // 2. Security - Injection Prevention:
-      //    - **Crucially important:** Use parameterized queries with `parameters` input.
-      //    - For NoSQL, ensure proper sanitization or use of library-specific query builders.
-      //
-      // 3. Query Execution & Result Formatting:
-      //    - Adapt based on `config.dbType`. The simulation below is SQL-centric.
-      //
-      // 4. Error Handling & Connection Closing/Releasing.
+      // Basic logging of the tool call attempt
+      console.log(`[${toolName}] Received query: '${query}' with params:`, parameters, `for flow: ${flowName}, agent: ${agentId}`);
 
-      // --- Simulation Logic (SQL-centric for now) ---
-      if (config.dbType !== "mongodb" && config.dbType !== "other") { // Assuming SQL-like for these
-        const lowerCaseQuery = query.toLowerCase().trim();
-        if (!lowerCaseQuery.startsWith("select")) {
-          console.warn(`[${toolName}] Non-SELECT query attempted: ${query}`);
-          return {
-            success: false,
-            error: "This simulation primarily supports SELECT SQL queries. Other query types are not allowed.",
-            executionTimeMs: Date.now() - startTime,
-          };
-        }
-        // Simplified security check (from original tool)
-        if (lowerCaseQuery.includes("drop ") || lowerCaseQuery.includes("delete ") || lowerCaseQuery.includes("update ") || lowerCaseQuery.includes("insert ") || lowerCaseQuery.includes("alter ") || lowerCaseQuery.includes("truncate ")) {
-            if (!lowerCaseQuery.startsWith("select") || (lowerCaseQuery.startsWith("select") && (lowerCaseQuery.includes(" from information_schema") || lowerCaseQuery.includes(" from pg_catalog")))){
-                return {
-                    success: false,
-                    error: "Harmful DML/DDL operations or access to system tables are not allowed in this simulation.",
-                    executionTimeMs: Date.now() - startTime,
-                };
+      // Simulate query execution based on config.dbType and query content
+      // IMPORTANT: This is a highly simplified and insecure simulation.
+      // Real database interaction requires proper ORMs/drivers, connection pooling,
+      // query sanitization/parameterization, and robust error handling.
+      // Permissions and access control are also critical.
+
+      if (config.dbType === 'sqlite' || config.dbType === 'postgresql' || config.dbType === 'mysql') {
+        // Simulate SQL SELECT query on a predefined "products" table
+        const lowerQuery = query.toLowerCase();
+        if (lowerQuery.startsWith('select * from products')) {
+          let filteredProducts = [...simulatedProducts];
+          if (lowerQuery.includes('where')) {
+            // Very crude WHERE clause simulation for category or ID
+            const matchCategory = lowerQuery.match(/where\s+category\s*=\s*['"](.+?)['"]/);
+            if (matchCategory && matchCategory[1]) {
+              filteredProducts = simulatedProducts.filter(p => p.category.toLowerCase() === matchCategory[1].toLowerCase());
             }
-        }
-
-        // Simulated responses based on table names (from original tool)
-        if (lowerCaseQuery.includes("from users")) {
-          const userIdParam = parameters?.userId || parameters?.id || 1;
-          const simulatedUser = {
-            id: Number(userIdParam),
-            name: `Simulated User ${userIdParam} from ${config.dbName || config.dbHost || 'DB'}`,
-            email: `user${userIdParam}@example.com`,
-            status: parameters?.status || "active"
-          };
+            const matchId = lowerQuery.match(/where\s+id\s*=\s*(\d+)/);            if (matchId && matchId[1]) {
+              filteredProducts = simulatedProducts.filter(p => p.id === parseInt(matchId[1], 10));
+            }
+          }
           return {
             success: true,
-            rowCount: 1,
-            rows: [simulatedUser],
-            columns: [ /* ... as before ... */ ],
+            rowCount: filteredProducts.length,
+            rows: filteredProducts,
+            columns: productTableColumns,
             executionTimeMs: Date.now() - startTime,
           };
-        } else if (lowerCaseQuery.includes("from products")) {
-          const simulatedProducts = [ /* ... as before, potentially add config info ... */ ];
-          return {
+        } else if (lowerQuery.startsWith('select count(*) from products')) {
+           // Simulate COUNT(*)
+           return {
             success: true,
-            rowCount: simulatedProducts.length,
-            rows: simulatedProducts,
-            columns: [ /* ... as before ... */ ],
+            rowCount: 1, // Row count for the count result itself
+            rows: [{ 'count(*)': simulatedProducts.length }],
+            columns: [{ name: 'count(*)', type: 'integer' }],
             executionTimeMs: Date.now() - startTime,
-          };
+           };
+        } else if (lowerQuery.startsWith('select name, price from products where id =') && parameters?.id) {
+            const product = simulatedProducts.find(p => p.id === parameters.id);
+            return {
+                success: !!product,
+                rowCount: product ? 1 : 0,
+                rows: product ? [{ name: product.name, price: product.price }] : [],
+                columns: [{ name: 'name', type: 'varchar' }, { name: 'price', type: 'decimal' }],
+                error: product ? undefined : `Product with ID ${parameters.id} not found.`,
+                executionTimeMs: Date.now() - startTime,
+            };
         }
       } else if (config.dbType === "mongodb") {
         // Crude simulation for MongoDB
         // Example: query might be '{"collection": "users", "filter": {"status": "active"}}'
         // Parameters could be merged into the filter or used for other options.
         try {
-          const mongoQuery = JSON.parse(query);
+          const mongoQuery = JSON.parse(query); // In a real scenario, ensure query is a string first
           if (mongoQuery.collection === 'users') {
-             const filterId = parameters?.id || 1;
+             const filterId = parameters?.id || 1; // Example: use parameter or default
              return {
                 success: true,
                 rowCount: 1,
-                rows: [{ _id: filterId, name: `Mongo User ${filterId}`, db: config.dbName }],
+                rows: [{ _id: filterId, name: `Mongo User ${filterId}`, db: config.dbName || 'unknown_db' }], // Include dbName from config
                 executionTimeMs: Date.now() - startTime,
              };
           }
-        } catch (e) {
-          return { success: false, error: "Invalid JSON query for MongoDB simulation.", executionTimeMs: Date.now() - startTime };
+        } catch (e: any) { // Catch parsing errors or other issues
+          return { success: false, error: `Invalid JSON query for MongoDB simulation: ${e.message}`, executionTimeMs: Date.now() - startTime };
         }
       }
 

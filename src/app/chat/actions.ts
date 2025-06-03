@@ -2,7 +2,7 @@
 
 import { basicChatFlow } from '@/ai/flows/chat-flow';
 import { ChatInput, ChatOutput, ChatFormState, ChatToolDetail } from '@/types/chat-types';
-import type { SavedAgentConfiguration } from '@/types/agent-configs'; // Import para o tipo
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Import para o tipo
 import { z } from 'zod';
 
 // Definindo um tipo mais simples para os detalhes da ferramenta passados para a action

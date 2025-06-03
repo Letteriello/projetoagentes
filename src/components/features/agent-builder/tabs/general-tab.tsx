@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration } from '@/types/agent-configs';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
 import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

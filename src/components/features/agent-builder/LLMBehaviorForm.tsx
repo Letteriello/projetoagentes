@@ -17,7 +17,7 @@ import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions
 import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow'; // For typing suggestions
 import AISuggestionIcon from './AISuggestionIcon'; // Added
 import { useToast } from "@/hooks/use-toast";
-import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
 // import { Separator } from "@/components/ui/separator"; // Separator might not be needed if using Cards for all sections
@@ -33,17 +33,24 @@ interface LLMBehaviorFormProps {
 const LLMBehaviorForm: React.FC<LLMBehaviorFormProps> = ({
   agentToneOptions,
 }) => {
-  const { control, setValue, watch, getValues, formState: { errors } } = useFormContext<SavedAgentConfiguration>();
+  const { 
+    control, 
+    setValue, 
+    watch, 
+    getValues, 
+    formState: { errors } 
+  } = useFormContext<SavedAgentConfiguration>();
+  
   const { toast } = useToast();
 
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState<boolean>(false);
   const [allSuggestions, setAllSuggestions] = React.useState<z.infer<typeof AiConfigurationAssistantOutputSchema> | undefined>(undefined);
 
-  // States for individual popover visibility
-  const [showGoalSuggestionPopover, setShowGoalSuggestionPopover] = React.useState(false);
-  const [showTasksSuggestionPopover, setShowTasksSuggestionPopover] = React.useState(false);
-  const [showPersonalitySuggestionPopover, setShowPersonalitySuggestionPopover] = React.useState(false);
-  const [showRestrictionsSuggestionPopover, setShowRestrictionsSuggestionPopover] = React.useState(false);
+  // Estados para visibilidade dos popovers
+  const [showGoalSuggestionPopover, setShowGoalSuggestionPopover] = React.useState<boolean>(false);
+  const [showTasksSuggestionPopover, setShowTasksSuggestionPopover] = React.useState<boolean>(false);
+  const [showPersonalitySuggestionPopover, setShowPersonalitySuggestionPopover] = React.useState<boolean>(false);
+  const [showRestrictionsSuggestionPopover, setShowRestrictionsSuggestionPopover] = React.useState<boolean>(false);
 
   const watchedSystemPromptGenerated = watch("config.systemPromptGenerated"); // Keep relevant watches
   const watchedAgentTemperature = watch("config.agentTemperature"); // Keep relevant watches

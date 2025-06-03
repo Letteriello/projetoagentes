@@ -73,8 +73,8 @@ import {
   RagMemoryConfig,
   ArtifactsConfig,
   A2AConfig as AgentA2AConfig // Renaming to avoid conflict with the component
-} from '@/types/agent-configs';
-import { AvailableTool } from '@/types/agent-configs';
+} from '@/types/agent-configs-fixed';
+import { AvailableTool } from '@/types/agent-configs-fixed';
 
 // Local AgentConfig type is removed.
 

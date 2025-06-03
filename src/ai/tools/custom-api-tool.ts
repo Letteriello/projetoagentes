@@ -3,7 +3,8 @@
  * described by an OpenAPI specification. This tool is created using a factory
  * function to allow for dynamic configuration of API endpoint, key, and headers.
  */
-import { defineTool, Tool } from 'genkit/tool';
+import { ToolDefinition } from '@genkit-ai/core';
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
 import { z } from 'zod';
 // import axios from 'axios'; // Would be used for actual HTTP calls
 
@@ -33,106 +34,46 @@ export const CustomApiOutputSchema = z.object({
 });
 
 // Factory function to create the customApiTool
-export function createCustomApiTool(config: CustomApiToolConfig): Tool<typeof CustomApiInputSchema, typeof CustomApiOutputSchema> {
-  // Use provided name and description or defaults
-  const toolName = config.name || 'customApiIntegration';
-  const toolDescription = config.description ||
-    "Interacts with a custom external API described by an OpenAPI specification. " +
-    "Provide the operationId to execute and any necessary parameters. " +
-    "This tool is configured with specific API connection details (URL, key).";
+export function createCustomApiTool(config: CustomApiToolConfig): ToolDefinition<typeof CustomApiInputSchema, typeof CustomApiOutputSchema> {
+  const toolName = config.name || 'customApi';
+  const toolDescription =
+    config.description ||
+    `Interacts with a custom API defined by an OpenAPI spec (URL: ${config.openapiSpecUrl || 'not specified'}). Provide operationId and parameters.`;
 
-  return defineTool(
+  const effectiveSpecUrl = config.openapiSpecUrl || "not_specified_in_config";
+  const effectiveBaseUrl = config.baseUrl; // Can be undefined if not set
+
+  console.log(`[${toolName}] Tool instance created with effective spec URL: ${effectiveSpecUrl}, base URL: ${effectiveBaseUrl}`);
+
+  // Return the Genkit tool definition
+  return ai.defineTool(
     {
       name: toolName,
-      description: toolDescription,
-      inputSchema: CustomApiInputSchema,
+      description: toolDescription,      inputSchema: CustomApiInputSchema,
       outputSchema: CustomApiOutputSchema,
     },
-    async ({ operationId, parameters }) => {
-      console.log(`[${toolName}] Received call for operationId: ${operationId}`, { parameters });
-      console.log(`[${toolName}] Tool configured with:`, {
-        openapiSpecUrl: config.openapiSpecUrl,
-        baseUrl: config.baseUrl,
-        apiKeyProvided: !!config.apiKey,
-        defaultHeaders: config.defaultHeaders,
-      });
+    async (input: z.infer<typeof CustomApiInputSchema>) => { const { operationId, parameters } = input;
+      // This is a simplified simulation. A real implementation would use axios or fetch.
+      // It would also involve more robust parsing of the OpenAPI spec to map operationId
+      // to HTTP method, path, and parameter types.
 
-      // Determine effective OpenAPI Spec URL and Base URL
-      // Base URL from config takes precedence if spec also has server URLs.
-      const effectiveSpecUrl = config.openapiSpecUrl;
-      let effectiveBaseUrl = config.baseUrl;
-
-      if (!effectiveSpecUrl) {
-        // If OpenAPI spec URL is not provided in config, the tool cannot function as intended.
-        // However, if a raw baseUrl and operationId (treated as path) were to be used, that's a different tool type.
-        // This tool assumes it needs the spec.
-        console.error(`[${toolName}] Error: OpenAPI specification URL not configured for the tool.`);
-        return {
-          success: false,
-          error: "OpenAPI specification URL not configured for the tool. Cannot determine API structure.",
-        };
+      console.log(`[${toolName}] Executing operation '${operationId}' with parameters:`, parameters);
+      if(config.apiKey) {
+        console.log(`[${toolName}] API key provided (simulated usage).`);
+        // In a real call, this would be added to headers or query params as per API spec.
+      }
+      if(config.defaultHeaders) {
+        console.log(`[${toolName}] Default headers provided:`, config.defaultHeaders);
       }
 
-      // TODO: Implement actual OpenAPI client logic here.
-      // This would typically involve:
-      // 1. Fetch and Parse the OpenAPI Specification (if not cached):
-      //    - Use `effectiveSpecUrl`.
-      //    - Libraries: 'axios' for fetching, 'js-yaml' or JSON.parse for parsing.
-      //    - Example: const openapiDocument = await fetchAndParseSpec(effectiveSpecUrl);
-      //
-      // 2. Determine the Base URL for the request:
-      //    - If `config.baseUrl` is provided, use it.
-      //    - Else, try to derive it from the `openapiDocument.servers` array.
-      //    - If still no base URL, return an error.
-      //      // if (!effectiveBaseUrl && openapiDocument.servers && openapiDocument.servers.length > 0) {
-      //      //   effectiveBaseUrl = openapiDocument.servers[0].url; // Use the first server URL
-      //      // }
-      //      if (!effectiveBaseUrl) { /* error */ }
-
-      // 3. Find Operation Details from the Spec:
-      //    - Locate the operation (path, method, parameter schemas) using `operationId` within `openapiDocument.paths`.
-      //    - Example: const operationDetails = findOperation(openapiDocument, operationId);
-      //    - If not found, return an error.
-      //
-      // 4. Validate and Prepare Parameters:
-      //    - Use `operationDetails.parameters` and `operationDetails.requestBody` schemas to validate input `parameters`.
-      //
-      // 5. Construct Headers:
-      //    - Start with `config.defaultHeaders`.
-      //    - Add `Authorization` header if `config.apiKey` is present (e.g., `Bearer ${config.apiKey}`).
-      //    - Add any other headers required by the spec or operation.
-      //      // const requestHeaders = { ...config.defaultHeaders };
-      //      // if (config.apiKey) requestHeaders['Authorization'] = `Bearer ${config.apiKey}`;
-      //
-      // 6. Execute the API Request (e.g., using axios):
-      //    - URL: `${effectiveBaseUrl}${operationDetails.path}` (path parameters substituted)
-      //    - Method: `operationDetails.method.toUpperCase()`
-      //    - Headers: `requestHeaders`
-      //    - Query Params: extracted from `parameters`
-      //    - Body: `parameters` corresponding to `requestBody`
-      //    - Example:
-      //      // try {
-      //      //   const response = await axios({
-      //      //     method: operationDetails.method,
-      //      //     url: constructedUrl,
-      //      //     headers: requestHeaders,
-      //      //     params: queryParameters, // for query params
-      //      //     data: requestBodyObject // for request body
-      //      //   });
-      //      //   return { success: true, statusCode: response.status, responseBody: response.data };
-      //      // } catch (error: any) { /* handle error, return CustomApiOutputSchema */ }
-
-      // Simulated Interaction Logic (Petstore example, adapted)
-      if (effectiveSpecUrl.includes("petstore.swagger.io")) {
-        // Attempt to use config.baseUrl if provided, otherwise default for Petstore
-        effectiveBaseUrl = effectiveBaseUrl || "https://petstore.swagger.io/v2";
-        console.log(`[${toolName}] Simulating for Petstore. Effective Base URL: ${effectiveBaseUrl}`);
-
+      // Simulate based on a known OpenAPI spec (e.g., PetStore)
+      // This is highly simplified and not a generic OpenAPI client.
+      if (effectiveSpecUrl === "http://petstore.swagger.io/v2/swagger.json" || effectiveSpecUrl === "https://petstore.swagger.io/v2/swagger.json") {
         if (operationId === "getPetById") {
-          if (parameters && parameters.petId !== undefined) {
+          if (parameters && parameters.petId) {
             // Actual call would be: GET `${effectiveBaseUrl}/pet/${parameters.petId}`
             // Headers would include config.defaultHeaders and potentially API key header
-            console.log(`[${toolName}] Simulating 'getPetById' for petId: ${parameters.petId}. API Key used: ${!!config.apiKey}`);
+            console.log(`[${toolName}] Simulating 'getPetById' for ID: ${parameters.petId}. API Key used: ${!!config.apiKey}`);
             return {
               success: true,
               statusCode: 200,
@@ -160,8 +101,7 @@ export function createCustomApiTool(config: CustomApiToolConfig): Tool<typeof Cu
       }
 
       console.warn(`[${toolName}] Operation '${operationId}' on spec '${effectiveSpecUrl}' is not supported by this simulation or the spec was not recognized.`);
-      return {
-        success: false,
+      return {        success: false,
         error: `Custom API operation '${operationId}' is not supported by this simulation, or spec '${effectiveSpecUrl}' was not recognized. Base URL used: ${effectiveBaseUrl || 'not set'}.`,
       };
     }

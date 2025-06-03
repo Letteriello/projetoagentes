@@ -6,12 +6,35 @@ import {
   workflowAgentConfigSchemaUpdated,
   customAgentConfigSchemaUpdated,
   a2aAgentSpecialistConfigSchemaUpdated,
-  // Assuming other necessary sub-schemas like statePersistenceConfigSchema etc. are implicitly tested
-  // via savedAgentConfigurationSchema if they are included in the mock data.
-  // This test focuses on the primary schemas listed in the prompt.
-} from './zod-schemas'; // Adjust path as necessary
-import type { SavedAgentConfiguration, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/agent-configs'; // Adjust path
-
+  ChatInputSchema,
+  ChatOutputSchema,
+  ToolDetailSchema,
+  toolConfigFieldSchema,
+  communicationChannelSchema,
+  artifactDefinitionSchema,
+  initialStateValueSchema,
+  stateValidationRuleSchema,
+  knowledgeSourceSchema,
+  a2aConfigSchema,
+  artifactsConfigSchema,
+  statePersistenceConfigSchema,
+  ragMemoryConfigSchema,
+  availableToolSchema,
+  toolConfigDataSchema,
+  adkCallbacksConfigSchema
+} from './zod-schemas';
+import type {
+  SavedAgentConfiguration,
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig,
+  A2AAgentSpecialistConfig
+} from '@/types/agent-configs-fixed';
+import type {
+  ChatInput,
+  ChatOutput,
+  ToolDetail
+} from '@/types/chat-types';
 
 // Helper to check for a specific error
 const findError = (result: z.SafeParseError<any>, path: string, messageSubstring?: string): boolean => {
@@ -35,9 +58,9 @@ const baseLLMConfig: LLMAgentConfig = {
   statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
   rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
   artifacts: { enabled: false, storageType: 'memory', definitions: [] },
-  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false },
+  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false, maxMessageSize: 1024 },
   adkCallbacks: {},
-  deploymentConfig: {},
+  agentRestrictions: [], // Campo obrigatório
 };
 
 const baseWorkflowConfig: WorkflowAgentConfig = {
@@ -49,9 +72,9 @@ const baseWorkflowConfig: WorkflowAgentConfig = {
   statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
   rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
   artifacts: { enabled: false, storageType: 'memory', definitions: [] },
-  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false },
+  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false, maxMessageSize: 1024 },
   adkCallbacks: {},
-  deploymentConfig: {},
+  agentRestrictions: [], // Campo obrigatório
 };
 
 const baseCustomConfig: CustomAgentConfig = {
@@ -62,9 +85,9 @@ const baseCustomConfig: CustomAgentConfig = {
   statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
   rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
   artifacts: { enabled: false, storageType: 'memory', definitions: [] },
-  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false },
+  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false, maxMessageSize: 1024 },
   adkCallbacks: {},
-  deploymentConfig: {},
+  agentRestrictions: [], // Campo obrigatório
 };
 
 const baseA2ASpecialistConfig: A2AAgentSpecialistConfig = {
@@ -74,11 +97,10 @@ const baseA2ASpecialistConfig: A2AAgentSpecialistConfig = {
   statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
   rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
   artifacts: { enabled: false, storageType: 'memory', definitions: [] },
-  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false },
+  a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false, maxMessageSize: 1024 },
   adkCallbacks: {},
-  deploymentConfig: {},
+  agentRestrictions: [], // Campo obrigatório
 };
-
 
 const baseSavedAgentConfig: SavedAgentConfiguration = {
   id: 'test-agent-id',
@@ -102,6 +124,35 @@ const baseSavedAgentConfig: SavedAgentConfiguration = {
   originalAgentId: 'test-agent-id',
 };
 
+const baseToolDetail: ToolDetail = {
+  id: 'tool-1',
+  name: 'Test Tool',
+  description: 'Test tool description',
+  enabled: true
+};
+
+const baseChatInput: ChatInput = {
+  userMessage: 'Test message',
+  history: [
+    { role: 'user', content: 'Hello', timestamp: new Date() },
+    { role: 'assistant', content: 'Hi there!', timestamp: new Date() }
+  ],
+  fileDataUri: 'data:test/file',
+  modelName: 'geminiPro',
+  systemPrompt: 'Test system prompt',
+  temperature: 0.7,
+  agentToolsDetails: [baseToolDetail]
+};
+
+const baseChatOutput: ChatOutput = {
+  outputMessage: 'Test response',
+  toolRequests: [
+    { toolId: 'tool-1', params: { param1: 'value1' } }
+  ],
+  toolResults: [
+    { toolId: 'tool-1', result: { success: true } }
+  ]
+};
 
 describe('savedAgentConfigurationSchema', () => {
   test('should parse a valid LLM agent configuration successfully', () => {
@@ -204,7 +255,6 @@ describe('savedAgentConfigurationSchema', () => {
     }
   });
 });
-
 
 describe('agentConfigSchema (discriminated union)', () => {
   test('should parse valid LLM config', () => {
@@ -347,13 +397,117 @@ describe('agentConfigSchema (discriminated union)', () => {
     // This schema currently only enforces type: 'a2a' and inherits base fields.
     // No additional required fields specific to this schema itself.
     test('should parse valid A2A specialist config (minimal)', () => {
-      const data = { type: 'a2a', framework: 'genkit' }; // Only type is strictly from this schema, framework from base
+      const data = { type: 'a2a', framework: 'genkit', a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', securityPolicy: 'none', loggingEnabled: false, maxMessageSize: 1024 } }; // Only type is strictly from this schema, framework from base
       const result = a2aAgentSpecialistConfigSchemaUpdated.safeParse(data);
       expect(result.success).toBe(true);
     });
   });
 });
 
+describe('ChatInputSchema', () => {
+  test('should parse valid chat input', () => {
+    const result = ChatInputSchema.safeParse(baseChatInput);
+    expect(result.success).toBe(true);
+  });
+
+  test('should fail if userMessage is missing', () => {
+    const data = { ...baseChatInput, userMessage: undefined };
+    const result = ChatInputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'userMessage', 'Required')).toBe(true);
+  });
+
+  test('should fail if history is missing', () => {
+    const data = { ...baseChatInput, history: undefined };
+    const result = ChatInputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'history', 'Required')).toBe(true);
+  });
+
+  test('should fail if modelName is missing', () => {
+    const data = { ...baseChatInput, modelName: undefined };
+    const result = ChatInputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'modelName', 'Required')).toBe(true);
+  });
+
+  test('should fail if temperature is missing', () => {
+    const data = { ...baseChatInput, temperature: undefined };
+    const result = ChatInputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'temperature', 'Required')).toBe(true);
+  });
+
+  test('should fail if agentToolsDetails is missing', () => {
+    const data = { ...baseChatInput, agentToolsDetails: undefined };
+    const result = ChatInputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'agentToolsDetails', 'Required')).toBe(true);
+  });
+});
+
+describe('ChatOutputSchema', () => {
+  test('should parse valid chat output', () => {
+    const result = ChatOutputSchema.safeParse(baseChatOutput);
+    expect(result.success).toBe(true);
+  });
+
+  test('should fail if outputMessage is missing', () => {
+    const data = { ...baseChatOutput, outputMessage: undefined };
+    const result = ChatOutputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'outputMessage', 'Required')).toBe(true);
+  });
+
+  test('should fail if toolRequests is missing', () => {
+    const data = { ...baseChatOutput, toolRequests: undefined };
+    const result = ChatOutputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'toolRequests', 'Required')).toBe(true);
+  });
+
+  test('should fail if toolResults is missing', () => {
+    const data = { ...baseChatOutput, toolResults: undefined };
+    const result = ChatOutputSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'toolResults', 'Required')).toBe(true);
+  });
+});
+
+describe('ToolDetailSchema', () => {
+  test('should parse valid tool detail', () => {
+    const result = ToolDetailSchema.safeParse(baseToolDetail);
+    expect(result.success).toBe(true);
+  });
+
+  test('should fail if id is missing', () => {
+    const data = { ...baseToolDetail, id: undefined };
+    const result = ToolDetailSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'id', 'Required')).toBe(true);
+  });
+
+  test('should fail if name is missing', () => {
+    const data = { ...baseToolDetail, name: undefined };
+    const result = ToolDetailSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'name', 'Required')).toBe(true);
+  });
+
+  test('should fail if description is missing', () => {
+    const data = { ...baseToolDetail, description: undefined };
+    const result = ToolDetailSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'description', 'Required')).toBe(true);
+  });
+
+  test('should fail if enabled is missing', () => {
+    const data = { ...baseToolDetail, enabled: undefined };
+    const result = ToolDetailSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'enabled', 'Required')).toBe(true);
+  });
+});
 
 // Unit tests for more granular schemas
 
@@ -497,10 +651,10 @@ describe('knowledgeSourceSchema', () => {
 });
 
 describe('a2aConfigSchema', () => {
-  const baseA2A = { enabled: true, communicationChannels: [ { id: 'ch1', name: 'Default Channel', direction: 'outbound' as const, messageFormat: 'json' as const, syncMode: 'async' as const } ] };
+  const baseA2A = { enabled: true, communicationChannels: [ { id: 'ch1', name: 'Default Channel', direction: 'outbound' as const, messageFormat: 'json' as const, syncMode: 'async' as const } ], maxMessageSize: 1024 };
   test('should parse valid data', () => {
     expect(a2aConfigSchema.safeParse(baseA2A).success).toBe(true);
-    expect(a2aConfigSchema.safeParse({ enabled: false }).success).toBe(true); // Other fields optional if not enabled
+    expect(a2aConfigSchema.safeParse({ enabled: false, maxMessageSize: 1024 }).success).toBe(true); // Other fields optional if not enabled
   });
   test('should fail if communicationChannels contains invalid object', () => {
     const data = { ...baseA2A, communicationChannels: [{ id: 'ch1' }] }; // Missing fields in channel
@@ -611,5 +765,31 @@ describe('adkCallbacksConfigSchema', () => {
     const result = adkCallbacksConfigSchema.safeParse({ beforeAgent: 123 });
     expect(result.success).toBe(false);
     if (!result.success) expect(findError(result, 'beforeAgent', 'Expected string, received number')).toBe(true);
+  });
+});
+
+describe('agentRestrictionsSchema', () => {
+  const testConfig = {
+    type: "llm",
+    framework: "genkit",
+    agentModel: "test-model",
+    agentGoal: "test goal",
+    agentTasks: ["task1"],
+    agentPersonality: "friendly",
+    agentTemperature: 0.7,
+    safetySettings: [],
+    agentRestrictions: [], // Campo obrigatório
+    statePersistence: { enabled: false },
+    rag: { enabled: false },
+    artifacts: { enabled: false },
+    a2a: { enabled: false },
+    adkCallbacks: {}
+  };
+
+  test('should fail if agentRestrictions is missing', () => {
+    const data = { ...testConfig, agentRestrictions: undefined };
+    const result = agentConfigSchema.safeParse(data);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(findError(result, 'agentRestrictions', 'Required')).toBe(true);
   });
 });

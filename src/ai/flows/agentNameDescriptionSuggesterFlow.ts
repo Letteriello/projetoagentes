@@ -1,7 +1,7 @@
-import { defineFlow, runFlow } from '@genkit-ai/flow';
+import { ai } from '@/ai/genkit';
 import { gemini15Pro } from '@genkit-ai/googleai'; // Assuming gemini15Pro is the desired LLM
 import * as z from 'zod';
-import { generate } from '@genkit-ai/ai';
+
 
 // 1. Define Input Schema (Zod)
 export const AgentNameDescriptionSuggesterInputSchema = z.object({
@@ -22,17 +22,17 @@ export const AgentNameDescriptionSuggesterOutputSchema = z.object({
 });
 
 // 3. Implement the Flow (defineFlow)
-export const agentNameDescriptionSuggesterFlow = defineFlow(
+export const agentNameDescriptionSuggesterFlow = ai.defineFlow(
   {
     name: 'agentNameDescriptionSuggester',
     inputSchema: AgentNameDescriptionSuggesterInputSchema,
     outputSchema: AgentNameDescriptionSuggesterOutputSchema,
   },
-  async (input) => {
+  async (input: { agentType: any; agentGoal: any; selectedTools: any; }) => {
     const { agentType, agentGoal, selectedTools } = input;
 
     const toolsDescription = selectedTools && selectedTools.length > 0
-      ? selectedTools.map(t => `${t.name} (Effect: ${t.description})`).join(', ')
+      ? selectedTools.map((t: { name: any; description: any; }) => `${t.name} (Effect: ${t.description})`).join(', ')
       : 'None';
 
     // Construct a prompt for an LLM (e.g., Gemini)
@@ -55,7 +55,7 @@ Do not include any other text or explanation outside of the JSON object.
 `;
 
     try {
-      const llmResponse = await generate({
+      const llmResponse = await ai.generate({
         model: gemini15Pro, // Ensure this model is configured in your Genkit setup
         prompt: prompt,
         config: {
@@ -110,7 +110,7 @@ Do not include any other text or explanation outside of the JSON object.
 /*
 async function testFlow() {
   try {
-    const result = await runFlow(agentNameDescriptionSuggesterFlow, {
+    const result = await ai.runFlow(agentNameDescriptionSuggesterFlow, {
       agentType: 'llm',
       agentGoal: 'To analyze customer feedback and identify common issues.',
       selectedTools: [

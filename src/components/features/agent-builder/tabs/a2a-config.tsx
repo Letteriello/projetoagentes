@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader,
 import { Separator } from '@/components/ui/separator';
 import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon'; // Renamed
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration, CommunicationChannel } from '@/types/agent-configs'; // Added CommunicationChannel
+import { SavedAgentConfiguration, CommunicationChannel } from '@/types/agent-configs-fixed'; // Added CommunicationChannel
 // SubAgentSelector is removed as subAgentIds are part of MultiAgentTab's scope (config.subAgentIds)
 
 interface A2AConfigTabProps {

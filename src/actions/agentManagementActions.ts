@@ -3,7 +3,7 @@
 // If `@/app/agent-builder/page` is client-component heavy, direct import might be problematic for server actions.
 // For now, we'll assume the type can be imported or is redefined/simplified here for the action's purpose.
 
-import type { SavedAgentConfiguration } from '@/types/agent-configs';
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 
 export async function saveAgentConfigurationAction(
   agentConfig: SavedAgentConfiguration

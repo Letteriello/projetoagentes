@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { saveAgentConfiguration } from "@/lib/agentServices";
 import { auth } from "@/lib/firebaseClient";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType, AgentFramework } from "@/types/agent-configs";
+import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType, AgentFramework } from '@/types/agent-configs-fixed';
 // Data imports from "@/data/agentBuilderConfig" are problematic as the file is missing.
 // const { initialGems, iconComponents, availableTools: builderAvailableTools } = await import("@/data/agentBuilderConfig"); // This will fail if file doesn't exist
 // Placeholder for data that would come from agentBuilderConfig.ts - USER NEEDS TO FIX THIS MISSING FILE OR PATH

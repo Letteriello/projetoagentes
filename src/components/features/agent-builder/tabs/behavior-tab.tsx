@@ -3,7 +3,7 @@ import { useFormContext, Controller } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { SavedAgentConfiguration } from '@/types/agent-configs'; // Import the main type
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Import the main type
 
 interface BehaviorTabProps {
   agentToneOptions: string[]; // Assuming these are simple strings like 'professional', 'friendly'

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom';
 import { FormProvider, useForm, UseFormReturn } from 'react-hook-form';
 import GeneralTab from './general-tab'; // Update path as needed
-import { SavedAgentConfiguration, LLMAgentConfig, AgentFramework, AgentType } from '@/types/agent-configs'; // Update path
+import { SavedAgentConfiguration, LLMAgentConfig, AgentFramework, AgentType } from '@/types/agent-configs-fixed'; // Update path
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content'; // Actual help content
 
 // --- Mocks ---

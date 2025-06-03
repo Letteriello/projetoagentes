@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
-import type { ArtifactDefinition } from "@/types/agent-configs";
+import type { ArtifactDefinition } from '@/types/agent-configs-fixed';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Props para o componente ArtifactsTab.

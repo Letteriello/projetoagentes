@@ -54,7 +54,7 @@ import { cn } from "@/lib/utils";
 import { ToolsTab } from "./tools-tab";
 import { standardTools as allTools } from "@/data/agent-builder/available-tools";
 import type { AvailableTool } from "@/types/tool-types";
-import type { ToolConfigData } from "@/types/agent-configs"; // Import the new type
+import type { ToolConfigData } from '@/types/agent-configs-fixed'; // Import the new type
 
 /**
  * Componente que integra a nova Tab de Ferramentas ao AgentBuilderDialog

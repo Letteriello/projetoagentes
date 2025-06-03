@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { FormProvider, useForm } from 'react-hook-form'; // For wrapping and getting methods if needed
 
 import AgentBuilderDialog from './agent-builder-dialog'; // The component to test
-import { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-configs';
+import { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-configs-fixed';
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content'; // Actual help content
 
 // --- Mocks ---

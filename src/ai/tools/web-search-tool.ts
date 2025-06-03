@@ -1,148 +1,164 @@
-import { Tool } from '@genkit-ai/sdk';
-import axios from 'axios'; // Re-introducing axios
-
 /**
- * Define a interface para os resultados de pesquisa na web
+ * @fileOverview Defines a Genkit tool for performing web searches.
+ * This tool is created using a factory function to allow for dynamic configuration
+ * of API keys and endpoints for a web search service.
  */
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-}
+import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
+import { ToolDefinition } from '@genkit-ai/core'; // Import ToolDefinition
+import { z } from 'zod';
+import axios from 'axios'; // For actual HTTP calls if implemented
 
-/**
- * Define a interface para a configuração da ferramenta de pesquisa na web
- */
+// Define the Zod schema for a single search result
+export const SearchResultSchema = z.object({
+  title: z.string(),
+  url: z.string().url(),
+  snippet: z.string(),
+});
+export type SearchResult = z.infer<typeof SearchResultSchema>;
+
+// Define the configuration interface for the tool
 export interface WebSearchToolConfig {
-  apiKey?: string;
-  apiUrl?: string;
+  apiKey?: string; // API key for the search service
+  apiUrl?: string; // API URL for the search service (e.g., Google Custom Search, Bing Search API)
+  name?: string; // Optional name for the tool instance
+  description?: string; // Optional description for the tool instance
 }
 
+// Define the Zod schema for the tool's input
+export const WebSearchInputSchema = z.object({
+  query: z.string().describe("The search query to execute."),
+  num_results: z.number().optional().default(5).describe("Number of results to return (max 10)."),
+  flowName: z.string().optional().describe("Name of the calling flow, for logging."),
+  agentId: z.string().optional().describe("ID of the calling agent, for logging."),
+});
+
+// Define the Zod schema for the tool's output
+export const WebSearchOutputSchema = z.object({
+  results: z.array(SearchResultSchema).describe("Array of search results."),
+  message: z.string().optional().describe("A message summarizing the search outcome."),
+  error: z.string().optional().describe("Error message if the search failed."),
+});
+
 /**
- * Cria uma ferramenta de pesquisa na web configurável.
- * @param config - Configuração para a ferramenta de pesquisa na web.
- * @returns Uma instância da ferramenta de pesquisa na web.
+ * Creates a configurable web search tool.
+ * @param config - Configuration for the web search tool.
+ * @returns A Genkit tool definition for web search.
  */
-export function createPerformWebSearchTool(config: WebSearchToolConfig): Tool {
-  return {
-    name: "perform_web_search",
-    description: "Permite buscar informações atualizadas na web para responder perguntas sobre eventos recentes, dados ou fatos que podem não estar no conhecimento do modelo.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "A consulta de pesquisa a ser executada",
-        },
-        num_results: {
-          type: "number",
-          description: "Número de resultados a serem retornados (máximo 10)",
-          default: 5,
-        }
-      },
-      required: ["query"],
+export function createPerformWebSearchTool(
+  config: WebSearchToolConfig
+): ToolDefinition<typeof WebSearchInputSchema, typeof WebSearchOutputSchema> {
+  const toolName = config.name || "performWebSearch";
+  const toolDescription =
+    config.description ||
+    "Performs a web search for up-to-date information to answer questions about recent events, data, or facts that may not be in the model's training data.";
+
+  console.log(`[${toolName}] Initialized. API URL: ${config.apiUrl || 'Default (e.g., DuckDuckGo simulation)'}, API Key Provided: ${!!config.apiKey}`);
+
+  return ai.defineTool(
+    {
+      name: toolName,      description: toolDescription,
+      inputSchema: WebSearchInputSchema,
+      outputSchema: WebSearchOutputSchema,
     },
-    handler: async ({ query, num_results = 5 }) => {
+    async (input: z.infer<typeof WebSearchInputSchema>) => {
+      const { query, num_results = 5, flowName, agentId } = input; // num_results has a default in schema
+
       try {
         const searchApiUrl = config.apiUrl || 'https://api.duckduckgo.com/'; // Default URL if not provided
         const searchApiKey = config.apiKey;
 
-        console.log(`Executando pesquisa web para: "${query}" com apiUrl: ${searchApiUrl}`);
+        console.log(`[${toolName}] Executing web search for: "${query}" (num_results: ${num_results}). API URL: ${searchApiUrl}. Flow: ${flowName}, Agent: ${agentId}`);
         
+        // If no API key is provided, return simulated results (as in original code)
         if (!searchApiKey) {
-          console.log("API key não fornecida na configuração - retornando resultados simulados");
-
+          console.log(`[${toolName}] API key not provided in config - returning simulated results.`);
           const simulatedResults: SearchResult[] = Array.from({ length: Math.min(num_results, 10) }, (_, i) => ({
-            title: `Resultado simulado ${i + 1} para "${query}" (sem API key)`,
+            title: `Simulated Result ${i + 1} for "${query}" (No API Key)`,
             url: `https://example.com/simulated-search?q=${encodeURIComponent(query)}&index=${i}`,
-            snippet: `Este é um resultado de exemplo ${i + 1} porque a API key não foi fornecida. Usando apiUrl: ${config.apiUrl || 'default URL'}.`
+            snippet: `This is a simulated search result snippet #${i + 1} for the query "${query}" because no API key was configured for the web search tool.`,
           }));
-
           return {
             results: simulatedResults,
-            message: "Resultados simulados. Forneça 'apiKey' na configuração da ferramenta para resultados reais."
+            message: "Web search simulation complete (no API key).",
           };
         }
 
-        // Implementação real com API - este é o bloco que seria usado em produção
-        // Para fins de exemplo, ele está comentado, mas a estrutura está aqui.
+        // Placeholder for actual API call logic using axios
+        // This section would need to be implemented based on the specific search API (Google, Bing, etc.)
+        // For example, if using a hypothetical API:
         /*
-        console.log(`Realizando chamada de API para ${searchApiUrl} com API Key: ${searchApiKey.substring(0,5)}...`);
+        console.log(`[${toolName}] Making real API call to ${searchApiUrl} with API key.`);
         const response = await axios.get(searchApiUrl, {
           params: {
-            q: query, // ou o nome do parâmetro que a API espera, ex: 'query', 'search_query'
-            // apiKey: searchApiKey, // algumas APIs esperam a chave como parâmetro
-            num: Math.min(num_results, 10), // ou o nome do parâmetro para número de resultados
-            format: 'json', // ou o formato esperado
-            // ... outros parâmetros específicos da API
+            q: query,
+            num: Math.min(num_results, 10), // Ensure num_results respects API limits
+            // ... other parameters specific to the API
           },
           headers: {
-            // 'Authorization': `Bearer ${searchApiKey}`, // outras APIs esperam no header
-            // 'X-Api-Key': searchApiKey, // ou um header customizado
-          }
+            'Authorization': `Bearer ${searchApiKey}`, // Or 'Ocp-Apim-Subscription-Key' for Bing, etc.
+            'Accept': 'application/json',
+          },
         });
-        
-        // Adapte o mapeamento abaixo de acordo com a estrutura REAL da sua API de pesquisa
-        // O exemplo abaixo é genérico
-        const responseData = response.data;
-        let searchResults: SearchResult[] = [];
 
-        // Exemplo: se a API retorna um array em `results` ou `items`
-        if (responseData.results && Array.isArray(responseData.results)) {
-          searchResults = responseData.results.map((item: any) => ({
-            title: item.title || 'Sem título',
-            url: item.url || item.link || '',
-            snippet: item.snippet || item.description || '',
-          })).slice(0, Math.min(num_results, 10));
-        } else if (responseData.items && Array.isArray(responseData.items)) {
-           searchResults = responseData.items.map((item: any) => ({
-            title: item.title || 'Sem título',
-            url: item.link || item.url || '',
-            snippet: item.snippet || item.description || '',
+        let searchResults: SearchResult[] = [];
+        // Process response.data based on the API's structure
+        // Example for a hypothetical API returning items in response.data.items:
+        if (response.data && response.data.items) {
+          searchResults = response.data.items.map((item: any) => ({
+            title: item.title || 'No title',
+            url: item.link || item.url || 'No URL',
+            snippet: item.snippet || 'No snippet',
           })).slice(0, Math.min(num_results, 10));
         }
-        // Adicione mais `else if` conforme necessário para a estrutura da sua API
+        // Add more `else if` blocks as needed for different API response structures
 
         return {
           results: searchResults,
-          message: `Encontrados ${searchResults.length} resultados para "${query}"`
+          message: `Found ${searchResults.length} results for "${query}" from real API.`,
         };
         */
 
-        // Se a implementação real da API (bloco comentado acima) não for usada,
-        // continuamos retornando resultados simulados detalhados quando a API key é fornecida.
-        // Isto ajuda a confirmar que o fluxo com API key está sendo atingido.
+        // If the actual API implementation (commented block above) is not used,
+        // continue returning detailed simulated results when an API key IS provided.
+        // This helps confirm the flow with an API key is being reached.
+        console.log(`[${toolName}] API key WAS provided. Simulating call to a real API endpoint.`);
         const simulatedResultsWithApiKey: SearchResult[] = Array.from({ length: Math.min(num_results, 10) }, (_, i) => ({
-            title: `Resultado REAL (simulado) ${i + 1} para: ${query}`,
+            title: `REAL API Result (Simulated) ${i + 1} for: ${query}`,
             url: `${config.apiUrl || 'https://api.example.com'}/search?q=${encodeURIComponent(query)}&key=${config.apiKey}&index=${i}`,
-            snippet: `Este é um resultado simulado ${i+1} para "${query}" como se viesse de uma API real, usando a API Key.`
+            snippet: `This is a simulated result #${i+1} for "${query}" as if it came from a real API, using the configured API Key.`
         }));
 
         return {
-          results: simulatedResultsWithApiKey,
-          message: "Pesquisa web concluída com sucesso (simulado com API Key)"
+          results: simulatedResultsWithApiKey,          message: "Web search (simulated with API Key) successful."
         };
 
       } catch (error) {
-        console.error("Erro na ferramenta de pesquisa web:", error);
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        console.error(`[${toolName}] Error during web search:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during web search.';
 
         if (axios.isAxiosError(error)) {
-          console.error("Detalhes do erro Axios:", error.response?.data);
+          console.error(`[${toolName}] Axios error details:`, error.response?.data);
           return {
-            error: `Falha ao realizar a pesquisa (Erro Axios): ${errorMessage} (status: ${error.response?.status})`,
-            results: []
+            results: [], // Ensure results is always an array
+            error: `Web search failed (Axios Error): ${errorMessage} (Status: ${error.response?.status || 'N/A'})`,
           };
         }
         return {
-          error: `Falha ao realizar a pesquisa: ${errorMessage}`,
-          results: []
+          results: [], // Ensure results is always an array
+          error: `Web search failed: ${errorMessage}`,
         };
       }
     },
-  };
+  );
 }
 
-// As exportações principais são a função de fábrica e as interfaces.
-// Os usuários desta ferramenta precisarão chamar createPerformWebSearchTool(config)
-// para obter uma instância da ferramenta.
+// Ensure this file is treated as a module.
+export {};
+
+// Example of how to export a pre-configured instance (optional)
+// export const googleCustomSearch = createPerformWebSearchTool({
+//   name: "googleWebSearch",
+//   description: "Performs a web search using Google Custom Search.",
+//   apiKey: process.env.GOOGLE_CUSTOM_SEARCH_API_KEY, // From secure source
+//   apiUrl: "https://www.googleapis.com/customsearch/v1", // Example, needs CX param too
+// });

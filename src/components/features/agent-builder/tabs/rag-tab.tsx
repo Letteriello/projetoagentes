@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { InfoIcon as InfoIconComponent } from '@/components/ui/InfoIcon'; // Renamed to avoid conflict
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration, RagMemoryConfig, KnowledgeSource } from '@/types/agent-configs';
+import { SavedAgentConfiguration, RagMemoryConfig, KnowledgeSource } from '@/types/agent-configs-fixed';
 
 // Props passed from AgentBuilderDialog
 interface RagTabProps {

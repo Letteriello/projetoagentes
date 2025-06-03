@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"; // Added Input import
 import { Textarea } from "@/components/ui/textarea"; // Textarea IS needed for customLogicDescription
 import JsonEditorField from '@/components/ui/JsonEditorField'; // IMPORTED JsonEditorField
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { SavedAgentConfiguration } from "@/types/agent-configs"; // MODIFIED
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
 

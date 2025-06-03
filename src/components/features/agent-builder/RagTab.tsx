@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"; // Checkbox is used here
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
-import type { RagMemoryConfig } from "@/types/agent-configs";
+import type { RagMemoryConfig } from '@/types/agent-configs-fixed';
 import type { MemoryServiceType } from "./memory-knowledge-tab"; // Local type, or import from actual source
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
