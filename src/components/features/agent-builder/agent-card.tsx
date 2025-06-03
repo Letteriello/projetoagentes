@@ -40,6 +40,8 @@ import {
   EyeOff as EyeOffIcon,
   Save as SaveIcon,
   Crown,
+  LucideIcon, // Added LucideIcon
+  HelpCircle, // Added HelpCircle for default icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -47,6 +49,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { safeToReactNode } from "@/lib/utils"; // Import safeToReactNode
 // Update type imports to use centralized definitions
 import type {
   SavedAgentConfiguration,
@@ -58,88 +61,14 @@ import type {
   AvailableTool, // Added AvailableTool here
 } from '@/types/agent-configs-fixed';
 
-// Definindo iconComponents aqui, para mapear os nomes de string para os componentes de ícone importados
-const iconComponents: Record<
-  string,
-  React.FC<React.SVGProps<SVGSVGElement>>
-> = {
-  // Ícones básicos
-  Search,
-  Calculator,
-  FileText,
-  CalendarDays,
-  Network,
-  Database,
-  Code2,
-  Cpu,
-  Default: Cpu, // Usando o Cpu importado como padrão
-
-  // Ícones de agentes específicos
-  Briefcase,
-  Stethoscope,
-  Plane,
-  Workflow,
-  Brain: Cpu, // Reutilizando Cpu para Brain
-  FileJson,
-  GripVertical,
-
-  // Ícones de ações
-  ConfigureIcon, // Settings2 renomeado como ConfigureIcon
-  ClipboardCopy,
-  AlertCircle,
-  DeleteIcon, // Trash2 renomeado como DeleteIcon
-  EditIcon, // Edit renomeado como EditIcon
-  ChatIcon, // MessageSquare renomeado como ChatIcon
-  CopyIcon, // Copy renomeado como CopyIcon
-  EyeIcon, // Eye renomeado como EyeIcon
-  EyeOffIcon, // EyeOff renomeado como EyeOffIcon
-  SaveIcon, // Save renomeado como SaveIcon
-  Plus,
-  Layers,
-  Info,
-  // Os nomes originais não precisam ser mapeados separadamente se os aliases são usados consistentemente
-  // e se os componentes originais (Edit, MessageSquare, etc.) não são referenciados diretamente no JSX com seu nome original.
-  // O JSX usa EditIcon, ChatIcon, etc.
-};
-
 const getToolIconComponent = (
-  iconName?: string,
+  Icon?: LucideIcon,
 ): React.FC<React.SVGProps<SVGSVGElement>> => {
-  // Garantir que nunca retornamos undefined, sempre retornando um componente válido
-  try {
-    // Caso 1: iconName é undefined ou string vazia
-    if (!iconName) {
-      return iconComponents["Default"] || Cpu;
-    }
-
-    // Caso 2: iconName existe diretamente como chave em iconComponents
-    if (iconName in iconComponents) {
-      const Icon = iconComponents[iconName as keyof typeof iconComponents];
-      if (Icon) return Icon;
-    }
-
-    // Caso 3: Tentar encontrar uma correspondência case-insensitive
-    const lowercaseName = iconName.toLowerCase();
-    const iconKeys = Object.keys(iconComponents);
-    const matchingKey = iconKeys.find(
-      (key) => key.toLowerCase() === lowercaseName,
-    );
-
-    if (
-      matchingKey &&
-      iconComponents[matchingKey as keyof typeof iconComponents]
-    ) {
-      return iconComponents[matchingKey as keyof typeof iconComponents];
-    }
-
-    // Nenhuma correspondência encontrada, usar o ícone padrão
-    console.log(`Ícone não encontrado para: ${iconName}, usando ícone padrão`);
-    return iconComponents["Default"] || Cpu;
-  } catch (error) {
-    // Capturar qualquer erro inesperado e garantir que sempre retornamos um componente válido
-    console.error(`Erro ao obter ícone para: ${iconName}`, error);
-    return Cpu;
+  if (Icon) {
+    return Icon;
   }
+  // Return a default icon if no icon is provided
+  return HelpCircle; // Or Cpu if HelpCircle is not preferred
 };
 
 interface AgentCardProps {
@@ -190,39 +119,53 @@ export function AgentCard({
     agentTypeDetails?.label.split("(")[0].trim() || agent.config.type; // Access via agent.config.type
 
   let AgentIconComponent: React.ReactNode;
-  let specificIconType: keyof typeof iconComponents | undefined = undefined;
 
-  if (agent.templateId === "legal_analyst_basic")
-    specificIconType = "Briefcase";
-  else if (agent.templateId === "medical_triage_info")
-    specificIconType = "Stethoscope";
-  else if (agent.templateId === "travel_planner_basic")
-    specificIconType = "Plane";
-
-  if (specificIconType) {
-    const SpecificIcon = iconComponents[specificIconType];
-    AgentIconComponent = SpecificIcon ? (
-      <SpecificIcon
+  if (agent.templateId === "legal_analyst_basic") {
+    AgentIconComponent = (
+      <Briefcase
         width={20}
         height={20}
         className="text-primary mr-4 self-start mt-1 w-10 h-10"
       />
-    ) : (
-      <Cpu
+    );
+  } else if (agent.templateId === "medical_triage_info") {
+    AgentIconComponent = (
+      <Stethoscope
+        width={20}
+        height={20}
+        className="text-primary mr-4 self-start mt-1 w-10 h-10"
+      />
+    );
+  } else if (agent.templateId === "travel_planner_basic") {
+    AgentIconComponent = (
+      <Plane
         width={20}
         height={20}
         className="text-primary mr-4 self-start mt-1 w-10 h-10"
       />
     );
   } else if (agentTypeDetails?.icon) {
-    AgentIconComponent = React.cloneElement(
-      agentTypeDetails.icon as React.ReactElement,
-      {
-        width: 20,
-        height: 20,
-        className: "text-primary mr-4 self-start mt-1 w-10 h-10",
-      },
-    );
+    if (React.isValidElement(agentTypeDetails.icon)) {
+      AgentIconComponent = React.cloneElement(
+        agentTypeDetails.icon, // No need to cast after isValidElement check
+        {
+          width: 20,
+          height: 20,
+          className: "text-primary mr-4 self-start mt-1 w-10 h-10",
+        },
+      );
+    } else {
+      // Fallback if agentTypeDetails.icon is a ReactNode but not a ReactElement (e.g. string, number)
+      // Or render it directly if it's a simple node, though sizing/className might be an issue.
+      // For now, using a default icon for non-element nodes is safer.
+      AgentIconComponent = (
+        <HelpCircle
+          width={20}
+          height={20}
+          className="text-primary mr-4 self-start mt-1 w-10 h-10"
+        />
+      );
+    }
   } else {
     AgentIconComponent = (
       <Cpu
@@ -243,7 +186,7 @@ export function AgentCard({
               {/* Wrapper for title and new icons */}
               <div className="flex items-center">
                 <CardTitle className="text-lg font-semibold text-foreground">
-                  {agent.agentName || "Agente Sem Nome"}
+                  {safeToReactNode(agent.agentName, "Agente Sem Nome")}
                 </CardTitle>
                 {/**
                  * Renders a Crown icon with a tooltip if the agent is designated as a root agent.
@@ -280,11 +223,11 @@ export function AgentCard({
                 )}
               </div>
               <Badge variant="secondary" className="text-xs h-6">
-                {agentTypeLabel}
+                {safeToReactNode(agentTypeLabel)}
               </Badge>
             </div>
             <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
-              {agent.description || "Sem descrição."}
+              {safeToReactNode(agent.description, "Sem descrição.")}
             </CardDescription>
           </div>
         </div>
@@ -296,7 +239,7 @@ export function AgentCard({
               Objetivo:
             </h4>
             <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-              {(agent.config as LLMAgentConfig).agentGoal}
+              {safeToReactNode((agent.config as LLMAgentConfig).agentGoal)}
             </p>
           </div>
         )}
@@ -308,7 +251,7 @@ export function AgentCard({
               Modelo de IA:
             </h4>
             <p className="text-xs text-muted-foreground">
-              {(agent.config as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel}
+              {safeToReactNode((agent.config as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel)}
             </p>
           </div>
         )}
@@ -319,10 +262,10 @@ export function AgentCard({
                 Descrição do Fluxo:
               </h4>
               <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                {(agent.config as WorkflowAgentConfig).workflowDescription}
+                {safeToReactNode((agent.config as WorkflowAgentConfig).workflowDescription)}
                 {(agent.config as WorkflowAgentConfig).detailedWorkflowType && (
                   <span className="block text-xs text-primary/70">
-                    Tipo: {(agent.config as WorkflowAgentConfig).detailedWorkflowType}
+                    Tipo: {safeToReactNode((agent.config as WorkflowAgentConfig).detailedWorkflowType)}
                   </span>
                 )}
               </p>
@@ -335,7 +278,7 @@ export function AgentCard({
                 Lógica Personalizada:
               </h4>
               <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
-                {(agent.config as CustomAgentConfig).customLogicDescription}
+                {safeToReactNode((agent.config as CustomAgentConfig).customLogicDescription)}
               </p>
             </div>
           )}
@@ -353,22 +296,16 @@ export function AgentCard({
                 const renderSafeIcon = (): React.ReactNode => {
                   try {
                     // Obter o componente do ícone com função aprimorada
-                    const IconComponent = getToolIconComponent(
-                      toolDetail.iconName,
-                    );
+                    const IconComponent = getToolIconComponent(fullTool?.icon);
                     // Verificação extra de segurança
-                    return IconComponent ? (
-                      <IconComponent width={12} height={12} />
-                    ) : (
-                      <Cpu width={12} height={12} />
-                    );
+                    return <IconComponent width={12} height={12} />;
                   } catch (error) {
                     console.error(
                       `Erro ao renderizar ícone para ferramenta ${toolDetail.id}:`,
                       error,
                     );
                     // Fallback final para garantir que sempre temos um elemento React válido
-                    return <Cpu width={12} height={12} />;
+                    return <HelpCircle width={12} height={12} />; // Use HelpCircle or Cpu as fallback
                   }
                 };
                 const toolIcon = renderSafeIcon();
@@ -421,7 +358,7 @@ export function AgentCard({
                   >
                     {toolIcon}
                     <span className="truncate group-hover:whitespace-normal group-hover:max-w-none">
-                      {toolDetail.label}
+                      {safeToReactNode(toolDetail.label)}
                     </span>
                     {fullTool?.needsConfiguration && (
                       <ConfigureIcon
