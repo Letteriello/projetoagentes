@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorBoundary as ReactErrorBoundary } from "react-error-boundary";
+import { winstonLogger } from '../lib/winston-logger';
 
 function ErrorFallback({
   error,
@@ -64,6 +65,10 @@ export function ErrorBoundaryClient({
       FallbackComponent={ErrorFallback}
       onError={(error, info) => {
         console.error("Error caught by error boundary:", error, info);
+        winstonLogger.error('Error caught by ErrorBoundaryClient:', {
+          error: error.toString(),
+          componentStack: info.componentStack,
+        });
 
         // Handle chunk loading errors globally
         if (typeof window !== "undefined" && error.name === "ChunkLoadError") {
