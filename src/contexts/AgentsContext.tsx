@@ -1,16 +1,17 @@
 // src/contexts/AgentsContext.tsx
 "use client";
 
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Usar os tipos unificados
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import * as React from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAgentStorage } from '@/hooks/use-agent-storage'; // Import the new hook
 
 interface AgentsContextType {
   savedAgents: SavedAgentConfiguration[];
   addAgent: (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<SavedAgentConfiguration | null>;
   updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>) => Promise<SavedAgentConfiguration | null>;
   deleteAgent: (agentId: string) => Promise<boolean>;
-  fetchAgents: () => Promise<void>; // Adicionar fetchAgents para ser chamado explicitamente se necessário
+  fetchAgents: () => Promise<void>;
   isLoadingAgents: boolean;
 }
 
@@ -20,66 +21,49 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = React.useState<boolean>(true);
   const { toast } = useToast();
+  const { loadAgents, saveAgent: saveAgentToStorage, updateAgent: updateAgentInStorage, deleteAgent: deleteAgentFromStorage } = useAgentStorage(); // Use the hook
 
   const fetchAgents = React.useCallback(async () => {
     setIsLoadingAgents(true);
     try {
-      const response = await fetch('/api/agents');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Falha ao buscar agentes', details: response.statusText }));
-        throw new Error(errorData.details || errorData.error || 'Network response was not ok');
-      }
-      const agents = await response.json() as SavedAgentConfiguration[];
-      // Convert string dates to Date objects if necessary for sorting or display
-      const processedAgents = agents.map(agent => ({
-        ...agent,
-        createdAt: agent.createdAt ? new Date(agent.createdAt) : new Date(),
-        updatedAt: agent.updatedAt ? new Date(agent.updatedAt) : new Date(),
-      })).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      // Replace API call with localStorage load
+      const agentsFromStorage = loadAgents();
+      // Ensure sorting is maintained if needed (loadAgents already handles date conversion)
+      const processedAgents = agentsFromStorage.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
       setSavedAgents(processedAgents);
-
     } catch (error) {
-      console.error("Erro ao buscar agentes via API:", error);
+      console.error("Erro ao buscar agentes do localStorage:", error);
       toast({
         title: "Erro ao Carregar Agentes",
-        description: `Não foi possível buscar os agentes salvos. ${error instanceof Error ? error.message : ''}`,
+        description: `Não foi possível buscar os agentes salvos localmente. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
     } finally {
       setIsLoadingAgents(false);
     }
-  }, [toast]);
+  }, [loadAgents, toast]); // Add loadAgents to dependency array
 
   React.useEffect(() => {
     fetchAgents();
   }, [fetchAgents]);
 
   const addAgent = async (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<SavedAgentConfiguration | null> => {
-    setIsLoadingAgents(true);
+    setIsLoadingAgents(true); // Keep for consistency, though operation is fast
     try {
-      const response = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(agentConfigData),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Falha ao adicionar agente', details: response.statusText }));
-        throw new Error(errorData.details || errorData.error || 'Network response was not ok');
+      // Replace API call with localStorage save
+      const newAgent = saveAgentToStorage(agentConfigData); // saveAgentToStorage is addAgentInternal from the hook
+      if (newAgent) {
+        // Update state, ensuring it's sorted
+        setSavedAgents(prev => [newAgent, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+        toast({ title: "Agente Adicionado", description: `"${newAgent.agentName}" foi salvo com sucesso localmente.` });
+        return newAgent;
       }
-      const newAgent = await response.json() as SavedAgentConfiguration;
-      const processedNewAgent = {
-        ...newAgent,
-        createdAt: newAgent.createdAt ? new Date(newAgent.createdAt) : new Date(),
-        updatedAt: newAgent.updatedAt ? new Date(newAgent.updatedAt) : new Date(),
-      };
-      setSavedAgents(prev => [processedNewAgent, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
-      toast({ title: "Agente Adicionado", description: `"${newAgent.agentName}" foi salvo com sucesso.` });
-      return processedNewAgent;
+      throw new Error("Falha ao salvar o agente localmente.");
     } catch (error) {
-      console.error("Erro ao adicionar agente via API:", error);
+      console.error("Erro ao adicionar agente no localStorage:", error);
       toast({
         title: "Erro ao Adicionar Agente",
-        description: `Não foi possível salvar o agente. ${error instanceof Error ? error.message : ''}`,
+        description: `Não foi possível salvar o agente localmente. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
       return null;
@@ -89,34 +73,24 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateAgent = async (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>) => {
-    setIsLoadingAgents(true);
+    setIsLoadingAgents(true); // Keep for consistency
     try {
-      const response = await fetch(`/api/agents/${agentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(agentConfigUpdate),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `Falha ao atualizar agente ${agentId}`, details: response.statusText }));
-        throw new Error(errorData.details || errorData.error || 'Network response was not ok');
+      // Replace API call with localStorage update
+      const updatedAgent = updateAgentInStorage({ ...agentConfigUpdate, id: agentId });
+      if (updatedAgent) {
+        setSavedAgents(prev =>
+          prev.map(agent => (agent.id === agentId ? updatedAgent : agent))
+              .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        );
+        toast({ title: "Agente Atualizado", description: "As alterações foram salvas localmente." });
+        return updatedAgent;
       }
-      const updatedAgent = await response.json() as SavedAgentConfiguration;
-       const processedUpdatedAgent = {
-        ...updatedAgent,
-        createdAt: updatedAgent.createdAt ? new Date(updatedAgent.createdAt) : new Date(),
-        updatedAt: updatedAgent.updatedAt ? new Date(updatedAgent.updatedAt) : new Date(),
-      };
-      setSavedAgents(prev =>
-        prev.map(agent => (agent.id === agentId ? processedUpdatedAgent : agent))
-            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-      );
-      toast({ title: "Agente Atualizado", description: "As alterações foram salvas." });
-      return processedUpdatedAgent;
+      throw new Error("Falha ao atualizar o agente localmente. Agente não encontrado.");
     } catch (error) {
-      console.error("Erro ao atualizar agente via API:", error);
+      console.error("Erro ao atualizar agente no localStorage:", error);
       toast({
         title: "Erro ao Atualizar Agente",
-        description: `Não foi possível salvar as alterações. ${error instanceof Error ? error.message : ''}`,
+        description: `Não foi possível salvar as alterações localmente. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
       return null;
@@ -126,23 +100,27 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteAgent = async (agentId: string): Promise<boolean> => {
-    setIsLoadingAgents(true);
+    setIsLoadingAgents(true); // Keep for consistency
     try {
-      const response = await fetch(`/api/agents/${agentId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `Falha ao deletar agente ${agentId}`, details: response.statusText }));
-        throw new Error(errorData.details || errorData.error || 'Network response was not ok');
+      // Replace API call with localStorage delete
+      const success = deleteAgentFromStorage(agentId);
+      if (success) {
+        setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
+        toast({ title: "Agente Deletado", description: "O agente foi removido com sucesso localmente." });
+        return true;
       }
-      setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
-      toast({ title: "Agente Deletado", description: "O agente foi removido com sucesso." });
-      return true;
-    } catch (error) {
-      console.error("Erro ao deletar agente via API:", error);
+      // If deleteAgentFromStorage returns false, it means agent was not found.
       toast({
         title: "Erro ao Deletar Agente",
-        description: `Não foi possível remover o agente. ${error instanceof Error ? error.message : ''}`,
+        description: "Não foi possível remover o agente localmente. Agente não encontrado.",
+        variant: "destructive",
+      });
+      return false;
+    } catch (error) {
+      console.error("Erro ao deletar agente no localStorage:", error);
+      toast({
+        title: "Erro ao Deletar Agente",
+        description: `Não foi possível remover o agente localmente. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
       return false;
