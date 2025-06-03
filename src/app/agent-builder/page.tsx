@@ -23,10 +23,13 @@ import {
   Users, // For Total Agents
   Wrench, // For Agents with Tools (alternative: PuzzlePiece)
   Route, // For Root Agents (alternative: Network, GitFork)
+  List, // Icon for List view
+  LayoutGrid, // Icon for Grid view
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
+import { useAgentStorage } from "@/hooks/use-agent-storage"; // Import useAgentStorage
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
@@ -87,6 +90,28 @@ export default function AgentBuilderPage() {
   // State for delete confirmation modal
   const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = React.useState(false);
   const [agentToDelete, setAgentToDelete] = React.useState<SavedAgentConfiguration | null>(null);
+
+  // State for agent order and drag-and-drop
+  const [agentOrder, setAgentOrder] = React.useState<string[]>([]);
+  const [draggedAgentId, setDraggedAgentId] = React.useState<string | null>(null);
+
+  const { saveAgentOrder } = useAgentStorage(); // Get saveAgentOrder directly
+
+  // View Mode state and persistence
+  type ViewMode = 'grid' | 'list';
+  const VIEW_MODE_STORAGE_KEY = 'agentViewMode_v1';
+  const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
+
+  React.useEffect(() => {
+    const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as ViewMode | null;
+    if (savedViewMode) {
+      setViewMode(savedViewMode);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -157,6 +182,73 @@ export default function AgentBuilderPage() {
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  React.useEffect(() => {
+    // Initialize agentOrder when savedAgents changes and agentOrder is empty
+    // This handles initial load and cases where savedAgents are updated externally.
+    if (savedAgents.length > 0 && agentOrder.length === 0) {
+      setAgentOrder(savedAgents.map(agent => agent.id));
+    } else if (savedAgents.length === 0 && agentOrder.length > 0) {
+      // Clear agentOrder if all agents are deleted
+      setAgentOrder([]);
+    }
+    // A more sophisticated sync might be needed if useAgentStorage provides persisted order later
+  }, [savedAgents, agentOrder]);
+
+
+  const orderedAgents = React.useMemo(() => {
+    if (agentOrder.length > 0 && savedAgents.length > 0) {
+      return agentOrder
+        .map(id => savedAgents.find(agent => agent.id === id))
+        .filter(Boolean) as SavedAgentConfiguration[];
+    }
+    return savedAgents; // Fallback to savedAgents if order is not yet established or empty
+  }, [agentOrder, savedAgents]);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, agentId: string) => {
+    setDraggedAgentId(agentId);
+    // Optional: Add styles for dragging element
+    // e.dataTransfer.effectAllowed = "move";
+    // e.dataTransfer.setData("text/plain", agentId); // Not strictly necessary with React state
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necessary to allow dropping
+    // Optional: Add styles for drop target
+    // e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetAgentId: string) => {
+    e.preventDefault();
+    if (!draggedAgentId || draggedAgentId === targetAgentId) {
+      setDraggedAgentId(null);
+      return;
+    }
+
+    const newOrder = [...agentOrder];
+    const draggedIndex = newOrder.indexOf(draggedAgentId);
+    const targetIndex = newOrder.indexOf(targetAgentId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedAgentId(null);
+      return; // Should not happen if IDs are correct
+    }
+
+    // Remove the dragged agent and insert it before the target agent
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedAgentId);
+
+    setAgentOrder(newOrder);
+    setDraggedAgentId(null);
+    // Persist the new order
+    saveAgentOrder(newOrder);
+    console.log("Nova ordem persistida:", newOrder);
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    // Optional: Clean up any drag state or styles
+    setDraggedAgentId(null);
+  };
 
   const handleOpenCreateAgentModal = () => {
     setEditingAgent(null);
@@ -326,6 +418,44 @@ export default function AgentBuilderPage() {
             <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
           </Button>
           <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} />
+
+          {/* View Mode Toggle Buttons */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setViewMode('grid')}
+                  className="shadow-sm"
+                  aria-label="Visualização em Grade"
+                >
+                  <LayoutGrid className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Grade</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setViewMode('list')}
+                  className="shadow-sm"
+                  aria-label="Visualização em Lista"
+                >
+                  <List className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Lista</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </header>
 
@@ -412,22 +542,36 @@ export default function AgentBuilderPage() {
               ))}
             </div>
           )}
-          {!isLoadingAgents && savedAgents && savedAgents.length > 0 ? (
+          {!isLoadingAgents && orderedAgents && orderedAgents.length > 0 ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {savedAgents.map((agent) => (
+              <div
+                className={cn(
+                  viewMode === 'grid'
+                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+                    : "flex flex-col gap-4" // Single column for list view
+                )}
+              >
+                {orderedAgents.map((agent) => (
                   <AgentCard
                     key={agent.id}
                     agent={agent}
-                    onEdit={() => handleEditAgent(agent)} // Already ensures form mode
+                    agentId={agent.id} // Pass agentId for drag and drop handlers
+                    viewMode={viewMode} // Pass current viewMode
+                    onEdit={() => handleEditAgent(agent)}
                     onSaveAsTemplate={handleSaveAsTemplate}
-                    onViewMonitoring={() => handleViewAgentMonitoring(agent)} // Already ensures form mode
+                    onViewMonitoring={() => handleViewAgentMonitoring(agent)}
                     onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
                     onDelete={() => handleDeleteAgent(agent.id)}
                     availableTools={defaultAvailableTools}
                     agentTypeOptions={agentTypeOptions}
                     isFavorite={agent.isFavorite}
                     onToggleFavorite={handleToggleFavorite}
+                    // Drag and Drop props
+                    draggable // This will be used by the AgentCard's div
+                    onDragStart={(e) => handleDragStart(e, agent.id)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, agent.id)}
+                    onDragEnd={handleDragEnd}
                   />
                 ))}
               </div>
