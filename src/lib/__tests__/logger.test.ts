@@ -50,15 +50,12 @@ jest.mock('../firebaseAdmin', () => {
   return firebaseAdmin;
 });
 
-// Mock Genkit Core
-const mockInstrument = jest.fn((opts, fn) => fn);
+// Mock Genkit Core - Removido instrumentation que não é mais usado
 const mockGetTraceId = jest.fn(() => 'test-trace-id');
 
 jest.mock('@genkit-ai/core', () => ({
-  instrumentation: {
-    instrument: (opts: any, fn: any) => mockInstrument(opts, fn),
-    getTraceId: () => mockGetTraceId(),
-  },
+  // Removida referência a instrumentation que causava erros
+  getTraceId: () => mockGetTraceId(),
 }));
 
 // Mock Genkit Flow

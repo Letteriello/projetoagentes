@@ -12,7 +12,7 @@ export const ai = configureGenkit({ // Changed function call
   ],
   model: 'googleai/gemini-2.0-flash',
   telemetry: {
-    instrumentation: 'google',
+    // Removida referência a instrumentation que não é suportada
     logger: 'google',
   },
   logLevel: 'debug',

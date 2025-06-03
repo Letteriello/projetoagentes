@@ -43,14 +43,11 @@ afterAll(() => {
   global.console = originalConsole;
 });
 
-// Mock Genkit Core
-const mockInstrument = jest.fn((opts, fn) => fn); // Actual fn is called
+// Mock Genkit Core - Removida instrumentação
 const mockGetTraceId = jest.fn(() => 'test-trace-id');
 jest.mock('@genkit-ai/core', () => ({
-  instrumentation: {
-    instrument: (opts: any, fn: any) => mockInstrument(opts, fn),
-    getTraceId: () => mockGetTraceId(),
-  },
+  // Removida referência a instrumentation que não é mais usada no logger
+  getTraceId: () => mockGetTraceId(),
 }));
 
 // Mock Genkit Flow
