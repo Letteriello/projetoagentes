@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -97,6 +98,11 @@ interface AgentCardProps {
   onToggleFavorite: (agentId: string, newFavoriteStatus: boolean) => void; // Added
 }
 
+const starVariants = {
+  initial: { scale: 1 },
+  toggled: { scale: [1, 1.4, 1], rotate: [0, 15, -15, 0], transition: { duration: 0.4 } },
+};
+
 export function AgentCard({
   agent,
   onEdit,
@@ -181,10 +187,16 @@ export function AgentCard({
   }
 
   return (
-    <Card className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:scale-[1.02]">
-      <CardHeader className="pb-3">
-        <div className="flex items-start">
-          {AgentIconComponent}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="flex flex-col" // Outer div for motion, Card is inside
+    >
+      <Card className="flex flex-col bg-card shadow-md hover:shadow-lg transition-shadow duration-300 hover:animate-subtle-scale h-full">
+        <CardHeader className="pb-3">
+          <div className="flex items-start">
+            {AgentIconComponent}
           <div className="flex-1">
             <div className="flex justify-between items-start mb-1">
               <div className="flex items-center">
@@ -219,14 +231,21 @@ export function AgentCard({
               <div className="flex items-center gap-2">
                 <TooltipProvider>
                   <Tooltip>
-                    <TooltipTrigger asChild>
+                    <TooltipTrigger asChild className="group">
                       <Button
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground hover:text-amber-500 h-7 w-7"
                         onClick={() => onToggleFavorite(agent.id, !isFavorite)}
                       >
-                        <Star className={cn("h-5 w-5", isFavorite ? "fill-amber-500 text-amber-500" : "text-muted-foreground")} />
+                        <motion.span
+                          key={isFavorite ? "favorite" : "not-favorite"} // Changed key to be more descriptive
+                          variants={starVariants}
+                          animate="toggled"
+                          className="flex items-center justify-center"
+                        >
+                          <Star className={cn("h-5 w-5 group-hover:animate-jiggle", isFavorite ? "fill-amber-500 text-amber-500" : "text-muted-foreground")} />
+                        </motion.span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -350,27 +369,28 @@ export function AgentCard({
         )}
       </CardContent>
       <CardFooter className="gap-2 mt-auto pt-4 border-t">
-        <Button variant="outline" size="sm" onClick={() => onEdit(agent)}>
-          <EditIcon size={16} className="mr-1.5" /> Editar
+        <Button variant="outline" size="sm" onClick={() => onEdit(agent)} className="group">
+          <EditIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Editar
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onSaveAsTemplate(agent)}>
-          <SaveIcon size={16} className="mr-1.5" /> Salvar como Template
+        <Button variant="outline" size="sm" onClick={() => onSaveAsTemplate(agent)} className="group">
+          <SaveIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Salvar como Template
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onViewMonitoring(agent)}>
-          <EyeIcon size={16} className="mr-1.5" /> Monitorar
+        <Button variant="outline" size="sm" onClick={() => onViewMonitoring(agent)} className="group">
+          <EyeIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Monitorar
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex">
-          <ChatIcon size={16} className="mr-1.5" /> Testar
+        <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex group">
+          <ChatIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Testar
         </Button>
         <Button
           variant="destructive"
           size="sm"
-          className="ml-auto"
+          className="ml-auto group"
           onClick={() => onDelete(agent.id)}
         >
-          <DeleteIcon size={16} className="mr-1.5" /> Excluir
+          <DeleteIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Excluir
         </Button>
       </CardFooter>
     </Card>
+  </motion.div>
   );
 }
