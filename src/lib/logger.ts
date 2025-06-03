@@ -1,8 +1,8 @@
 // src/lib/logger.ts
 import { genkitFlow, WrappedFlow } from '@genkit-ai/flow';
 import { instrumentation } from '@genkit-ai/core';
-// Certifique-se de que 'firebaseAdmin.ts' está em 'src/lib/' e exporta 'firestore' e 'admin'
-import { firestore, admin } from './firebaseAdmin'; 
+// Importação corrigida do firebaseAdmin
+import admin, { firestore } from './firebaseAdmin';
 
 const LOGS_COLLECTION = 'agent_logs_v3'; // Nome da coleção incrementado
 
