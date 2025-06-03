@@ -51,6 +51,7 @@ import {
   Brain,
   Settings2,
   Loader2,
+  ClipboardCopy,
   // Wand2 // Already imported
 } from 'lucide-react';
 

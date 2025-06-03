@@ -11,11 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { SavedAgentConfiguration, WorkflowDetailedType } from '@/types/agent-configs-new'; // Updated import
-import { InfoIcon } from '@/components/ui/InfoIcon'; // Assuming InfoIcon is available
-import { agentBuilderHelpContent } from '@/data/agent-builder-help-content'; // For tooltips
+import type { SavedAgentConfiguration } from '@/types/agent-types'; // Changed import
+import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for now, verify if needed
+import { InfoIcon } from '@/components/ui/InfoIcon';
+import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import { Button } from '@/components/ui/button';
-import { Wand2, Loader2 } from 'lucide-react';
+import { Wand2, Loader2, ClipboardCopy } from 'lucide-react'; // Added ClipboardCopy
+import { toast } from '@/hooks/use-toast'; // Added toast
 
 interface BehaviorTabProps {
   agentToneOptions: string[];
@@ -36,8 +38,25 @@ const workflowDetailedTypeOptions: { label: string; value: WorkflowDetailedType 
 ];
 
 export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSuggestions, isSuggesting }: BehaviorTabProps) {
-  const { control, watch, formState: { errors } } = useFormContext<FormContextType>();
+  const methods = useFormContext<FormContextType>();
+  const { control, watch, getValues } = methods; // Destructure getValues here
   const agentType = watch('config.type');
+
+  const handleCopySystemPrompt = () => {
+    const systemPrompt = getValues().config?.systemPromptGenerated;
+    if (systemPrompt) {
+      navigator.clipboard.writeText(systemPrompt)
+        .then(() => {
+          toast({ title: "Sucesso!", description: "Prompt do sistema copiado para a área de transferência." });
+        })
+        .catch(err => {
+          console.error("Failed to copy system prompt: ", err);
+          toast({ title: "Erro", description: "Falha ao copiar o prompt do sistema.", variant: "destructive" });
+        });
+    } else {
+      toast({ title: "Atenção", description: "Nenhum prompt do sistema gerado para copiar.", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -203,6 +222,21 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
                <p className="text-xs text-muted-foreground mt-2">
                 Certifique-se de que o "Agent Goal" e "Agent Tasks" estejam preenchidos para melhores sugestões.
               </p>
+            </div>
+          )}
+
+          {/* Copy System Prompt Button */}
+          {agentType === 'llm' && (
+            <div className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopySystemPrompt}
+              >
+                <ClipboardCopy className="mr-2 h-4 w-4" />
+                Copiar Prompt do Sistema
+              </Button>
             </div>
           )}
         </>
