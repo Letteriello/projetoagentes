@@ -65,6 +65,35 @@ export default {
   				ring: 'hsl(var(--sidebar-ring))'
   			}
   		},
+		spacing: {
+			'spacing-xxs': '0.125rem',
+			'spacing-xs': '0.25rem',
+			'spacing-xs-plus': '0.375rem',
+			'spacing-sm': '0.5rem',
+			'spacing-sm-plus': '0.625rem',
+			'spacing-sm-plus-plus': '0.75rem',
+			'spacing-sm-lgish': '0.875rem',
+			'spacing-md': '1rem',
+			'spacing-lg': '1.5rem',
+			'spacing-xl': '2rem',
+			'spacing-xl-plus': '2.25rem',
+			'spacing-2xl': '2.5rem',
+			'spacing-2xl-plus': '2.75rem',
+			'spacing-3xl': '3rem'
+		},
+		fontSize: {
+			'font-size-xs': '0.75rem',
+			'font-size-sm': '0.875rem',
+			'font-size-base': '1rem',
+			'font-size-lg': '1.125rem',
+			'font-size-xl': '1.25rem',
+			'font-size-2xl': '1.5rem'
+		},
+		boxShadow: {
+			'shadow-sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+			'shadow-md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+			'shadow-lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'
+		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
