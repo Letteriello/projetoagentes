@@ -255,7 +255,7 @@ export const standardTools: AvailableTool[] = [
  */
 const mcpToolsWithIcons: AvailableTool[] = mcpTools.map(tool => ({
   ...tool,
-  icon: getIconComponent((tool as any).iconName as string)
+  icon: getIconComponent(tool.iconName) // Removed 'as any' and 'as string', tool.iconName is string | undefined
 }));
 
 /**
