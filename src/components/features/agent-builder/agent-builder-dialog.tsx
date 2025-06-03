@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge'; // Import Badge
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -53,6 +54,7 @@ import {
   Settings2,
   Loader2,
   ClipboardCopy,
+  Undo2, // Import Undo2
   // Wand2 // Already imported
 } from 'lucide-react';
 
@@ -398,9 +400,16 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         <FormProvider {...methods}>
           <form onSubmit={methods.handleSubmit(onSubmit)}>
             <DialogHeader className="p-6 pb-4 border-b">
-              <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
+              <div className="flex items-center">
+                <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
+                {editingAgent && (
+                  <Badge variant="outline" className="ml-3 text-sm">
+                    Editando: {editingAgent.agentName}
+                  </Badge>
+                )}
+              </div>
               <DialogDescription>
-                {editingAgent ? `Modifique as configurações do agente "${editingAgent.agentName}".` : "Configure um novo agente inteligente para suas tarefas."}
+                {editingAgent ? `Modifique as configurações do agente.` : "Configure um novo agente inteligente para suas tarefas."}
               </DialogDescription>
               <input
                 type="file"
@@ -794,6 +803,23 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                   <DialogClose asChild>
                     <Button variant="outline" type="button">Cancelar</Button>
                   </DialogClose>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      if (editingAgent) {
+                        methods.reset(prepareFormDefaultValues(editingAgent));
+                        toast({
+                          title: "Alterações Revertidas",
+                          description: "Os dados do formulário foram revertidos para o original.",
+                        });
+                      }
+                    }}
+                    className="mr-2" // Added margin for spacing
+                  >
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Reverter
+                  </Button>
                   <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
                     {methods.formState.isSubmitting ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -19,6 +19,7 @@ import {
   Info,
   MessageSquareText,
   Edit3,
+  Ghost, // Added Ghost icon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
@@ -52,6 +53,7 @@ import { HelpModal } from '@/components/ui/HelpModal';
 import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-builder-help-content';
 import { FeedbackButton } from "@/components/features/agent-builder/feedback-button";
 import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -312,7 +314,23 @@ export default function AgentBuilderPage() {
               <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
             </Button>
           </div>
-          {isLoadingAgents && <p className="text-center py-4">Carregando agentes...</p>}
+          {isLoadingAgents && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="p-4 rounded-lg border border-border bg-card space-y-4 h-[210px] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Skeleton className="h-10 w-10 rounded-md" />
+                      <Skeleton className="h-5 w-1/2" />
+                    </div>
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              ))}
+            </div>
+          )}
           {!isLoadingAgents && savedAgents.length > 0 ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -335,13 +353,19 @@ export default function AgentBuilderPage() {
             </div>
           ) : (
             !isLoadingAgents && (
-              <div className="text-center py-12 border-2 border-dashed border-border rounded-lg bg-card">
-                <Layers className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-medium text-foreground">
-                  Nenhum agente criado ainda
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Use o botão "Novo Agente (Formulário)" acima ou alterne para "Conversar com IA" para criar seu primeiro agente.
+              <div className="text-center py-16 border-2 border-dashed border-border rounded-lg bg-card shadow-sm">
+                <Ghost className="mx-auto h-20 w-20 text-muted-foreground/70" />
+                <h2 className="mt-6 text-xl font-semibold text-foreground">
+                  Crie seu Primeiro Agente Inteligente
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+                  Agentes são assistentes de IA personalizados que você pode construir para realizar tarefas específicas, automatizar processos ou interagir de formas únicas. Comece agora mesmo!
+                </p>
+                <Button onClick={handleOpenCreateAgentModal} className="mt-6">
+                  <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
+                </Button>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Ou alterne para "Conversar com IA" para uma criação guiada.
                 </p>
               </div>
             )

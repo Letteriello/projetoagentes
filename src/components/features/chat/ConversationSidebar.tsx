@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
+import { MessageSquarePlus } from "lucide-react"; // Import the icon
 
 // TODO: Move AgentSelectItem to a shared types file
 interface AgentSelectItem {
@@ -190,13 +191,19 @@ export function ConversationSidebar({
             </button>
 
             {/* Conversation List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar-dark -mr-2 pr-2">
+            <div className="flex-1 overflow-y-auto custom-scrollbar-dark -mr-2 pr-2 flex flex-col">
               {" "}
-              {/* Negative margin for scrollbar */}
+              {/* Negative margin for scrollbar, and flex for centering empty state */}
               {conversations.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center mt-4">
-                  No chats yet. Click 'New Chat' to start.
-                </p>
+                <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
+                  <MessageSquarePlus className="w-12 h-12 text-gray-500 mb-3" />
+                  <h3 className="text-md font-semibold text-gray-300 mb-1">
+                    Inicie uma Nova Conversa
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    Clique no botão "New Chat" acima para começar um novo diálogo.
+                  </p>
+                </div>
               ) : (
                 <ul className="space-y-1">
                   {conversations.map((conv) => (
