@@ -18,6 +18,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2
+} from "lucide-react"; // Added icons
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
@@ -132,6 +136,15 @@ function DatePicker({ date, setDate, placeholder }: { date?: Date, setDate: (dat
   );
 }
 
+// Helper component for consistent empty states
+const EmptyStateDisplay = ({ icon: Icon, title, message, suggestion }: { icon: React.ElementType, title: string, message: string, suggestion?: string }) => (
+  <div className="flex flex-col items-center justify-center text-center py-10 md:py-16">
+    <Icon className="w-12 h-12 text-muted-foreground/70 mb-4" />
+    <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+    <p className="text-sm text-muted-foreground max-w-md">{message}</p>
+    {suggestion && <p className="text-xs text-muted-foreground/80 mt-2">{suggestion}</p>}
+  </div>
+);
 
 export default function AgentMonitorPage() {
   const [filters, setFilters] = useState<Filters>(initialFilters);
@@ -592,9 +605,20 @@ export default function AgentMonitorPage() {
       {/* Agent Status Summary */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Agent Status Overview</h2>
-        {agentStatusLoading && <p className="text-center py-4 text-muted-foreground">Loading agent status...</p>}
-        {agentStatusError && <p className="text-red-500 text-center py-4">{agentStatusError}</p>}
-        {!agentStatusLoading && !agentStatusError && agentStatusData.length > 0 && (
+        {agentStatusLoading ? (
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div>
+              <Skeleton className="h-8 w-1/4 mx-auto mb-2" />
+              <Skeleton className="h-4 w-1/2 mx-auto" />
+            </div>
+            <div>
+              <Skeleton className="h-8 w-1/4 mx-auto mb-2" />
+              <Skeleton className="h-4 w-1/2 mx-auto" />
+            </div>
+          </div>
+        ) : agentStatusError ? (
+          <p className="text-red-500 text-center py-4">{agentStatusError}</p>
+        ) : agentStatusData.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 text-center">
             <div>
               <p className="text-3xl font-bold text-green-500">{agentStatusData.filter(a => a.isActive).length}</p>
@@ -607,16 +631,22 @@ export default function AgentMonitorPage() {
           </div>
         )}
          {!agentStatusLoading && !agentStatusError && agentStatusData.length === 0 && (
-          <p className="text-center py-4 text-muted-foreground">No agent status data available.</p>
+          <EmptyStateDisplay
+            icon={Activity}
+            title="Nenhum Status de Agente"
+            message="Não há dados de status de agente disponíveis no momento."
+          />
         )}
       </div>
 
       {/* Execution History Chart */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Execution History (Mock Data)</h2>
-        {executionHistoryLoading && <p className="text-center py-10 text-muted-foreground">Loading chart...</p>}
-        {executionHistoryError && <p className="text-red-500 text-center py-10">{executionHistoryError}</p>}
-        {!executionHistoryLoading && !executionHistoryError && executionHistoryData.length > 0 && (
+        {executionHistoryLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : executionHistoryError ? (
+          <p className="text-red-500 text-center py-10">{executionHistoryError}</p>
+        ) : executionHistoryData.length > 0 ? (
           <ChartContainer config={executionHistoryChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
@@ -637,16 +667,22 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!executionHistoryLoading && !executionHistoryError && executionHistoryData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No execution history data available.</p>
+          <EmptyStateDisplay
+            icon={ListX}
+            title="Nenhum Histórico de Execução"
+            message="Não há dados de histórico de execução disponíveis."
+          />
         )}
       </div>
 
       {/* Average Response Time Chart (Mock) */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Average Response Times (Mock Data)</h2>
-        {averageResponseTimeLoading && <p className="text-center py-10 text-muted-foreground">Loading chart...</p>}
-        {averageResponseTimeError && <p className="text-red-500 text-center py-10">{averageResponseTimeError}</p>}
-        {!averageResponseTimeLoading && !averageResponseTimeError && averageResponseTimeData.length > 0 && (
+        {averageResponseTimeLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : averageResponseTimeError ? (
+          <p className="text-red-500 text-center py-10">{averageResponseTimeError}</p>
+        ) : averageResponseTimeData.length > 0 ? (
           <ChartContainer config={averageResponseTimeChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={averageResponseTimeData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -664,16 +700,22 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!averageResponseTimeLoading && !averageResponseTimeError && averageResponseTimeData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No average response time data available.</p>
+          <EmptyStateDisplay
+            icon={LineChart}
+            title="Nenhum Dado de Tempo de Resposta"
+            message="Não há dados de tempo médio de resposta disponíveis."
+          />
         )}
       </div>
 
       {/* Tool Usage Metrics Chart (Mock) */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Tool Usage Metrics (Mock Data)</h2>
-        {toolUsageMetricsLoading && <p className="text-center py-10 text-muted-foreground">Loading chart...</p>}
-        {toolUsageMetricsError && <p className="text-red-500 text-center py-10">{toolUsageMetricsError}</p>}
-        {!toolUsageMetricsLoading && !toolUsageMetricsError && toolUsageMetricsData.length > 0 && (
+        {toolUsageMetricsLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : toolUsageMetricsError ? (
+          <p className="text-red-500 text-center py-10">{toolUsageMetricsError}</p>
+        ) : toolUsageMetricsData.length > 0 ? (
           <ChartContainer config={toolUsageMetricsChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={toolUsageMetricsData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -688,16 +730,22 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!toolUsageMetricsLoading && !toolUsageMetricsError && toolUsageMetricsData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No tool usage metrics data available.</p>
+          <EmptyStateDisplay
+            icon={PieChart}
+            title="Nenhuma Métrica de Uso de Ferramenta"
+            message="Não há métricas de uso de ferramenta disponíveis."
+          />
         )}
       </div>
 
       {/* Existing charts below - these are driven by API and filters */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Agent Usage Frequency</h2>
-        {agentUsageLoading && <p className="text-center py-10">Loading chart...</p>}
-        {agentUsageError && <p className="text-red-500 text-center py-10">Error loading agent usage: {agentUsageError}</p>}
-        {!agentUsageLoading && !agentUsageError && agentUsageData.length > 0 && (
+        {agentUsageLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : agentUsageError ? (
+          <p className="text-red-500 text-center py-10">Error loading agent usage: {agentUsageError}</p>
+        ) : agentUsageData.length > 0 ? (
           <ChartContainer config={agentUsageChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={agentUsageData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -715,16 +763,23 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!agentUsageLoading && !agentUsageError && agentUsageData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No data available for the selected filters.</p>
+          <EmptyStateDisplay
+            icon={BarChartBig}
+            title="Nenhum Uso de Agente"
+            message="Nenhum dado de uso de agente disponível para os filtros selecionados."
+            suggestion="Tente ajustar os filtros ou aguarde novos dados."
+          />
         )}
       </div>
       
       {/* Keep other placeholders for now */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Flow Usage Frequency</h2>
-        {flowUsageLoading && <p className="text-center py-10">Loading chart...</p>}
-        {flowUsageError && <p className="text-red-500 text-center py-10">Error loading flow usage: {flowUsageError}</p>}
-        {!flowUsageLoading && !flowUsageError && flowUsageData.length > 0 && (
+        {flowUsageLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : flowUsageError ? (
+          <p className="text-red-500 text-center py-10">Error loading flow usage: {flowUsageError}</p>
+        ) : flowUsageData.length > 0 ? (
           <ChartContainer config={flowUsageChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={flowUsageData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -739,15 +794,22 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!flowUsageLoading && !flowUsageError && flowUsageData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No data available for the selected filters.</p>
+          <EmptyStateDisplay
+            icon={BarChartBig}
+            title="Nenhum Uso de Fluxo"
+            message="Nenhum dado de uso de fluxo disponível para os filtros selecionados."
+            suggestion="Tente ajustar os filtros ou aguarde novos dados."
+          />
         )}
       </div>
 
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Tool Usage Frequency</h2>
-        {toolUsageLoading && <p className="text-center py-10">Loading chart...</p>}
-        {toolUsageError && <p className="text-red-500 text-center py-10">Error loading tool usage: {toolUsageError}</p>}
-        {!toolUsageLoading && !toolUsageError && toolUsageData.length > 0 && (
+        {toolUsageLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : toolUsageError ? (
+          <p className="text-red-500 text-center py-10">Error loading tool usage: {toolUsageError}</p>
+        ) : toolUsageData.length > 0 ? (
           <ChartContainer config={toolUsageChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={toolUsageData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -762,15 +824,22 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!toolUsageLoading && !toolUsageError && toolUsageData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No data available for the selected filters.</p>
+          <EmptyStateDisplay
+            icon={BarChartBig}
+            title="Nenhum Uso de Ferramenta"
+            message="Nenhum dado de uso de ferramenta disponível para os filtros selecionados."
+            suggestion="Tente ajustar os filtros ou aguarde novos dados."
+          />
         )}
       </div>
       
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Error Rates (by Flow Name)</h2>
-        {errorRatesLoading && <p className="text-center py-10">Loading chart...</p>}
-        {errorRatesError && <p className="text-red-500 text-center py-10">Error loading error rates: {errorRatesError}</p>}
-        {!errorRatesLoading && !errorRatesError && errorRatesData.length > 0 && (
+        {errorRatesLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : errorRatesError ? (
+          <p className="text-red-500 text-center py-10">Error loading error rates: {errorRatesError}</p>
+        ) : errorRatesData.length > 0 ? (
           <ChartContainer config={errorRatesChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={errorRatesData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -785,15 +854,22 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!errorRatesLoading && !errorRatesError && errorRatesData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No data available for the selected filters.</p>
+          <EmptyStateDisplay
+            icon={ShieldAlert}
+            title="Nenhuma Taxa de Erro"
+            message="Nenhuma taxa de erro disponível para os filtros selecionados."
+            suggestion="Tente ajustar os filtros ou aguarde novos dados."
+          />
         )}
       </div>
 
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Average Response Times (by Flow Name)</h2>
-        {avgResponseTimesLoading && <p className="text-center py-10">Loading chart...</p>}
-        {avgResponseTimesError && <p className="text-red-500 text-center py-10">Error loading average response times: {avgResponseTimesError}</p>}
-        {!avgResponseTimesLoading && !avgResponseTimesError && avgResponseTimesData.length > 0 && (
+        {avgResponseTimesLoading ? (
+          <Skeleton className="h-[300px] w-full rounded-md" />
+        ) : avgResponseTimesError ? (
+          <p className="text-red-500 text-center py-10">Error loading average response times: {avgResponseTimesError}</p>
+        ) : avgResponseTimesData.length > 0 ? (
           <ChartContainer config={avgResponseTimesChartConfig} className="min-h-[200px] w-full">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={avgResponseTimesData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -808,7 +884,12 @@ export default function AgentMonitorPage() {
           </ChartContainer>
         )}
         {!avgResponseTimesLoading && !avgResponseTimesError && avgResponseTimesData.length === 0 && (
-          <p className="text-center py-10 text-muted-foreground">No data available for the selected filters.</p>
+          <EmptyStateDisplay
+            icon={LineChart}
+            title="Nenhum Tempo de Resposta"
+            message="Nenhum dado de tempo médio de resposta disponível para os filtros selecionados."
+            suggestion="Tente ajustar os filtros ou aguarde novos dados."
+          />
         )}
       </div>
 
@@ -819,9 +900,32 @@ export default function AgentMonitorPage() {
             <h2 className="text-xl font-semibold">Trace Details for ID: {currentTraceId}</h2>
             <Button variant="outline" size="sm" onClick={() => { setCurrentTraceId(''); setTraceData([]); setTraceError(null); }}>Clear Trace</Button>
           </div>
-          {traceLoading && <p className="text-center py-10">Loading trace details...</p>}
-          {traceError && <p className="text-red-500 text-center py-10">Error loading trace: {traceError}</p>}
-          {!traceLoading && !traceError && traceData.length > 0 && (
+          {traceLoading ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full"> {/* Use table-fixed if desired, but might not be necessary for skeletons */}
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th scope="col" className="w-[200px] px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Timestamp</th>
+                    <th scope="col" className="w-[100px] px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
+                    <th scope="col" className="w-[250px] px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Flow / Agent</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-background divide-y divide-border">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <tr key={`skel-trace-${index}`}>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-3/4" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-20" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-5/6" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-full" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : traceError ? (
+            <p className="text-red-500 text-center py-10">Error loading trace: {traceError}</p>
+          ) : traceData.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-border table-fixed">
                 <thead className="bg-muted/50">
@@ -885,24 +989,43 @@ export default function AgentMonitorPage() {
             </div>
           )}
           {!traceLoading && !traceError && currentTraceId && traceData.length === 0 && (
-            <p className="text-center py-10 text-muted-foreground">No logs found for Trace ID: {currentTraceId}</p>
+            <EmptyStateDisplay
+              icon={FileQuestion}
+              title="Nenhum Detalhe de Trace"
+              message={`Nenhum log encontrado para o Trace ID: ${currentTraceId}.`}
+              suggestion="Verifique o ID do trace ou tente um diferente."
+            />
           )}
         </div>
       )}
 
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Log Viewer</h2>
-        <p>Raw logs with filtering and pagination will be displayed here.</p>
+        <EmptyStateDisplay
+          icon={ScrollText}
+          title="Visualizador de Logs"
+          message="Os logs brutos com filtros e paginação serão exibidos aqui assim que a funcionalidade for implementada."
+        />
       </div>
 
       <div className="bg-card p-6 rounded-lg shadow mb-8"> {/* Added mb-8 for spacing */}
-        <h2 className="text-xl font-semibold mb-4">Log Viewer</h2>
-        <p className="text-muted-foreground">Raw logs with filtering and pagination will be displayed here. (Functionality to be fully implemented based on API)</p>
+        <h2 className="text-xl font-semibold mb-4">Log Viewer (Alternativo)</h2> {/* Renamed title for clarity if they are different sections */}
+         <EmptyStateDisplay
+          icon={Inbox} // Using a different icon for variety if this is a distinct section
+          title="Visualizador de Logs Detalhado"
+          message="Uma visualização mais detalhada dos logs, possivelmente com análise avançada, aparecerá aqui."
+          suggestion="Funcionalidade a ser implementada com base na API de logs."
+        />
       </div>
 
       <div className="bg-card p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Detailed Statistics (API Driven)</h2>
-        <p className="text-muted-foreground">Specific metrics like usage frequency, error rates, and response times based on actual log data will be shown here once API calls are fully filtered and connected to these charts.</p>
+        <EmptyStateDisplay
+          icon={Table2}
+          title="Estatísticas Detalhadas"
+          message="Métricas específicas baseadas em dados de log reais serão exibidas aqui quando a integração API estiver completa."
+          suggestion="Aguarde a implementação completa da API para visualização de dados."
+        />
       </div>
     </div>
   );

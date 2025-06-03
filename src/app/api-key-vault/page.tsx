@@ -71,6 +71,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ApiKeyVaultEntry } from "@/types/apiKeyVaultTypes"; // Import the main type
+import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 // Use ApiKeyVaultEntry directly
 const initialApiKeys: ApiKeyVaultEntry[] = [];
@@ -89,6 +90,7 @@ const SERVICE_TYPE_OPTIONS = [
 
 export default function ApiKeyVaultPage() {
   const [apiKeys, setApiKeys] = React.useState<ApiKeyVaultEntry[]>(initialApiKeys);
+  const [isLoadingApiKeys, setIsLoadingApiKeys] = React.useState(true); // Added loading state
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
 
   // RHF for "Add New Key" Dialog
@@ -312,6 +314,7 @@ export default function ApiKeyVaultPage() {
 
   React.useEffect(() => {
     const fetchKeys = async () => {
+      setIsLoadingApiKeys(true); // Set loading true at the start
       try {
         const response = await fetch("/api/apikeys");
         if (!response.ok) {
@@ -328,6 +331,8 @@ export default function ApiKeyVaultPage() {
         console.error("Failed to fetch API keys:", error);
         setApiKeys([]); // Ensure it's an empty array on error
         // toast({ title: "Erro ao Carregar", description: "Não foi possível carregar as configurações de chave API.", variant: "destructive" });
+      } finally {
+        setIsLoadingApiKeys(false); // Set loading false in finally block
       }
     };
     fetchKeys();
@@ -458,10 +463,40 @@ export default function ApiKeyVaultPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {apiKeys.length === 0 ? (
+              {isLoadingApiKeys ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <TableRow key={`skeleton-${index}`}>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <div className="flex justify-end space-x-2">
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : apiKeys.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    Nenhuma configuração de chave API registrada ainda.
+                  <TableCell colSpan={5} className="py-10 md:py-16">
+                    <div className="flex flex-col items-center justify-center space-y-3 text-center">
+                      <KeyRound className="h-16 w-16 text-muted-foreground/70" />
+                      <h2 className="text-xl font-medium text-foreground">
+                        Nenhuma Chave API Configurada
+                      </h2>
+                      <p className="text-sm text-muted-foreground max-w-md">
+                        As chaves API permitem que seus agentes se conectem e interajam com serviços externos. Adicione sua primeira chave para começar.
+                      </p>
+                      <Button onClick={() => {
+                        addKeyMethods.reset(); // Ensure form is reset
+                        setIsAddKeyDialogOpen(true);
+                      }} className="mt-2">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Adicionar Chave API
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 import { ChatMessageUI } from '@/types/chat';
 import { forwardRef, useRef, useEffect } from 'react';
 import SimplerChatMessage from './SimplerChatMessage';
@@ -93,23 +94,18 @@ const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
               className={cn("flex items-end gap-2.5 justify-start w-full")}
             >
               <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
-                <Bot className="h-5 w-5 text-primary animate-pulse" />
+                <Bot className="h-5 w-5 text-primary" />
               </div>
-              <div className="p-3 rounded-lg bg-card max-w-[70%] shadow-sm rounded-bl-none border border-border/50">
-                <span className="flex gap-1 items-center text-sm text-muted-foreground animate-pulse">
-                  <span>D</span>
-                  <span>i</span>
-                  <span>g</span>
-                  <span>i</span>
-                  <span>t</span>
-                  <span>a</span>
-                  <span>n</span>
-                  <span>d</span>
-                  <span>o</span>
+              <div className="p-3 rounded-lg bg-card max-w-[70%] shadow-sm rounded-bl-none border border-border/50 space-y-2">
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="h-4 w-3/5" />
+                {/* Optional: Keep "Digitando..." alongside or remove if Skeleton is enough */}
+                {/* <span className="flex gap-1 items-center text-xs text-muted-foreground/80 animate-pulse">
+                  <span>D</span><span>i</span><span>g</span><span>i</span><span>t</span><span>a</span><span>n</span><span>d</span><span>o</span>
                   <span className="animate-bounce" style={{ animationDelay: "0s" }}>.</span>
                   <span className="animate-bounce" style={{ animationDelay: "0.15s" }}>.</span>
                   <span className="animate-bounce" style={{ animationDelay: "0.3s" }}>.</span>
-                </span>
+                </span> */}
               </div>
             </motion.div>
           )}
