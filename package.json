@@ -73,6 +73,7 @@
     "recharts": "^2.15.1",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
+    "setimmediate": "^1.0.5",
     "stream-http": "^3.2.0",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",

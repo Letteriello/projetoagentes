@@ -35,7 +35,7 @@ export const winstonLogger = createLogger({
   ],
 });
 
-// Example usage (optional, can be removed)
-winstonLogger.info('This is an informational message.');
-winstonLogger.error('This is an error message with a stack trace.', new Error('Example Error'));
-winstonLogger.warn('This is a warning message with extra data.', { data1: 'value1', data2: 'value2' });
+// Exemplo de uso (removido para evitar execução no lado do cliente)
+// winstonLogger.info('Mensagem informativa');
+// winstonLogger.error('Mensagem de erro', new Error('Erro de exemplo'));
+// winstonLogger.warn('Aviso com dados adicionais', { dado1: 'valor1', dado2: 'valor2' });

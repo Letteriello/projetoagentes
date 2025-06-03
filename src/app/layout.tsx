@@ -9,6 +9,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { EnvironmentProvider } from '@/contexts/EnvironmentContext';
+import { LoggerProvider } from '@/components/logger-provider';
 
 // Import polyfills for Node.js modules in browser environment
 import '@/lib/polyfills';
@@ -67,20 +68,24 @@ export default function RootLayout({
         <NodePolyfillScript />
       </head>
       <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
-        <AuthProvider>
-          <ThemeProvider>
-            <EnvironmentProvider>
-              <AgentsProvider>
-                <SidebarProvider defaultOpen>
-                  <AppLayout>
-                    <ErrorBoundaryClient>{children}</ErrorBoundaryClient>
-                  </AppLayout>
-                </SidebarProvider>
-              </AgentsProvider>
-              <Toaster />
-            </EnvironmentProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <LoggerProvider>
+            <AuthProvider>
+              <EnvironmentProvider>
+                <AgentsProvider>
+                  <SidebarProvider>
+                    <AppLayout>
+                      <ErrorBoundaryClient>
+                        {children}
+                      </ErrorBoundaryClient>
+                    </AppLayout>
+                  </SidebarProvider>
+                </AgentsProvider>
+              </EnvironmentProvider>
+            </AuthProvider>
+            <Toaster />
+          </LoggerProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
