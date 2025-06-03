@@ -1,8 +1,8 @@
 // src/lib/logger.ts
-import { instrumentation } from '@genkit-ai/core';
 
 // Definição do tipo Flow para uso no logger
 type Flow<Req, Res> = (input: Req, context?: any) => Promise<Res>;
+
 // Importação condicional do firebaseAdmin (apenas no servidor)
 let admin: any;
 let firestore: any;
@@ -39,7 +39,7 @@ async function writeLogToFirestore(logEntry: Omit<LogEntry, 'timestamp'>) {
     });
   } catch (error) {
     console.error('Failed to write log to Firestore:', error);
-    console.log('[FALLBACK_LOG]', { ...logEntry, timestamp: admin.firestore.Timestamp.now(), errorDetails: String(error) });
+    console.log('[FALLBACK_LOG]', { ...logEntry, timestamp: new Date().toISOString(), errorDetails: String(error) });
   }
 }
 
@@ -53,6 +53,7 @@ export const enhancedLogger = {
       data: { input: input },
     });
   },
+  
   logEnd: async (flowName: string, agentId?: string, output?: any) => {
     await writeLogToFirestore({
       flowName: flowName,
@@ -62,99 +63,42 @@ export const enhancedLogger = {
       data: { output: output },
     });
   },
-  logToolCall: async (flowName: string, agentId?: string, toolName?: string, input?: any, output?: any) => {
+  
+  logToolCall: async (flowName: string, agentId?: string, toolName?: string, input?: any) => {
     await writeLogToFirestore({
       flowName: flowName,
       agentId: agentId,
       type: 'tool_call',
       traceId: undefined,
-      data: { toolName: toolName, input: input, output: output },
+      data: { 
+        tool: toolName,
+        input: input 
+      },
     });
   },
-  logError: async (flowName: string, agentId?: string, error?: any, details?: any) => {
+  
+  logError: async (flowName: string, agentId?: string, error?: Error, details?: any) => {
     await writeLogToFirestore({
-      flowName: flowName,
-      agentId: agentId,
+      flowName,
+      agentId,
       type: 'error',
       traceId: undefined,
       data: {
         error: error ? { name: error.name, message: error.message, stack: error.stack } : 'Unknown error',
-        details: details,
+        details,
       },
     });
   },
+  
   logInfo: async (flowName: string, agentId?: string, message?: string, data?: any) => {
     await writeLogToFirestore({
-      flowName: flowName,
-      agentId: agentId,
+      flowName,
+      agentId,
       type: 'info',
       traceId: undefined,
-      data: { message: message, ...data },
+      data: { message, ...data },
     });
   },
-};
-    { tag: 'enhancedLogger.logEnd' },
-    async (flowName: string, agentId?: string, output?: any) => {
-      const traceId = instrumentation.getTraceId();
-      await writeLogToFirestore({
-        flowName,
-        agentId,
-        type: 'end',
-        traceId,
-        data: { output },
-      });
-    }
-  ),
-
-  logToolCall: instrumentation.instrument(
-    { tag: 'enhancedLogger.logToolCall' },
-    async (
-      flowName: string,
-      agentId?: string,
-      toolName?: string,
-      input?: any,
-      output?: any
-    ) => {
-      const traceId = instrumentation.getTraceId();
-      await writeLogToFirestore({
-        flowName,
-        agentId,
-        type: 'tool_call',
-        traceId,
-        data: { toolName, input, output },
-      });
-    }
-  ),
-
-  logError: instrumentation.instrument(
-    { tag: 'enhancedLogger.logError' },
-    async (flowName: string, agentId?: string, error?: any, details?: any) => {
-      const traceId = instrumentation.getTraceId();
-      await writeLogToFirestore({
-        flowName,
-        agentId,
-        type: 'error',
-        traceId,
-        data: {
-          error: error ? { name: error.name, message: error.message, stack: error.stack } : 'Unknown error',
-          details,
-        },
-      });
-    }
-  ),
-  logInfo: instrumentation.instrument(
-    { tag: 'enhancedLogger.logInfo' },
-    async (flowName: string, agentId?: string, message?: string, data?: any) => {
-      const traceId = instrumentation.getTraceId();
-      await writeLogToFirestore({
-        flowName,
-        agentId,
-        type: 'info',
-        traceId,
-        data: { message, ...data },
-      });
-    }
-  ),
 };
 
 // Função auxiliar para criar um fluxo logável

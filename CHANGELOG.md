@@ -6,4 +6,11 @@
 - Desabilitados temporariamente tooltips no `SidebarMenuButton` para eliminar ciclo de refs do Radix UI.
 - Melhorias garantem maior estabilidade e previnem loops de renderização.
 
+### Logger: corrigidos erros de importação e sintaxe
+- Reescrito completamente o arquivo `src/lib/logger.ts` para remover dependência de `instrumentation` do Genkit.
+- Implementadas funções de log assíncronas simples e diretas, sem tracing externo.
+- Mantida compatibilidade com Firestore para armazenamento de logs.
+- Preservada a API pública do logger para manter compatibilidade com o código existente.
+- Correções garantem funcionamento correto e evitam erros de TypeScript.
+
 ---
