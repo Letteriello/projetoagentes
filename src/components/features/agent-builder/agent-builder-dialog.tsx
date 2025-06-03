@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 // Label replaced by FormLabel where appropriate
 import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
+import { toast } from '@/hooks/use-toast';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   FormField,
@@ -236,17 +237,45 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   }, [editingAgent, methods]); // methods should be in dependency array if it could change, but typically it doesn't for useForm.
 
   const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (data) => {
-    // Ensure timestamps and versions are correctly handled before saving
-    const now = new Date().toISOString();
-    data.updatedAt = now;
-    if (!data.createdAt) { // If it's a new agent (though default function sets it)
-      data.createdAt = now;
+    const { id: saveToastId, update: updateSaveToast, dismiss: dismissSaveToast } = toast({
+      title: "Saving Agent...",
+      description: "Please wait while the configuration is being saved.",
+      variant: "default",
+    });
+
+    try {
+      // Ensure timestamps and versions are correctly handled before saving
+      const now = new Date().toISOString();
+      data.updatedAt = now;
+      if (!data.createdAt) { // If it's a new agent (though default function sets it)
+        data.createdAt = now;
+      }
+      // internalVersion could be incremented here if logic requires
+      await onSave(data); // Assuming onSave might be async
+
+      updateSaveToast({
+        title: "Success!",
+        description: "Agent configuration saved successfully.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Failed to save agent configuration:", error);
+      updateSaveToast({
+        title: "Error Saving",
+        description: "Failed to save agent configuration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTimeout(() => dismissSaveToast(), 5000);
     }
-    // internalVersion could be incremented here if logic requires
-    onSave(data);
   };
 
   const handleGetAiSuggestions = async () => {
+    const { id: suggestionToastId, update: updateSuggestionToast, dismiss: dismissSuggestionToast } = toast({
+      title: "Fetching AI Suggestions...",
+      description: "Please wait while we generate suggestions.",
+      variant: "default",
+    });
     setIsSuggesting(true);
     setSuggestionError(null);
     setAiSuggestions(null); // Clear previous suggestions
@@ -270,11 +299,23 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       });
       // console.log("AI suggestions received:", response);
       setAiSuggestions(response);
+      updateSuggestionToast({
+        title: "Suggestions Ready",
+        description: "AI suggestions have been loaded.",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Failed to get AI suggestions:", error);
-      setSuggestionError("Falha ao obter sugestões da IA. Verifique o console para mais detalhes.");
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      setSuggestionError(`Falha ao obter sugestões da IA. ${errorMessage}`);
+      updateSuggestionToast({
+        title: "Error Fetching Suggestions",
+        description: suggestionError || "An unknown error occurred.", // Use state value if set, otherwise generic
+        variant: "destructive",
+      });
     } finally {
       setIsSuggesting(false);
+      setTimeout(() => dismissSuggestionToast(), 5000);
     }
   };
 
