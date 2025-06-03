@@ -1,3 +1,4 @@
+// src/components/features/agent-builder/agent-card.tsx
 "use client";
 
 import * as React from "react";
@@ -40,8 +41,9 @@ import {
   EyeOff as EyeOffIcon,
   Save as SaveIcon,
   Crown,
-  LucideIcon, // Added LucideIcon
-  HelpCircle, // Added HelpCircle for default icon
+  LucideIcon,
+  HelpCircle,
+  Star, // Added Star
 } from "lucide-react";
 import {
   Tooltip,
@@ -49,17 +51,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { safeToReactNode } from "@/lib/utils"; // Import safeToReactNode
-// Update type imports to use centralized definitions
+import { safeToReactNode } from "@/lib/utils";
 import type {
   SavedAgentConfiguration,
-  AgentConfig, // General union type
+  AgentConfig,
   LLMAgentConfig,
   WorkflowAgentConfig,
-  CustomAgentConfig, // For casting agent.config
-  // ToolConfigData is not directly used in props but good for context if needed later
-  AvailableTool, // Added AvailableTool here
+  // CustomAgentConfig,  // Marked as unused in provided code, will keep for now
+  AvailableTool,
 } from '@/types/agent-configs-fixed';
+import { cn } from "@/lib/utils";
+
 
 const getToolIconComponent = (
   Icon?: LucideIcon,
@@ -67,24 +69,32 @@ const getToolIconComponent = (
   if (Icon) {
     return Icon;
   }
-  // Return a default icon if no icon is provided
-  return HelpCircle; // Or Cpu if HelpCircle is not preferred
+  return HelpCircle;
 };
+
+// Define CustomAgentConfig locally if not used elsewhere to avoid import errors if it's truly unused globally
+interface CustomAgentConfig extends AgentConfig {
+  customLogicDescription?: string;
+  // Add other fields specific to CustomAgentConfig if any
+}
+
 
 interface AgentCardProps {
   agent: SavedAgentConfiguration;
   onEdit: (agent: SavedAgentConfiguration) => void;
   onTest: (agent: SavedAgentConfiguration) => void;
   onDelete: (agentId: string) => void;
-  onViewMonitoring: (agent: SavedAgentConfiguration) => void; // New prop for monitoring
-  onSaveAsTemplate: (agent: SavedAgentConfiguration) => void; // New prop
-  availableTools: AvailableTool[]; // Necessário para obter o label correto e o ícone da ferramenta
+  onViewMonitoring: (agent: SavedAgentConfiguration) => void;
+  onSaveAsTemplate: (agent: SavedAgentConfiguration) => void;
+  availableTools: AvailableTool[];
   agentTypeOptions: {
     id: string;
     label: string;
     icon?: React.ReactNode;
     description?: string;
   }[];
+  isFavorite?: boolean; // Added
+  onToggleFavorite: (agentId: string, newFavoriteStatus: boolean) => void; // Added
 }
 
 export function AgentCard({
@@ -92,20 +102,17 @@ export function AgentCard({
   onEdit,
   onTest,
   onDelete,
-  onViewMonitoring, // Destructure new prop
-  onSaveAsTemplate, // Destructure new prop
+  onViewMonitoring,
+  onSaveAsTemplate,
   availableTools,
   agentTypeOptions,
+  isFavorite, // Added
+  onToggleFavorite, // Added
 }: AgentCardProps) {
-  /**
-   * Determines if the agent has any tools that require configuration but are not yet configured.
-   * A tool is considered unconfigured if it has `hasConfig: true` and its corresponding entry
-   * in `agent.toolConfigsApplied` is missing or is an empty object.
-   */
   const hasUnconfiguredTools = agent.toolsDetails?.some(
     (toolDetail) => {
       if (!toolDetail.hasConfig) {
-        return false; // Does not require configuration
+        return false;
       }
       const config = agent.toolConfigsApplied?.[toolDetail.id];
       return !config || Object.keys(config).length === 0;
@@ -113,10 +120,10 @@ export function AgentCard({
   ) ?? false;
 
   const agentTypeDetails = agentTypeOptions.find(
-    (opt) => opt.id === agent.config.type, // Access via agent.config.type
+    (opt) => opt.id === agent.config.type,
   );
   const agentTypeLabel =
-    agentTypeDetails?.label.split("(")[0].trim() || agent.config.type; // Access via agent.config.type
+    agentTypeDetails?.label.split("(")[0].trim() || agent.config.type;
 
   let AgentIconComponent: React.ReactNode;
 
@@ -147,7 +154,7 @@ export function AgentCard({
   } else if (agentTypeDetails?.icon) {
     if (React.isValidElement(agentTypeDetails.icon)) {
       AgentIconComponent = React.cloneElement(
-        agentTypeDetails.icon, // No need to cast after isValidElement check
+        agentTypeDetails.icon,
         {
           width: 20,
           height: 20,
@@ -155,9 +162,6 @@ export function AgentCard({
         },
       );
     } else {
-      // Fallback if agentTypeDetails.icon is a ReactNode but not a ReactElement (e.g. string, number)
-      // Or render it directly if it's a simple node, though sizing/className might be an issue.
-      // For now, using a default icon for non-element nodes is safer.
       AgentIconComponent = (
         <HelpCircle
           width={20}
@@ -183,15 +187,10 @@ export function AgentCard({
           {AgentIconComponent}
           <div className="flex-1">
             <div className="flex justify-between items-start mb-1">
-              {/* Wrapper for title and new icons */}
               <div className="flex items-center">
                 <CardTitle className="text-lg font-semibold text-foreground">
                   {safeToReactNode(agent.agentName, "Agente Sem Nome")}
                 </CardTitle>
-                {/**
-                 * Renders a Crown icon with a tooltip if the agent is designated as a root agent.
-                 * This visually indicates the agent's special status in a hierarchy.
-                 */}
                 {agent.config.isRootAgent && (
                   <TooltipProvider>
                     <Tooltip>
@@ -204,11 +203,6 @@ export function AgentCard({
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {/**
-                 * Renders an AlertCircle icon with a tooltip if the agent has one or more tools
-                 * that require configuration but have not yet been configured by the user.
-                 * This serves as a visual warning to prompt the user to complete necessary setups.
-                 */}
                 {hasUnconfiguredTools && (
                   <TooltipProvider>
                     <Tooltip>
@@ -222,12 +216,31 @@ export function AgentCard({
                   </TooltipProvider>
                 )}
               </div>
-              <Badge variant="secondary" className="text-xs h-6">
-                {safeToReactNode(agentTypeLabel)}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-amber-500 h-7 w-7"
+                        onClick={() => onToggleFavorite(agent.id, !isFavorite)}
+                      >
+                        <Star className={cn("h-5 w-5", isFavorite ? "fill-amber-500 text-amber-500" : "text-muted-foreground")} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isFavorite ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Badge variant="secondary" className="text-xs h-6">
+                  {safeToReactNode(agentTypeLabel)}
+                </Badge>
+              </div>
             </div>
             <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
-              {safeToReactNode(agent.description, "Sem descrição.")}
+              {safeToReactNode(agent.agentDescription, "Sem descrição.")}
             </CardDescription>
           </div>
         </div>
@@ -244,8 +257,8 @@ export function AgentCard({
           </div>
         )}
         {(agent.config.type === "llm" ||
-          agent.config.type === "workflow" || // Workflow can also have a model
-          agent.config.type === "custom") && (agent.config as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel && ( // More specific cast
+          agent.config.type === "workflow" ||
+          agent.config.type === "custom") && (agent.config as LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig).agentModel && (
           <div>
             <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">
               Modelo de IA:
@@ -256,16 +269,16 @@ export function AgentCard({
           </div>
         )}
         {agent.config.type === "workflow" &&
-          (agent.config as WorkflowAgentConfig).workflowDescription && (
+          (agent.config as WorkflowAgentConfig).workflowDescription && ( // Assuming workflowDescription exists
             <div>
               <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">
                 Descrição do Fluxo:
               </h4>
               <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
                 {safeToReactNode((agent.config as WorkflowAgentConfig).workflowDescription)}
-                {(agent.config as WorkflowAgentConfig).detailedWorkflowType && (
+                {(agent.config as WorkflowAgentConfig).workflowType && ( // Changed from detailedWorkflowType to workflowType
                   <span className="block text-xs text-primary/70">
-                    Tipo: {safeToReactNode((agent.config as WorkflowAgentConfig).detailedWorkflowType)}
+                    Tipo: {safeToReactNode((agent.config as WorkflowAgentConfig).workflowType)}
                   </span>
                 )}
               </p>
@@ -282,7 +295,7 @@ export function AgentCard({
               </p>
             </div>
           )}
-        {agent.toolsDetails && agent.toolsDetails.length > 0 && ( // Check if toolsDetails exists
+        {agent.toolsDetails && agent.toolsDetails.length > 0 && (
           <div className="pt-2">
             <h4 className="text-sm font-semibold mb-1 text-foreground/80">
               Ferramentas:
@@ -292,52 +305,14 @@ export function AgentCard({
                 const fullTool = availableTools.find(
                   (t) => t.id === toolDetail.id,
                 );
-                // Wrapper de segurança para garantir que nunca renderizamos undefined
-                const renderSafeIcon = (): React.ReactNode => {
-                  try {
-                    // Obter o componente do ícone com função aprimorada
-                    const IconComponent = getToolIconComponent(fullTool?.icon);
-                    // Verificação extra de segurança
-                    return <IconComponent width={12} height={12} />;
-                  } catch (error) {
-                    console.error(
-                      `Erro ao renderizar ícone para ferramenta ${toolDetail.id}:`,
-                      error,
-                    );
-                    // Fallback final para garantir que sempre temos um elemento React válido
-                    return <HelpCircle width={12} height={12} />; // Use HelpCircle or Cpu as fallback
-                  }
-                };
-                const toolIcon = renderSafeIcon();
+                const IconComponent = getToolIconComponent(fullTool?.icon);
+                const toolIcon = <IconComponent width={12} height={12} />;
 
                 const isConfigured =
                   fullTool?.needsConfiguration &&
                   agent.toolConfigsApplied?.[toolDetail.id] &&
-                  ((fullTool.id === "webSearch" &&
-                    agent.toolConfigsApplied[fullTool.id]?.googleApiKey &&
-                    agent.toolConfigsApplied[fullTool.id]?.googleCseId) ||
-                    (fullTool.id === "customApiIntegration" &&
-                      agent.toolConfigsApplied[fullTool.id]?.openapiSpecUrl) ||
-                    (fullTool.id === "databaseAccess" &&
-                      (agent.toolConfigsApplied[fullTool.id]
-                        ?.dbConnectionString ||
-                        (agent.toolConfigsApplied[fullTool.id]?.dbHost &&
-                          agent.toolConfigsApplied[fullTool.id]?.dbName))) ||
-                    (fullTool.id === "knowledgeBase" &&
-                      agent.toolConfigsApplied[fullTool.id]?.knowledgeBaseId) ||
-                    (fullTool.id === "calendarAccess" &&
-                      agent.toolConfigsApplied[fullTool.id]
-                        ?.calendarApiEndpoint) ||
-                    (fullTool.needsConfiguration &&
-                      ![
-                        "webSearch",
-                        "customApiIntegration",
-                        "databaseAccess",
-                        "knowledgeBase",
-                        "calendarAccess",
-                      ].includes(fullTool.id) &&
-                      Object.keys(agent.toolConfigsApplied[fullTool.id] || {})
-                        .length > 0));
+                  Object.keys(agent.toolConfigsApplied[toolDetail.id] || {}).length > 0;
+
                 return (
                   <Badge
                     key={toolDetail.id}
@@ -365,11 +340,7 @@ export function AgentCard({
                         width={10}
                         height={10}
                         className={`ml-1 ${isConfigured ? "text-emerald-500" : "text-sky-500"}`}
-                      >
-                        <title>
-                          {isConfigured ? "Configurada" : "Requer configuração"}
-                        </title>
-                      </ConfigureIcon>
+                      />
                     )}
                   </Badge>
                 );
@@ -388,14 +359,9 @@ export function AgentCard({
         <Button variant="outline" size="sm" onClick={() => onViewMonitoring(agent)}>
           <EyeIcon size={16} className="mr-1.5" /> Monitorar
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex"> {/* Testar button might be hidden on smaller card footers if too many buttons */}
+        <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex">
           <ChatIcon size={16} className="mr-1.5" /> Testar
         </Button>
-        {/* Simplified Test button for very small screens, or adjust layout above */}
-        {/* <Button variant="outline" size="icon" onClick={() => onTest(agent)} className="sm:hidden">
-          <ChatIcon size={16} />
-          <span className="sr-only">Testar</span>
-        </Button> */}
         <Button
           variant="destructive"
           size="sm"
