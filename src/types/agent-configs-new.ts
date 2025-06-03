@@ -10,6 +10,27 @@ export type StatePersistenceType = "session" | "memory" | "database";
 export type ArtifactStorageType = "local" | "cloud" | "memory" | "filesystem";
 export type StateScope = 'GLOBAL' | 'AGENT' | 'TEMPORARY';
 
+// Artifact Interfaces
+export interface ArtifactDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  required?: boolean; // default to false
+  accessPermissions?: 'read' | 'write' | 'read_write'; // default to 'read_write'
+  versioningEnabled?: boolean; // default to false
+  storagePath?: string; // URI/path to the uploaded file
+  fileName?: string; // Original name of the uploaded file
+}
+
+export interface ArtifactsConfig {
+  enabled: boolean;
+  storageType: ArtifactStorageType;
+  cloudStorageBucket?: string;
+  localStoragePath?: string;
+  definitions?: ArtifactDefinition[];
+}
+
 // Interfaces
 export interface ToolConfigField {
   id: string;
@@ -85,6 +106,7 @@ export interface AgentConfigBase {
   statePersistence?: StatePersistenceConfig;
   knowledgeSources?: KnowledgeSource[];
   ragMemoryConfig?: RagMemoryConfig;
+  artifacts?: ArtifactsConfig;
 }
 
 export interface ModelSafetySettingItem {

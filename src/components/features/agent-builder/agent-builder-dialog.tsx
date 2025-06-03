@@ -84,7 +84,8 @@ import type {
   ToolConfigData,
   StatePersistenceConfig,
   RagMemoryConfig,
-  ArtifactsConfig,
+  ArtifactsConfig, // Existing import
+  ArtifactStorageType, // Import for DEFAULT_ARTIFACTS_CONFIG
   A2AConfig as AgentA2AConfig, // Keep alias
   AvailableTool, // Now from agent-types
   AgentType, // Added as per subtask example
@@ -93,6 +94,15 @@ import type {
   // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
   // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
 } from '@/types/agent-types';
+
+// Define a default for ArtifactsConfig to ensure it's always present
+const DEFAULT_ARTIFACTS_CONFIG: ArtifactsConfig = {
+  enabled: false,
+  storageType: 'memory' as ArtifactStorageType, // Default to 'memory'
+  cloudStorageBucket: '',
+  localStoragePath: '',
+  definitions: [],
+};
 
 // Local AgentConfig type is removed.
 // Import the Zod schema
@@ -182,7 +192,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         // Initialize other optional base fields with default 'disabled' states
         statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
         rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
-        artifacts: { enabled: false, storageType: 'memory', definitions: [] },
+        artifacts: { ...DEFAULT_ARTIFACTS_CONFIG }, // Use the defined default
         a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', maxMessageSize: 1024, loggingEnabled: false },
         adkCallbacks: {}, // Initialize empty ADK callbacks
       } as LLMAgentConfig, // Type assertion for the default config
@@ -204,18 +214,26 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     };
   };
 
+  // Helper function to prepare default values ensuring artifacts config is present
+  const prepareFormDefaultValues = (agent?: SavedAgentConfiguration | null): SavedAgentConfiguration => {
+    const baseConfig = agent || createDefaultSavedAgentConfiguration();
+    return {
+      ...baseConfig,
+      config: {
+        ...baseConfig.config,
+        artifacts: baseConfig.config?.artifacts || { ...DEFAULT_ARTIFACTS_CONFIG },
+      },
+    };
+  };
+
   const methods = useForm<SavedAgentConfiguration>({
-    defaultValues: editingAgent || createDefaultSavedAgentConfiguration(),
+    defaultValues: prepareFormDefaultValues(editingAgent),
     resolver: zodResolver(savedAgentConfigurationSchema), // Use Zod schema for validation
   });
 
   React.useEffect(() => {
-    if (editingAgent) {
-      methods.reset(editingAgent);
-    } else {
-      methods.reset(createDefaultSavedAgentConfiguration());
-    }
-  }, [editingAgent, methods]);
+    methods.reset(prepareFormDefaultValues(editingAgent));
+  }, [editingAgent, methods]); // methods should be in dependency array if it could change, but typically it doesn't for useForm.
 
   const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (data) => {
     // Ensure timestamps and versions are correctly handled before saving
