@@ -1,0 +1,541 @@
+import { useState, useEffect, useCallback, useOptimistic } from 'react';
+import { Conversation, ChatMessageUI, Message, MessageFeedback } from '@/types/chat';
+import { User } from 'firebase/auth';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  getAllConversations,
+  getConversationById,
+  createNewConversation,
+  deleteConversationFromStorage,
+  renameConversationInStorage,
+  addMessageToConversation,
+  updateMessageFeedback,
+  deleteMessageFromConversation, // Added for regenerate
+} from '@/lib/firestoreConversationStorage';
+import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { Timestamp } from 'firebase/firestore';
+
+// Define ExtendedChatMessageUI and OptimisticUpdateAction
+export interface ExtendedChatMessageUI extends ChatMessageUI {
+  isStreaming?: boolean;
+  isError?: boolean;
+  imageUrl?: string;
+  fileName?: string;
+}
+
+export type OptimisticUpdateAction =
+  | { type: 'add_message'; message: ExtendedChatMessageUI }
+  | { type: 'update_message_content'; messageId: string; newContentChunk: string }
+  | { type: 'update_message_status'; messageId: string; newStatus: 'completed' | 'error' | 'pending'; newContent?: string; isStreaming?: boolean }
+  | { type: 'remove_message'; messageId: string }
+  | { type: 'set_messages'; messages: ExtendedChatMessageUI[] }
+  | { type: 'update_message_feedback'; messageId: string; feedback: MessageFeedback | null };
+
+export interface ActiveChatTarget {
+  id: string;
+  name: string;
+  type: 'gem' | 'agent' | 'adk-agent';
+  config: any;
+}
+type TestRunConfig = any;
+
+
+export interface ChatStore {
+  conversations: Conversation[];
+  activeConversationId: string | null;
+  messages: ExtendedChatMessageUI[];
+  optimisticMessages: ExtendedChatMessageUI[];
+  isPending: boolean;
+  isLoadingMessages: boolean;
+  isLoadingConversations: boolean;
+  inputContinuation: any;
+  selectedFile: File | null;
+  selectedFileName: string | null;
+  selectedFileDataUri: string | null;
+  currentUserId: string | undefined;
+  inputValue: string;
+
+  setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
+  setActiveConversationId: React.Dispatch<React.SetStateAction<string | null>>;
+  setMessages: React.Dispatch<React.SetStateAction<ExtendedChatMessageUI[]>>;
+  setIsPending: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsLoadingMessages: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsLoadingConversations: React.Dispatch<React.SetStateAction<boolean>>;
+  setInputContinuation: React.Dispatch<React.SetStateAction<any>>;
+  setSelectedFile: React.Dispatch<React.SetStateAction<File | null>>;
+  setSelectedFileName: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedFileDataUri: React.Dispatch<React.SetStateAction<string | null>>;
+  setInputValue: React.Dispatch<React.SetStateAction<string>>;
+
+  handleNewConversation: (defaultTitle?: string) => Promise<Conversation | null>; // Added optional param
+  handleSelectConversation: (conversationId: string) => void;
+  handleDeleteConversation: (conversationId: string) => Promise<void>;
+  handleRenameConversation: (conversationId: string, newTitle: string) => Promise<void>;
+
+  submitMessage: (messageInputValue: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => Promise<void>;
+  handleFeedback: (messageId: string, feedback: MessageFeedback | null) => Promise<void>; // Corrected type
+  handleRegenerate: (messageIdToRegenerate: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => Promise<void>;
+  clearSelectedFile: () => void;
+}
+
+
+export function useChatStore(): ChatStore {
+  const { currentUser } = useAuth();
+  const router = useRouter();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]); // True state from DB
+  const [isPending, setIsPending] = useState<boolean>(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState<boolean>(false);
+  const [inputContinuation, setInputContinuation] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState<string>("");
+  const currentUserId = currentUser?.uid;
+
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<ExtendedChatMessageUI[], OptimisticUpdateAction>(
+    messages, // Initialize optimisticMessages with messages from DB
+    (state, action) => {
+      switch (action.type) {
+        case 'add_message':
+          return [...state, action.message];
+        case 'update_message_content':
+          return state.map(msg =>
+            msg.id === action.messageId ? { ...msg, text: (msg.text || "") + action.newContentChunk, isStreaming: true } : msg
+          );
+        case 'update_message_status':
+          return state.map(msg =>
+            msg.id === action.messageId ? { ...msg, status: action.newStatus, text: action.newContent !== undefined ? action.newContent : msg.text, isStreaming: action.isStreaming !== undefined ? action.isStreaming : false, isError: action.newStatus === 'error' } : msg
+          );
+        case 'remove_message':
+          return state.filter(msg => msg.id !== action.messageId);
+        case 'set_messages':
+          return action.messages; // Used to reset or initialize optimistic messages
+        case 'update_message_feedback':
+          return state.map(msg =>
+            msg.id === action.messageId ? { ...msg, feedback: action.feedback } : msg
+          );
+        default:
+          return state;
+      }
+    }
+  );
+
+  // Effect to update messages (true state) when optimisticMessages change AFTER an action
+  // This is tricky with useOptimistic. The source of truth `messages` should be updated
+  // after successful persistence, not directly from optimisticMessages.
+  // So, setMessages will be called in specific handlers after DB operations.
+
+  useEffect(() => {
+    if (currentUser?.uid) {
+      setIsLoadingConversations(true);
+      getAllConversations(currentUser.uid)
+        .then((fetchedConversations) => {
+          setConversations(fetchedConversations);
+        })
+        .catch((error) => {
+          console.error("Error loading conversations:", error);
+          toast({ title: "Error", description: "Failed to load conversations.", variant: "destructive"});
+        })
+        .finally(() => setIsLoadingConversations(false));
+    }
+  }, [currentUser?.uid]);
+
+  const handleNewConversation = useCallback(async (defaultTitle: string = "New Chat"): Promise<Conversation | null> => {
+    if (!currentUserId) {
+      toast({ title: "Error", description: "User not logged in.", variant: "destructive" });
+      return null;
+    }
+    try {
+      const newConversation = await createNewConversation(currentUserId, defaultTitle);
+      setConversations((prevs) => [newConversation, ...prevs]);
+      setMessages([]);
+      addOptimisticMessage({ type: 'set_messages', messages: [] });
+      router.push(`/chat/${newConversation.id}`);
+      return newConversation;
+    } catch (error) {
+      console.error("Error creating new conversation:", error);
+      toast({ title: "Error", description: "Failed to create new conversation.", variant: "destructive" });
+      return null;
+    }
+  }, [currentUserId, router, addOptimisticMessage]);
+
+  const handleSelectConversation = useCallback(async (conversationId: string) => {
+    setActiveConversationId(conversationId);
+    setIsLoadingMessages(true);
+    setInputContinuation(null);
+
+    try {
+      const conversation = await getConversationById(conversationId);
+      const uiMessages: ExtendedChatMessageUI[] = (conversation?.messages || []).map((dbMessage: Message) => ({
+        id: dbMessage.id || uuidv4(),
+        text: dbMessage.content || "",
+        sender: dbMessage.isUser ? "user" : "agent",
+        timestamp: dbMessage.timestamp ? (dbMessage.timestamp instanceof Date ? dbMessage.timestamp : (dbMessage.timestamp as any).toDate()) : new Date(),
+        status: 'completed',
+        feedback: dbMessage.feedback,
+        isStreaming: false,
+        isError: false,
+        conversationId: conversation?.id
+      }));
+      setMessages(uiMessages); // Set the true state
+      addOptimisticMessage({ type: 'set_messages', messages: uiMessages }); // Sync optimistic state
+    } catch (error) {
+      console.error("Error selecting conversation:", error);
+      toast({ title: "Error", description: "Failed to load conversation messages.", variant: "destructive" });
+      setMessages([]);
+      addOptimisticMessage({ type: 'set_messages', messages: [] });
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [addOptimisticMessage]); // Removed router dependency
+
+  const handleDeleteConversation = useCallback(async (conversationId: string) => {
+    if (!currentUserId) {
+      toast({ title: "Error", description: "User not logged in.", variant: "destructive" }); return;
+    }
+    try {
+      await deleteConversationFromStorage(conversationId);
+      setConversations((prevs) => prevs.filter((conv) => conv.id !== conversationId));
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null);
+        setMessages([]);
+        addOptimisticMessage({ type: 'set_messages', messages: [] });
+        router.push('/chat');
+      }
+      toast({ title: "Success", description: "Conversation deleted." });
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      toast({ title: "Error", description: "Failed to delete conversation.", variant: "destructive" });
+    }
+  }, [currentUserId, activeConversationId, router, addOptimisticMessage]);
+
+  const handleRenameConversation = useCallback(async (conversationId: string, newTitle: string) => {
+    try {
+      await renameConversationInStorage(conversationId, newTitle);
+      setConversations((prevs) => prevs.map((conv) => (conv.id === conversationId ? { ...conv, title: newTitle } : conv)));
+      toast({ title: "Success", description: "Conversation renamed." });
+    } catch (error) {
+      console.error("Error renaming conversation:", error);
+      toast({ title: "Error", description: "Failed to rename conversation.", variant: "destructive" });
+    }
+  }, []);
+
+  useEffect(() => {
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const pathConvId = currentPath.startsWith('/chat/') ? currentPath.split('/')[2] : null;
+
+    if (pathConvId && pathConvId !== activeConversationId) {
+        setActiveConversationId(pathConvId); // Sync activeId from URL
+    }
+
+    // If activeConversationId is set, and messages are not loaded for it (or empty), load them.
+    if (activeConversationId &&
+        (!messages.length || messages[0]?.conversationId !== activeConversationId || messages.some(m => !m.id)) &&
+        !isLoadingMessages) {
+      const conversationExists = conversations.find(c => c.id === activeConversationId);
+      if (conversationExists) {
+        handleSelectConversation(activeConversationId);
+      } else if (conversations.length > 0 && !isLoadingConversations) {
+        // Active ID from URL is invalid/stale, redirect to first valid conversation
+        router.push(`/chat/${conversations[0].id}`);
+      }
+    } else if (!activeConversationId && pathConvId === null && conversations.length > 0 && !isLoadingConversations && !isLoadingMessages) {
+      // No active ID, no ID in path, but conversations are loaded. Select one.
+      const lastActiveConversationId = localStorage.getItem('lastActiveConversationId');
+      const targetConversation = conversations.find(c => c.id === lastActiveConversationId) || conversations[0];
+      if (targetConversation) {
+         router.push(`/chat/${targetConversation.id}`); // Navigate, then this effect will re-run and load
+      }
+    } // Case for no conversations and no active ID: remain on /chat or show empty state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId, conversations, isLoadingConversations, isLoadingMessages, router]); // handleSelectConversation removed from deps
+
+  useEffect(() => {
+    if (activeConversationId) {
+      localStorage.setItem('lastActiveConversationId', activeConversationId);
+    }
+  }, [activeConversationId]);
+
+  const clearSelectedFile = useCallback(() => {
+    setSelectedFile(null); setSelectedFileName(null); setSelectedFileDataUri(null);
+  }, []);
+
+  const submitMessage = async ( messageInputValue: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => {
+    if (!currentUserId) { /* ... */ return; }
+    if (!messageInputValue.trim() && !selectedFile) { /* ... */ return; }
+
+    setIsPending(true);
+    const userMessageId = uuidv4();
+    const userMessageTimestamp = new Date();
+    const userMessagePayload: ExtendedChatMessageUI = {
+      id: userMessageId, text: messageInputValue, sender: "user", status: "pending",
+      timestamp: userMessageTimestamp,
+      imageUrl: selectedFile?.type.startsWith("image/") ? selectedFileDataUri : undefined,
+      fileName: selectedFileName || undefined,
+    };
+    addOptimisticMessage({ type: "add_message", message: userMessagePayload });
+
+    let currentConvId = activeConversationId;
+    if (!currentConvId) {
+      const newConv = await handleNewConversation(activeChatTarget?.name || messageInputValue.substring(0, 30) || "New Chat");
+      if (newConv) currentConvId = newConv.id;
+      else { /* revert, set pending false, return */
+        addOptimisticMessage({ type: "remove_message", messageId: userMessageId });
+        setIsPending(false); return;
+      }
+    }
+    if (!currentConvId) { /* error, revert, set pending false, return */
+        toast({ title: "Error", description: "No active conversation selected.", variant: "destructive" });
+        addOptimisticMessage({ type: "remove_message", messageId: userMessageId });
+        setIsPending(false); return;
+    }
+    userMessagePayload.conversationId = currentConvId; // Add convId after it's confirmed
+
+    try {
+      const userMessageToPersist: Message = {
+        id: userMessageId, isUser: true, content: messageInputValue,
+        timestamp: Timestamp.fromDate(userMessageTimestamp),
+        imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
+        conversationId: currentConvId,
+      };
+      await addMessageToConversation(currentConvId, userMessageToPersist);
+      // Update true `messages` state
+      setMessages(prev => [...prev, { ...userMessagePayload, status: 'completed' }]);
+      addOptimisticMessage({ type: 'update_message_status', messageId: userMessageId, newStatus: 'completed' });
+      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: messageInputValue.substring(0,50) }) : c));
+    } catch (error) { /* error handling, revert optimistic, set pending false */
+        console.error("Error persisting user message:", error);
+        toast({ title: "Error", description: "Failed to send your message.", variant: "destructive" });
+        addOptimisticMessage({ type: "update_message_status", messageId: userMessageId, newStatus: "error", newContent: messageInputValue });
+        setIsPending(false); return;
+    }
+
+    const currentInputForAgent = messageInputValue;
+    const currentFileDataUriForAgent = selectedFileDataUri;
+    setInputValue(""); clearSelectedFile();
+
+    const agentMessageId = uuidv4();
+    const agentMessageTimestamp = new Date();
+    const agentOptimisticPayload: ExtendedChatMessageUI = {
+      id: agentMessageId, text: "", sender: "agent", status: "pending",
+      isStreaming: true, timestamp: agentMessageTimestamp, conversationId: currentConvId,
+    };
+    addOptimisticMessage({ type: "add_message", message: agentOptimisticPayload });
+
+    const historyForBackend: Message[] = messages // Use true `messages` state for history
+      .filter(m => m.status === 'completed') // only completed from true state
+      .map(uiMsg => ({
+        id: uiMsg.id, isUser: uiMsg.sender === 'user', content: uiMsg.text,
+        timestamp: Timestamp.fromDate(uiMsg.timestamp), feedback: uiMsg.feedback,
+        imageUrl: uiMsg.imageUrl, fileName: uiMsg.fileName,
+        conversationId: uiMsg.conversationId,
+      }));
+    // Add the current user message to history as it's now completed
+    historyForBackend.push({
+        id: userMessageId, isUser: true, content: currentInputForAgent,
+        timestamp: Timestamp.fromDate(userMessageTimestamp),
+        imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
+        conversationId: currentConvId,
+    });
+
+
+    let apiEndpoint = activeChatTarget?.type === 'adk-agent' ? '/api/agent-creator-stream' : '/api/chat-stream';
+    const requestBody = {
+      userMessage: currentInputForAgent, history: historyForBackend, userId: currentUserId, stream: true,
+      fileDataUri: currentFileDataUriForAgent, conversationId: currentConvId,
+      agentConfig: activeChatTarget?.config, testRunConfig: testRunConfig,
+    };
+
+    try {
+      const response = await fetch(apiEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
+      if (!response.ok) { /* ... error handling ... */ throw new Error(`API Error: ${response.status}`); }
+
+      const reader = response.body?.getReader(); const decoder = new TextDecoder();
+      let accumulatedAgentResponse = "";
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read(); if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedAgentResponse += chunk;
+          addOptimisticMessage({ type: "update_message_content", messageId: agentMessageId, newContentChunk: chunk });
+        }
+      }
+      const finalAgentPayload: ExtendedChatMessageUI = { ...agentOptimisticPayload, text: accumulatedAgentResponse, status: 'completed', isStreaming: false};
+      addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "completed", isStreaming: false, newContent: accumulatedAgentResponse });
+
+      const agentMessageToPersist: Message = {
+          id: agentMessageId, isUser: false, content: accumulatedAgentResponse,
+          timestamp: Timestamp.fromDate(agentMessageTimestamp), // or Timestamp.now()
+          conversationId: currentConvId,
+      };
+      await addMessageToConversation(currentConvId, agentMessageToPersist);
+      setMessages(prev => [...prev, finalAgentPayload]); // Update true state
+      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
+
+    } catch (error: any) { /* ... error handling ... */
+        console.error("Error during agent response:", error);
+        const errorMsg = error.message || "Agent response error.";
+        addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "error", isStreaming: false, newContent: errorMsg });
+        // No need to update `setMessages` for the error state unless we persist it
+        toast({title: "Error", description: errorMsg, variant: "destructive"});
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleFeedback = async (messageId: string, feedback: MessageFeedback | null) => {
+    if (!activeConversationId) {
+      toast({ title: "Error", description: "No active conversation.", variant: "destructive" });
+      return;
+    }
+    const originalMessage = messages.find(msg => msg.id === messageId);
+    const originalFeedback = originalMessage?.feedback || null;
+
+    addOptimisticMessage({ type: "update_message_feedback", messageId, feedback });
+
+    try {
+      await updateMessageFeedback(activeConversationId, messageId, feedback);
+      // Update the true `messages` state
+      setMessages(prevMessages => prevMessages.map(msg =>
+        msg.id === messageId ? { ...msg, feedback } : msg
+      ));
+    } catch (error) {
+      console.error("Error updating feedback:", error);
+      toast({ title: "Error", description: "Failed to save feedback.", variant: "destructive" });
+      // Revert optimistic update
+      addOptimisticMessage({ type: "update_message_feedback", messageId, feedback: originalFeedback });
+    }
+  };
+
+  const handleRegenerate = async (messageIdToRegenerate: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => {
+    if (!currentUserId || !activeConversationId) {
+      toast({ title: "Error", description: "User or conversation not identified.", variant: "destructive" });
+      return;
+    }
+
+    const agentMessageIndex = optimisticMessages.findIndex(msg => msg.id === messageIdToRegenerate && msg.sender === 'agent');
+    if (agentMessageIndex === -1) {
+      toast({ title: "Error", description: "Agent message to regenerate not found.", variant: "destructive" });
+      return;
+    }
+
+    let userPromptIndex = -1;
+    for (let i = agentMessageIndex - 1; i >= 0; i--) {
+      if (optimisticMessages[i].sender === 'user') {
+        userPromptIndex = i;
+        break;
+      }
+    }
+    if (userPromptIndex === -1) {
+      toast({ title: "Error", description: "Original user prompt not found.", variant: "destructive" });
+      return;
+    }
+    const userPromptMessage = optimisticMessages[userPromptIndex];
+
+    setIsPending(true);
+
+    // Optimistically remove messages from the agent message to be regenerated onwards
+    const messagesToRemove = optimisticMessages.slice(agentMessageIndex);
+    for (const msgToRemove of messagesToRemove) {
+      addOptimisticMessage({ type: "remove_message", messageId: msgToRemove.id });
+    }
+
+    // Actual deletion from DB (can happen in background, errors logged but don't block UI flow)
+    for (const msgToRemove of messagesToRemove) {
+      try {
+        await deleteMessageFromConversation(activeConversationId, msgToRemove.id);
+      } catch (error) {
+        console.error(`Failed to delete message ${msgToRemove.id} from DB:`, error);
+        // Not re-throwing or toasting for these, to keep regeneration flow smooth
+      }
+    }
+    // Update the true `messages` state after removal
+    setMessages(prev => prev.slice(0, agentMessageIndex));
+
+
+    const historyForBackend: Message[] = messages // Use true `messages` state BEFORE regeneration
+      .slice(0, userPromptIndex + 1) // History up to and including the user prompt
+      .filter(m => m.status === 'completed')
+      .map(uiMsg => ({
+        id: uiMsg.id, isUser: uiMsg.sender === 'user', content: uiMsg.text,
+        timestamp: Timestamp.fromDate(uiMsg.timestamp), feedback: uiMsg.feedback,
+        imageUrl: uiMsg.imageUrl, fileName: uiMsg.fileName,
+        conversationId: uiMsg.conversationId,
+      }));
+
+    // The userPromptMessage.text is the input for this new agent turn.
+    // File data from original user prompt (if any) should also be used.
+    const currentFileDataUriForAgent = userPromptMessage.imageUrl ? userPromptMessage.imageUrl : (userPromptMessage.fileName ? "file_placeholder_for_non_image" : undefined);
+
+
+    const newAgentMessageId = uuidv4();
+    const newAgentTimestamp = new Date();
+    const newAgentOptimisticPayload: ExtendedChatMessageUI = {
+      id: newAgentMessageId, text: "", sender: "agent", status: "pending",
+      isStreaming: true, timestamp: newAgentTimestamp, conversationId: activeConversationId,
+    };
+    addOptimisticMessage({ type: "add_message", message: newAgentOptimisticPayload });
+
+    let apiEndpoint = activeChatTarget?.type === 'adk-agent' ? '/api/agent-creator-stream' : '/api/chat-stream';
+    const requestBody = {
+      userMessage: userPromptMessage.text, // Use original prompt text
+      history: historyForBackend.slice(0, -1), // History EXCLUDES the user prompt itself
+      userId: currentUserId, stream: true,
+      fileDataUri: currentFileDataUriForAgent, // Use original file if any
+      conversationId: activeConversationId,
+      agentConfig: activeChatTarget?.config, testRunConfig: testRunConfig,
+    };
+
+    try {
+      const response = await fetch(apiEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
+      if (!response.ok) { throw new Error(`API Error: ${response.status}`); }
+
+      const reader = response.body?.getReader(); const decoder = new TextDecoder();
+      let accumulatedAgentResponse = "";
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read(); if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedAgentResponse += chunk;
+          addOptimisticMessage({ type: "update_message_content", messageId: newAgentMessageId, newContentChunk: chunk });
+        }
+      }
+
+      const finalAgentPayload: ExtendedChatMessageUI = { ...newAgentOptimisticPayload, text: accumulatedAgentResponse, status: 'completed', isStreaming: false};
+      addOptimisticMessage({ type: "update_message_status", messageId: newAgentMessageId, status: "completed", isStreaming: false, newContent: accumulatedAgentResponse });
+
+      const agentMessageToPersist: Message = {
+          id: newAgentMessageId, isUser: false, content: accumulatedAgentResponse,
+          timestamp: Timestamp.fromDate(newAgentTimestamp),
+          conversationId: activeConversationId,
+      };
+      await addMessageToConversation(activeConversationId, agentMessageToPersist);
+      setMessages(prev => [...prev, finalAgentPayload]); // Update true state
+      setConversations(prev => prev.map(c => c.id === activeConversationId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
+
+    } catch (error: any) {
+        console.error("Error during agent response regeneration:", error);
+        const errorMsg = error.message || "Agent response regeneration error.";
+        addOptimisticMessage({ type: "update_message_status", messageId: newAgentMessageId, status: "error", isStreaming: false, newContent: errorMsg });
+        toast({title: "Error", description: errorMsg, variant: "destructive"});
+    } finally {
+      setIsPending(false);
+      // Do not clear inputValue or selectedFile here as they were not used for regeneration.
+    }
+  };
+
+  return {
+    conversations, activeConversationId, messages, optimisticMessages, isPending, isLoadingMessages,
+    isLoadingConversations, inputContinuation, selectedFile, selectedFileName, selectedFileDataUri,
+    currentUserId, inputValue, setConversations, setActiveConversationId, setMessages, setIsPending,
+    setIsLoadingMessages, setIsLoadingConversations, setInputContinuation, setSelectedFile,
+    setSelectedFileName, setSelectedFileDataUri, setInputValue, handleNewConversation,
+    handleSelectConversation, handleDeleteConversation, handleRenameConversation, submitMessage,
+    handleFeedback, handleRegenerate, clearSelectedFile,
+  };
+}
