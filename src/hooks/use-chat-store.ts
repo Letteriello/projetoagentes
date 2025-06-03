@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useOptimistic } from 'react';
-import { Conversation, ChatMessageUI, Message, MessageFeedback } from '@/types/chat';
+import { Conversation, ChatMessageUI, Message, MessageFeedback, ToolCallData, ToolResponseData, ErrorDetails } from '@/types/chat';
 import { User } from 'firebase/auth';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -346,38 +346,142 @@ export function useChatStore(): ChatStore {
 
     let apiEndpoint = activeChatTarget?.type === 'adk-agent' ? '/api/agent-creator-stream' : '/api/chat-stream';
     const requestBody = {
-      userMessage: currentInputForAgent, history: historyForBackend, userId: currentUserId, stream: true,
+      userMessage: currentInputForAgent, history: historyForBackend, userId: currentUserId, stream: true, // stream: true might be problematic if we expect a JSON object with tool data
       fileDataUri: currentFileDataUriForAgent, conversationId: currentConvId,
       agentConfig: activeChatTarget?.config, testRunConfig: testRunConfig,
     };
 
     try {
       const response = await fetch(apiEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
-      if (!response.ok) { /* ... error handling ... */ throw new Error(`API Error: ${response.status}`); }
+      if (!response.ok) { throw new Error(`API Error: ${response.status} ${await response.text()}`); }
 
-      const reader = response.body?.getReader(); const decoder = new TextDecoder();
-      let accumulatedAgentResponse = "";
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read(); if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          accumulatedAgentResponse += chunk;
-          addOptimisticMessage({ type: "update_message_content", messageId: agentMessageId, newContentChunk: chunk });
+      // Check content type to decide how to process
+      const contentType = response.headers.get("content-type");
+      let finalAgentText = "";
+      const newMessagesToAdd: ExtendedChatMessageUI[] = [];
+
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json(); // Assuming BasicChatOutput structure
+
+        // Process Tool Requests and Results first
+        if (data.toolRequests && data.toolResults) {
+          data.toolRequests.forEach((toolRequest: ToolCallData) => { // Assuming ChatToolRequest is compatible with ToolCallData
+            const toolCallMessage: ExtendedChatMessageUI = {
+              id: uuidv4(),
+              sender: 'system',
+              text: `Usando ferramenta: ${toolRequest.name}...`,
+              timestamp: new Date(),
+              toolCall: {
+                name: toolRequest.name,
+                input: toolRequest.input as Record<string, any>,
+              },
+              status: 'completed',
+              conversationId: currentConvId,
+            };
+            newMessagesToAdd.push(toolCallMessage);
+
+            // Find corresponding toolResult
+            // Assuming 'ref' is used for matching, or fallback to name/order if not.
+            // For this implementation, let's assume order or a direct match by name if ref is not robustly implemented/available.
+            // A more robust solution would use 'toolRequest.ref' if available on both request and result.
+            const toolResult = data.toolResults.find((tr: ToolResponseData) => tr.name === toolRequest.name); // Simplified matching
+
+            if (toolResult) {
+              // Assuming toolResult is of type ToolExecutionResult from chat-flow.ts which now has errorDetails
+              const isError = toolResult.status === 'error';
+              const responseText = isError
+                ? `Erro na ferramenta ${toolResult.name}: ${toolResult.errorDetails ? toolResult.errorDetails.message : 'Erro desconhecido'}`
+                : `Resultado da ferramenta ${toolResult.name}: ${typeof toolResult.output === 'object' ? JSON.stringify(toolResult.output, null, 2) : toolResult.output}`;
+
+              const toolResponseMessage: ExtendedChatMessageUI = {
+                id: uuidv4(),
+                sender: 'system',
+                text: responseText,
+                timestamp: new Date(),
+                toolResponse: { // This should conform to ToolResponseData from @/types/chat
+                  name: toolResult.name,
+                  output: !isError ? toolResult.output : undefined, // Only set output if not an error
+                  errorDetails: isError ? (toolResult.errorDetails as ErrorDetails) : undefined, // Pass the full ErrorDetails object
+                  status: toolResult.status as 'success' | 'error' | 'pending', // status is non-optional in ToolResponseData
+                },
+                status: 'completed', // Message status itself
+                conversationId: currentConvId,
+              };
+              newMessagesToAdd.push(toolResponseMessage);
+            }
+          });
         }
+
+        if (data.outputMessage) {
+          finalAgentText = data.outputMessage;
+          const agentResponseMessage: ExtendedChatMessageUI = {
+            ...agentOptimisticPayload, // Use the ID of the pending message
+            id: agentMessageId,
+            text: finalAgentText,
+            status: 'completed',
+            isStreaming: false,
+          };
+          newMessagesToAdd.push(agentResponseMessage);
+        }
+
+        // Update optimistic messages: remove pending, add all new ones
+        addOptimisticMessage({ type: 'remove_message', messageId: agentMessageId });
+        newMessagesToAdd.forEach(msg => {
+          // Ensure msg includes conversationId
+          const messageWithConvId = { ...msg, conversationId: currentConvId };
+          addOptimisticMessage({ type: 'add_message', message: messageWithConvId });
+        });
+
+        // Persist new messages to Firestore (tool calls, tool responses, final agent message)
+        // This part needs careful implementation to match Firestore structure
+        for (const msg of newMessagesToAdd) {
+          const messageToPersist: Message = {
+            id: msg.id,
+            isUser: msg.sender === 'user',
+            content: msg.text,
+            timestamp: Timestamp.fromDate(msg.timestamp),
+            conversationId: currentConvId,
+            // Map toolCall/toolResponse to Firestore fields if necessary
+            // For now, assuming content/text is sufficient for display.
+            // Detailed tool data might be stored in a separate field or within metadata.
+          };
+          if (msg.sender !== 'user') { // User message already persisted
+             await addMessageToConversation(currentConvId, messageToPersist);
+          }
+        }
+        setMessages(prev => [...prev.filter(m => m.id !== agentMessageId), ...newMessagesToAdd]);
+
+
+      } else { // Fallback to existing streaming logic if not JSON
+        const reader = response.body?.getReader(); const decoder = new TextDecoder();
+        let accumulatedAgentResponse = "";
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read(); if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedAgentResponse += chunk;
+            addOptimisticMessage({ type: "update_message_content", messageId: agentMessageId, newContentChunk: chunk });
+          }
+        }
+        finalAgentText = accumulatedAgentResponse;
+        const finalAgentPayload: ExtendedChatMessageUI = { ...agentOptimisticPayload, text: finalAgentText, status: 'completed', isStreaming: false};
+        addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "completed", isStreaming: false, newContent: finalAgentText });
+
+        const agentMessageToPersist: Message = {
+            id: agentMessageId, isUser: false, content: finalAgentText,
+            timestamp: Timestamp.fromDate(agentMessageTimestamp),
+            conversationId: currentConvId,
+        };
+        await addMessageToConversation(currentConvId, agentMessageToPersist);
+        setMessages(prev => [...prev, finalAgentPayload]);
       }
-      const finalAgentPayload: ExtendedChatMessageUI = { ...agentOptimisticPayload, text: accumulatedAgentResponse, status: 'completed', isStreaming: false};
-      addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "completed", isStreaming: false, newContent: accumulatedAgentResponse });
 
-      const agentMessageToPersist: Message = {
-          id: agentMessageId, isUser: false, content: accumulatedAgentResponse,
-          timestamp: Timestamp.fromDate(agentMessageTimestamp), // or Timestamp.now()
-          conversationId: currentConvId,
-      };
-      await addMessageToConversation(currentConvId, agentMessageToPersist);
-      setMessages(prev => [...prev, finalAgentPayload]); // Update true state
-      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
+      // Common post-processing for both JSON and stream paths
+      if (currentConvId && finalAgentText) { // Ensure there's an agent text to update preview
+         setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: finalAgentText.substring(0,50) }) : c));
+      }
 
-    } catch (error: any) { /* ... error handling ... */
+    } catch (error: any) {
         console.error("Error during agent response:", error);
         const errorMsg = error.message || "Agent response error.";
         addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "error", isStreaming: false, newContent: errorMsg });

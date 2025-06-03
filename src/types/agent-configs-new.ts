@@ -194,6 +194,8 @@ export interface SavedAgentConfiguration {
   a2aConfig?: Record<string, any>;
   communicationChannels?: CommunicationChannel[];
   deploymentConfig?: DeploymentConfig;
+  /** Enables verbose debug information in the chat for this agent. */
+  debugModeEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
   isTemplate: boolean;

@@ -48,6 +48,23 @@ interface ToolResponsePart {
   output: unknown;
 }
 
+// Interface for structured tool execution results
+// Defines structured error details that tools can return or the flow can generate.
+interface ErrorDetails {
+  code?: string;
+  message: string;
+  details?: any;
+}
+
+interface ToolExecutionResult {
+  name: string;
+  input?: Record<string, unknown>;
+  output?: any; // Holds successful output if status is 'success'
+  errorDetails?: ErrorDetails; // Holds structured error if status is 'error'
+  status: 'success' | 'error';
+  ref?: string; // from the original toolRequest for matching
+}
+
 const allAvailableTools: Record<string, AppTool> = { 
   performWebSearch: createPerformWebSearchTool({
     apiKey: process.env.SEARCH_API_KEY
@@ -134,7 +151,7 @@ export interface BasicChatOutput {
   outputMessage?: string;
   stream?: ReadableStream<any>;
   toolRequests?: ChatToolRequest[];
-  toolResults?: any[];
+  toolResults?: ToolExecutionResult[]; // Updated to use ToolExecutionResult
   error?: string;
 }
 
@@ -212,7 +229,7 @@ async function basicChatFlowInternal(
     // Loop for handling tool requests and responses
     let finalOutputText = '';
     let executedToolRequests: ChatToolRequest[] = [];
-    let executedToolResults: any[] = [];
+    let executedToolResults: ToolExecutionResult[] = []; // Updated type
     let currentMessages = [...messages]; // Start with the initial set of messages
 
     const MAX_TOOL_ITERATIONS = 5; // Prevent infinite loops
@@ -269,56 +286,148 @@ async function basicChatFlowInternal(
       // This requires actually calling the tools.
 
       const toolResponseParts: ToolResponsePart[] = [];
-      for (const toolRequest of executedToolRequests.slice(executedToolRequests.length - choice.message.content.filter((p: Part) => p.toolRequest).length)) { // Process only new requests
-        // This is a simplified placeholder for actual tool execution.
-        // In a real scenario, you'd look up `toolRequest.name` in your `genkitTools`
-        // and execute its `func` with `toolRequest.input`.
-        // For now, let's assume a dummy result.
-        // This part is CRITICAL and needs to match your actual tool execution strategy.
-        // The `ai.runTool()` or similar utility might be needed if not handled by `ai.generate()` itself.
-        
-        // Placeholder: Simulate finding and running the tool
-        const toolToRun = genkitTools.find(t => t.name === toolRequest.name) as AppTool | undefined;
-        
-        if (!toolToRun) {
-          throw new Error(`Ferramenta ${toolRequest.name} não encontrada`);
-        }
+      // Process only new tool requests from the current LLM response
+      const newToolRequests = choice.message.content.filter((p: Part) => p.toolRequest).map(p => p.toolRequest as ToolRequest);
 
-        // Validar input se schema existir
-        if (toolToRun.inputSchema) {
-          const validation = toolToRun.inputSchema.safeParse(toolRequest.input);
-          if (!validation.success) {
-            throw new Error(`Input inválido para ${toolRequest.name}: ${validation.error}`);
+      for (const toolRequest of newToolRequests) {
+        let toolExecutionFailed = false;
+        let resultOutput: any; // Can be success output or error information for the LLM
+        let errorMessage: string | undefined;
+
+        try {
+          const toolToRun = genkitTools.find(t => t.name === toolRequest.name) as AppTool | undefined;
+
+          if (!toolToRun) {
+            toolExecutionFailed = true;
+            errorMessage = `Ferramenta ${toolRequest.name} não encontrada`;
+            resultOutput = { error: errorMessage, code: 'TOOL_NOT_FOUND' }; // Structure for LLM
+            executedToolResults.push({
+              name: toolRequest.name,
+              input: toolRequest.input as Record<string, unknown>,
+              errorDetails: { message: errorMessage, code: 'TOOL_NOT_FOUND' },
+              status: 'error',
+              ref: toolRequest.ref,
+            });
+            // Continue to next tool request if this one not found
+            // but still add a response part so LLM knows it was attempted
+            toolResponseParts.push({ toolRequest, output: resultOutput });
+            continue;
           }
-          if (toolToRun && typeof toolToRun.func === 'function') {
-            const result = await toolToRun.func(validation.data);
-            toolResponseParts.push({ toolRequest, output: result });
+
+          let validatedInput = toolRequest.input;
+          if (toolToRun.inputSchema) {
+            const validation = toolToRun.inputSchema.safeParse(toolRequest.input);
+            if (!validation.success) {
+              toolExecutionFailed = true;
+              errorMessage = `Input inválido para ${toolRequest.name}: ${validation.error.toString()}`;
+              resultOutput = { error: errorMessage, code: 'INPUT_VALIDATION_ERROR', details: validation.error.issues }; // Structure for LLM
+              executedToolResults.push({
+                name: toolRequest.name,
+                input: toolRequest.input as Record<string, unknown>,
+                errorDetails: { message: errorMessage, code: 'INPUT_VALIDATION_ERROR', details: validation.error.issues },
+                status: 'error',
+                ref: toolRequest.ref,
+              });
+              toolResponseParts.push({ toolRequest, output: resultOutput });
+              continue; // Skip execution if validation fails
+            }
+            validatedInput = validation.data;
+          }
+
+          if (typeof toolToRun.func !== 'function') {
+            toolExecutionFailed = true;
+            errorMessage = `Ferramenta ${toolRequest.name} não possui função executável.`;
+            resultOutput = { error: errorMessage, code: 'TOOL_NOT_EXECUTABLE' }; // Structure for LLM
+            executedToolResults.push({
+              name: toolRequest.name,
+              input: toolRequest.input as Record<string, unknown>,
+              errorDetails: { message: errorMessage, code: 'TOOL_NOT_EXECUTABLE' },
+              status: 'error',
+              ref: toolRequest.ref,
+            });
+            toolResponseParts.push({ toolRequest, output: resultOutput });
+            continue;
+          }
+
+          // Execute the tool function
+          const toolRawOutput = await toolToRun.func(validatedInput);
+
+          // Check if the tool returned structured errorDetails itself
+          if (toolRawOutput && typeof toolRawOutput === 'object' && 'errorDetails' in toolRawOutput && toolRawOutput.errorDetails) {
+            toolExecutionFailed = true;
+            const toolErrorDetails = toolRawOutput.errorDetails as ErrorDetails;
+            executedToolResults.push({
+              name: toolRequest.name,
+              input: toolRequest.input as Record<string, unknown>,
+              errorDetails: toolErrorDetails,
+              status: 'error',
+              ref: toolRequest.ref,
+            });
+            // For LLM: send the structured error from the tool
+            resultOutput = { error: toolErrorDetails.message, code: toolErrorDetails.code, details: toolErrorDetails.details };
+            toolResponseParts.push({ toolRequest, output: resultOutput });
           } else {
-            throw new Error(`Ferramenta ${toolRequest.name} não possui função executável`);
+            // Tool executed successfully and returned direct output
+            resultOutput = toolRawOutput;
+            executedToolResults.push({
+              name: toolRequest.name,
+              input: toolRequest.input as Record<string, unknown>,
+              output: resultOutput,
+              status: 'success',
+              ref: toolRequest.ref,
+            });
+            toolResponseParts.push({ toolRequest, output: resultOutput });
           }
-        } else {
-          if (toolToRun && typeof toolToRun.func === 'function') {
-            const result = await toolToRun.func(toolRequest.input);
-            toolResponseParts.push({ toolRequest, output: result });
-          } else {
-            throw new Error(`Ferramenta ${toolRequest.name} não possui função executável`);
-          }
+
+        } catch (e: any) {
+          toolExecutionFailed = true;
+          const toolCrashError: ErrorDetails = {
+            message: e.message || 'Tool crashed during execution',
+            code: 'TOOL_CRASH',
+            details: e.stack
+          };
+          resultOutput = { error: toolCrashError.message, code: toolCrashError.code }; // Structure for LLM
+
+          // Ensure we record the error for the specific tool
+          executedToolResults.push({
+            name: toolRequest.name,
+            input: toolRequest.input as Record<string, unknown>,
+            errorDetails: toolCrashError,
+            status: 'error',
+            ref: toolRequest.ref,
+          });
+          // Also add a response part for the LLM to know about the error
+          toolResponseParts.push({ toolRequest, output: resultOutput });
+          // Depending on desired behavior, you might choose to 'continue' or 'break' here.
+          // For now, it continues to process other tools if any.
         }
-        // Storing results for BasicChatOutput
-        executedToolResults.push({name: toolRequest.name, result: toolResponseParts[toolResponseParts.length - 1].output});
       }
 
       // Add tool responses to messages for the next iteration
-      currentMessages.push({
-        role: 'tool',
-        content: toolResponseParts.map(part => ({
-          text: JSON.stringify({
-            name: part.toolRequest.name,
-            output: part.output,
-            ref: part.toolRequest.ref
+      // Only add if there were actual tool responses generated.
+      if (toolResponseParts.length > 0) {
+        currentMessages.push({
+          role: 'tool',
+          content: toolResponseParts.map(part => {
+            // Ensure that the 'output' being stringified is appropriate,
+            // especially if it's an error object.
+            // For Genkit, the 'output' in ToolResponsePart is what's sent to the LLM.
+            // If 'part.output' is an error, it should be represented in a way the LLM can understand.
+            // For now, we assume JSON.stringify will handle it, but this might need refinement
+            // based on how the LLM expects tool error messages.
+            return {
+              text: JSON.stringify({ // This structure might need to align with Genkit's expected ToolResponse format if not using `Part.toolResponse`
+                name: part.toolRequest.name,
+                output: part.output, // This could be a success result or an error message/object
+                ref: part.toolRequest.ref
+              }),
+              // Ideally, Genkit's ToolResponsePart should be used directly if possible,
+              // which might involve structuring 'output' as { error: string } or similar for errors.
+              // Example: content: toolResponseParts (if toolResponseParts are already ToolResponse[])
+            };
           })
-        }))
-      });
+        });
+      }
     } // End of while loop
 
     // const stream = llmResponse.stream ? llmResponse.stream() : null; // Stream handling would need rework with this loop
