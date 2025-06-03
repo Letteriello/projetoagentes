@@ -44,20 +44,55 @@ async function writeLogToFirestore(logEntry: Omit<LogEntry, 'timestamp'>) {
 }
 
 export const enhancedLogger = {
-  logStart: instrumentation.instrument(
-    { tag: 'enhancedLogger.logStart' },
-    async (flowName: string, agentId?: string, input?: any) => {
-      const traceId = instrumentation.getTraceId();
-      await writeLogToFirestore({
-        flowName,
-        agentId,
-        type: 'start',
-        traceId,
-        data: { input },
-      });
-    }
-  ),
-  logEnd: instrumentation.instrument(
+  logStart: async (flowName: string, agentId?: string, input?: any) => {
+    await writeLogToFirestore({
+      flowName: flowName,
+      agentId: agentId,
+      type: 'start',
+      traceId: undefined,
+      data: { input: input },
+    });
+  },
+  logEnd: async (flowName: string, agentId?: string, output?: any) => {
+    await writeLogToFirestore({
+      flowName: flowName,
+      agentId: agentId,
+      type: 'end',
+      traceId: undefined,
+      data: { output: output },
+    });
+  },
+  logToolCall: async (flowName: string, agentId?: string, toolName?: string, input?: any, output?: any) => {
+    await writeLogToFirestore({
+      flowName: flowName,
+      agentId: agentId,
+      type: 'tool_call',
+      traceId: undefined,
+      data: { toolName: toolName, input: input, output: output },
+    });
+  },
+  logError: async (flowName: string, agentId?: string, error?: any, details?: any) => {
+    await writeLogToFirestore({
+      flowName: flowName,
+      agentId: agentId,
+      type: 'error',
+      traceId: undefined,
+      data: {
+        error: error ? { name: error.name, message: error.message, stack: error.stack } : 'Unknown error',
+        details: details,
+      },
+    });
+  },
+  logInfo: async (flowName: string, agentId?: string, message?: string, data?: any) => {
+    await writeLogToFirestore({
+      flowName: flowName,
+      agentId: agentId,
+      type: 'info',
+      traceId: undefined,
+      data: { message: message, ...data },
+    });
+  },
+};
     { tag: 'enhancedLogger.logEnd' },
     async (flowName: string, agentId?: string, output?: any) => {
       const traceId = instrumentation.getTraceId();
@@ -125,21 +160,21 @@ export const enhancedLogger = {
 // Função auxiliar para criar um fluxo logável
 export function createLoggableFlow<Request, Response>(
   name: string,
-  flow: FlowType<Request, Response>
-): FlowType<Request, Response> {
+  flow: (input: Request, context?: any) => Promise<Response>
+): (input: Request, context?: any) => Promise<Response> {
   // Verifica se estamos no servidor
   if (typeof window !== 'undefined') {
     // No cliente, retornamos uma função vazia que lança um erro
     return (() => {
       throw new Error('createLoggableFlow should only be used on the server side');
-    }) as unknown as Flow<Request, Response>;
+    }) as unknown as (input: Request, context?: any) => Promise<Response>;
   }
 
   // Importação dinâmica apenas no servidor
   const { genkitFlow } = require('@genkit-ai/flow');
   
   return genkitFlow(
-    { name },
+    { name: name },
     async (input: Request, context?: any) => {
       const agentId = (input as any)?.agentId || 'unknown_agent';
       

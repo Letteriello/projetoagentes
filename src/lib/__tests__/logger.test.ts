@@ -1,33 +1,53 @@
 import { enhancedLogger, createLoggableFlow } from '../logger';
 
 // Mocks para o Firestore
-const mockAdd = jest.fn();
+const mockAdd = jest.fn().mockResolvedValue({ id: 'test-doc-id' });
 const mockCollection = jest.fn(() => ({ add: mockAdd }));
+
+// Cria um mock para o Timestamp do Firestore
+const createMockTimestamp = () => ({
+  seconds: Math.floor(Date.now() / 1000),
+  nanos: 0,
+  toDate: () => new Date(),
+  toMillis: () => Date.now(),
+  isEqual: (other: any) => false,
+  valueOf: () => 'test-timestamp'
+});
 
 // Mock firebaseAdmin dynamic import as used in logger.ts
 jest.mock('../firebaseAdmin', () => {
-  const mockTimestamp = { seconds: Date.now() / 1000, nanos: 0 };
+  const mockTimestamp = createMockTimestamp();
   
   // Simula o objeto firestore que será usado no logger
   const mockFirestore = {
-    collection: (collectionName: string) => mockCollection(collectionName)
+    collection: mockCollection
   };
 
-  return {
+  // Simula o módulo firebaseAdmin
+  const firebaseAdmin = {
     __esModule: true,
     default: {
-      firestore: {
-        Timestamp: {
-          now: () => mockTimestamp,
-          fromDate: (date: Date) => ({ seconds: date.getTime() / 1000, nanos: 0 })
-        },
-        // Garante que a propriedade collection está disponível
-        collection: mockFirestore.collection
-      }
+      firestore: () => ({
+        collection: mockCollection
+      })
     },
-    // Exporta o firestore diretamente também para compatibilidade
     firestore: mockFirestore
   };
+
+  // Adiciona o Timestamp ao mock
+  firebaseAdmin.firestore.Timestamp = {
+    now: () => mockTimestamp,
+    fromDate: (date: Date) => ({
+      seconds: Math.floor(date.getTime() / 1000),
+      nanos: 0,
+      toDate: () => date,
+      toMillis: () => date.getTime(),
+      isEqual: (other: any) => false,
+      valueOf: () => 'test-timestamp-from-date'
+    })
+  };
+
+  return firebaseAdmin;
 });
 
 // Mock Genkit Core

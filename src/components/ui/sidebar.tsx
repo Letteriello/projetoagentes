@@ -28,7 +28,7 @@ const SIDEBAR_WIDTH_ICON = "3.5rem"; // w-14 (56px)
 type SidebarContextValue = {
   state: "expanded" | "collapsed";
   open: boolean;
-  setOpen: (open: boolean) => void;
+  setOpen: (open: boolean) => void; // Aceita apenas booleano, nunca função
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile?: boolean;
@@ -107,19 +107,18 @@ const SidebarProvider = React.forwardRef<
 
     const open = openProp ?? _open;
     const setOpen = React.useCallback(
-      (value: boolean | ((current: boolean) => boolean)) => {
-        const newOpenState = typeof value === "function" ? value(open) : value;
-        if (setOpenProp) {
-          setOpenProp(newOpenState);
-        } else {
-          _setOpen(newOpenState);
-        }
-        if (typeof window !== "undefined" && collapsible !== "none") {
-          document.cookie = `${SIDEBAR_COOKIE_NAME}=${newOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
-        }
-      },
-      [setOpenProp, open, collapsible],
-    );
+  (value: boolean) => {
+    if (setOpenProp) {
+      setOpenProp(value);
+    } else {
+      _setOpen(value);
+    }
+    if (typeof window !== "undefined" && collapsible !== "none") {
+      document.cookie = `${SIDEBAR_COOKIE_NAME}=${value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+    }
+  },
+  [setOpenProp, collapsible],
+);
 
     const toggleSidebar = React.useCallback(() => {
       if (isMobile === undefined) return;
@@ -241,18 +240,31 @@ export const Sidebar = React.forwardRef<
     const [isHoveringLocal, setIsHoveringLocal] = React.useState(false);
 
     const handleMouseEnter = React.useCallback(() => {
-      if (!isMobile && collapsible === 'icon' && !isPinnedOpen && !isHoveringLocal) {
-        setIsHoveringLocal(true);
-        setOpen(true);
-      }
-    }, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen, setIsHoveringLocal]);
+  if (
+    !isMobile &&
+    collapsible === 'icon' &&
+    !isPinnedOpen &&
+    !isHoveringLocal
+  ) {
+    if (!isHoveringLocal) setIsHoveringLocal(true);
+if (!open) setOpen(true);
+  }
+}, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen]);
     
     const handleMouseLeave = React.useCallback(() => {
-      if (!isMobile && collapsible === 'icon' && !isPinnedOpen && isHoveringLocal) {
-        setIsHoveringLocal(false);
-        setOpen(false);
-      }
-    }, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen, setIsHoveringLocal]);
+  if (
+    !isMobile &&
+    collapsible === 'icon' &&
+    !isPinnedOpen &&
+    isHoveringLocal
+  ) {
+    setIsHoveringLocal((prev) => {
+      if (prev) return false;
+      return prev;
+    });
+    if (open) setOpen(false);
+  }
+}, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen]);
 
     if (!mounted) {
       return null; // Defer rendering until client-mounted to avoid hydration issues
@@ -678,7 +690,8 @@ const SidebarMenuButton = React.forwardRef<
     },
     ref,
   ) => {
-    const Comp = asChild ? Slot : "button";
+    // Sempre renderiza um <button> real dentro do TooltipTrigger para evitar ciclo de refs
+    const Comp = "button";
     const {
       isMobile,
       state,
@@ -702,9 +715,11 @@ const SidebarMenuButton = React.forwardRef<
       classNameProp,
     );
 
+    // Só passa o ref para o DOM real se não for Slot
+    const domRef = asChild ? undefined : ref;
     const buttonElement = (
       <Comp
-        ref={ref}
+        ref={domRef}
         data-sidebar="menu-button"
         data-size={size}
         // data-active é aplicado somente no cliente para evitar mismatch
@@ -716,20 +731,9 @@ const SidebarMenuButton = React.forwardRef<
       </Comp>
     );
 
-    if (!clientMounted || !tooltip) {
-      return buttonElement;
-    }
-
-    const showTooltip = isIconOnly && tooltip;
-    const tooltipContentProps =
-      typeof tooltip === "string" ? { children: tooltip } : tooltip;
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
-        {showTooltip && <TooltipContent {...tooltipContentProps} />}
-      </Tooltip>
-    );
+    // Temporariamente desabilitado tooltips para resolver o ciclo de refs
+    // O tooltip era usado apenas no estado isIconOnly
+    return buttonElement;
   },
 );
 SidebarMenuButton.displayName = "SidebarMenuButton";
