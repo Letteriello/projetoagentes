@@ -6,6 +6,22 @@ import { useForm, FormProvider, SubmitHandler } from "react-hook-form"; // Added
 import { zodResolver } from "@hookform/resolvers/zod"; // Added Zod resolver
 import { z } from "zod"; // Added Zod
 import { toast } from "@/hooks/use-toast"; // Import toast
+import {
+  MCP_SERVER_STATUS_CONNECTED,
+  MCP_SERVER_STATUS_ERROR,
+  TOAST_TITLE_MCP_SERVER_ADDED,
+  TOAST_DESCRIPTION_MCP_SERVER_ADDED,
+  TOAST_TITLE_ERROR_ADDING_SERVER,
+  TOAST_DESCRIPTION_ERROR_ADDING_SERVER,
+  TOAST_TITLE_MCP_SERVER_REMOVED,
+  TOAST_DESCRIPTION_MCP_SERVER_REMOVED,
+  TOAST_TITLE_ERROR_REMOVING_SERVER,
+  TOAST_DESCRIPTION_ERROR_REMOVING_SERVER,
+  TOAST_TITLE_MCP_SERVER_UPDATED,
+  TOAST_DESCRIPTION_MCP_SERVER_UPDATED,
+  TOAST_TITLE_ERROR_UPDATING_SERVER,
+  TOAST_DESCRIPTION_ERROR_UPDATING_SERVER,
+} from "@/lib/constants";
 import { Cpu, Plus, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,11 +75,11 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
       onAdd({
         id: crypto.randomUUID(), // Generate ID here
         ...data,
-        status: "connected", // Set default status, or as per your logic
+        status: MCP_SERVER_STATUS_CONNECTED, // Set default status, or as per your logic
       });
       toast({
-        title: "MCP Server Added",
-        description: `Server '${data.name}' was successfully added.`,
+        title: TOAST_TITLE_MCP_SERVER_ADDED,
+        description: TOAST_DESCRIPTION_MCP_SERVER_ADDED.replace('{serverName}', data.name),
         variant: "default",
       });
       setIsAddModalOpen(false); // Close modal
@@ -71,8 +87,8 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
     } catch (error) {
       console.error("Error adding MCP server:", error);
       toast({
-        title: "Error Adding Server",
-        description: "Failed to add the MCP server. Please try again.",
+        title: TOAST_TITLE_ERROR_ADDING_SERVER,
+        description: TOAST_DESCRIPTION_ERROR_ADDING_SERVER,
         variant: "destructive",
       });
     }
@@ -82,15 +98,15 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
     try {
       onRemove(serverId);
       toast({
-        title: "MCP Server Removed",
-        description: `Server '${serverName}' was successfully removed.`,
+        title: TOAST_TITLE_MCP_SERVER_REMOVED,
+        description: TOAST_DESCRIPTION_MCP_SERVER_REMOVED.replace('{serverName}', serverName),
         variant: "default",
       });
     } catch (error) {
       console.error("Error removing MCP server:", error);
       toast({
-        title: "Error Removing Server",
-        description: "Failed to remove the server. Please try again.",
+        title: TOAST_TITLE_ERROR_REMOVING_SERVER,
+        description: TOAST_DESCRIPTION_ERROR_REMOVING_SERVER,
         variant: "destructive",
       });
     }
@@ -100,15 +116,15 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
     try {
       onUpdate(server);
       toast({
-        title: "MCP Server Update",
-        description: `Server '${server.name}' update process initiated.`,
+        title: TOAST_TITLE_MCP_SERVER_UPDATED,
+        description: TOAST_DESCRIPTION_MCP_SERVER_UPDATED.replace('{serverName}', server.name),
         variant: "default",
       });
     } catch (error) {
       console.error("Error initiating MCP server update:", error);
       toast({
-        title: "Error Updating Server",
-        description: "Failed to initiate server update. Please try again.",
+        title: TOAST_TITLE_ERROR_UPDATING_SERVER,
+        description: TOAST_DESCRIPTION_ERROR_UPDATING_SERVER,
         variant: "destructive",
       });
     }
@@ -150,10 +166,10 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
                 <div className="flex items-center gap-2">
                   <Cpu size={14} className="text-primary" />
                   <span className="font-medium text-sm">{server.name}</span>
-                  {server.status === "connected" && (
+                  {server.status === MCP_SERVER_STATUS_CONNECTED && (
                     <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
                   )}
-                  {server.status === "error" && (
+                  {server.status === MCP_SERVER_STATUS_ERROR && (
                     <span className="h-2 w-2 rounded-full bg-red-500"></span>
                   )}
                 </div>

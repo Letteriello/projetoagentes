@@ -1,6 +1,51 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
 import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe } from "lucide-react";
+import {
+  TOOL_ID_WEB_SEARCH,
+  TOOL_ID_CALCULATOR,
+  TOOL_ID_KNOWLEDGE_BASE,
+  TOOL_ID_CALENDAR_ACCESS,
+  TOOL_ID_CUSTOM_API_INTEGRATION,
+  TOOL_ID_DATABASE_ACCESS,
+  TOOL_ID_CODE_EXECUTOR,
+  GENKIT_TOOL_NAME_WEB_SEARCH,
+  GENKIT_TOOL_NAME_CALCULATOR,
+  GENKIT_TOOL_NAME_KNOWLEDGE_BASE_RETRIEVE,
+  GENKIT_TOOL_NAME_CALENDAR_GET_EVENTS,
+  GENKIT_TOOL_NAME_CUSTOM_API_CALL,
+  GENKIT_TOOL_NAME_DATABASE_QUERY,
+  GENKIT_TOOL_NAME_CODE_EXECUTE,
+  CONFIG_FIELD_GOOGLE_API_KEY,
+  CONFIG_FIELD_GOOGLE_CSE_ID,
+  CONFIG_FIELD_ALLOWED_DOMAINS,
+  CONFIG_FIELD_BLOCKED_DOMAINS,
+  CONFIG_FIELD_KNOWLEDGE_BASE_ID,
+  CONFIG_FIELD_CALENDAR_API_ENDPOINT,
+  CONFIG_FIELD_OPENAPI_SPEC_URL,
+  CONFIG_FIELD_OPENAPI_API_KEY,
+  CONFIG_FIELD_ALLOWED_HTTP_METHODS,
+  CONFIG_FIELD_DB_TYPE,
+  CONFIG_FIELD_DB_HOST,
+  CONFIG_FIELD_DB_PORT,
+  CONFIG_FIELD_DB_NAME,
+  CONFIG_FIELD_DB_USER,
+  CONFIG_FIELD_DB_PASSWORD,
+  CONFIG_FIELD_DB_DESCRIPTION,
+  CONFIG_FIELD_ALLOWED_SQL_OPERATIONS,
+  CONFIG_FIELD_SANDBOX_ENDPOINT,
+  // CONFIG_FIELD_AUTHENTICATION_TYPE, // Not used in this file yet
+  // CONFIG_FIELD_API_KEY, // Not used in this file yet
+  // CONFIG_FIELD_OAUTH_CLIENT_ID, // Not used in this file yet
+  // CONFIG_FIELD_OAUTH_CLIENT_SECRET, // Not used in this file yet
+  // CONFIG_FIELD_OAUTH_TOKEN_URL, // Not used in this file yet
+  // CONFIG_FIELD_DATABASE_TYPE, // Not used in this file yet
+  // CONFIG_FIELD_CONNECTION_STRING, // Not used in this file yet
+  // CONFIG_FIELD_QUERY, // Not used in this file yet
+  // CONFIG_FIELD_CODE_LANGUAGE, // Not used in this file yet
+  // CONFIG_FIELD_CODE_TO_EXECUTE, // Not used in this file yet
+  // CONFIG_FIELD_MAX_OUTPUT_CHARACTERS, // Not used in this file yet
+} from "@/lib/constants";
 
 function getIconComponent(name?: string): LucideIcon {
   const iconMap: Record<string, LucideIcon> = {
@@ -28,17 +73,17 @@ import * as React from "react";
  */
 export const standardTools: AvailableTool[] = [
   { 
-    id: "webSearch", 
+    id: TOOL_ID_WEB_SEARCH,
     name: "Busca na Web (Google)", 
     icon: Search, 
     description: "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.", 
     hasConfig: true, 
     configType: "webSearch", 
     requiresAuth: true,
-    genkitToolName: "performWebSearch",
+    genkitToolName: GENKIT_TOOL_NAME_WEB_SEARCH,
     configFields: [
       {
-        id: "googleApiKey",
+        id: CONFIG_FIELD_GOOGLE_API_KEY,
         label: "Chave de API do Google",
         type: "password",
         required: true,
@@ -46,7 +91,7 @@ export const standardTools: AvailableTool[] = [
         description: "Chave de API do Google para Custom Search"
       },
       {
-        id: "googleCseId",
+        id: CONFIG_FIELD_GOOGLE_CSE_ID,
         label: "ID do Custom Search Engine",
         type: "text",
         required: true,
@@ -54,13 +99,13 @@ export const standardTools: AvailableTool[] = [
         description: "ID do mecanismo de busca personalizado"
       },
       {
-        id: "allowedDomains",
+        id: CONFIG_FIELD_ALLOWED_DOMAINS,
         label: "Allowed Domains (comma-separated)",
         type: "textarea",
         description: "List of domains the search is restricted to. E.g., 'example.com,another.org'"
       },
       {
-        id: "blockedDomains",
+        id: CONFIG_FIELD_BLOCKED_DOMAINS,
         label: "Blocked Domains (comma-separated)",
         type: "textarea",
         description: "List of domains to exclude from search. E.g., 'undesired.com,restricted.net'"
@@ -68,24 +113,24 @@ export const standardTools: AvailableTool[] = [
     ]
   },
   {
-    id: "calculator", 
+    id: TOOL_ID_CALCULATOR,
     name: "Calculadora", 
     icon: Calculator, 
     description: "Permite realizar cálculos matemáticos (via função Genkit).", 
     hasConfig: false,
-    genkitToolName: "calculator" 
+    genkitToolName: GENKIT_TOOL_NAME_CALCULATOR
   },
   { 
-    id: "knowledgeBase", 
+    id: TOOL_ID_KNOWLEDGE_BASE,
     name: "Consulta à Base de Conhecimento (RAG)", 
     icon: FileText, 
     description: "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.", 
     hasConfig: true, 
     configType: "knowledgeBase",
-    genkitToolName: "queryKnowledgeBase",
+    genkitToolName: GENKIT_TOOL_NAME_KNOWLEDGE_BASE_RETRIEVE,
     configFields: [
       {
-        id: "knowledgeBaseId",
+        id: CONFIG_FIELD_KNOWLEDGE_BASE_ID,
         label: "ID da Base de Conhecimento",
         type: "text",
         required: true,
@@ -95,17 +140,17 @@ export const standardTools: AvailableTool[] = [
     ]
   },
   { 
-    id: "calendarAccess", 
+    id: TOOL_ID_CALENDAR_ACCESS,
     name: "Acesso à Agenda/Calendário", 
     icon: CalendarDays, 
     description: "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.", 
     hasConfig: true, 
     configType: "calendarAccess",
     requiresAuth: true,
-    genkitToolName: "accessCalendar",
+    genkitToolName: GENKIT_TOOL_NAME_CALENDAR_GET_EVENTS,
     configFields: [
       {
-        id: "calendarApiEndpoint",
+        id: CONFIG_FIELD_CALENDAR_API_ENDPOINT,
         label: "Endpoint da API de Calendário",
         type: "text",
         required: true,
@@ -115,17 +160,17 @@ export const standardTools: AvailableTool[] = [
     ]
   },
   { 
-    id: "customApiIntegration", 
+    id: TOOL_ID_CUSTOM_API_INTEGRATION,
     name: "Integração com API Externa (OpenAPI)", 
     icon: Network, 
     description: "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.", 
     hasConfig: true, 
     configType: "openApi",
     requiresAuth: true,
-    genkitToolName: "invokeOpenAPI",
+    genkitToolName: GENKIT_TOOL_NAME_CUSTOM_API_CALL,
     configFields: [
       {
-        id: "openapiSpecUrl",
+        id: CONFIG_FIELD_OPENAPI_SPEC_URL,
         label: "URL do Spec OpenAPI",
         type: "text",
         required: true,
@@ -133,7 +178,7 @@ export const standardTools: AvailableTool[] = [
         description: "URL do esquema OpenAPI (Swagger)"
       },
       {
-        id: "openapiApiKey",
+        id: CONFIG_FIELD_OPENAPI_API_KEY,
         label: "Chave de API (opcional)",
         type: "password",
         required: false,
@@ -141,7 +186,7 @@ export const standardTools: AvailableTool[] = [
         description: "Chave de autenticação para a API"
       },
       {
-        id: "allowedHttpMethods",
+        id: CONFIG_FIELD_ALLOWED_HTTP_METHODS,
         label: "Allowed HTTP Methods (comma-separated)",
         type: "textarea",
         placeholder: "GET,POST",
@@ -150,17 +195,17 @@ export const standardTools: AvailableTool[] = [
     ]
   },
   {
-    id: "databaseAccess", 
+    id: TOOL_ID_DATABASE_ACCESS,
     name: "Acesso a Banco de Dados (SQL)", 
     icon: Database, 
     description: "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.", 
     hasConfig: true, 
     configType: "database",
     requiresAuth: true,
-    genkitToolName: "queryDatabase",
+    genkitToolName: GENKIT_TOOL_NAME_DATABASE_QUERY,
     configFields: [
       {
-        id: "dbType",
+        id: CONFIG_FIELD_DB_TYPE,
         label: "Tipo de Banco",
         type: "select",
         required: true,
@@ -173,7 +218,7 @@ export const standardTools: AvailableTool[] = [
         description: "Tipo de banco de dados SQL"
       },
       {
-        id: "dbHost",
+        id: CONFIG_FIELD_DB_HOST,
         label: "Host do Banco",
         type: "text",
         required: true,
@@ -181,7 +226,7 @@ export const standardTools: AvailableTool[] = [
         description: "Endereço do servidor do banco de dados"
       },
       {
-        id: "dbPort",
+        id: CONFIG_FIELD_DB_PORT,
         label: "Porta",
         type: "text",
         required: true,
@@ -189,7 +234,7 @@ export const standardTools: AvailableTool[] = [
         description: "Porta de conexão do banco de dados"
       },
       {
-        id: "dbName",
+        id: CONFIG_FIELD_DB_NAME,
         label: "Nome do Banco",
         type: "text",
         required: true,
@@ -197,7 +242,7 @@ export const standardTools: AvailableTool[] = [
         description: "Nome do banco de dados"
       },
       {
-        id: "dbUser",
+        id: CONFIG_FIELD_DB_USER,
         label: "Usuário",
         type: "text",
         required: true,
@@ -205,7 +250,7 @@ export const standardTools: AvailableTool[] = [
         description: "Nome de usuário para acesso ao banco"
       },
       {
-        id: "dbPassword",
+        id: CONFIG_FIELD_DB_PASSWORD,
         label: "Senha",
         type: "password",
         required: true,
@@ -213,7 +258,7 @@ export const standardTools: AvailableTool[] = [
         description: "Senha de acesso ao banco de dados"
       },
       {
-        id: "dbDescription",
+        id: CONFIG_FIELD_DB_DESCRIPTION,
         label: "Descrição (opcional)",
         type: "textarea",
         required: false,
@@ -221,7 +266,7 @@ export const standardTools: AvailableTool[] = [
         description: "Descrição das tabelas e estrutura do banco"
       },
       {
-        id: "allowedSqlOperations",
+        id: CONFIG_FIELD_ALLOWED_SQL_OPERATIONS,
         label: "Allowed SQL Operations (comma-separated)",
         type: "textarea",
         placeholder: "SELECT,INSERT",
@@ -230,16 +275,16 @@ export const standardTools: AvailableTool[] = [
     ]
   },
   {
-    id: "codeExecutor", 
+    id: TOOL_ID_CODE_EXECUTOR,
     name: "Execução de Código (Python Sandbox)", 
     icon: Code2, 
     description: "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.", 
     hasConfig: true, 
     configType: "codeExecutor",
-    genkitToolName: "executeCode",
+    genkitToolName: GENKIT_TOOL_NAME_CODE_EXECUTE,
     configFields: [
       {
-        id: "sandboxEndpoint",
+        id: CONFIG_FIELD_SANDBOX_ENDPOINT,
         label: "Endpoint do Sandbox",
         type: "text",
         required: true,

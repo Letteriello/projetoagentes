@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AgentSelector } from "@/components/agent-selector";
+import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Menu,
@@ -22,6 +22,7 @@ import {
 import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { ActiveChatTarget } from "@/hooks/use-chat-store"; // Import ActiveChatTarget
 
 interface Gem {
   id: string;
@@ -36,7 +37,7 @@ interface ADKAgent {
 
 interface ChatHeaderProps {
   onMenuToggle?: () => void;
-  activeChatTarget: string;
+  activeChatTargetDetails?: ActiveChatTarget | null; // Changed from activeChatTarget: string
   usingADKAgent: boolean;
   setUsingADKAgent: (value: boolean) => void;
   selectedADKAgentId: string | null;
@@ -55,7 +56,7 @@ interface ChatHeaderProps {
 
 export default function ChatHeader({
   onMenuToggle,
-  activeChatTarget,
+  activeChatTargetDetails, // Changed from activeChatTarget
   usingADKAgent,
   setUsingADKAgent,
   selectedADKAgentId,
@@ -93,6 +94,21 @@ export default function ChatHeader({
     return "Assistente IA";
   };
 
+  // Determine display name based on activeChatTargetDetails
+  let displayName = "Nova Conversa";
+  if (activeChatTargetDetails) {
+    const prefix =
+      activeChatTargetDetails.type === "gem"
+        ? "Gem: "
+        : activeChatTargetDetails.type === "agent"
+        ? "Agent: "
+        : activeChatTargetDetails.type === "adk-agent"
+        ? "ADK Agent: "
+        : "";
+    displayName = prefix + activeChatTargetDetails.name;
+  }
+
+
   return (
     <header className="flex items-center justify-between p-3 border-b bg-background/95 backdrop-blur-sm mx-auto w-full">
       {/* Lado esquerdo - Menu e título */}
@@ -107,7 +123,7 @@ export default function ChatHeader({
           <Menu className="h-5 w-5" />
         </Button>
         <h1 className="text-base font-medium truncate max-w-[120px] sm:max-w-xs md:max-w-md">
-          {activeChatTarget || "Nova Conversa"}
+          {displayName}
         </h1>
       </div>
 
