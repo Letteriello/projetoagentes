@@ -321,8 +321,34 @@ export function ChatUI() {
       return;
     }
     setPendingAgentConfig(null); // UI specific state for agent creator
-    // Pass the file to submitMessage. The store will need to handle it.
-    await store.submitMessage(store.inputValue, activeChatTarget, testRunConfig, file);
+
+    const { id: msgToastId, update: updateMsgToast, dismiss: dismissMsgToast } = toast({
+      title: "Sending Message...",
+      description: "Please wait.",
+      variant: "default"
+    });
+
+    try {
+      // Pass the file to submitMessage. The store will need to handle it.
+      await store.submitMessage(store.inputValue, activeChatTarget, testRunConfig, file);
+      updateMsgToast({
+        title: "Message Sent!",
+        // description: "Your message has been sent.", // Optional description
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error submitting message:", error);
+      updateMsgToast({
+        title: "Error Sending Message",
+        description: "Failed to send your message. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Dismiss the toast after a short delay
+      setTimeout(() => {
+        dismissMsgToast();
+      }, 3000); // 3 seconds
+    }
     inputRef.current?.focus(); // Keep UI focus logic
   };
 

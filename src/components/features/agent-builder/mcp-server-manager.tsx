@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useForm, FormProvider, SubmitHandler } from "react-hook-form"; // Added RHF imports
 import { zodResolver } from "@hookform/resolvers/zod"; // Added Zod resolver
 import { z } from "zod"; // Added Zod
+import { toast } from "@/hooks/use-toast"; // Import toast
 import { Cpu, Plus, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,13 +55,63 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
   });
 
   const handleAddServerSubmit: SubmitHandler<z.infer<typeof mcpServerFormSchema>> = (data) => {
-    onAdd({
-      id: crypto.randomUUID(), // Generate ID here
-      ...data,
-      status: "connected", // Set default status, or as per your logic
-    });
-    setIsAddModalOpen(false); // Close modal
-    methods.reset(); // Reset form for next time
+    try {
+      onAdd({
+        id: crypto.randomUUID(), // Generate ID here
+        ...data,
+        status: "connected", // Set default status, or as per your logic
+      });
+      toast({
+        title: "MCP Server Added",
+        description: `Server '${data.name}' was successfully added.`,
+        variant: "default",
+      });
+      setIsAddModalOpen(false); // Close modal
+      methods.reset(); // Reset form for next time
+    } catch (error) {
+      console.error("Error adding MCP server:", error);
+      toast({
+        title: "Error Adding Server",
+        description: "Failed to add the MCP server. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveServer = (serverId: string, serverName: string) => {
+    try {
+      onRemove(serverId);
+      toast({
+        title: "MCP Server Removed",
+        description: `Server '${serverName}' was successfully removed.`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error removing MCP server:", error);
+      toast({
+        title: "Error Removing Server",
+        description: "Failed to remove the server. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateServer = (server: MCPServerConfig) => {
+    try {
+      onUpdate(server);
+      toast({
+        title: "MCP Server Update",
+        description: `Server '${server.name}' update process initiated.`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error initiating MCP server update:", error);
+      toast({
+        title: "Error Updating Server",
+        description: "Failed to initiate server update. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleOpenDialog = () => {
@@ -115,7 +166,7 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => onUpdate(server)} // Assuming onUpdate opens another modal or form
+                  onClick={() => handleUpdateServer(server)}
                 >
                   <Settings size={14} />
                 </Button>
@@ -123,7 +174,7 @@ export const MCPServerManager: React.FC<MCPServerManagerProps> = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-destructive"
-                  onClick={() => onRemove(server.id)}
+                  onClick={() => handleRemoveServer(server.id, server.name)}
                 >
                   <Trash2 size={14} />
                 </Button>
