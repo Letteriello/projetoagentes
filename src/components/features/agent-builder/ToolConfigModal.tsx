@@ -293,12 +293,6 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
               This example does not explicitly render them based on `configuringTool.configFields`
               which would require a dynamic form generation logic.
            */}
-           {!["google-search", "openapi-custom", "database-connector"].includes(configuringTool.id) && configuringTool.configFields && configuringTool.configFields.length > 0 && !configuringTool.requiresAuth && (
-             <div className="p-3 border rounded-md bg-amber-50 text-amber-700">
-                <p className="text-sm font-medium">Configuração Adicional Necessária</p>
-                <p className="text-xs">Esta ferramenta tem campos de configuração ({configuringTool.configFields.map(f=>f.label).join(', ')}) que precisam de UI específica neste modal.</p>
-             </div>
-           )}
 
 
         {/* Guardrail UI fields - remain the same */}

@@ -225,7 +225,7 @@ export default function ToolsTab({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setToolToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => toolToDelete && handleDeleteCustomTool(toolIdToDelete)}>Excluir</AlertDialogAction>
+            <AlertDialogAction onClick={() => toolToDelete && handleDeleteCustomTool(toolToDelete)}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -390,22 +390,10 @@ export default function ToolsTab({
                             <Trash2Icon className="h-4 w-4" />
                           </Button>
                         )}
-<<<<<<< HEAD
-                        <Controller
-                          name={`toolsDetails.${index}.enabled`}
-                          render={({ field }) => (
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          )}
-                        />
-=======
                          <Controller
                             name={`tools`} 
                             control={control}
-                            render={({ field }) // field here isn't directly used for array
-                            }) => (
+                            render={({ field }) => ( // field here isn't directly used for array
                               <Switch
                                 id={`tool-select-${tool.id}`}
                                 checked={isSelected}
@@ -413,7 +401,6 @@ export default function ToolsTab({
                               />
                             )}
                           />
->>>>>>> ef3635d464ff311df41a780234788271d933d8ab
                       </div>
                     </div>
                   </Card>
