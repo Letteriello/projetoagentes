@@ -49,10 +49,14 @@ import {
   ChevronsUpDown,
   Brain,
   Settings2,
-  Loader2
+  Loader2,
+  // Wand2 // Already imported
 } from 'lucide-react';
 
 import { HelpModal } from '@/components/ui/HelpModal';
+import { aiConfigurationAssistantFlow, AiConfigurationAssistantOutput } from '@/ai/flows/aiConfigurationAssistantFlow';
+import AISuggestionDisplay from './AISuggestionDisplay';
+import { runFlow } from 'genkit/flow';
 import { InfoIcon } from '@/components/ui/InfoIcon'; // Though used in tabs, modal logic is here
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 
@@ -125,11 +129,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeEditTab, setActiveEditTab] = React.useState('general');
   const [currentStep, setCurrentStep] = React.useState(0);
-  // Add 'deploy' to tabOrder and update grid columns for TabsList later
   const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'deploy', 'review'];
 
   const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
   const [helpModalContent, setHelpModalContent] = React.useState<{ title: string; body: React.ReactNode } | null>(null);
+
+  // State for AI Suggestions
+  const [aiSuggestions, setAiSuggestions] = React.useState<AiConfigurationAssistantOutput | null>(null);
+  const [isSuggesting, setIsSuggesting] = React.useState(false);
+  const [suggestionError, setSuggestionError] = React.useState<string | null>(null);
 
   const showHelpModal = (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => {
     const content = agentBuilderHelpContent[contentKey.tab]?.[contentKey.field]?.modal;
@@ -218,6 +226,66 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     }
     // internalVersion could be incremented here if logic requires
     onSave(data);
+  };
+
+  const handleGetAiSuggestions = async () => {
+    setIsSuggesting(true);
+    setSuggestionError(null);
+    setAiSuggestions(null); // Clear previous suggestions
+
+    try {
+      const currentConfig = methods.getValues().config as LLMAgentConfig; // Assuming LLM type for goal/tasks
+      const agentGoal = currentConfig?.agentGoal;
+      const agentTasks = currentConfig?.agentTasks;
+
+      if (!agentGoal || !agentTasks || agentTasks.length === 0) {
+        setSuggestionError("Por favor, defina o objetivo e as tarefas do agente primeiro para obter sugestões relevantes.");
+        setIsSuggesting(false);
+        return;
+      }
+
+      // console.log("Requesting AI suggestions with goal:", agentGoal, "and tasks:", agentTasks);
+      const response = await runFlow(aiConfigurationAssistantFlow, {
+        agentGoal,
+        agentTasks,
+        suggestionContext: 'fullConfig',
+      });
+      // console.log("AI suggestions received:", response);
+      setAiSuggestions(response);
+    } catch (error) {
+      console.error("Failed to get AI suggestions:", error);
+      setSuggestionError("Falha ao obter sugestões da IA. Verifique o console para mais detalhes.");
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const handleApplySuggestions = (suggestionsToApply: AiConfigurationAssistantOutput) => {
+    // console.log("Applying suggestions:", suggestionsToApply);
+    const configPath = 'config'; // Base path for LLMAgentConfig fields
+
+    if (suggestionsToApply.suggestedPersonality) {
+      methods.setValue(`${configPath}.agentPersonality` as any, suggestionsToApply.suggestedPersonality, { shouldValidate: true, shouldDirty: true });
+    }
+    if (suggestionsToApply.suggestedRestrictions) {
+      methods.setValue(`${configPath}.agentRestrictions` as any, suggestionsToApply.suggestedRestrictions, { shouldValidate: true, shouldDirty: true });
+    }
+    if (suggestionsToApply.suggestedModel) {
+      methods.setValue(`${configPath}.agentModel` as any, suggestionsToApply.suggestedModel, { shouldValidate: true, shouldDirty: true });
+    }
+    if (suggestionsToApply.suggestedTemperature !== undefined) {
+      methods.setValue(`${configPath}.agentTemperature` as any, suggestionsToApply.suggestedTemperature, { shouldValidate: true, shouldDirty: true });
+    }
+    if (suggestionsToApply.suggestedTools && suggestionsToApply.suggestedTools.length > 0) {
+      const toolIds = suggestionsToApply.suggestedTools.map(t => t.id);
+      methods.setValue('tools', toolIds, { shouldValidate: true, shouldDirty: true });
+       // Additionally, update toolsDetails if your structure requires it
+      const toolsDetails = suggestionsToApply.suggestedTools.map(t => ({ id: t.id, name: t.name, description: t.description }));
+      methods.setValue('toolsDetails', toolsDetails, { shouldValidate: true, shouldDirty: true });
+    }
+
+    setAiSuggestions(null); // Close the suggestion display
+    // Optionally, trigger a toast notification for success
   };
 
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -370,6 +438,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                   <BehaviorTab
                     agentToneOptions={agentToneOptions} // Pass only necessary static options
                     showHelpModal={showHelpModal}
+                    onGetAiSuggestions={handleGetAiSuggestions}
+                    isSuggesting={isSuggesting}
                   />
                 </TabsContent>
 

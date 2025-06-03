@@ -14,10 +14,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { SavedAgentConfiguration, WorkflowDetailedType } from '@/types/agent-configs-new'; // Updated import
 import { InfoIcon } from '@/components/ui/InfoIcon'; // Assuming InfoIcon is available
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content'; // For tooltips
+import { Button } from '@/components/ui/button';
+import { Wand2, Loader2 } from 'lucide-react';
 
 interface BehaviorTabProps {
   agentToneOptions: string[];
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
+  onGetAiSuggestions?: () => void;
+  isSuggesting?: boolean;
 }
 
 type FormContextType = SavedAgentConfiguration;
@@ -31,7 +35,7 @@ const workflowDetailedTypeOptions: { label: string; value: WorkflowDetailedType 
   { label: "State Machine", value: "stateMachine" },
 ];
 
-export default function BehaviorTab({ agentToneOptions, showHelpModal }: BehaviorTabProps) {
+export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSuggestions, isSuggesting }: BehaviorTabProps) {
   const { control, watch, formState: { errors } } = useFormContext<FormContextType>();
   const agentType = watch('config.type');
 
@@ -180,6 +184,27 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal }: Behavio
             )}
           />
           {/* TODO: Add fields for agentRestrictions, modelSafetySettings, maxHistoryTokens, maxTokensPerResponse */}
+
+          {/* AI Suggestions Button */}
+          {onGetAiSuggestions && agentType === 'llm' && (
+            <div className="mt-6 pt-6 border-t">
+               <h3 className="text-lg font-medium mb-2">Assistente de Configuração IA</h3>
+               <p className="text-sm text-muted-foreground mb-4">
+                Obtenha sugestões da IA para personalidade, restrições, modelo, temperatura e ferramentas com base no objetivo e tarefas definidos para o agente.
+               </p>
+              <Button type="button" onClick={onGetAiSuggestions} disabled={isSuggesting} className="w-full sm:w-auto">
+                {isSuggesting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="mr-2 h-4 w-4" />
+                )}
+                Sugerir Configurações de Comportamento (IA)
+              </Button>
+               <p className="text-xs text-muted-foreground mt-2">
+                Certifique-se de que o "Agent Goal" e "Agent Tasks" estejam preenchidos para melhores sugestões.
+              </p>
+            </div>
+          )}
         </>
       )}
 
