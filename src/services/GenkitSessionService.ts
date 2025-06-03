@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { Tool } from '@genkit-ai/sdk';
 import { ai } from '@/ai/genkit';
 
 // Tipos que simulam a estrutura do Genkit/ADK
@@ -89,7 +90,7 @@ export class GenkitSessionService {
     options: {
       modelId?: string;
       systemPrompt?: string;
-      tools?: any[];
+      tools?: Tool[];
       temperature?: number;
       fileDataUri?: string;
     } = {}
