@@ -19,6 +19,25 @@ export interface Conversation {
   // summary?: string; // Optional: for a brief overview
 }
 
+export interface ToolCallData {
+  name: string;
+  input?: Record<string, any>; // Or a more specific type
+}
+
+// Defines structured error details that tools can return or be used by the system.
+export interface ErrorDetails {
+  code?: string;
+  message: string;
+  details?: any;
+}
+
+export interface ToolResponseData {
+  name: string;
+  output?: any; // Output might not exist if there's an error
+  errorDetails?: ErrorDetails; // Structured error information
+  status: 'success' | 'error' | 'pending'; // Status should always be set
+}
+
 export interface ChatMessageUI {
   id: string;
   text: string;
@@ -29,12 +48,14 @@ export interface ChatMessageUI {
   isStreaming?: boolean; // Added for streaming
   isError?: boolean; // Added/Ensured
   status?: 'pending' | 'completed' | 'error'; // Added status for UI
-  toolUsed?: {
+  toolUsed?: { // This field might be deprecated in favor of toolCall/toolResponse
     name: string;
     status?: 'pending' | 'success' | 'error';
     input?: Record<string, any>; // Or a more specific type if available
     output?: any; // Or a more specific type if available
   };
+  toolCall?: ToolCallData;
+  toolResponse?: ToolResponseData; // This will now use the updated ToolResponseData
   feedback?: 'liked' | 'disliked' | null; // Added for message feedback
 }
 

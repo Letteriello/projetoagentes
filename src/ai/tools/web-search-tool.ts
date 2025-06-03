@@ -16,6 +16,14 @@ export const SearchResultSchema = z.object({
 });
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 
+// Define the Zod schema for structured error details
+export const ErrorDetailsSchema = z.object({
+  code: z.string().optional().describe("An optional error code (e.g., API_ERROR, VALIDATION_ERROR)."),
+  message: z.string().describe("A human-readable error message."),
+  details: z.any().optional().describe("Any additional details or context about the error."),
+});
+export type ErrorDetails = z.infer<typeof ErrorDetailsSchema>;
+
 // Define the configuration interface for the tool
 export interface WebSearchToolConfig {
   apiKey?: string; // API key for the search service
@@ -36,7 +44,7 @@ export const WebSearchInputSchema = z.object({
 export const WebSearchOutputSchema = z.object({
   results: z.array(SearchResultSchema).describe("Array of search results."),
   message: z.string().optional().describe("A message summarizing the search outcome."),
-  error: z.string().optional().describe("Error message if the search failed."),
+  errorDetails: ErrorDetailsSchema.optional().describe("Structured error information if the web search failed."),
 });
 
 /**
@@ -136,16 +144,30 @@ export function createPerformWebSearchTool(
         console.error(`[${toolName}] Error during web search:`, error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during web search.';
 
+        let errorCode = 'UNKNOWN_TOOL_ERROR';
+        let errorDetailsData: any = undefined;
+
         if (axios.isAxiosError(error)) {
-          console.error(`[${toolName}] Axios error details:`, error.response?.data);
-          return {
-            results: [], // Ensure results is always an array
-            error: `Web search failed (Axios Error): ${errorMessage} (Status: ${error.response?.status || 'N/A'})`,
-          };
+          errorCode = error.response?.status ? `AXIOS_${error.response.status}` : 'AXIOS_ERROR';
+          errorDetailsData = error.response?.data;
+          console.error(`[${toolName}] Axios error details:`, errorDetailsData);
+        } else if (error instanceof z.ZodError) {
+          errorCode = 'INPUT_VALIDATION_ERROR';
+          errorDetailsData = error.issues;
         }
+        // Example for custom error types, can be extended
+        // else if (error.name === 'SimulatedError') {
+        //   errorCode = 'SIMULATED_TOOL_ERROR';
+        // }
+
         return {
-          results: [], // Ensure results is always an array
-          error: `Web search failed: ${errorMessage}`,
+          results: [], // Always return empty results array on error
+          message: undefined, // Clear any success message
+          errorDetails: {
+            code: errorCode,
+            message: errorMessage,
+            details: errorDetailsData,
+          },
         };
       }
     },

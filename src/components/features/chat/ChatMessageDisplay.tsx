@@ -12,6 +12,9 @@ import {
   FileBadge, // Using FileBadge for CSV/Spreadsheet as per previous subtask consistency
   FileCode2,
   FileType as FileIcon, // Default file icon
+  Settings2,      // Added for tool calls
+  CheckCircle2,   // Added for tool success
+  XCircle,        // Added for tool error
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -95,46 +98,96 @@ export default function ChatMessageDisplay({
             : "bg-card text-card-foreground border border-border/50 rounded-bl-none",
         )}
       >
-        {/* Seção para exibir a mensagem de texto usando ReactMarkdown. */}
-        {message.text && (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]} // Plugin para suporte a GitHub Flavored Markdown.
-            className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2"
-            components={{
-              // Componente customizado para renderizar blocos de código com realce de sintaxe.
-              code({ node, inline, className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || "");
-                return !inline && match ? (
-                  <CodeBlock
-                    language={match[1]}
-                    value={String(children).replace(/\n$/, "")}
-                    {...props}
-                  />
-                ) : (
-                  <code className={cn(className, "text-sm")} {...props}>
-                    {children}
-                  </code>
-                );
-              },
-              // Componente customizado para renderizar parágrafos.
-              // Adiciona o cursor piscante se a mensagem for do agente e estiver sendo transmitida.
-              p: ({ children }) => {
-                return (
-                  <p>
-                    {children}
-                    {/* Adiciona o cursor piscante aqui, verificando message.isStreaming diretamente do objeto message */}
-                    {isAgent && message.isStreaming && <BlinkingCursor />}
-                  </p>
-                );
-              },
-            }}
-          >
-            {message.text}
-          </ReactMarkdown>
-        )}
+        <div className="flex flex-col"> {/* Wrapper for icon + text and details sections */}
+          <div className="flex items-start"> {/* Flex container for icon (if any) and text */}
+            {/* Icon for Tool Call */}
+            {message.toolCall && (
+              <Settings2 className="h-4 w-4 mr-2 self-center flex-shrink-0" />
+            )}
+            {/* Icon for Tool Response */}
+            {message.toolResponse && message.toolResponse.status === 'success' && (
+              <CheckCircle2 className="h-4 w-4 mr-2 self-center text-green-500 flex-shrink-0" />
+            )}
+            {message.toolResponse && message.toolResponse.status === 'error' && (
+              <XCircle className="h-4 w-4 mr-2 self-center text-red-500 flex-shrink-0" />
+            )}
+            {/* Seção para exibir a mensagem de texto usando ReactMarkdown. */}
+            {message.text && (
+              <div className="flex-grow min-w-0"> {/* Ensure text content can shrink and wrap */}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]} // Plugin para suporte a GitHub Flavored Markdown.
+                  className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2"
+                  components={{
+                    // Componente customizado para renderizar blocos de código com realce de sintaxe.
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || "");
+                      return !inline && match ? (
+                        <CodeBlock
+                          language={match[1]}
+                          value={String(children).replace(/\n$/, "")}
+                          {...props}
+                        />
+                      ) : (
+                        <code className={cn(className, "text-sm")} {...props}>
+                          {children}
+                        </code>
+                      );
+                    },
+                    // Componente customizado para renderizar parágrafos.
+                    // Adiciona o cursor piscante se a mensagem for do agente e estiver sendo transmitida.
+                    p: ({ children }) => {
+                      return (
+                        <p>
+                          {children}
+                          {/* Adiciona o cursor piscante aqui, verificando message.isStreaming diretamente do objeto message */}
+                          {isAgent && message.isStreaming && <BlinkingCursor />}
+                        </p>
+                      );
+                    },
+                  }}
+                >
+                  {message.text}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+
+          {/* Details for Tool Call Input */}
+          {message.toolCall && message.toolCall.input && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer">Detalhes da Entrada</summary>
+              <pre className="bg-muted p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                {JSON.stringify(message.toolCall.input, null, 2)}
+              </pre>
+            </details>
+          )}
+
+          {/* Details for Tool Response Output (Success) */}
+          {message.toolResponse && message.toolResponse.status === 'success' && message.toolResponse.output && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer">Detalhes da Saída</summary>
+              <pre className="bg-muted p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                {typeof message.toolResponse.output === 'object' ? JSON.stringify(message.toolResponse.output, null, 2) : String(message.toolResponse.output)}
+              </pre>
+            </details>
+          )}
+
+          {/* Details for Tool Response Error */}
+          {message.toolResponse && message.toolResponse.status === 'error' && message.toolResponse.errorDetails && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer">Detalhes do Erro</summary>
+              <pre className="bg-muted p-2 rounded-md overflow-x-auto text-red-600 whitespace-pre-wrap break-all">
+                {`Code: ${message.toolResponse.errorDetails.code || 'N/A'}
+Message: ${message.toolResponse.errorDetails.message}${message.toolResponse.errorDetails.details ? `
+Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.stringify(message.toolResponse.errorDetails.details, null, 2) : message.toolResponse.errorDetails.details}` : ''}`}
+              </pre>
+            </details>
+          )}
+        </div>
+
         {/* Seção para exibir imagens anexadas. */}
         {message.imageUrl && (
-          <div className="mt-2">
+          <div className="mt-2"> {/* This mt-2 might need adjustment if details are present */}
             <Image
               src={message.imageUrl}
               alt={message.fileName || "Imagem anexada"} // Texto alternativo para a imagem.
@@ -148,7 +201,7 @@ export default function ChatMessageDisplay({
         {message.fileName && !message.imageUrl && (
           <div
             className={cn(
-              "mt-2 p-2.5 rounded-md flex items-center gap-2.5 text-sm",
+              "mt-2 p-2.5 rounded-md flex items-center gap-2.5 text-sm", // This mt-2 might need adjustment
               isUser ? "bg-primary/80" : "bg-muted/50 border border-border/30",
             )}
           >
@@ -166,7 +219,7 @@ export default function ChatMessageDisplay({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleDownload} // Aciona a função de download ao clicar.
+                onClick={handleDownload} // Aciona o função de download ao clicar.
                 className={cn(
                   "h-6 w-6 p-0", // Classes de estilo para o botão.
                   isUser
