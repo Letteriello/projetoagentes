@@ -1,9 +1,9 @@
+// src/app/agent-builder/page.tsx
 "use client";
 
 import * as React from "react";
-import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-// Card components are used, keep them.
 import {
   Card,
   CardHeader,
@@ -17,218 +17,44 @@ import {
   Plus,
   Layers,
   Info,
-  // Icons below are now part of iconComponents in agentBuilderConfig.tsx,
-  // so they are not directly needed here UNLESS AgentBuilderPage itself uses them.
-  // Search, Calculator, FileText, CalendarDays, Network, Database, Code2, // Removed these direct icon imports
-  // Workflow, Brain, FileJson, Settings2 as ConfigureIcon,
-  // GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon,
-  // Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon,
-  // Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon,
+  MessageSquareText,
+  Edit3,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
-// import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjusted path - REMOVED
 import { cn } from "@/lib/utils";
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
-import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog"; // Import new dialog
+import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-// import { AvailableTool } from "@/types/tool-types"; // Removed, will use from agentBuilderConfig
-
-// Comment related to AvailableTool import removed as the import itself is removed.
-
-// export const availableTools: AvailableTool[] = [ // Removed local definition
-//   {
-//     id: "webSearch",
-//     label: "Busca na Web (Google)",
-//     name: "webSearch",
-//     type: "genkit_native",
-//     icon: Search, // This would cause an error as Search is removed
-//     description:
-//       "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.",
-//     hasConfig: true,
-//     genkitToolName: "performWebSearch",
-//   },
-//   {
-//     id: "calculator",
-//     label: "Calculadora",
-//     name: "calculator",
-//     type: "genkit_native",
-//     icon: Calculator, // This would cause an error
-//     description: "Permite realizar cálculos matemáticos (via função Genkit).",
-//     genkitToolName: "calculator",
-//   },
-//   {
-//     id: "knowledgeBase",
-//     label: "Consulta à Base de Conhecimento (RAG)",
-//     name: "knowledgeBase",
-//     type: "genkit_native",
-//     icon: FileText, // This would cause an error
-//     description:
-//       "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.",
-//     hasConfig: true,
-//     genkitToolName: "queryKnowledgeBase",
-//   },
-//   {
-//     id: "calendarAccess",
-//     label: "Acesso à Agenda/Calendário",
-//     name: "calendarAccess",
-//     type: "genkit_native",
-//     icon: CalendarDays, // This would cause an error
-//     description:
-//       "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.",
-//     hasConfig: true,
-//     genkitToolName: "accessCalendar",
-//   },
-//   {
-//     id: "customApiIntegration",
-//     label: "Integração com API Externa (OpenAPI)",
-//     name: "customApiIntegration",
-//     type: "genkit_native",
-//     icon: Network, // This would cause an error
-//     description:
-//       "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.",
-//     hasConfig: true,
-//     genkitToolName: "invokeOpenAPI",
-//   },
-//   {
-//     id: "databaseAccess",
-//     label: "Acesso a Banco de Dados (SQL)",
-//     name: "databaseAccess",
-//     type: "genkit_native",
-//     icon: Database, // This would cause an error
-//     description:
-//       "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.",
-//     hasConfig: true,
-//     genkitToolName: "queryDatabase",
-//   },
-//   {
-//     id: "codeExecutor",
-//     label: "Execução de Código (Python Sandbox)",
-//     name: "codeExecutor",
-//     type: "genkit_native",
-//     icon: Code2, // This would cause an error
-//     description:
-//       "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.",
-//     hasConfig: true,
-//     genkitToolName: "executeCode",
-//   },
-// ];
-
-// Comment related to AvailableTool import removed as the import itself is removed.
-
-// A lista de ferramentas já foi definida acima. // This comment is now misleading
-// Se precisar adicionar mais ferramentas, adicione-as ao array existente acima.
-
-// export const agentToneOptions = [ // Removed local definition
-//   { id: "friendly", label: "Amigável e Prestativo" },
-//   { id: "professional", label: "Profissional e Direto" },
-//   { id: "formal", label: "Formal e Educado" },
-//   { id: "casual", label: "Casual e Descontraído" },
-//   { id: "funny", label: "Engraçado e Divertido" },
-//   { id: "analytical", label: "Analítico e Detalhista" },
-//   { id: "concise", label: "Conciso e Objetivo" },
-//   { id: "empathetic", label: "Empático e Compreensivo" },
-//   { id: "creative", label: "Criativo e Inspirador" },
-// ];
-
-// export const agentTypeOptions = [ // Removed local definition
-//   {
-//     id: "custom" as const,
-//     label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)",
-//     icon: FileJson as ReactNode, // This would cause an error
-//     description:
-//       "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl).",
-//   },
-//   {
-//     id: "a2a" as const,
-//     label: "Agente-para-Agente (A2A)",
-//     icon: Network as ReactNode, // This would cause an error
-//     description:
-//       "Permite comunicação e cooperação entre múltiplos agentes para solucionar tarefas complexas através de interações coordenadas.",
-//   },
-// ];
-
-// export type AgentFramework = // Removed local definition
-//   | "genkit"
-//   | "crewai"
-//   | "langchain"
-//   | "custom"
-//   | "none";
-
-// export interface AgentConfigBase { // Removed local definition
-//   agentName: string;
-//   agentDescription: string;
-//   agentVersion: string;
-//   agentIcon?: string;
-//   agentTools: string[];
-//   isRootAgent?: boolean;
-//   subAgents?: string[];
-//   globalInstruction?: string;
-//   agentFramework?: AgentFramework;
-// }
-
-// Imports from the new data file
 import type {
-  AgentConfigBase,
-  LLMAgentConfig,
-  WorkflowAgentConfig,
-  CustomAgentConfig,
-  A2AAgentSpecialistConfig,
-  A2AConfig,
-  ToolConfigData,
   SavedAgentConfiguration,
-  AgentFramework,
-  AgentType,
-  // WorkflowDetailedType, // Assuming not directly used in page.tsx based on initial assessment
-  // TerminationConditionType,
-  // StatePersistenceType,
-  // ArtifactStorageType,
-  // StateScope,
-  // ToolConfigField,
-  // CommunicationChannel,
-  // ArtifactDefinition,
-  // ArtifactsConfig,
-  // InitialStateValue,
-  // StateValidationRule,
-  // StatePersistenceConfig,
-  // KnowledgeSource,
-  // RagMemoryConfig,
-  AgentConfig,
-  AvailableTool // Added here
+  AvailableTool
 } from '@/types/agent-types';
 
 import {
-  // Data exports
-  availableTools,
+  availableTools as defaultAvailableTools,
   agentToneOptions,
   agentTypeOptions,
   iconComponents
-  // agentTemplates, // Removed as it's not used in this file
-  // AgentTemplate // Removed as it's not used in this file
 } from "@/data/agentBuilderConfig";
-import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui"; // Nova UI
-import { MessageSquareText, Edit3 } from "lucide-react"; // Ícones para alternar
-// Import the new monitoring components
+import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui";
 import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
 import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
-import { v4 as uuidv4 } from 'uuid'; // Import uuidv4
+import { v4 as uuidv4 } from 'uuid';
 import { HelpModal } from '@/components/ui/HelpModal';
 import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-builder-help-content';
-import { FeedbackButton } from "@/components/features/agent-builder/feedback-button"; // Added
-import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal"; // Added
+import { FeedbackButton } from "@/components/features/agent-builder/feedback-button";
+import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal";
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
-  // IMPORTANT: The useAgents hook now returns addAgent, updateAgent, deleteAgent that call the API.
-  // The setSavedAgents directly might not be the primary way to update if API calls refresh the list.
-  // However, for optimistic updates or direct client-side list manipulation (like after delete), it's still useful.
   const { savedAgents, addAgent: addAgentViaContext, updateAgent: updateAgentViaContext, deleteAgent: deleteAgentViaContext, isLoadingAgents } = useAgents();
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
@@ -237,19 +63,18 @@ export default function AgentBuilderPage() {
   const [selectedAgentForMonitoring, setSelectedAgentForMonitoring] = React.useState<SavedAgentConfiguration | null>(null);
   const [currentViewTab, setCurrentViewTab] = React.useState<'details' | 'monitoring'>('details');
   const [isMounted, setIsMounted] = React.useState(false);
-  const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form"); // Novo estado
+  const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form");
 
-  // State for the new Save As Template dialog
   const [isSaveAsTemplateDialogOpen, setIsSaveAsTemplateDialogOpen] = React.useState(false);
   const [currentAgentForTemplating, setCurrentAgentForTemplating] = React.useState<SavedAgentConfiguration | null>(null);
 
   const [activeTutorial, setActiveTutorial] = React.useState<GuidedTutorial | null>(null);
   const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
-  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = React.useState(false); // Added
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = React.useState(false);
 
   const searchParams = useSearchParams();
-  const router = useRouter(); // For clearing URL param
+  const router = useRouter();
 
   const startTutorial = (tutorialId: string) => {
     const tutorial = guidedTutorials.find(t => t.id === tutorialId);
@@ -280,65 +105,39 @@ export default function AgentBuilderPage() {
 
   React.useEffect(() => {
     const templateId = searchParams.get("templateId");
-
     if (templateId) {
       const loadTemplate = async () => {
         try {
           const template = await getAgentTemplate(templateId);
           if (template) {
-            // Prepare a new agent configuration from the template
-            const {
-              id, // Original template ID - do not reuse for the new agent
-              userId, // Original template owner - do not reuse
-              createdAt, // Original template creation date
-              updatedAt, // Original template update date
-              isTemplate, // New agent is not a template itself (yet)
-              // templateId: originalTemplateId, // This was the ID of the template it was based on, if any. Not needed for the new agent's templateId field.
-              ...restOfTemplateData
-            } = template;
-
+            const { id, userId, createdAt, updatedAt, isTemplate, ...restOfTemplateData } = template;
             const newAgentFromTemplate: SavedAgentConfiguration = {
               ...restOfTemplateData,
-              id: uuidv4(), // Generate a new unique ID for this new agent draft
-              agentName: `Cópia de ${template.agentName}`, // Suggest a new name
-              // agentDescription: template.agentDescription, // Already in restOfTemplateData
-              // config: template.config, // Already in restOfTemplateData
-              // tools: template.tools, // Already in restOfTemplateData
-              // toolConfigsApplied: template.toolConfigsApplied, // Already in restOfTemplateData
-              templateId: templateId, // Link to the template it was created from
-              isTemplate: false, // This new config is an agent, not a template
-              createdAt: new Date().toISOString(), // Set new creation time
-              updatedAt: new Date().toISOString(), // Set new update time
-              // userId: currentUserId, // Set current user ID if available
+              id: uuidv4(),
+              agentName: `Cópia de ${template.agentName}`,
+              templateId: templateId,
+              isTemplate: false,
+              isFavorite: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             };
-
             setEditingAgent(newAgentFromTemplate);
             setIsBuilderModalOpen(true);
-            // Clear the templateId from URL to prevent re-triggering
-            // Using window.history.replaceState for simplicity with next/navigation's current router
-            // A more Next.js idiomatic way might involve router.replace with careful handling of state
-            window.history.replaceState(null, '', '/agent-builder');
-
+            // Remove the templateId from URL after loading
+            router.replace('/agent-builder', undefined);
           } else {
-            toast({
-              title: "Template não encontrado",
-              description: "Não foi possível carregar o template selecionado.",
-              variant: "destructive",
-            });
+            toast({ title: "Template não encontrado", variant: "destructive" });
+             router.replace('/agent-builder', undefined);
           }
         } catch (error) {
           console.error("Erro ao carregar template:", error);
-          toast({
-            title: "Erro ao Carregar Template",
-            description: "Ocorreu um problema ao tentar carregar o template.",
-            variant: "destructive",
-          });
+          toast({ title: "Erro ao Carregar Template", variant: "destructive" });
+           router.replace('/agent-builder', undefined);
         }
       };
-
       loadTemplate();
     }
-  }, [searchParams, router, toast]); // Add router and toast to dependencies
+  }, [searchParams, router, toast]);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -346,141 +145,125 @@ export default function AgentBuilderPage() {
 
   const handleOpenCreateAgentModal = () => {
     setEditingAgent(null);
+    setBuildMode("form"); // Ensure form mode when creating new
     setIsBuilderModalOpen(true);
   };
 
   const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
     setEditingAgent(agentToEdit);
-    setSelectedAgentForMonitoring(null); // Clear monitoring view when opening edit modal
-    setCurrentViewTab('details'); // Default to details tab
+    setSelectedAgentForMonitoring(null);
+    setCurrentViewTab('details');
+    setBuildMode("form"); // Ensure form mode
     setIsBuilderModalOpen(true);
   };
 
   const handleViewAgentMonitoring = (agentToView: SavedAgentConfiguration) => {
     setSelectedAgentForMonitoring(agentToView);
-    setEditingAgent(null); // Clear editing modal state
+    setEditingAgent(null);
     setIsBuilderModalOpen(false);
-    setCurrentViewTab('monitoring'); // Switch to monitoring tab
-     // Potentially switch buildMode to 'form' if monitoring is part of that view.
-    // For now, let's assume monitoring view can exist independently or alongside form elements.
-    // If buildMode should be 'form' to see this, uncomment:
-    // setBuildMode('form');
+    setBuildMode("form"); // Ensure form mode for monitoring view consistency
+    setCurrentViewTab('monitoring');
   };
 
-  const handleEditAgentWithMode = (agentToEdit: SavedAgentConfiguration, mode: "form" | "chat") => {
-    setEditingAgent(agentToEdit);
-    setSelectedAgentForMonitoring(null);
-    setBuildMode(mode);
-    if (mode === 'form') {
-      setCurrentViewTab('details');
-      setIsBuilderModalOpen(true);
-    }
-  };
-
-  // Updated to use context functions that call the API
   const handleSaveAgent = async (agentConfig: SavedAgentConfiguration) => {
     let result: SavedAgentConfiguration | null = null;
-    if (editingAgent) { // For existing agents, agentConfig.id should be editingAgent.id
-      const updatePayload: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> = { ...agentConfig };
-      delete (updatePayload as any).id; // Ensure ID is not in the payload for update, API uses path param
-      delete (updatePayload as any).userId;
-      delete (updatePayload as any).createdAt;
-      delete (updatePayload as any).updatedAt;
+    // Preserve existing isFavorite status if editing, default to false if new or not set
+    const existingAgent = savedAgents.find(a => a.id === agentConfig.id);
+    const dataToSave = {
+      ...agentConfig,
+      isFavorite: agentConfig.isFavorite ?? existingAgent?.isFavorite ?? false
+    };
 
-      result = await updateAgentViaContext(editingAgent.id, updatePayload);
+    if (editingAgent || savedAgents.some(a => a.id === agentConfig.id)) {
+      const agentIdToUpdate = editingAgent?.id || agentConfig.id;
+      // Ensure not to spread fields that shouldn't be updated directly or are managed by backend/context
+      const { id, userId, createdAt, updatedAt, ...updatePayload } = dataToSave;
+      result = await updateAgentViaContext(agentIdToUpdate, updatePayload);
       if (result) {
-        toast({
-          title: "Agente Atualizado!",
-          description: `O agente "${result.agentName}" foi atualizado.`,
-        });
+        toast({ title: "Agente Atualizado!", description: `O agente "${result.agentName}" foi atualizado.` });
       }
     } else {
-      // For new agents, agentConfig.id might be undefined or a placeholder from client
-      const { id, createdAt, updatedAt, userId, ...newAgentData } = agentConfig;
+      const { id, createdAt, updatedAt, userId, ...newAgentData } = dataToSave;
       result = await addAgentViaContext(newAgentData as Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>);
       if (result) {
-        toast({
-          title: "Agente Criado!",
-          description: `O agente "${result.agentName}" foi adicionado à sua lista.`,
-        });
+        toast({ title: "Agente Criado!", description: `O agente "${result.agentName}" foi adicionado.` });
       }
     }
-    if (result) { // If save was successful (either add or update)
-        setEditingAgent(null); // Clear editing state
-        // setSelectedAgentForMonitoring(null); // Also clear monitoring selection if tied to edit
-        setIsBuilderModalOpen(false); // Close modal
+    if (result) {
+        setEditingAgent(null);
+        setIsBuilderModalOpen(false);
+    } else {
+        toast({ title: "Erro ao Salvar", description: "Não foi possível salvar o agente.", variant: "destructive" });
     }
-    // The context should ideally refresh the savedAgents list after add/update
   };
 
   const handleDeleteAgent = async (agentIdToDelete: string) => {
     if (selectedAgentForMonitoring?.id === agentIdToDelete) {
-      setSelectedAgentForMonitoring(null); // Clear monitoring view if the deleted agent was being monitored
+      setSelectedAgentForMonitoring(null);
     }
     if (currentAgentForTemplating?.id === agentIdToDelete) {
-      setCurrentAgentForTemplating(null); // Clear if it was about to be templated
+      setCurrentAgentForTemplating(null);
       setIsSaveAsTemplateDialogOpen(false);
     }
     const success = await deleteAgentViaContext(agentIdToDelete);
     if (success) {
-      toast({
-        title: "Agente Excluído",
-        description: "O agente foi removido da lista.",
-      });
+      toast({ title: "Agente Excluído" });
+    } else {
+      toast({ title: "Erro ao Excluir", variant: "destructive" });
     }
-    // Context should refresh the list
   };
 
   const handleSaveAsTemplate = async (agent: SavedAgentConfiguration) => {
-    // This function now just opens the dialog
     setCurrentAgentForTemplating(agent);
     setIsSaveAsTemplateDialogOpen(true);
   };
 
   const executeSaveAsTemplate = async (templateDetails: { useCases: string[]; templateDetailsPreview: string }) => {
-    if (!currentAgentForTemplating) {
-      toast({ title: "Erro", description: "Nenhum agente selecionado para salvar como template.", variant: "destructive" });
-      return;
-    }
-
-    const {
-      id, createdAt, updatedAt, isFavorite, // Exclude these from the new template
-      ...agentDataToCopy // Keep most of the agent's configuration
-    } = currentAgentForTemplating;
-
-    const templateName = `Template de ${currentAgentForTemplating.agentName}`; // Or prompt user for a name
-
+    if (!currentAgentForTemplating) return;
+    const { id, createdAt, updatedAt, isFavorite, ...agentDataToCopy } = currentAgentForTemplating;
+    const templateName = `Template de ${currentAgentForTemplating.agentName}`;
     const newTemplateData: Partial<SavedAgentConfiguration> = {
       ...agentDataToCopy,
       agentName: templateName,
-      agentDescription: `Template baseado em ${currentAgentForTemplating.agentName}: ${currentAgentForTemplating.agentDescription}`,
-      useCases: templateDetails.useCases, // Add new field
-      templateDetailsPreview: templateDetails.templateDetailsPreview, // Add new field
-      isTemplate: true, // Mark as template
-      // userId, createdAt, updatedAt will be handled by the backend service
-      // templateId should be null or not set for a new template.
+      agentDescription: `Template baseado em ${currentAgentForTemplating.agentName}`,
+      useCases: templateDetails.useCases,
+      templateDetailsPreview: templateDetails.templateDetailsPreview,
+      isTemplate: true,
+      isFavorite: false, // Templates are not favorited by default
     };
-
     try {
-      const savedTemplateId = await saveAgentTemplate(newTemplateData as SavedAgentConfiguration, undefined /* currentUserId if available */);
+      const savedTemplateId = await saveAgentTemplate(newTemplateData as SavedAgentConfiguration);
       if (savedTemplateId) {
-        toast({
-          title: "Template Salvo!",
-          description: `O agente "${currentAgentForTemplating.agentName}" foi salvo como um novo template com nome "${templateName}".`,
-        });
-      } else {
-        throw new Error("Falha ao obter o ID do template salvo.");
-      }
+        toast({ title: "Template Salvo!", description: `Template "${templateName}" criado.` });
+      } else { throw new Error("Falha ao salvar template."); }
     } catch (error) {
-      console.error("Erro ao salvar como template:", error);
-      toast({
-        title: "Erro ao Salvar Template",
-        description: "Não foi possível salvar o agente como template. Tente novamente.",
-        variant: "destructive",
-      });
+      console.error("Erro ao salvar template:", error);
+      toast({ title: "Erro ao Salvar Template", description: (error as Error).message, variant: "destructive" });
     } finally {
       setCurrentAgentForTemplating(null);
       setIsSaveAsTemplateDialogOpen(false);
+    }
+  };
+
+  const handleToggleFavorite = async (agentId: string, newFavoriteStatus: boolean) => {
+    const agentToUpdate = savedAgents.find(agent => agent.id === agentId);
+    if (!agentToUpdate) {
+      toast({ title: "Erro", description: "Agente não encontrado.", variant: "destructive" });
+      return;
+    }
+    // Create payload with only isFavorite to avoid unintended updates
+    const result = await updateAgentViaContext(agentId, { isFavorite: newFavoriteStatus });
+    if (result) {
+      toast({
+        title: newFavoriteStatus ? "Agente Favoritado!" : "Agente Desfavoritado",
+        description: `O agente "${result.agentName}" foi ${newFavoriteStatus ? 'adicionado aos' : 'removido dos'} favoritos.`,
+      });
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status de favorito do agente.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -498,10 +281,7 @@ export default function AgentBuilderPage() {
           <Button
             variant={buildMode === 'chat' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => {
-                setBuildMode('chat');
-                setIsBuilderModalOpen(false);
-            }}
+            onClick={() => { setBuildMode('chat'); setIsBuilderModalOpen(false); setEditingAgent(null); setSelectedAgentForMonitoring(null); }}
             title="Construir com Chat IA"
             className="shadow-sm"
           >
@@ -510,26 +290,24 @@ export default function AgentBuilderPage() {
           <Button
             variant={buildMode === 'form' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => {
-                setBuildMode('form');
-                // Logic for opening modal if editingAgent exists, or just switching mode
-                setIsBuilderModalOpen(!!editingAgent);
-            }}
+            onClick={() => { setBuildMode('form'); /* setIsBuilderModalOpen(!!editingAgent); // Keep existing modal logic for form */ }}
             title="Editor Avançado (Formulário)"
             className="shadow-sm"
           >
             <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
           </Button>
-          <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} /> {/* Added */}
+          <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} />
         </div>
       </header>
 
       {buildMode === 'chat' ? (
-        <AgentCreatorChatUI initialAgentConfig={editingAgent} />
+        <AgentCreatorChatUI
+            initialAgentConfig={editingAgent}
+            onSwitchToFormEdit={(agentToEdit) => handleEditAgentWithMode(agentToEdit, "form")}
+        />
       ) : (
         <>
-          <div className="flex items-center justify-end pt-4 gap-2"> {/* Adjusted pt and added gap */}
-            {/* Tutorial Button already added in the header for all modes, or could be here specifically for form mode */}
+          <div className="flex items-center justify-end pt-4 gap-2">
             <Button onClick={handleOpenCreateAgentModal} className={cn("button-live-glow", isMounted && "opacity-100")}>
               <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
             </Button>
@@ -542,19 +320,15 @@ export default function AgentBuilderPage() {
                   <AgentCard
                     key={agent.id}
                     agent={agent}
-                    onEdit={() => handleEditAgent(agent)}
-                    onSaveAsTemplate={handleSaveAsTemplate} // Add this line
-                    // Add a new prop/handler to AgentCard for monitoring
-                    onViewMonitoring={() => handleViewAgentMonitoring(agent)}
-                    onTest={() =>
-                      toast({
-                        title: "Em breve!",
-                        description: "Funcionalidade de teste no chat.",
-                      })
-                    }
+                    onEdit={() => handleEditAgent(agent)} // Already ensures form mode
+                    onSaveAsTemplate={handleSaveAsTemplate}
+                    onViewMonitoring={() => handleViewAgentMonitoring(agent)} // Already ensures form mode
+                    onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
                     onDelete={() => handleDeleteAgent(agent.id)}
-                    availableTools={availableTools}
+                    availableTools={defaultAvailableTools}
                     agentTypeOptions={agentTypeOptions}
+                    isFavorite={agent.isFavorite}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 ))}
               </div>
@@ -573,7 +347,6 @@ export default function AgentBuilderPage() {
             )
           )}
 
-          {/* Section for displaying selected agent's monitoring or details */}
           {selectedAgentForMonitoring && buildMode === 'form' && (
             <Card className="mt-6">
               <CardHeader>
@@ -586,44 +359,31 @@ export default function AgentBuilderPage() {
                     variant={currentViewTab === 'details' ? 'default' : 'outline'}
                     onClick={() => {
                       setCurrentViewTab('details');
-                      // Optionally, if AgentBuilderDialog should open for this agent's details:
-                      // setEditingAgent(selectedAgentForMonitoring);
-                      // setIsBuilderModalOpen(true);
-                      // For now, details tab can be a placeholder or show read-only info.
-                      // To re-open the modal for editing from here:
-                      handleEditAgent(selectedAgentForMonitoring);
-                      // And ensure selectedAgentForMonitoring is cleared if modal takes full control
-                      // setSelectedAgentForMonitoring(null); // if opening modal means exiting this view
+                      // Transition to editing this agent
+                       handleEditAgent(selectedAgentForMonitoring);
+                       setSelectedAgentForMonitoring(null); // Close monitoring view
                     }}
                   >
                     Configuração
                   </Button>
                   <Button
                     variant={currentViewTab === 'monitoring' ? 'default' : 'outline'}
-                    onClick={() => setCurrentViewTab('monitoring')}
+                    onClick={() => setCurrentViewTab('monitoring')} // Already in monitoring view
                   >
                     Monitoramento
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                {currentViewTab === 'details' && (
-                  <div>
-                    <p>Exibindo detalhes de configuração para: <strong>{selectedAgentForMonitoring.agentName}</strong>.</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Para editar, feche esta visualização e clique no botão de edição do card do agente,
-                      ou clique em 'Configuração' acima para reabrir o editor.
-                    </p>
-                    {/* Or, directly embed/render a read-only view of agent config here */}
-                  </div>
-                )}
-                {currentViewTab === 'monitoring' && (
-                  <div className="space-y-6"> {/* Add spacing between metrics and logs */}
-                    {/* AgentMetricsView */}
+                 {/* Content for monitoring tab is below, no direct config editing here */}
+                {currentViewTab === 'monitoring' ? (
+                  <div className="space-y-6">
                     <AgentMetricsView agentId={selectedAgentForMonitoring.id} />
-
-                    {/* AgentLogView */}
                     <AgentLogView agentId={selectedAgentForMonitoring.id} />
+                  </div>
+                ) : (
+                   <div>
+                    <p>Para editar a configuração, clique no botão "Configuração" acima ou feche esta visualização e use o botão de edição no card do agente.</p>
                   </div>
                 )}
               </CardContent>
@@ -632,22 +392,23 @@ export default function AgentBuilderPage() {
         </>
       )}
 
-      {buildMode === 'form' && editingAgent && !selectedAgentForMonitoring && (
+      {/* This specific condition for AgentBuilderDialog ensures it only opens in 'form' mode for a new agent or when editing an existing one */}
+      {buildMode === 'form' && isBuilderModalOpen && (
         <AgentBuilderDialog
-          isOpen={isBuilderModalOpen && !!editingAgent && !isSaveAsTemplateDialogOpen} // Ensure save as template dialog is not also open
+          isOpen={isBuilderModalOpen} // isBuilderModalOpen is the source of truth
           onOpenChange={(isOpenValue: boolean) => {
             setIsBuilderModalOpen(isOpenValue);
             if (!isOpenValue) {
-              setEditingAgent(null);
+              setEditingAgent(null); // Clear editing agent when dialog closes
             }
           }}
-          editingAgent={editingAgent}
+          editingAgent={editingAgent} // This can be null for new agent
           onSave={handleSaveAgent}
-          availableTools={availableTools}
+          availableTools={defaultAvailableTools}
           agentTypeOptions={agentTypeOptions}
           agentToneOptions={agentToneOptions}
           iconComponents={iconComponents}
-          availableAgentsForSubSelector={savedAgents.map(a => ({id: a.id, agentName: a.agentName}))} // Pass available agents for sub-selector
+          availableAgentsForSubSelector={savedAgents.map(a => ({id: a.id, agentName: a.agentName}))}
         />
       )}
 
@@ -675,37 +436,15 @@ export default function AgentBuilderPage() {
           totalSteps={activeTutorial.steps.length}
           onNextStep={handleTutorialNext}
           onPrevStep={handleTutorialPrev}
-          size="lg" // Or another appropriate size for tutorials
+          size="lg"
         >
-          {/* Render tutorial step content. Similar to help modal, handle HTML strings carefully */}
           <div dangerouslySetInnerHTML={{ __html: activeTutorial.steps[currentTutorialStep].content as string }} />
-          {/* Add visual if present: activeTutorial.steps[currentTutorialStep].visual */}
         </HelpModal>
       )}
       <FeedbackModal
         isOpen={isFeedbackModalOpen}
         onOpenChange={setIsFeedbackModalOpen}
-      /> {/* Added */}
-
+      />
     </div>
   );
 }
-
-// Helper function to get available tools, assuming it's defined elsewhere or passed
-// For now, this is just a placeholder
-// const getAvailableTools = (): any[] => {
-//   return []; // Replace with actual logic
-// }
-// const getAgentTypeOptions = (): any[] => {
-//   return []; // Replace with actual logic
-// }
-// const getAgentToneOptions = (): any[] => {
-//  return []; // Replace with actual logic
-// }
-// const getIconComponents = (): Record<string, React.FC<React.SVGProps<SVGSVGElement>>> => {
-//  return {}; // Replace with actual logic
-// }
-// const getAgentTemplates = (): any[] => {
-//  return []; // Replace with actual logic
-// }
-

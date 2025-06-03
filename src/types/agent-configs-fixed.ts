@@ -67,6 +67,7 @@ export interface SavedAgentConfiguration {
   updatedAt: string;
   isTemplate?: boolean;
   userId?: string;
+  isFavorite?: boolean;
 }
 
 // Exportar todos os tipos
