@@ -1,70 +1,8 @@
-// Google ADK Integration Library
-// This file provides integration with Google's Agent Development Kit
-
+// src/lib/google-adk.ts
 import { v4 as uuidv4 } from 'uuid';
-
-// Tipos para integração com Google ADK
-export interface ADKAgentConfig {
-  agentId?: string;
-  displayName: string;
-  description?: string;
-  model: string;
-  tools?: ADKTool[];
-  capabilities?: string[];
-}
-
-export interface ADKTool {
-  name: string;
-  description?: string;
-  inputSchema?: any;
-  outputSchema?: any;
-  implementation?: (params: any) => Promise<any>;
-}
-
-export interface ADKChatMessage {
-  role: 'user' | 'model' | 'system' | 'tool';
-  content: string | ADKContentPart[];
-  toolCallId?: string;
-  toolName?: string;
-  toolResults?: any;
-}
-
-export interface ADKContentPart {
-  type: 'text' | 'image' | 'file';
-  text?: string;
-  imageUrl?: string;
-  fileUrl?: string;
-  mimeType?: string;
-}
-
-export interface ADKChatCompletionOptions {
-  model?: string;
-  messages: ADKChatMessage[];
-  temperature?: number;
-  topP?: number;
-  maxTokens?: number;
-  tools?: ADKTool[];
-}
-
-export interface ADKChatCompletionResponse {
-  id: string;
-  model: string;
-  choices: {
-    index: number;
-    message: ADKChatMessage;
-    finishReason: string;
-  }[];
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  toolCalls?: {
-    id: string;
-    toolName: string;
-    parameters: any;
-  }[];
-}
+// Import the specific DB function needed
+import { getAgentByIdDB } from '@/lib/agentIndexedDB';
+import { ADKAgentConfig, ADKChatMessage, ADKContentPart, ADKChatCompletionOptions, ADKChatCompletionResponse, ADKTool } from '@/types/adk-types'; // Assuming types are here
 
 // Mock da API do Google ADK - Substituir pela implementação real quando disponível
 export class GoogleADK {
@@ -75,16 +13,13 @@ export class GoogleADK {
     if (apiKey) {
       this.apiKey = apiKey;
     } else {
-      // Tenta buscar a API key de variáveis de ambiente ou localStorage
+      // API key from localStorage is fine, as it's a user setting, not structured data
       this.apiKey = typeof window !== 'undefined' 
         ? localStorage.getItem('GOOGLE_ADK_API_KEY') 
         : process.env.GOOGLE_ADK_API_KEY || null;
     }
   }
   
-  /**
-   * Define a API key para o Google ADK
-   */
   setApiKey(apiKey: string): void {
     this.apiKey = apiKey;
     if (typeof window !== 'undefined') {
@@ -92,44 +27,29 @@ export class GoogleADK {
     }
   }
   
-  /**
-   * Verifica se a API key está configurada
-   */
   hasApiKey(): boolean {
     return !!this.apiKey;
   }
   
-  /**
-   * Cria um novo agente no Google ADK
-   */
   async createAgent(config: ADKAgentConfig): Promise<string> {
     if (!this.hasApiKey()) {
       throw new Error('API key não configurada para o Google ADK');
     }
-    
-    // Implementação real: chamada à API do Google para criar um agente
-    // Por enquanto, retornamos um ID simulado
     const agentId = config.agentId || `agent-${uuidv4()}`;
-    
-    // localStorage persistence for agent configuration has been removed.
-    // This mock ADK will no longer persist agents.
-    
+    // Persistence of agent configuration is now handled by useAgentStorage with IndexedDB
+    // This mock ADK class itself will no longer persist agents directly.
+    // The UI/hook should call addAgentDB via useAgentStorage.
+    console.log(`[GoogleADK Mock] createAgent called for ID: ${agentId}. Agent data should be saved via useAgentStorage/IndexedDB separately.`);
     return agentId;
   }
   
-  /**
-   * Envia uma mensagem para processamento pelo modelo do Google ADK
-   */
   async sendMessage(options: ADKChatCompletionOptions): Promise<ADKChatCompletionResponse> {
     if (!this.hasApiKey()) {
       throw new Error('API key não configurada para o Google ADK');
     }
     
     const model = options.model || this.defaultModel;
-    
-    // Simulação de resposta para desenvolvimento
-    // Substituir por chamada real à API
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simula latência da rede
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const response: ADKChatCompletionResponse = {
       id: `chatcmpl-${uuidv4()}`,
@@ -151,9 +71,7 @@ export class GoogleADK {
       }
     };
     
-    // Verifica se deve usar ferramentas
     if (options.tools && options.tools.length > 0 && Math.random() < 0.3) {
-      // Simula uma chamada de ferramenta em 30% dos casos
       const randomTool = options.tools[Math.floor(Math.random() * options.tools.length)];
       response.toolCalls = [
         {
@@ -167,22 +85,14 @@ export class GoogleADK {
     return response;
   }
   
-  /**
-   * Executa a chamada de uma ferramenta e retorna os resultados
-   */
   async executeToolCall(toolCall: any, tools: ADKTool[]): Promise<any> {
     const tool = tools.find(t => t.name === toolCall.toolName);
     if (!tool || !tool.implementation) {
       throw new Error(`Ferramenta ${toolCall.toolName} não implementada`);
     }
-    
     return await tool.implementation(toolCall.parameters);
   }
   
-  /**
-   * Simula uma resposta do modelo baseada no histórico de mensagens
-   * Apenas para fins de desenvolvimento - será substituída pela API real
-   */
   private generateMockResponse(messages: ADKChatMessage[]): string {
     const lastMessage = messages[messages.length - 1];
     let content = '';
@@ -196,66 +106,40 @@ export class GoogleADK {
         .join(' ');
     }
     
-    // Respostas simuladas básicas
     if (content.toLowerCase().includes('olá') || content.toLowerCase().includes('oi')) {
       return 'Olá! Como posso ajudar você hoje?';
     }
-    
     if (content.toLowerCase().includes('ajuda')) {
       return 'Estou aqui para ajudar! Posso responder perguntas, fornecer informações ou auxiliar com tarefas específicas. O que você gostaria de saber?';
     }
-    
-    if (content.toLowerCase().includes('agente')) {
-      return 'Os agentes são assistentes virtuais especializados que podem ser configurados com ferramentas específicas para realizar tarefas. Você pode criar seu próprio agente personalizado usando nossa interface de construção.';
-    }
-    
-    if (content.toLowerCase().includes('google adk') || content.toLowerCase().includes('api')) {
-      return 'O Google Agent Development Kit (ADK) é uma plataforma que permite desenvolver agentes de IA avançados com acesso a ferramentas e capacidades personalizadas. Este projeto demonstra como integrar essas capacidades em uma aplicação web.';
-    }
-    
-    // Resposta genérica
     return 'Entendi sua mensagem. Como posso ajudar com mais informações sobre esse assunto?';
   }
 
-  /**
-   * Lista os agentes ADK disponíveis (mock).
-   * @returns Promise<ADKAgentConfig[]>
-   */
   public async listAgents(): Promise<ADKAgentConfig[]> {
-    console.log("[GoogleADK Mock] listAgents called");
-    // localStorage persistence for agent configuration has been removed.
-    // Returning an empty array as this mock ADK no longer persists agents.
+    console.log("[GoogleADK Mock] listAgents called. Agent data should be retrieved via useAgentStorage/IndexedDB.");
+    // This mock should not directly access IndexedDB.
+    // The calling context (e.g., a React component) should use `useAgentStorage().loadAgents()`.
+    // For the purpose of this mock ADK, it returns an empty array,
+    // as it doesn't manage the list itself.
     return [];
   }
-
-  /**
-   * Cria um novo agente ADK (mock).
-   */
-  // ... rest of the code remains the same ...
 }
 
-// Exporta uma instância padrão para uso em toda a aplicação
 export const googleADK = new GoogleADK();
 
-// Função auxiliar para enviar mensagem para o agente
 export async function sendMessageToAgent(
   agentId: string, 
   message: string | ADKContentPart[], 
   history: ADKChatMessage[] = []
 ): Promise<ADKChatMessage> {
-  // Recupera a configuração do agente
-  let agentConfig: ADKAgentConfig | null = null;
-  
-  if (typeof window !== 'undefined') {
-    const savedAgents = JSON.parse(localStorage.getItem('ADK_AGENTS') || '{}');
-    agentConfig = savedAgents[agentId] || null;
-  }
+  // Retrieve agent configuration from IndexedDB
+  const agentConfig = await getAgentByIdDB(agentId); // Changed from localStorage
   
   if (!agentConfig) {
-    throw new Error(`Agente com ID ${agentId} não encontrado`);
+    // Try to provide a more specific error if agent is not found by ID
+    throw new Error(`Agente com ID ${agentId} não encontrado no IndexedDB.`);
   }
   
-  // Prepara as mensagens para envio
   const messages: ADKChatMessage[] = [
     ...history,
     {
@@ -264,19 +148,18 @@ export async function sendMessageToAgent(
     }
   ];
   
-  // Envia a mensagem para o ADK
+  // Ensure agentConfig.tools is treated as ADKTool[]
+  const adkTools: ADKTool[] = (agentConfig.tools || []) as ADKTool[];
+
   const response = await googleADK.sendMessage({
     model: agentConfig.model,
     messages,
-    tools: agentConfig.tools
+    tools: adkTools
   });
   
-  // Processa chamadas de ferramentas, se houver
-  if (response.toolCalls && response.toolCalls.length > 0 && agentConfig.tools) {
+  if (response.toolCalls && response.toolCalls.length > 0 && adkTools.length > 0) {
     for (const toolCall of response.toolCalls) {
-      const toolResult = await googleADK.executeToolCall(toolCall, agentConfig.tools);
-      
-      // Adiciona o resultado da ferramenta à conversa
+      const toolResult = await googleADK.executeToolCall(toolCall, adkTools);
       messages.push({
         role: 'tool',
         content: JSON.stringify(toolResult),
@@ -285,11 +168,10 @@ export async function sendMessageToAgent(
       });
     }
     
-    // Continua a conversa com os resultados da ferramenta
     const followUpResponse = await googleADK.sendMessage({
       model: agentConfig.model,
       messages,
-      tools: agentConfig.tools
+      tools: adkTools
     });
     
     return followUpResponse.choices[0].message;
@@ -298,87 +180,47 @@ export async function sendMessageToAgent(
   return response.choices[0].message;
 }
 
-// Função para criar um agente com as ferramentas selecionadas
+// createCustomAgent function remains unchanged as its responsibility is to format
+// the agent config and call googleADK.createAgent. The actual saving of this
+// agent to IndexedDB should be handled by the UI/caller of createCustomAgent,
+// typically by then calling useAgentStorage().saveAgent(returnedConfig).
 export async function createCustomAgent(
   name: string,
   description: string,
   selectedTools: string[],
   systemPrompt: string
-): Promise<string> {
-  // Mapeamento de ferramentas disponíveis
+): Promise<ADKAgentConfig> { // Return ADKAgentConfig for the caller to save
   const availableTools: Record<string, ADKTool> = {
-    'web_search': {
-      name: 'web_search',
-      description: 'Pesquisa informações na web',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
-        },
-        required: ['query']
-      },
-      implementation: async (params: any) => {
-        // Implementação simulada
-        return { results: [`Resultados simulados para: ${params.query}`] };
-      }
-    },
-    'calculator': {
-      name: 'calculator',
-      description: 'Realiza cálculos matemáticos',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          expression: { type: 'string' }
-        },
-        required: ['expression']
-      },
-      implementation: async (params: any) => {
-        try {
-          // ATENÇÃO: eval é usado apenas para demonstração
-          // Em um ambiente de produção, use uma biblioteca segura de avaliação matemática
-          return { result: eval(params.expression) };
-        } catch (error) {
-          return { error: 'Expressão inválida' };
-        }
-      }
-    },
-    'weather': {
-      name: 'weather',
-      description: 'Obtém informações meteorológicas',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          location: { type: 'string' }
-        },
-        required: ['location']
-      },
-      implementation: async (params: any) => {
-        // Implementação simulada
-        return { 
-          location: params.location, 
-          temperature: `${Math.floor(Math.random() * 30)}°C`,
-          condition: ['Ensolarado', 'Nublado', 'Chuvoso'][Math.floor(Math.random() * 3)]
-        };
-      }
-    }
+    'web_search': { name: 'web_search', description: 'Search the web', implementation: async (params: any) => `Search results for ${params.query}` },
+    'calculator': { name: 'calculator', description: 'Calculate expressions', implementation: async (params: any) => `Result of ${params.expression}` },
+    'weather': { name: 'weather', description: 'Get weather forecast', implementation: async (params: any) => `Weather in ${params.location}: Sunny` }
   };
   
-  // Cria a configuração do agente
   const agentConfig: ADKAgentConfig = {
     displayName: name,
     description,
-    model: 'gemini-1.5-pro',
-    tools: selectedTools.map(toolName => availableTools[toolName]),
-    capabilities: ['code_generation', 'tool_use']
+    model: 'gemini-1.5-pro', // Default or make configurable
+    tools: selectedTools.map(toolName => availableTools[toolName]).filter(t => t), // Filter out undefined tools
+    capabilities: ['code_generation', 'tool_use'] // Example capabilities
   };
   
-  // Adiciona um prompt do sistema como primeira mensagem
   if (systemPrompt) {
-    // O prompt do sistema será armazenado na configuração
-    // e adicionado automaticamente a cada conversa
-    agentConfig.description = `${description}\n\nSystem prompt: ${systemPrompt}`;
+    // System prompt can be part of the description or a dedicated field if ADK supports it
+    agentConfig.description = `${description}
+
+System prompt: ${systemPrompt}`;
   }
   
-  // Cria o agente no Google ADK
-  return await googleADK.createAgent(agentConfig);
+  // The googleADK.createAgent is a mock and doesn't save.
+  // It could return the generated agentId or the full config.
+  // Let's assume it returns the agentId and we augment the config with it.
+  const agentId = await googleADK.createAgent(agentConfig);
+
+  // The caller of createCustomAgent will be responsible for saving this config to IndexedDB
+  // using useAgentStorage hook.
+  return { ...agentConfig, agentId }; // Return the full config including a potential ID
 }
+
+// Ensure all imports for ADK types are correct, e.g.
+// import { ADKAgentConfig, ADKChatMessage, ADKContentPart, ADKChatCompletionOptions, ADKChatCompletionResponse, ADKTool } from '@/types/adk-types';
+// (Path to adk-types.ts might need adjustment)
