@@ -647,7 +647,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem";
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button relative flex items-center gap-2 overflow-hidden rounded-md p-2 text-left outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+  "peer/menu-button relative flex items-center gap-2 overflow-hidden rounded-md p-2 text-left outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 active:animate-press-down [&_[data-lucide]]:group-hover/sidebarbutton:animate-jiggle",
   {
     variants: {
       variant: {
@@ -707,6 +707,7 @@ const SidebarMenuButton = React.forwardRef<
 
     const finalClassName = cn(
       sidebarMenuButtonVariants({ variant, size }),
+      "group/sidebarbutton", // Added group for hover effect on icon
       // Aplica o brilho somente se montado no cliente e ativo
       clientMounted &&
         isActive &&
@@ -877,6 +878,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-active={isActive ? "true" : undefined}
       className={cn(
         "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+        "group/sidebarsubbutton active:animate-press-down [&_[data-lucide]]:group-hover/sidebarsubbutton:animate-jiggle", // Added group and animations
         isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
         size === "sm" && "text-xs",
         size === "md" && "text-sm",
