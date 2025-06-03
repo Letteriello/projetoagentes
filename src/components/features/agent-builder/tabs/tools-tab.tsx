@@ -452,19 +452,6 @@ export default function ToolsTab({
                             <Trash2Icon className="h-4 w-4" />
                           </Button>
                         )}
-<<<<<<< HEAD
-                         <Controller
-                            name={`tools`} 
-                            control={control}
-                            render={({ field }) => ( // field here isn't directly used for array
-                              <Switch
-                                id={`tool-select-${tool.id}`}
-                                checked={isSelected}
-                                onCheckedChange={(checked) => handleToolSelectionChange(tool.id, checked)}
-                              />
-                            )}
-                          />
-=======
                         <Controller
                           name="tools"
                           control={control}
@@ -476,7 +463,6 @@ export default function ToolsTab({
                             />
                           )}
                         />
->>>>>>> develop
                       </div>
                     </div>
                   </Card>

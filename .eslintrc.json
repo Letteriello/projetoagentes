@@ -2,7 +2,7 @@
   "extends": [
     "next/core-web-vitals",
     "plugin:promise/recommended",
-    "plugin:security/recommended"
+    "plugin:security/recommended-legacy"
   ],
   "plugins": [
     "react-hooks"
