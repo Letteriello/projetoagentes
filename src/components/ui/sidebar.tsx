@@ -18,12 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-const SIDEBAR_COOKIE_NAME = "sidebar_state";
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
-const SIDEBAR_WIDTH = "16rem"; // w-64
-const SIDEBAR_WIDTH_MOBILE = "18rem"; // Tailwind w-72
-const SIDEBAR_WIDTH_ICON = "3.5rem"; // w-14 (56px)
+import { SIDEBAR_COOKIE_NAME, SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_WIDTH, SIDEBAR_WIDTH_MOBILE, SIDEBAR_WIDTH_ICON } from "@/lib/constants";
 
 type SidebarContextValue = {
   state: "expanded" | "collapsed";
