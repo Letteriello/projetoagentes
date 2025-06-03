@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AppLogo } from "@/components/icons/logo";
 import {
   Cpu,
   MessageSquare,
@@ -171,7 +172,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               href="/agent-builder"
               className="hover:text-sidebar-primary/90 transition-colors"
             >
-              <span className="aida-logo-text">Aida</span>
+              <AppLogo className="h-8 w-8" />
             </Link>
           )}
         </SidebarHeader>
