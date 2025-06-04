@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2, MessageSquare, Send, AlertTriangle
+  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2, MessageSquare, Send, AlertTriangle, Loader2, Brain, Waypoints, AlertCircle as AlertCircleIcon, Info as InfoIconLucide, CheckCircle2, Users as UsersIcon, Package, Workflow, ListChecks, Clock, AlertTriangle as AlertTriangleIcon // Added new icons
 } from "lucide-react"; // Added icons
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 import { cn } from "@/lib/utils";
@@ -45,16 +45,24 @@ import {
 } from "@/components/ui/chart";
 import { type MonitorEvent, ToolCallEvent, ErrorEvent, InfoEvent, TaskCompletionEvent, AgentStateEvent, PerformanceMetricsEvent, A2AMessageEvent } from '@/types/monitor-events'; // Added A2AMessageEvent
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { EvaluationReport } from '@/types/evaluation-report'; // Added for Task 9.1
 import {
   type AgentStatus,
   type ExecutionHistory,
   type AverageResponseTime,
   type ToolUsage as ToolUsageMetric, // Renamed to avoid conflict
   generateAgentStatusData,
+  // generateExecutionHistoryData, // Already imported
+  // generateAverageResponseTimeData, // Already imported
+  // generateToolUsageData, // Already imported
+} from "@/services/mockAgentData"; // Assuming mockAgentData is the correct path
+
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from "@/components/ui/table"; // Import Table components
   generateExecutionHistoryData,
   generateAverageResponseTimeData,
   generateToolUsageData,
-} from "@/services/mockAgentData";
 
 
 interface Filters {
@@ -240,6 +248,22 @@ export default function AgentMonitorPage() {
   const [a2aMessages, setA2aMessages] = useState<A2AMessageEvent[]>([]);
   const [a2aMessagesLoading, setA2aMessagesLoading] = useState<boolean>(false); // For future API calls
   const [a2aMessagesError, setA2aMessagesError] = useState<string | null>(null);
+
+// States for Task 9.1: Agent Evaluation
+const [selectedAgentForEvaluation, setSelectedAgentForEvaluation] = useState<DisplayAgent | null>(null);
+const [isEvaluatingAgent, setIsEvaluatingAgent] = useState<boolean>(false);
+const [evaluationReport, setEvaluationReport] = useState<EvaluationReport | null>(null);
+const [evaluationError, setEvaluationError] = useState<string | null>(null);
+
+// State for Task 9.5: Simulated Tool Performance
+interface SimulatedToolPerformance {
+  toolName: string;
+  successRate: number;
+  averageLatencyMs: number;
+  errorCount: number;
+  totalRuns: number;
+}
+const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<SimulatedToolPerformance[]>([]);
 
   const agentUsageChartConfig = {
     count: {
@@ -620,6 +644,16 @@ export default function AgentMonitorPage() {
     } finally {
       setToolUsageMetricsLoading(false);
     }
+
+    // Populate simulated tool performance data (Task 9.5)
+    const mockToolPerformanceData: SimulatedToolPerformance[] = [
+      { toolName: "Web Search", successRate: 0.90, averageLatencyMs: 520, errorCount: 5, totalRuns: 50 },
+      { toolName: "Calculator", successRate: 0.99, averageLatencyMs: 45, errorCount: 1, totalRuns: 100 },
+      { toolName: "DatabaseAccess", successRate: 0.85, averageLatencyMs: 150, errorCount: 15, totalRuns: 100 },
+      { toolName: "KnowledgeBase", successRate: 0.92, averageLatencyMs: 210, errorCount: 8, totalRuns: 100 },
+      { toolName: "CustomAPIIntegration", successRate: 0.75, averageLatencyMs: 800, errorCount: 25, totalRuns: 100 },
+    ];
+    setSimulatedToolPerformance(mockToolPerformanceData);
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
@@ -699,15 +733,15 @@ export default function AgentMonitorPage() {
           });
         } else if (newEvent.eventType === 'performance_metrics') {
           const perfEvent = newEvent as PerformanceMetricsEvent;
-          const metricItem: ChartableMetric = {
-            id: perfEvent.agentId,
-            name: perfEvent.agentId,
-            value: perfEvent.value,
-            timestamp: perfEvent.timestamp,
-            unit: perfEvent.unit,
-          };
 
           if (perfEvent.metricName === 'latency') {
+            const metricItem: ChartableMetric = {
+              id: perfEvent.agentId, // Group by agentId
+              name: perfEvent.agentId, // Display agentId on chart
+              value: perfEvent.value, // Latency value
+              timestamp: perfEvent.timestamp,
+              unit: perfEvent.unit,
+            };
             setLatencyMetrics(prevMetrics => {
               const agentIndex = prevMetrics.findIndex(m => m.id === perfEvent.agentId);
               if (agentIndex > -1) {
@@ -718,19 +752,39 @@ export default function AgentMonitorPage() {
               }
             });
           } else if (perfEvent.metricName === 'token_usage') {
-            if(perfEvent.details?.tokensUsed) metricItem.value = perfEvent.details.tokensUsed;
-            else if(perfEvent.details?.totalTokens) metricItem.value = perfEvent.details.totalTokens;
-
+            // Aggregate token usage per agent
             setTokenUsageMetrics(prevMetrics => {
-              const agentIndex = prevMetrics.findIndex(m => m.id === perfEvent.agentId);
-              if (agentIndex > -1) {
-                const newMetrics = [...prevMetrics.filter(m => m.id !== perfEvent.agentId), metricItem];
-                return newMetrics.sort((a,b) => a.name.localeCompare(b.name));
+              const agentId = perfEvent.agentId;
+              // Find existing metric for this agent
+              const existingMetricIndex = prevMetrics.findIndex(m => m.id === agentId);
+              let newMetricsArray;
+
+              if (existingMetricIndex > -1) {
+                  // Update existing agent's token count by adding the new value
+                  newMetricsArray = prevMetrics.map((m, index) =>
+                      index === existingMetricIndex ? { ...m, value: m.value + perfEvent.value, timestamp: perfEvent.timestamp } : m
+                  );
               } else {
-                return [...prevMetrics, metricItem].sort((a,b) => a.name.localeCompare(b.name));
+                  // Add new agent's token count
+                  const newMetric: ChartableMetric = {
+                      id: agentId,
+                      name: agentId, // Display agentId on chart
+                      value: perfEvent.value, // Initial token value
+                      timestamp: perfEvent.timestamp,
+                      unit: perfEvent.unit || 'tokens',
+                  };
+                  newMetricsArray = [...prevMetrics, newMetric];
               }
+              return newMetricsArray.sort((a,b) => a.name.localeCompare(b.name));
             });
           } else if (perfEvent.metricName === 'cost') {
+            const metricItem: ChartableMetric = { // Define metricItem here for cost as well
+              id: perfEvent.agentId,
+              name: perfEvent.agentId,
+              value: perfEvent.value, // Default to perfEvent.value
+              timestamp: perfEvent.timestamp,
+              unit: perfEvent.unit,
+            };
              if(perfEvent.details?.simulatedCost) metricItem.value = perfEvent.details.simulatedCost;
 
             setCostMetrics(prevMetrics => {
@@ -948,7 +1002,33 @@ export default function AgentMonitorPage() {
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   };
 
-  const renderEventDetails = (event: MonitorEvent) => {
+  const getEventIcon = (eventType: MonitorEvent['eventType'], event?: MonitorEvent) => {
+    switch (eventType) {
+      case 'tool_call':
+        return <Waypoints size={16} className="mr-2 text-blue-500" />;
+      case 'task_completion':
+        return <CheckCircle2 size={16} className="mr-2 text-green-500" />;
+      case 'error':
+        return <AlertCircleIcon size={16} className="mr-2 text-red-500" />;
+      case 'info':
+        // Could differentiate further based on info message content if needed
+        if ((event as InfoEvent)?.data?.type === 'llm_request' || (event as InfoEvent)?.message.toLowerCase().includes('llm')) {
+           return <Brain size={16} className="mr-2 text-purple-500" />;
+        }
+        return <InfoIconLucide size={16} className="mr-2 text-gray-500" />;
+      case 'agent_state':
+         // Could check for specific states if needed for different icons
+        return <Activity size={16} className="mr-2 text-teal-500" />;
+      case 'performance_metrics':
+        return <BarChartBig size={16} className="mr-2 text-indigo-500" />;
+      case 'a2a_message':
+        return <MessageSquare size={16} className="mr-2 text-orange-500" />;
+      default:
+        return <Package size={16} className="mr-2 text-gray-400" />; // Default icon
+    }
+  };
+
+  const renderEventDetails = (event: MonitorEvent, isTrajectoryView: boolean = false) => {
     let details = `Agent: ${event.agentId}`;
     let content = '';
     let styleClass = 'text-sm'; // Base style
@@ -1016,9 +1096,13 @@ export default function AgentMonitorPage() {
         }
         break;
       default:
-        const unknownEvent = event as any;
-        content = `Unknown event type: ${unknownEvent.eventType}`;
-        styleClass += ' text-gray-400 dark:text-gray-500';
+    // In trajectory view, we might want to be more verbose for unknown types
+    // For the main feed, it's already handled.
+    // This function is also used by the main feed, so keep existing behavior for that.
+    // If isTrajectoryView is true, we could add more, but for now, it's consistent.
+    const unknownEvent = event as any;
+    content = `Evento desconhecido: ${unknownEvent.eventType} - Dados: ${JSON.stringify(unknownEvent)}`;
+    styleClass += ' text-gray-400 dark:text-gray-500';
     }
     return <span className={styleClass}><strong className="font-medium">{details}</strong> - {content}</span>;
   };
@@ -1028,6 +1112,52 @@ export default function AgentMonitorPage() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Agent Monitor</h1>
       
+      {/* START OF AGENT EVALUATION SECTION (Task 9.1) */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Avaliação de Agente (Simulado)</h2>
+        <div className="flex items-end gap-4 mb-4">
+          <div className="flex-grow">
+            <Label htmlFor="agentForEvalSelect" className="text-xs text-muted-foreground">Selecione um Agente para Avaliar</Label>
+            <Select
+              value={selectedAgentForEvaluation?.id || ""}
+              onValueChange={(agentId) => {
+                const agentToEval = Object.values(displayAgents).find(a => a.id === agentId);
+                setSelectedAgentForEvaluation(agentToEval || null);
+                setEvaluationReport(null); // Clear previous report
+                setEvaluationError(null); // Clear previous error
+              }}
+            >
+              <SelectTrigger id="agentForEvalSelect" className="h-9 text-sm mt-1">
+                <SelectValue placeholder="Selecione um Agente" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(displayAgents).length > 0 ? (
+                  Object.values(displayAgents).map(agent => (
+                    <SelectItem key={agent.id} value={agent.id}>{agent.name || agent.id}</SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-agents" disabled>Nenhum agente ativo detectado</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handleEvaluateAgent}
+            disabled={!selectedAgentForEvaluation || isEvaluatingAgent}
+            className="h-9"
+          >
+            {isEvaluatingAgent ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Avaliando...</> : "Avaliar Agente"}
+          </Button>
+        </div>
+        {evaluationError && <p className="text-red-500 text-sm mb-4">Erro na Avaliação: {evaluationError}</p>}
+        {evaluationReport && (
+          <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-muted/20 dark:bg-muted/10">
+            <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(evaluationReport, null, 2)}</pre>
+          </ScrollArea>
+        )}
+      </div>
+      {/* END OF AGENT EVALUATION SECTION */}
+
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Filters</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1293,42 +1423,60 @@ export default function AgentMonitorPage() {
                   <p className="text-sm text-muted-foreground mb-3">
                     Showing trajectory for Trace ID: <span className="font-mono text-primary">{selectedTraceIdForTrajectory}</span>
                   </p>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5"> {/* Increased spacing slightly */}
                     {getTrajectoryEvents(selectedTraceIdForTrajectory).map((event, index, array) => {
+                      const isExpanded = expandedTrajectoryNodes[event.id] || false; // Default to false if not set
+                      // Basic depth calculation (example - can be refined)
+                      let depth = 0;
+                      if (event.eventType === 'tool_call') depth = 1;
+                      else if (event.eventType === 'error' && array[index-1]?.eventType === 'tool_call') depth = 2;
+
                       return (
-                        <li key={event.id} className={`p-2.5 rounded-md border border-border/70 bg-background dark:bg-black/20`}>
+                        <li key={event.id} className={`p-2.5 rounded-md border border-border/70 bg-background dark:bg-black/20 group/trajectory-item`} style={{ marginLeft: `${depth * 20}px` }}> {/* Apply depth as margin */}
                           <div className="flex justify-between items-start">
                             <span className="font-mono text-[10px] text-muted-foreground">{format(new Date(event.timestamp), "HH:mm:ss.SSS")}</span>
                           </div>
-                          <div className="mt-1 text-xs">
-                            {renderEventDetails(event)}
+                          <div className="mt-0.5 flex items-center"> {/* Flex container for icon and details */}
+                            {getEventIcon(event.eventType, event)} {/* Call getEventIcon here */}
+                            {renderEventDetails(event, true)} {/* Pass true for isTrajectoryView */}
                           </div>
                            {(event.eventType === 'tool_call' && ((event as ToolCallEvent).input || (event as ToolCallEvent).output)) && (
-                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-border/50 text-[10px]">
-                              { (event as ToolCallEvent).input && (
-                                <div className="mb-1">
-                                  <strong className="text-muted-foreground">Input:</strong>
-                                  <pre className="p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).input, null, 2)}</pre>
-                                </div>
-                              )}
-                              { (event as ToolCallEvent).output && (
-                                <div>
-                                  <strong className="text-muted-foreground">Output:</strong>
-                                  <pre className="p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).output, null, 2)}</pre>
-                                </div>
-                              )}
-                               {(event as ToolCallEvent).status === 'error' && (event as ToolCallEvent).errorDetails && (
-                                <div className="mt-1">
-                                  <strong className="text-red-500 dark:text-red-400">Tool Error:</strong>
-                                  <pre className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).errorDetails, null, 2)}</pre>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          <div className="mt-1.5 text-[10px]">
+                            <Button variant="link" size="xs" className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground group-hover/trajectory-item:opacity-100 opacity-0 transition-opacity" onClick={() => setExpandedTrajectoryNodes(prev => ({...prev, [event.id]: !prev[event.id]}))}>
+                              {isExpanded ? <ChevronDown size={12} className="mr-1"/> : <ChevronRight size={12} className="mr-1"/>}
+                              {isExpanded ? 'Ocultar Detalhes' : 'Mostrar Detalhes do Input/Output'}
+                            </Button>
+                            {isExpanded && (
+                              <div className="mt-1 pt-1.5 border-t border-dashed border-border/50">
+                                { (event as ToolCallEvent).input && (
+                                  <div className="mb-1">
+                                    <strong className="text-muted-foreground">Input:</strong>
+                                    <pre className="p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).input, null, 2)}</pre>
+                                  </div>
+                                )}
+                                { (event as ToolCallEvent).output && (
+                                  <div>
+                                    <strong className="text-muted-foreground">Output:</strong>
+                                    <pre className="p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).output, null, 2)}</pre>
+                                  </div>
+                                )}
+                                {(event as ToolCallEvent).status === 'error' && (event as ToolCallEvent).errorDetails && (
+                                      <div className="mt-1">
+                                        <strong className="text-red-500 dark:text-red-400">Tool Error:</strong>
+                                        <pre className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).errorDetails, null, 2)}</pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                            {event.eventType === 'error' && (event as ErrorEvent).stackTrace && (
+                            // Similar expand/collapse for stack trace if desired
                             <div className="mt-1.5 pt-1.5 border-t border-dashed border-border/50 text-[10px]">
-                                <strong className="text-red-500 dark:text-red-400">Stack Trace:</strong>
-                                <pre className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded  whitespace-pre-wrap break-all">{(event as ErrorEvent).stackTrace}</pre>
+                                <div className="mt-1">
+                                  <strong className="text-red-500 dark:text-red-400">Stack Trace:</strong>
+                                  <pre className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded whitespace-pre-wrap break-all">{(event as ErrorEvent).stackTrace}</pre>
+                                </div>
                             </div>
                            )}
                         </li>
@@ -1341,14 +1489,14 @@ export default function AgentMonitorPage() {
               <EmptyStateDisplay
                 icon={SearchX}
                 title="No Events for Trace ID"
-                message={`No events found for Trace ID: ${selectedTraceIdForTrajectory}. Ensure the ID is correct and events have been processed.`}
+                message={`Nenhum evento encontrado para o Trace ID: ${selectedTraceIdForTrajectory}. Certifique-se de que o ID está correto e os eventos foram processados.`}
               />
             )
           ) : (
             <EmptyStateDisplay
               icon={Settings2}
               title="Select a Trace ID"
-              message="Enter a Trace ID in the input above to view its execution trajectory. Verbose mode must be enabled."
+              message="Digite um Trace ID no campo acima para visualizar sua trajetória de execução. O modo verbose deve estar habilitado."
             />
           )}
         </div>
@@ -1920,3 +2068,51 @@ export default function AgentMonitorPage() {
     </div>
   );
 }
+
+    const handleEvaluateAgent = async () => {
+      if (!selectedAgentForEvaluation) {
+        setEvaluationError("Nenhum agente selecionado para avaliação.");
+        return;
+      }
+      setIsEvaluatingAgent(true);
+      setEvaluationReport(null);
+      setEvaluationError(null);
+
+      try {
+        // Simulate fetching agent config (using displayAgent for mock)
+        const mockAgentConfig = {
+          id: selectedAgentForEvaluation.id,
+          name: selectedAgentForEvaluation.name,
+          // Simulate some guardrails from a hypothetical full agent config
+          evaluationGuardrails: {
+            prohibitedKeywords: ["confidencial", "segredo"],
+            maxResponseLength: 150,
+            checkForToxicity: true,
+          }
+        };
+        // Simulate some conversations
+        const mockConversations = [
+          { userInput: "Olá, como você está?", agentOutput: "Estou bem, obrigado por perguntar!" },
+          { userInput: "Qual é o segredo para o sucesso?", agentOutput: "O segredo é trabalho duro e dedicação. Não posso revelar informações confidenciais." },
+          { userInput: "Conte uma piada bem longa", agentOutput: "Por que a galinha atravessou a estrada? Para chegar ao outro lado! Esta é uma piada muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito, muito longa." }
+        ];
+
+        const response = await fetch('/api/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentConfig: mockAgentConfig, conversations: mockConversations }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Falha na avaliação: ${response.statusText}`);
+        }
+        const report: EvaluationReport = await response.json();
+        setEvaluationReport(report);
+      } catch (error: any) {
+        console.error("Erro ao avaliar agente:", error);
+        setEvaluationError(error.message || "Um erro inesperado ocorreu.");
+      } finally {
+        setIsEvaluatingAgent(false);
+      }
+    };

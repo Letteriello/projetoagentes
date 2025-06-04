@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Conversation } from "@/types/chat";
+import { Conversation, MessageData } from "@/types/chat"; // Import MessageData
 import { cn } from "@/lib/utils";
 import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
 import { MessageSquarePlus } from "lucide-react"; // Import the icon
@@ -80,6 +80,17 @@ const ChevronLeftIcon = () => (
   </svg>
 );
 
+const DownloadIcon = () => ( // Added DownloadIcon for Evalset
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+  </svg>
+);
+
+interface EvalsetTurn {
+  input: Array<{ role: 'user'; content: string }>;
+  output: { role: 'assistant'; content: string } | null;
+}
+
 export interface ConversationSidebarProps {
   isOpen: boolean;
   conversations: Conversation[];
@@ -98,7 +109,71 @@ export interface ConversationSidebarProps {
   savedAgents: SavedAgentConfigType[]; 
   adkAgents: AgentSelectItem[]; 
   onSelectAgent: (agent: AgentSelectItem | Gem | SavedAgentConfigType) => void;
+  // Props from the original diff that were missing in the read_files output
+  activeAgentConfig?: SavedAgentConfigType | Gem | null; // Assuming this is the correct type
+  onAgentConfigChange?: (agentConfig: SavedAgentConfigType | Gem) => void; // Assuming this is the correct type
+  availableGems?: Gem[];
+  availableAgents?: AgentSelectItem[];
 }
+
+const handleGenerateEvalset = (conversation: Conversation) => {
+  if (!conversation.messages || conversation.messages.length === 0) {
+    console.warn("Nenhuma mensagem na conversa para gerar Evalset.");
+    // Poderia usar um toast para notificar o usuário
+    return;
+  }
+
+  const evalset: EvalsetTurn[] = [];
+  let currentUserInputs: Array<{ role: 'user'; content: string }> = [];
+
+  conversation.messages.forEach((msg: MessageData) => {
+    // Assume que msg.content é sempre string para simplificar este mock.
+    // Em um cenário real, msg.content pode ser Part[] e precisaria ser tratado.
+    const messageContent = (Array.isArray(msg.content) ?
+                            (msg.content[0] as any)?.text || '' :
+                            String(msg.content)) || '';
+
+    if (msg.role === "user") {
+      currentUserInputs.push({ role: "user", content: messageContent });
+    } else if (msg.role === "assistant") {
+      if (currentUserInputs.length > 0) {
+        evalset.push({
+          input: [...currentUserInputs],
+          output: { role: "assistant", content: messageContent },
+        });
+        currentUserInputs = []; // Reset para o próximo turno
+      } else {
+        // Isso pode acontecer se a conversa começar com o assistente ou houver respostas consecutivas do assistente.
+        // Para este formato de evalset (input -> output), vamos ignorar respostas do assistente sem input do usuário precedente.
+        console.warn("Resposta do assistente encontrada sem input do usuário precedente. Será ignorada no Evalset:", msg);
+      }
+    }
+  });
+
+  // Caso a conversa termine com mensagens do usuário sem resposta do assistente
+  if (currentUserInputs.length > 0) {
+    evalset.push({
+      input: [...currentUserInputs],
+      output: null, // Sem output do assistente para este último input
+    });
+  }
+
+  if (evalset.length === 0) {
+    console.warn("Nenhum turno válido de input/output encontrado para gerar Evalset.");
+    return;
+  }
+
+  const jsonString = JSON.stringify(evalset, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `evalset-${conversation.id}-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 export function ConversationSidebar({
   conversations,
@@ -110,6 +185,11 @@ export function ConversationSidebar({
   isOpen,
   onToggleSidebar,
   isLoading, // Destructure isLoading from props
+  // Destructure other props that might be used if they were in the original props
+  // activeAgentConfig,
+  // onAgentConfigChange,
+  // availableGems,
+  // availableAgents,
 }: ConversationSidebarProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -174,13 +254,15 @@ export function ConversationSidebar({
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Chats</h2>
-              <button
-                onClick={onToggleSidebar}
-                className="p-1 rounded-md hover:bg-gray-700 text-gray-400 hover:text-gray-100"
-                aria-label="Close sidebar"
-              >
-                <ChevronLeftIcon />
-              </button>
+              {onToggleSidebar && ( // Render close button only if onToggleSidebar is provided
+                <button
+                  onClick={onToggleSidebar}
+                  className="p-1 rounded-md hover:bg-gray-700 text-gray-400 hover:text-gray-100"
+                  aria-label="Close sidebar"
+                >
+                  <ChevronLeftIcon />
+                </button>
+              )}
             </div>
 
             {/* New Chat Button */}
@@ -204,10 +286,10 @@ export function ConversationSidebar({
                 </ul>
               ) : conversations.length === 0 ? (
                 <EmptyState
-                  icon={<MessageSquarePlus className="w-12 h-12 text-gray-500" />} // Adjusted icon size to match original
+                  icon={<MessageSquarePlus className="w-12 h-12 text-gray-500" />}
                   title="Inicie uma Nova Conversa"
                   description="Clique no botão New Chat acima para começar um novo diálogo."
-                  className="flex-grow justify-center text-gray-400 bg-transparent border-none shadow-none px-0 py-0" // Override default styling to match original layout better
+                  className="flex-grow justify-center text-gray-400 bg-transparent border-none shadow-none px-0 py-0"
                 />
               ) : (
                 <ul className="space-y-1">
@@ -244,6 +326,17 @@ export function ConversationSidebar({
 
                         {renamingId !== conv.id && (
                           <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                             <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateEvalset(conv); // Call evalset generation
+                              }}
+                              className="p-1 rounded-md hover:bg-sky-500 text-gray-400 hover:text-sky-100"
+                              aria-label="Gerar Evalset"
+                              title="Gerar Evalset"
+                            >
+                              <DownloadIcon />
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
