@@ -20,9 +20,20 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
   const [mounted, setMounted] = useState(false);
 
   // Evita problema de hidratação (diferença entre servidor e cliente)
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Evita problema de hidratação (diferença entre servidor e cliente)
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleToggle = () => {
+    setIsAnimating(true);
+    toggleTheme();
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, 300); // Duration of the animation
+  };
 
   if (!mounted) {
     return (
@@ -39,13 +50,21 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={toggleTheme}
+            onClick={handleToggle}
             className={`w-9 h-9 text-muted-foreground hover:text-foreground ${className || ''}`}
           >
             {theme === "dark" ? (
-              <Moon className="h-[1.15rem] w-[1.15rem] rotate-0 scale-100 transition-all" />
+              <Moon
+                className={`h-[1.15rem] w-[1.15rem] transition-all duration-300 ease-in-out ${
+                  isAnimating ? 'rotate-[360deg] scale-75' : 'rotate-0 scale-100'
+                }`}
+              />
             ) : (
-              <Sun className="h-[1.15rem] w-[1.15rem] rotate-0 scale-100 transition-all" />
+              <Sun
+                className={`h-[1.15rem] w-[1.15rem] transition-all duration-300 ease-in-out ${
+                  isAnimating ? 'rotate-[360deg] scale-125' : 'rotate-0 scale-100'
+                }`}
+              />
             )}
             <span className="sr-only">Alternar tema</span>
           </Button>

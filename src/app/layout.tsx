@@ -14,6 +14,9 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { EnvironmentProvider } from '@/contexts/EnvironmentContext';
 import { LoggerProvider } from '@/components/logger-provider';
 
+// Network Status Hook
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+
 // Command Palette Imports
 import {
   CommandDialog,
@@ -99,7 +102,7 @@ export default function RootLayout({
     registerCommand,
   } = useCommandPalette();
   const router = useRouter();
-  const { toast } = useToast();
+  const { toast } = useToast(); // This instance is for the layout's own toast needs like command palette
 
   // Register global keyboard shortcut for Command Palette
   React.useEffect(() => {
@@ -181,6 +184,7 @@ export default function RootLayout({
               </EnvironmentProvider>
             </AuthProvider>
             <Toaster />
+            <NetworkStatusNotifier />
             <CommandDialog open={isOpen} onOpenChange={(open) => !open && closePalette()}>
               <CommandInput placeholder="Digite um comando ou pesquise..." />
               <CommandList>
@@ -219,4 +223,45 @@ export default function RootLayout({
       </body>
     </html>
   );
+}
+
+// Network Status Notifier Component
+function NetworkStatusNotifier() {
+  const isOnline = useNetworkStatus();
+  // Get a new instance of useToast for the notifier, to avoid conflicts if layout uses toast for other things.
+  // Or, ensure useToast is context-safe if called multiple times (which it should be as a hook).
+  // For this case, useToast() should return the same global state and dispatch.
+  const { toast: networkToast, dismiss } = useToast();
+  const offlineToastIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!isOnline) {
+      // Only show toast if one isn't already active for offline status
+      if (!offlineToastIdRef.current) {
+        const { id } = networkToast({
+          title: "Você está offline",
+          description: "Verifique sua conexão. Algumas funcionalidades podem estar indisponíveis.",
+          variant: "destructive",
+          // Provide a no-op onOpenChange to attempt to prevent auto-dismissal from some internal mechanisms
+          // The main persistence will rely on TOAST_LIMIT=1 and manually dismissing when back online.
+          onOpenChange: () => {},
+        });
+        offlineToastIdRef.current = id;
+      }
+    } else {
+      if (offlineToastIdRef.current) {
+        dismiss(offlineToastIdRef.current);
+        offlineToastIdRef.current = null;
+        // Optionally, show a "back online" toast
+        networkToast({
+          title: "Você está online novamente!",
+          description: "Sua conexão foi restaurada.",
+          variant: "default", // Assuming 'default' is a success-like or neutral style
+          // Standard auto-dismissal for this one, so use default onOpenChange by not providing it
+        });
+      }
+    }
+  }, [isOnline, networkToast, dismiss]);
+
+  return null; // This component does not render anything itself
 }
