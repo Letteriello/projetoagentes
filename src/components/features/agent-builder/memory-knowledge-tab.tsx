@@ -128,10 +128,23 @@ interface MemoryKnowledgeTabProps {
   setEnableStatePersistence: (enabled: boolean) => void;
   statePersistenceType: "session" | "memory" | "database";
   setStatePersistenceType: (type: "session" | "memory" | "database") => void;
-  // Align with centralized initialState type: Array<{ key: string; value: any; type: 'string' | 'number' | 'boolean'; }>
-  initialStateValues: Array<{ key: string; value: any; type: 'string' | 'number' | 'boolean'; }>;
+  initialStateValues: Array<{
+    id?: string; // Optional ID
+    key: string;
+    value: any;
+    type: 'string' | 'number' | 'boolean';
+    scope: 'global' | 'agent' | 'temporary'; // Added scope
+    description?: string; // Added description
+  }>;
   setInitialStateValues: (
-    values: Array<{ key: string; value: any; type: 'string' | 'number' | 'boolean'; }>,
+    values: Array<{
+      id?: string;
+      key: string;
+      value: any;
+      type: 'string' | 'number' | 'boolean';
+      scope: 'global' | 'agent' | 'temporary';
+      description?: string;
+    }>,
   ) => void;
 
   // Compartilhamento de estado
@@ -185,14 +198,14 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
     key: string;
     value: string;
     type: 'string' | 'number' | 'boolean';
-    // scope and description are removed as they are not in the centralized type
-    // If they are needed, the centralized type must be updated first.
+    scope: 'global' | 'agent' | 'temporary'; // Added scope
+    description: string; // Added description (not optional for form state)
   }>({
     key: '',
     value: '',
     type: 'string', // Default type
-    // scope: 'agent', // Removed
-    // description: '' // Removed
+    scope: 'agent', // Default scope
+    description: '' // Default empty description
   });
 
   // O estado para seleção de aba já foi definido na linha 140
@@ -316,23 +329,66 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
     // For string, no special parsing needed beyond initial trim check
 
     setInitialStateValues([...initialStateValues, { 
+      id: `state-${Date.now()}`, // Add a temporary ID if not using UUIDs from a library
       key: newStateValue.key,
       value: parsedValue,
       type: newStateValue.type,
+      scope: newStateValue.scope,
+      description: newStateValue.description === '' ? undefined : newStateValue.description,
     }]);
     
-    setNewStateValue({ // Reset to the simplified structure
+    setNewStateValue({
       key: '',
       value: '',
-      type: 'string', // Reset type to default
+      type: 'string',
+      scope: 'agent',
+      description: '',
     });
     
     setShowNewStateForm(false);
   };
   
   // Remover valor de estado
-  const handleRemoveStateValue = (index: number) => {
+  const handleRemoveStateValue = (index: number) => { // Or by ID if available
     setInitialStateValues(initialStateValues.filter((_, i) => i !== index));
+  };
+
+  // Define the type for clarity, based on props and target structure
+  type InitialStateValueItem = {
+    id?: string;
+    key: string;
+    value: any;
+    type: 'string' | 'number' | 'boolean';
+    scope: 'global' | 'agent' | 'temporary';
+    description?: string;
+  };
+
+  const handleInitialStateFieldUpdate = (
+    index: number, // Assuming index-based update for now, switch to ID if items have stable IDs
+    field: keyof InitialStateValueItem,
+    value: string | boolean | number | undefined // Allow boolean/number for type consistency
+  ) => {
+    const updatedValues = initialStateValues.map((item, idx) => {
+      if (idx === index) {
+        let processedValue = value;
+        // Attempt to parse value if field is 'value' and type changes or is number/boolean
+        if (field === 'value') {
+          if (item.type === 'number') {
+            processedValue = parseFloat(value as string);
+            if (isNaN(processedValue as number)) processedValue = 0; // Default or handle error
+          } else if (item.type === 'boolean') {
+            if (typeof value === 'string') {
+              processedValue = value.toLowerCase() === 'true';
+            } else {
+              processedValue = Boolean(value); // Coerce to boolean
+            }
+          }
+        }
+        return { ...item, [field]: processedValue };
+      }
+      return item;
+    });
+    setInitialStateValues(updatedValues);
   };
   
   return (
@@ -425,6 +481,30 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                         </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="mt-4 mb-6"> {/* Added mb-6 for spacing after the alert */}
+                    <Alert variant="default"> {/* Using "default" variant */}
+                      <Info className="h-4 w-4" /> {/* Icon color will be default for the variant */}
+                      <AlertTitle>Implicações dos Tipos de Persistência de Estado</AlertTitle>
+                      <AlertDescription>
+                        <ul className="list-disc pl-5 space-y-1 text-xs">
+                          <li>
+                            <strong>Memory:</strong> O estado é mantido apenas na memória durante a sessão ativa do agente. Perde-se quando o agente é reiniciado ou a sessão termina. Adequado para testes rápidos ou cenários onde a persistência de longo prazo não é necessária. Baixa escalabilidade para múltiplos instances.
+                          </li>
+                          <li>
+                            <strong>Session:</strong> O estado é persistido durante a sessão do usuário (ex: usando cookies ou armazenamento de sessão do navegador/servidor). Pode sobreviver a recarregamentos de página, mas geralmente é perdido quando o usuário fecha o navegador ou a sessão expira. Escalabilidade depende da implementação do gerenciador de sessão.
+                          </li>
+                          <li>
+                            <strong>Database:</strong> O estado é salvo em um banco de dados dedicado (ex: Firestore, PostgreSQL). Oferece persistência de longo prazo, sobrevivendo a reinícios do agente e sessões de usuário. Permite que o agente recupere seu estado anterior em diferentes interações ou dispositivos. Mais escalável e robusto para produção. Requer configuração de banco de dados.
+                          </li>
+                        </ul>
+                        <p className="mt-2 text-xs">
+                          Escolha o tipo de persistência com base nos requisitos de longevidade dos dados do seu agente, necessidade de escalabilidade e complexidade de infraestrutura.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+
                   <div className="space-y-2">
                     <Label className="flex items-center">Valores Iniciais do Estado
                         <Tooltip>
@@ -464,27 +544,82 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                                         <TooltipContent><p>O tipo de dado do valor inicial.</p></TooltipContent>
                                     </Tooltip>
                                 </TableHead>
+                                <TableHead>Escopo</TableHead>
+                                <TableHead>Descrição</TableHead>
                                 <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {initialStateValues.map((item, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>{item.key}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className="font-mono">
-                                            {typeof item.value === 'boolean' ? item.value.toString() : item.value}
-                                        </Badge>
+                                <TableRow key={item.id ?? index}> {/* Use ID if available, else index */}
+                                    <TableCell className="align-top w-1/5">
+                                      <Input
+                                        value={item.key}
+                                        onChange={(e) => handleInitialStateFieldUpdate(index, 'key', e.target.value)}
+                                        className="h-8 w-full"
+                                        placeholder="State Key"
+                                      />
                                     </TableCell>
-                                    <TableCell>
-                                        <Badge variant="secondary">{item.type}</Badge>
+                                    <TableCell className="align-top w-1/4">
+                                      <Textarea
+                                        value={String(item.value)}
+                                        onChange={(e) => {
+                                          handleInitialStateFieldUpdate(index, 'value', e.target.value);
+                                        }}
+                                        className="h-16 text-xs w-full resize-none"
+                                        placeholder="State Value"
+                                        rows={2}
+                                      />
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="align-top w-1/6">
+                                      <Select
+                                        value={item.type}
+                                        onValueChange={(newValue: 'string' | 'number' | 'boolean') => {
+                                          handleInitialStateFieldUpdate(index, 'type', newValue);
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 w-full">
+                                          <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="string">Texto</SelectItem>
+                                          <SelectItem value="number">Número</SelectItem>
+                                          <SelectItem value="boolean">Booleano</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell className="align-top w-1/6">
+                                      <Select
+                                        value={item.scope}
+                                        onValueChange={(newValue: 'global' | 'agent' | 'temporary') =>
+                                          handleInitialStateFieldUpdate(index, 'scope', newValue)
+                                        }
+                                      >
+                                        <SelectTrigger className="h-8 w-full">
+                                          <SelectValue placeholder="Select scope" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="global">Global</SelectItem>
+                                          <SelectItem value="agent">Agent</SelectItem>
+                                          <SelectItem value="temporary">Temporary</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell className="align-top w-1/4">
+                                      <Textarea
+                                        value={item.description || ''}
+                                        onChange={(e) => handleInitialStateFieldUpdate(index, 'description', e.target.value === '' ? undefined : e.target.value)}
+                                        placeholder="Description (optional)"
+                                        className="h-16 text-xs w-full resize-none"
+                                        rows={2}
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right align-top">
                                         <Button variant="ghost" size="icon" onClick={() => handleRemoveStateValue(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {initialStateValues.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Nenhum valor inicial definido.</TableCell></TableRow>} {/* Adjusted colSpan */}
+                            {initialStateValues.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum valor inicial definido.</TableCell></TableRow>}
                         </TableBody>
                     </Table>
                     <Button variant="outline" size="sm" onClick={() => setShowNewStateForm(true)} className="mt-2"><Plus className="mr-2 h-4 w-4" /> Adicionar Valor de Estado</Button>
@@ -506,18 +641,15 @@ export const MemoryKnowledgeTab: React.FC<MemoryKnowledgeTabProps> = ({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            {/* UI for scope and description removed */}
-                            {/*
-                            <Select value={newStateValue.scope} onValueChange={(v) => setNewStateValue(prev => ({...prev, scope: v as any}))}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select value={newStateValue.scope} onValueChange={(v) => setNewStateValue(prev => ({...prev, scope: v as 'global' | 'agent' | 'temporary'}))}>
+                                <SelectTrigger><SelectValue placeholder="Selecione o Escopo"/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="agent">Agente</SelectItem>
+                                    <SelectItem value="agent">Agent</SelectItem>
                                     <SelectItem value="global">Global</SelectItem>
-                                    <SelectItem value="temporary">Temporário</SelectItem>
+                                    <SelectItem value="temporary">Temporary</SelectItem>
                                 </SelectContent>
                             </Select>
                             <Input placeholder="Descrição (opcional)" value={newStateValue.description} onChange={(e) => setNewStateValue(prev => ({...prev, description: e.target.value}))} />
-                            */}
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => setShowNewStateForm(false)}>Cancelar</Button>
                                 <Button size="sm" onClick={handleAddStateValue}>Adicionar</Button>
