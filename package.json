@@ -14,11 +14,16 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=src --testPathIgnorePatterns=/e2e/ --testPathIgnorePatterns=\\.integration\\.test\\.",
+    "test:integration": "jest --testPathPattern=\\.integration\\.test\\.",
+    "test:e2e": "playwright test",
     "load-test": "node tests/load-test.js"
   },
   "dependencies": {
     "@genkit-ai/core": "^1.11.0",
+    "@genkit-ai/firebase": "^1.11.0",
     "@genkit-ai/googleai": "^1.11.0",
+    "@genkit-ai/vertexai": "^1.11.0",
     "@monaco-editor/react": "^4.7.0",
     "@opentelemetry/exporter-jaeger": "^2.0.1",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -53,14 +58,12 @@
     "firebase-admin": "^13.4.0",
     "framer-motion": "^12.15.0",
     "genkit": "^1.11.0",
-    "genkit-plugin-firestore": "^1.11.0", // Added firestore plugin
-    "genkit-plugin-vertexai": "^1.11.0", // Added vertexai plugin
     "genkitx-openai": "^0.20.1",
     "https-browserify": "^1.0.0",
     "https-proxy-agent": "^7.0.6",
     "js-yaml": "^4.1.0",
+    "lru-cache": "^7.14.1",
     "lucide-react": "^0.475.0",
-    "lru-cache": "^7.14.1", // Added lru-cache
     "monaco-editor": "^0.52.2",
     "next": "^15.3.3",
     "os-browserify": "^0.3.0",
@@ -82,14 +85,13 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "util": "^0.12.5",
-    "zod": "^3.25.42"
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "zod": "^3.25.46"
   },
   "devDependencies": {
-    "axios": "^1.0.0",
     "@hookform/resolvers": "^5.0.1",
+    "@next/bundle-analyzer": "^15.3.3",
     "@playwright/test": "^1.52.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.3",
@@ -103,8 +105,11 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/react-window": "^1.8.8",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.0.0",
     "buffer": "^6.0.3",
     "eslint-config-next": "^15.3.3",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-promise": "^7.2.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-security": "^3.0.1",
