@@ -105,6 +105,7 @@ export default function MessageInputArea({
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
+  const [tokenCount, setTokenCount] = useState(0); // Added state for token count
   const MAX_TEXTAREA_ROWS = 6; // Define max rows for textarea
 
   // Internal state for attachments
@@ -272,6 +273,21 @@ export default function MessageInputArea({
     }
   };
 
+useEffect(() => {
+  if (inputValue.trim() === "") {
+    setTokenCount(0);
+  } else {
+    try {
+      const { encode } = require('gpt-3-encoder'); // Dynamically import to avoid issues in non-browser env if any
+      const currentTokens = encode(inputValue).length;
+      setTokenCount(currentTokens);
+    } catch (error) {
+      console.warn("Token encoding error:", error);
+      setTokenCount(0); // Fallback on error
+    }
+  }
+}, [inputValue]);
+
   return (
     <form
       ref={formRef}
@@ -406,7 +422,10 @@ export default function MessageInputArea({
           disabled={isPending}
           className="min-h-[44px] pr-12 resize-none overflow-y-hidden custom-scrollbar py-2.5 leading-tight"
         />
-        {/* Character count or other indicators can go here if needed */}
+        {/* Token Counter Display */}
+        <div className="text-xs text-muted-foreground text-right px-3 py-1">
+          Estimativa de Tokens: {tokenCount}
+        </div>
       </div>
 
       <Button
