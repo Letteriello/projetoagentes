@@ -1,3 +1,10 @@
+## [Corrigido] - 2025-06-04
+### Conflito de Merge: `src/app/agent-builder/page.tsx`
+- Resolvido conflito de merge no arquivo `src/app/agent-builder/page.tsx`.
+- Removidos os marcadores de conflito (`<<<<<<< HEAD`, `=======`, `>>>>>>>`) e mantido o conteúdo mais recente do arquivo.
+
+---
+
 ## [Corrigido] - 2025-06-03
 ### Logger Provider: corrigido erro `TypeError: setImmediate is not a function` no cliente
 - Refatorado `src/components/logger-provider.tsx` para utilizar o `console` nativo do navegador para logs no lado do cliente.

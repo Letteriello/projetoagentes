@@ -1,9 +1,9 @@
 "use client"; // Required for hooks like useEffect, useState, useCommandPalette
 
-import * as React from 'react'; // Import React
+import * as React from 'react';
 import "./globals.css";
 import { Inter } from 'next/font/google';
-import { useRouter } from 'next/navigation'; // For navigation commands
+import { useRouter } from 'next/navigation';
 import { AppLayout } from "@/components/layout/app-layout";
 import { ErrorBoundaryClient } from '@/components/error-boundary-client';
 import { Toaster } from "@/components/ui/toaster";
@@ -25,14 +25,14 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { useCommandPalette, CommandAction } from "@/hooks/use-command-palette";
-import { Cpu, MessageSquare, Plus, Settings as SettingsIcon } from "lucide-react"; // Icons for commands
+import { Cpu, MessageSquare, Plus, Settings as SettingsIcon } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 
-// Import polyfills for Node.js modules in browser environment
-import '@/lib/polyfills';
-import '@/lib/node-polyfills';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+// Initialize Inter font
+export const inter = Inter({ 
+  subsets: ['latin'], 
+  variable: '--font-inter' 
+});
 
 // Script to polyfill Node.js modules early in the page lifecycle
 function NodePolyfillScript() {

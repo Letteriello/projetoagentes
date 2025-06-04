@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 // src/app/agent-builder/page.tsx
 "use client";
 
@@ -58,657 +56,416 @@ import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-cr
 import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
 import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
 import { v4 as uuidv4 } from 'uuid';
-import { HelpModal } from '@/components/ui/HelpModal';
-import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-builder-help-content';
-import { FeedbackButton } from "@/components/features/agent-builder/feedback-button";
-import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ConfirmationModal } from "@/components/ui/confirmation-modal"; // Import ConfirmationModal
+import { HelpModal } from '@/components/ui/help-modal';
+import { FeedbackModal } from '@/components/features/agent-builder/FeedbackModal';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal'; 
 
-// Moved ViewMode type definition here to be accessible by AgentRow
-type ViewMode = 'grid' | 'list';
+// Define tutorials (example structure)
+const tutorials = {
+  createAgent: {
+    id: 'createAgent',
+    title: 'Como Criar um Novo Agente',
+    steps: [
+      { title: 'Passo 1: Abrir o Construtor', content: 'Clique no botão <strong>+ Novo Agente</strong> para abrir o formulário de criação.' },
+      { title: 'Passo 2: Preencher Detalhes', content: 'Insira o nome, descrição, tipo e tom do agente. Selecione um ícone.' },
+      { title: 'Passo 3: Configurar Ferramentas', content: 'Adicione e configure as ferramentas que seu agente usará.' },
+      { title: 'Passo 4: Definir Instruções', content: 'Forneça as instruções base para o comportamento do agente.' },
+      { title: 'Passo 5: Salvar o Agente', content: 'Clique em <strong>Salvar Agente</strong> para finalizar.' },
+    ],
+  },
+  // Add more tutorials as needed
+};
+
+const AGENT_CARD_LIST_ITEM_SIZE = 210; // Approximate height of an agent card + padding
 
 export default function AgentBuilderPage() {
+  const { agents, addAgent, updateAgent, deleteAgent, isLoading, error } = useAgents();
+  const { saveAgentConfig, loadAgentConfigs, deleteAgentConfig } = useAgentStorage();
   const { toast } = useToast();
-  const { savedAgents, addAgent: addAgentViaContext, updateAgent: updateAgentViaContext, deleteAgent: deleteAgentViaContext, isLoadingAgents } = useAgents();
-
-  // Calculate statistics
-  const totalAgents = savedAgents.length;
-  const agentsWithTools = savedAgents.filter(agent => agent.tools && agent.tools.length > 0).length;
-  const rootAgents = savedAgents.filter(agent => agent.config && agent.config.isRootAgent).length;
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
-  const [editingAgent, setEditingAgent] =
-    React.useState<SavedAgentConfiguration | null>(null);
+  const [editingAgent, setEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
+  const [isSaveAsTemplateModalOpen, setIsSaveAsTemplateModalOpen] = React.useState(false);
+  const [agentToSaveAsTemplate, setAgentToSaveAsTemplate] = React.useState<SavedAgentConfiguration | null>(null);
+  const [buildMode, setBuildMode] = React.useState<'form' | 'chat'>('form');
   const [selectedAgentForMonitoring, setSelectedAgentForMonitoring] = React.useState<SavedAgentConfiguration | null>(null);
-  const [currentViewTab, setCurrentViewTab] = React.useState<'details' | 'monitoring'>('details');
-  const [isMounted, setIsMounted] = React.useState(false);
-  const [buildMode, setBuildMode] = React.useState<"form" | "chat">("form");
+  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
 
-  const [isSaveAsTemplateDialogOpen, setIsSaveAsTemplateDialogOpen] = React.useState(false);
-  const [currentAgentForTemplating, setCurrentAgentForTemplating] = React.useState<SavedAgentConfiguration | null>(null);
-
-  const [activeTutorial, setActiveTutorial] = React.useState<GuidedTutorial | null>(null);
-  const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
+  // Tutorial State
   const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
+  const [activeTutorial, setActiveTutorial] = React.useState(tutorials.createAgent); // Default tutorial
+  const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
+
+  // Feedback Modal State
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = React.useState(false);
 
-  // State for delete confirmation modal
+  // Confirmation Modal State for Deleting Agent
   const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = React.useState(false);
   const [agentToDelete, setAgentToDelete] = React.useState<SavedAgentConfiguration | null>(null);
 
-  // State for agent order and drag-and-drop
-  const [agentOrder, setAgentOrder] = React.useState<string[]>([]);
-  const [draggedAgentId, setDraggedAgentId] = React.useState<string | null>(null);
-
-  const { saveAgentOrder } = useAgentStorage(); // Get saveAgentOrder directly
-
-  // View Mode state and persistence
-  // type ViewMode = 'grid' | 'list'; // Moved to top-level
-  const VIEW_MODE_STORAGE_KEY = 'agentViewMode_v1';
-  const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
-  const listRef = React.useRef<FixedSizeList>(null); // Ref for FixedSizeList
-
   React.useEffect(() => {
-    const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as ViewMode | null;
-    if (savedViewMode) {
-      setViewMode(savedViewMode);
-    }
-  }, []);
+    const agentIdToEdit = searchParams.get('edit');
+    const agentToMonitorId = searchParams.get('monitor');
+    const openBuilder = searchParams.get('create') === 'true';
 
-  React.useEffect(() => {
-    localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
-  }, [viewMode]);
-
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const startTutorial = (tutorialId: string) => {
-    const tutorial = guidedTutorials.find(t => t.id === tutorialId);
-    if (tutorial) {
-      setActiveTutorial(tutorial);
-      setCurrentTutorialStep(0);
-      setIsTutorialModalOpen(true);
-    }
-  };
-
-  const handleTutorialNext = () => {
-    if (activeTutorial && currentTutorialStep < activeTutorial.steps.length - 1) {
-      setCurrentTutorialStep(prev => prev + 1);
-    }
-  };
-
-  const handleTutorialPrev = () => {
-    if (currentTutorialStep > 0) {
-      setCurrentTutorialStep(prev => prev - 1);
-    }
-  };
-
-  const closeTutorialModal = () => {
-    setIsTutorialModalOpen(false);
-    setActiveTutorial(null);
-    setCurrentTutorialStep(0);
-  };
-
-  React.useEffect(() => {
-    const templateId = searchParams.get("templateId");
-    if (templateId) {
-      const loadTemplate = async () => {
-        try {
-          const template = await getAgentTemplate(templateId);
-          if (template) {
-            const { id, userId, createdAt, updatedAt, isTemplate, ...restOfTemplateData } = template;
-            const newAgentFromTemplate: SavedAgentConfiguration = {
-              ...restOfTemplateData,
-              id: uuidv4(),
-              agentName: `Cópia de ${template.agentName}`,
-              templateId: templateId,
-              isTemplate: false,
-              isFavorite: false,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            setEditingAgent(newAgentFromTemplate);
-            setIsBuilderModalOpen(true);
-            // Remove the templateId from URL after loading
-            router.replace('/agent-builder', undefined);
-          } else {
-            toast({ title: "Template não encontrado", variant: "destructive" });
-             router.replace('/agent-builder', undefined);
-          }
-        } catch (error) {
-          console.error("Erro ao carregar template:", error);
-          toast({ title: "Erro ao Carregar Template", variant: "destructive" });
-           router.replace('/agent-builder', undefined);
-        }
-      };
-      loadTemplate();
-    }
-  }, [searchParams, router, toast]);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  React.useEffect(() => {
-    // Initialize agentOrder when savedAgents changes and agentOrder is empty
-    // This handles initial load and cases where savedAgents are updated externally.
-    if (savedAgents.length > 0 && agentOrder.length === 0) {
-      setAgentOrder(savedAgents.map(agent => agent.id));
-    } else if (savedAgents.length === 0 && agentOrder.length > 0) {
-      // Clear agentOrder if all agents are deleted
-      setAgentOrder([]);
-    }
-    // A more sophisticated sync might be needed if useAgentStorage provides persisted order later
-  }, [savedAgents, agentOrder]);
-
-
-  const orderedAgents = React.useMemo(() => {
-    if (agentOrder.length > 0 && savedAgents.length > 0) {
-      return agentOrder
-        .map(id => savedAgents.find(agent => agent.id === id))
-        .filter(Boolean) as SavedAgentConfiguration[];
-    }
-    return savedAgents; // Fallback to savedAgents if order is not yet established or empty
-  }, [agentOrder, savedAgents]);
-
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, agentId: string) => {
-    setDraggedAgentId(agentId);
-    // Optional: Add styles for dragging element
-    // e.dataTransfer.effectAllowed = "move";
-    // e.dataTransfer.setData("text/plain", agentId); // Not strictly necessary with React state
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Necessary to allow dropping
-    // Optional: Add styles for drop target
-    // e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetAgentId: string) => {
-    e.preventDefault();
-    if (!draggedAgentId || draggedAgentId === targetAgentId) {
-      setDraggedAgentId(null);
-      return;
+    if (openBuilder) {
+      handleCreateNewAgent();
     }
 
-    const newOrder = [...agentOrder];
-    const draggedIndex = newOrder.indexOf(draggedAgentId);
-    const targetIndex = newOrder.indexOf(targetAgentId);
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedAgentId(null);
-      return; // Should not happen if IDs are correct
+    if (agentIdToEdit) {
+      const agentFound = agents.find(agent => agent.id === agentIdToEdit);
+      if (agentFound) {
+        setEditingAgent(agentFound);
+        setIsBuilderModalOpen(true);
+      }
     }
+    if (agentToMonitorId) {
+      const agentFound = agents.find(agent => agent.id === agentToMonitorId);
+      if (agentFound) {
+        setSelectedAgentForMonitoring(agentFound);
+      }
+    }
+  }, [searchParams, agents]);
 
-    // Remove the dragged agent and insert it before the target agent
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedAgentId);
-
-    setAgentOrder(newOrder);
-    setDraggedAgentId(null);
-    // Persist the new order
-    saveAgentOrder(newOrder);
-    console.log("Nova ordem persistida:", newOrder);
-  };
-
-  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    // Optional: Clean up any drag state or styles
-    setDraggedAgentId(null);
-  };
-
-  const handleOpenCreateAgentModal = () => {
+  const handleCreateNewAgent = () => {
     setEditingAgent(null);
-    setBuildMode("form"); // Ensure form mode when creating new
+    setBuildMode('form'); // Default to form mode for new agents
     setIsBuilderModalOpen(true);
   };
 
-  const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
-    setEditingAgent(agentToEdit);
-    setSelectedAgentForMonitoring(null);
-    setCurrentViewTab('details');
-    setBuildMode("form"); // Ensure form mode
+  const handleEditAgent = (agent: SavedAgentConfiguration) => {
+    setEditingAgent(agent);
+    setBuildMode('form'); // Default to form mode for editing
     setIsBuilderModalOpen(true);
   };
 
-  const handleViewAgentMonitoring = (agentToView: SavedAgentConfiguration) => {
-    setSelectedAgentForMonitoring(agentToView);
-    setEditingAgent(null);
-    setIsBuilderModalOpen(false);
-    setBuildMode("form"); // Ensure form mode for monitoring view consistency
-    setCurrentViewTab('monitoring');
-  };
-
-  const handleSaveAgent = async (agentConfig: SavedAgentConfiguration) => {
-    let result: SavedAgentConfiguration | null = null;
-    // Preserve existing isFavorite status if editing, default to false if new or not set
-    const existingAgent = savedAgents.find(a => a.id === agentConfig.id);
-    const dataToSave = {
-      ...agentConfig,
-      isFavorite: agentConfig.isFavorite ?? existingAgent?.isFavorite ?? false
-    };
-
-    if (editingAgent || savedAgents.some(a => a.id === agentConfig.id)) {
-      const agentIdToUpdate = editingAgent?.id || agentConfig.id;
-      // Ensure not to spread fields that shouldn't be updated directly or are managed by backend/context
-      const { id, userId, createdAt, updatedAt, ...updatePayload } = dataToSave;
-      result = await updateAgentViaContext(agentIdToUpdate, updatePayload);
-      if (result) {
-        toast({ title: "Agente Atualizado!", description: `O agente "${result.agentName}" foi atualizado.` });
-      }
-    } else {
-      const { id, createdAt, updatedAt, userId, ...newAgentData } = dataToSave;
-      result = await addAgentViaContext(newAgentData as Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>);
-      if (result) {
-        toast({ title: "Agente Criado!", description: `O agente "${result.agentName}" foi adicionado.` });
-      }
-    }
-    if (result) {
-        setEditingAgent(null);
-        setIsBuilderModalOpen(false);
-    } else {
-        toast({ title: "Erro ao Salvar", description: "Não foi possível salvar o agente.", variant: "destructive" });
-    }
-  };
-
-  const handleDeleteAgent = (agentIdToDelete: string) => {
-    const agentObject = savedAgents.find(agent => agent.id === agentIdToDelete);
-    if (agentObject) {
-      setAgentToDelete(agentObject);
+  const handleDeleteAgent = (agentId: string) => {
+    const agent = agents.find(a => a.id === agentId);
+    if (agent) {
+      setAgentToDelete(agent);
       setIsConfirmDeleteAgentOpen(true);
-    } else {
-      toast({ title: "Erro", description: "Agente não encontrado para exclusão.", variant: "destructive" });
     }
   };
 
   const onConfirmDeleteAgent = async () => {
     if (agentToDelete) {
-      if (selectedAgentForMonitoring?.id === agentToDelete.id) {
-        setSelectedAgentForMonitoring(null);
+      try {
+        await deleteAgent(agentToDelete.id);
+        await deleteAgentConfig(agentToDelete.id); // Also delete from local storage
+        toast({
+          title: "Agente Excluído",
+          description: `O agente "${agentToDelete.agentName}" foi excluído com sucesso.`,
+          variant: "destructive",
+        });
+      } catch (error) {
+        console.error("Erro ao excluir agente:", error);
+        toast({
+          title: "Erro ao Excluir",
+          description: "Não foi possível excluir o agente. Tente novamente.",
+          variant: "destructive",
+        });
       }
-      if (currentAgentForTemplating?.id === agentToDelete.id) {
-        setCurrentAgentForTemplating(null);
-        setIsSaveAsTemplateDialogOpen(false);
-      }
-      const success = await deleteAgentViaContext(agentToDelete.id);
-      if (success) {
-        toast({ title: "Agente Excluído", description: `O agente "${agentToDelete.agentName}" foi excluído.` });
-      } else {
-        toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o agente "${agentToDelete.agentName}".`, variant: "destructive" });
-      }
-      setIsConfirmDeleteAgentOpen(false);
       setAgentToDelete(null);
+      setIsConfirmDeleteAgentOpen(false);
     }
   };
 
-  const handleSaveAsTemplate = async (agent: SavedAgentConfiguration) => {
-    setCurrentAgentForTemplating(agent);
-    setIsSaveAsTemplateDialogOpen(true);
-  };
-
-  const executeSaveAsTemplate = async (templateDetails: { useCases: string[]; templateDetailsPreview: string }) => {
-    if (!currentAgentForTemplating) return;
-    const { id, createdAt, updatedAt, isFavorite, ...agentDataToCopy } = currentAgentForTemplating;
-    const templateName = `Template de ${currentAgentForTemplating.agentName}`;
-    const newTemplateData: Partial<SavedAgentConfiguration> = {
-      ...agentDataToCopy,
-      agentName: templateName,
-      agentDescription: `Template baseado em ${currentAgentForTemplating.agentName}`,
-      useCases: templateDetails.useCases,
-      templateDetailsPreview: templateDetails.templateDetailsPreview,
-      isTemplate: true,
-      isFavorite: false, // Templates are not favorited by default
-    };
+  const handleSaveAgent = async (agentConfig: SavedAgentConfiguration) => {
     try {
-      const savedTemplateId = await saveAgentTemplate(newTemplateData as SavedAgentConfiguration);
-      if (savedTemplateId) {
-        toast({ title: "Template Salvo!", description: `Template "${templateName}" criado.` });
-      } else { throw new Error("Falha ao salvar template."); }
+      if (editingAgent) {
+        await updateAgent(agentConfig.id, agentConfig);
+        toast({
+          title: "Agente Atualizado",
+          description: `O agente "${agentConfig.agentName}" foi atualizado com sucesso.`,
+        });
+      } else {
+        const newAgentWithId = { ...agentConfig, id: uuidv4() };
+        await addAgent(newAgentWithId);
+        toast({
+          title: "Agente Criado",
+          description: `O agente "${newAgentWithId.agentName}" foi criado com sucesso.`,
+        });
+      }
+      await saveAgentConfig(agentConfig); // Save to local storage
+      setIsBuilderModalOpen(false);
+      setEditingAgent(null);
     } catch (error) {
-      console.error("Erro ao salvar template:", error);
-      toast({ title: "Erro ao Salvar Template", description: (error as Error).message, variant: "destructive" });
-    } finally {
-      setCurrentAgentForTemplating(null);
-      setIsSaveAsTemplateDialogOpen(false);
-    }
-  };
-
-  const handleToggleFavorite = async (agentId: string, newFavoriteStatus: boolean) => {
-    const agentToUpdate = savedAgents.find(agent => agent.id === agentId);
-    if (!agentToUpdate) {
-      toast({ title: "Erro", description: "Agente não encontrado.", variant: "destructive" });
-      return;
-    }
-    // Create payload with only isFavorite to avoid unintended updates
-    const result = await updateAgentViaContext(agentId, { isFavorite: newFavoriteStatus });
-    if (result) {
+      console.error("Erro ao salvar agente:", error);
       toast({
-        title: newFavoriteStatus ? "Agente Favoritado!" : "Agente Desfavoritado",
-        description: `O agente "${result.agentName}" foi ${newFavoriteStatus ? 'adicionado aos' : 'removido dos'} favoritos.`,
-      });
-    } else {
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o status de favorito do agente.",
+        title: "Erro ao Salvar",
+        description: "Não foi possível salvar o agente. Tente novamente.",
         variant: "destructive",
       });
     }
   };
 
-  const headerContent = (
-    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <Cpu className="h-8 w-8 text-primary" />
-        <h1 className="text-2xl md:text-3xl font-bold">Construtor de Agentes</h1>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button variant="outline" onClick={() => { startTutorial(guidedTutorials[0].id); }} className="shadow-sm">
-          <Layers className="mr-2 h-4 w-4" /> Ver Tutoriais
-        </Button>
-        <Button
-          variant={buildMode === 'chat' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => { setBuildMode('chat'); setIsBuilderModalOpen(false); setEditingAgent(null); setSelectedAgentForMonitoring(null); }}
-          title="Construir com Chat IA"
-          className="shadow-sm"
-        >
-          <MessageSquareText className="mr-2 h-4 w-4" /> Conversar com IA
-        </Button>
-        <Button
-          variant={buildMode === 'form' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => { setBuildMode('form'); /* setIsBuilderModalOpen(!!editingAgent); // Keep existing modal logic for form */ }}
-          title="Editor Avançado (Formulário)"
-          className="shadow-sm"
-        >
-          <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
-        </Button>
-        <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} />
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('grid')}
-                className="shadow-sm"
-                aria-label="Visualização em Grade"
-              >
-                <LayoutGrid className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Grade</p></TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewMode('list')}
-                className="shadow-sm"
-                aria-label="Visualização em Lista"
-              >
-                <List className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Lista</p></TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-    </header>
-  );
+  const handleSaveAsTemplate = (agent: SavedAgentConfiguration) => {
+    setAgentToSaveAsTemplate(agent);
+    setIsSaveAsTemplateModalOpen(true);
+  };
 
-  if (isLoadingAgents) {
-    return (
-      <div className="space-y-8 p-4">
-        {headerContent}
-        {/* Skeleton for Dashboard cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card key={`skeleton-dashboard-${index}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-[120px]" />
-                <Skeleton className="h-5 w-5 rounded-full" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-1/3 mb-1" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        {/* Skeleton for "Novo Agente" button area */}
-        <div className="flex items-center justify-end pt-4 gap-2">
-           <Skeleton className="h-10 w-40" /> {/* Adjusted width for "Novo Agente (Formulário)" */}
-        </div>
-        {/* Skeleton for Agent Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-4">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={`skeleton-agent-${index}`} className="p-4 rounded-lg border border-border bg-card space-y-3 h-[200px] flex flex-col justify-between">
-              <div>
-                <div className="flex items-center space-x-3 mb-3">
-                  <Skeleton className="h-10 w-10 rounded-md" />
-                  <Skeleton className="h-5 w-3/5" />
-                </div>
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-4/5" />
-              </div>
-              <Skeleton className="h-9 w-full" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const onConfirmSaveAsTemplate = async (templateName: string) => {
+    if (agentToSaveAsTemplate) {
+      try {
+        await saveAgentTemplate(agentToSaveAsTemplate, templateName);
+        toast({
+          title: "Template Salvo",
+          description: `O agente "${agentToSaveAsTemplate.agentName}" foi salvo como template "${templateName}".`,
+        });
+      } catch (error) {
+        console.error("Erro ao salvar template:", error);
+        toast({
+          title: "Erro ao Salvar Template",
+          description: "Não foi possível salvar o template. Tente novamente.",
+          variant: "destructive",
+        });
+      }
+      setIsSaveAsTemplateModalOpen(false);
+      setAgentToSaveAsTemplate(null);
+    }
+  };
+
+  const handleSelectAgentForMonitoring = (agent: SavedAgentConfiguration) => {
+    setSelectedAgentForMonitoring(agent);
+    // Potentially navigate or change view to show logs/metrics
+    router.push(`/agent-builder?monitor=${agent.id}`, { scroll: false });
+  };
+
+  const handleOpenTutorial = (tutorialId: keyof typeof tutorials) => {
+    setActiveTutorial(tutorials[tutorialId]);
+    setCurrentTutorialStep(0);
+    setIsTutorialModalOpen(true);
+  };
+
+  const closeTutorialModal = () => setIsTutorialModalOpen(false);
+  const handleTutorialNext = () => setCurrentTutorialStep(prev => Math.min(prev + 1, activeTutorial.steps.length - 1));
+  const handleTutorialPrev = () => setCurrentTutorialStep(prev => Math.max(prev - 1, 0));
+
+  const totalAgents = agents.length;
+  const agentsWithTools = agents.filter(agent => agent.tools && agent.tools.length > 0).length;
+  const rootAgents = agents.filter(agent => agent.isRootAgent).length; // Assuming isRootAgent property exists
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
   }
 
-  return (
-    <div className="space-y-8 p-4">
-      {headerContent}
+  if (error) {
+    return <div className="flex items-center justify-center h-screen text-red-500">Erro ao carregar agentes: {error}</div>;
+  }
 
-      {/* Actual Dashboard Section - only if agents exist */}
-      {savedAgents && savedAgents.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  const AgentRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const agent = agents[index];
+    if (!agent) return null;
+    return (
+      <div style={style} className="px-1 py-2">
+        <AgentCard
+          agent={agent}
+          onEdit={handleEditAgent}
+          onDelete={handleDeleteAgent} // Pass handleDeleteAgent directly
+          onSaveAsTemplate={handleSaveAsTemplate}
+          onSelectForMonitoring={handleSelectAgentForMonitoring}
+          isSelectedForMonitoring={selectedAgentForMonitoring?.id === agent.id}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      <header className="mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+              Construtor de Agentes IA
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">
+              Crie, configure e gerencie seus agentes de inteligência artificial.
+            </p>
+          </div>
+          <div className="flex items-center space-x-2 mt-4 md:mt-0">
+            <Button onClick={() => handleOpenTutorial('createAgent')} variant="outline">
+              <Info className="mr-2" /> Tutorial
+            </Button>
+            <Button onClick={() => setIsFeedbackModalOpen(true)} variant="outline">
+              <MessageSquareText className="mr-2" /> Feedback
+            </Button>
+            <Button onClick={handleCreateNewAgent} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="mr-2" /> Novo Agente
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total de Agentes</CardTitle>
-              <Users className="h-5 w-5 text-muted-foreground" />
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalAgents}</div>
+              <p className="text-xs text-muted-foreground">
+                {/* +20.1% from last month (example) */}
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Agentes com Ferramentas</CardTitle>
-              <Wrench className="h-5 w-5 text-muted-foreground" />
+              <Wrench className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{agentsWithTools}</div>
+              <p className="text-xs text-muted-foreground">
+                {/* +180.1% from last month (example) */}
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Agentes Raiz</CardTitle>
-              <Route className="h-5 w-5 text-muted-foreground" />
+              <Route className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{rootAgents}</div>
+              <p className="text-xs text-muted-foreground">
+                {/* +19% from last month (example) */}
+              </p>
             </CardContent>
           </Card>
         </div>
-      )}
-      {/* End Dashboard Section */}
 
-      {buildMode === 'chat' ? (
-        <AgentCreatorChatUI
-            initialAgentConfig={editingAgent}
-            onSwitchToFormEdit={(agentToEdit) => handleEditAgentWithMode(agentToEdit, "form")}
-        />
-      ) : (
-        <>
-          <div className="flex items-center justify-end pt-4 gap-2">
-            <Button onClick={handleOpenCreateAgentModal} className={cn("button-live-glow", isMounted && "opacity-100")}>
-              <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
+        <div className="flex justify-end items-center mb-4">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={viewMode === 'list' ? "secondary" : "outline"} 
+                  size="icon" 
+                  onClick={() => setViewMode('list')}
+                  className="mr-2"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Visualizar em Lista</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={viewMode === 'grid' ? "secondary" : "outline"} 
+                  size="icon" 
+                  onClick={() => setViewMode('grid')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Visualizar em Grade</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </header>
+
+      {selectedAgentForMonitoring ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h2 className="text-2xl font-semibold mb-4">Monitorando: {selectedAgentForMonitoring.agentName}</h2>
+            <Button onClick={() => setSelectedAgentForMonitoring(null)} variant="outline" className="mb-4">
+              Voltar para Lista de Agentes
             </Button>
+            <AgentMetricsView agent={selectedAgentForMonitoring} />
           </div>
-
-          {/* Conditional rendering for agent list OR empty state */}
-          {orderedAgents && orderedAgents.length > 0 ? (
-            <div className="space-y-6">
-              {viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  {orderedAgents.map((agent) => (
-                    <AgentCard
-                      key={agent.id}
-                      agent={agent}
-                      agentId={agent.id}
-                      viewMode={viewMode}
-                      onEdit={() => handleEditAgent(agent)}
-                      onSaveAsTemplate={handleSaveAsTemplate}
-                      onViewMonitoring={() => handleViewAgentMonitoring(agent)}
-                      onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
-                      onDelete={() => handleDeleteAgent(agent.id)}
-                      availableTools={defaultAvailableTools}
-                      agentTypeOptions={agentTypeOptions}
-                      isFavorite={agent.isFavorite}
-                      onToggleFavorite={handleToggleFavorite}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, agent.id)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, agent.id)}
-                      onDragEnd={handleDragEnd}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div style={{ height: '700px', width: '100%' }} className="flex flex-col">
-                  <FixedSizeList
-                    ref={listRef}
-                    height={700}
-                    itemCount={orderedAgents.length}
-                    itemSize={AGENT_CARD_LIST_ITEM_SIZE}
-                    width="100%"
-                    itemData={{
-                      agents: orderedAgents,
-                      viewMode,
-                      handleEditAgent,
-                      handleSaveAsTemplate,
-                      handleViewAgentMonitoring,
-                      toast,
-                      handleDeleteAgent,
-                      defaultAvailableTools,
-                      agentTypeOptions,
-                      handleToggleFavorite,
-                      handleDragStart,
-                      handleDragOver,
-                      handleDrop,
-                      handleDragEnd,
-                    }}
-                  >
-                    {AgentRow}
-                  </FixedSizeList>
-                </div>
-              )}
+          <AgentLogView agentId={selectedAgentForMonitoring.id} />
+        </div>
+      ) : (
+        agents.length === 0 ? (
+          <div className="text-center py-12">
+            <Ghost className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-xl font-semibold text-gray-900 dark:text-gray-100">Nenhum agente encontrado</h3>
+            <p className="mt-1 text-gray-500 dark:text-gray-400">Comece criando um novo agente para vê-lo aqui.</p>
+            <div className="mt-6">
+              <Button onClick={handleCreateNewAgent} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2" /> Criar Primeiro Agente
+              </Button>
+            </div>
+          </div>
+        ) : (
+          viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {agents.map((agent) => (
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  onEdit={handleEditAgent}
+                  onDelete={handleDeleteAgent} // Pass handleDeleteAgent directly
+                  onSaveAsTemplate={handleSaveAsTemplate}
+                  onSelectForMonitoring={handleSelectAgentForMonitoring}
+                  isSelectedForMonitoring={selectedAgentForMonitoring?.id === agent.id}
+                />
+              ))}
             </div>
           ) : (
-            // This is the empty state, shown only if not loading and no agents
-            <div className="text-center py-16 border-2 border-dashed border-border rounded-lg bg-card shadow-sm">
-              <Ghost className="mx-auto h-20 w-20 text-muted-foreground/70" />
-              <h2 className="mt-6 text-xl font-semibold text-foreground">
-                Crie seu Primeiro Agente Inteligente
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                Agentes são assistentes de IA personalizados que você pode construir para realizar tarefas específicas, automatizar processos ou interagir de formas únicas. Comece agora mesmo!
-              </p>
-              <Button onClick={handleOpenCreateAgentModal} className="mt-6">
-                <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
-              </Button>
-              <p className="mt-4 text-xs text-muted-foreground">
-                Ou alterne para "Conversar com IA" para uma criação guiada.
-              </p>
+            // List View using react-window
+            <div className="border rounded-md overflow-hidden">
+              <FixedSizeList
+                height={Math.min(600, agents.length * AGENT_CARD_LIST_ITEM_SIZE)} // Adjust height dynamically or set a max
+                itemCount={agents.length}
+                itemSize={AGENT_CARD_LIST_ITEM_SIZE}
+                width="100%"
+              >
+                {AgentRow}
+              </FixedSizeList>
             </div>
-          )}
-
-          {selectedAgentForMonitoring && buildMode === 'form' && (
-            <Card className="mt-6">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Visualizando Agente: {selectedAgentForMonitoring.agentName}</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedAgentForMonitoring(null)}>Fechar</Button>
-                </div>
-                <div className="flex space-x-2 pt-2">
-                  <Button
-                    variant={currentViewTab === 'details' ? 'default' : 'outline'}
-                    onClick={() => {
-                      setCurrentViewTab('details');
-                       handleEditAgent(selectedAgentForMonitoring);
-                       setSelectedAgentForMonitoring(null);
-                    }}
-                  >
-                    Configuração
-                  </Button>
-                  <Button
-                    variant={currentViewTab === 'monitoring' ? 'default' : 'outline'}
-                    onClick={() => setCurrentViewTab('monitoring')}
-                  >
-                    Monitoramento
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {currentViewTab === 'monitoring' ? (
-                  <div className="space-y-6">
-                    <AgentMetricsView agentId={selectedAgentForMonitoring.id} />
-                    <AgentLogView agentId={selectedAgentForMonitoring.id} />
-                  </div>
-                ) : (
-                   <div>
-                    <p>Para editar a configuração, clique no botão "Configuração" acima ou feche esta visualização e use o botão de edição no card do agente.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </>
+          )
+        )
       )}
 
-      {/* Modals section */}
-      {buildMode === 'form' && isBuilderModalOpen && (
-        <AgentBuilderDialog
-          isOpen={isBuilderModalOpen}
-          onOpenChange={(isOpenValue: boolean) => {
-            setIsBuilderModalOpen(isOpenValue);
-            if (!isOpenValue) {
+      {isBuilderModalOpen && (
+        buildMode === 'form' ? (
+          <AgentBuilderDialog
+            isOpen={isBuilderModalOpen}
+            onClose={() => {
+              setIsBuilderModalOpen(false);
               setEditingAgent(null);
-            }
-          }}
-          editingAgent={editingAgent}
-          onSave={handleSaveAgent}
-          availableTools={defaultAvailableTools}
-          agentTypeOptions={agentTypeOptions}
-          agentToneOptions={agentToneOptions}
-          iconComponents={iconComponents}
-          availableAgentsForSubSelector={savedAgents.map(a => ({id: a.id, agentName: a.agentName}))}
-        />
+            }}
+            onSave={handleSaveAgent}
+            agent={editingAgent}
+            availableTools={defaultAvailableTools} // Pass default tools or fetch dynamically
+            agentToneOptions={agentToneOptions}
+            agentTypeOptions={agentTypeOptions}
+            iconComponents={iconComponents}
+          />
+        ) : (
+          <AgentCreatorChatUI
+            isOpen={isBuilderModalOpen} // This might need to be a different state if chat UI is a separate modal
+            onClose={() => {
+              setIsBuilderModalOpen(false);
+              setEditingAgent(null); // Clear editing agent when closing chat UI too
+            }}
+            onSave={handleSaveAgent} // Or a different save handler for chat-created agents
+            initialAgentConfig={editingAgent} // Pass existing config if editing, or null/default for new
+            // onEditInFormMode={handleEditAgentWithMode} // Function to switch to form mode
+          />
+        )
       )}
 
-      {isSaveAsTemplateDialogOpen && currentAgentForTemplating && (
+      {isSaveAsTemplateModalOpen && agentToSaveAsTemplate && (
         <SaveAsTemplateDialog
-          isOpen={isSaveAsTemplateDialogOpen}
-          onOpenChange={(isOpenValue) => {
-            setIsSaveAsTemplateDialogOpen(isOpenValue);
-            if (!isOpenValue) {
-              setCurrentAgentForTemplating(null);
-            }
-          }}
-          agentToTemplate={currentAgentForTemplating}
-          onSaveTemplate={executeSaveAsTemplate}
+          isOpen={isSaveAsTemplateModalOpen}
+          onClose={() => setIsSaveAsTemplateModalOpen(false)}
+          onSave={onConfirmSaveAsTemplate}
+          agentName={agentToSaveAsTemplate.agentName}
         />
       )}
 
-      {activeTutorial && isTutorialModalOpen && (
-        <HelpModal
+      {isTutorialModalOpen && (
+        <HelpModal 
           isOpen={isTutorialModalOpen}
           onClose={closeTutorialModal}
           title={activeTutorial.steps[currentTutorialStep].title}
@@ -757,5 +514,3 @@ export default function AgentBuilderPage() {
 //   if (mode === "form") setIsBuilderModalOpen(true);
 //   else setSelectedAgentForMonitoring(null); // Or other logic for chat build mode
 // };
-[end of src/app/agent-builder/page.tsx]
->>>>>>> 92099ffe78e8f65516c9783854608899240fff5c
