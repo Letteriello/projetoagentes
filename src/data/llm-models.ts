@@ -184,5 +184,56 @@ export const llmModels: LLMModelDetails[] = [
       behavior: 'tool_failure_simulation',
     },
     maxOutputTokens: 1024,
+  },
+  /**
+   * Simulated fine-tuned model for customer support.
+   * Based on gemini-1.0-pro.
+   */
+  {
+    id: 'googleai/gemini-1.0-pro-finetuned-support',
+    name: 'Gemini 1.0 Pro (Fine-tuned for Support)',
+    provider: 'Google',
+    capabilities: { // Copied from gemini-1.0-pro
+      streaming: true,
+      tools: true,
+      // vision: false, // Assuming base gemini-1.0-pro doesn't have vision explicitly true
+    },
+    estimatedCost: { // Slightly higher than base, or same
+      input: 0.0012,
+      output: 0.0025,
+      unit: 'USD_PER_1K_CHARACTERS',
+    },
+    maxOutputTokens: 2048, // Same as gemini-1.0-pro
+    customProperties: {
+      fineTuningType: "support_queries",
+      baseModel: "gemini-1.0-pro",
+      description: "Optimized for customer support, help desk interactions, and FAQ responses."
+    },
+  },
+  /**
+   * Simulated fine-tuned model for code generation.
+   * Based on gemini-1.0-pro.
+   */
+  {
+    id: 'googleai/gemini-1.0-pro-finetuned-code',
+    name: 'Gemini 1.0 Pro (Fine-tuned for Code Generation)',
+    provider: 'Google',
+    capabilities: { // Copied from gemini-1.0-pro
+      streaming: true,
+      tools: true,
+      // vision: false,
+    },
+    estimatedCost: {
+      input: 0.0015,
+      output: 0.0030,
+      unit: 'USD_PER_1K_CHARACTERS',
+    },
+    maxOutputTokens: 2048, // Same as gemini-1.0-pro
+    customProperties: {
+      fineTuningType: "code_generation",
+      baseModel: "gemini-1.0-pro",
+      supportedLanguages: ["javascript", "python", "typescript", "java", "go"],
+      description: "Optimized for generating code snippets, explaining code, and assisting with software development tasks."
+    },
   }
 ];

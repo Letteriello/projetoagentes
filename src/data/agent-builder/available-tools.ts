@@ -1,10 +1,14 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
-import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock } from "lucide-react"; // Added Clock
-import { dateTimeTool } from "../../ai/tools/date-time-tool"; // Import dateTimeTool
-import { petStoreTool } from "../../ai/tools/openapi-tool"; // Import petStoreTool
-import { fileIoTool } from "../../ai/tools/file-io-tool"; // Import fileIoTool
-import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Video } from "lucide-react"; // Added Video
+// Merged lucide-react imports and added Video, Clock, Smile, ThumbsUp
+import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock, Video, Smile, ThumbsUp } from "lucide-react";
+import { dateTimeTool } from "../../ai/tools/date-time-tool";
+import { petStoreTool } from "../../ai/tools/openapi-tool";
+import { fileIoTool } from "../../ai/tools/file-io-tool";
+import { imageClassifierTool } from '../../ai/tools/image-classifier-tool'; // Import for Image Classifier
+import { textSummarizerTool } from '../../ai/tools/text-summarizer-tool'; // Import for Text Summarizer
+import { sentimentAnalyzerTool } from '../../ai/tools/sentiment-analyzer-tool'; // Import for Sentiment Analyzer
+import { aiFeedbackTool } from '../../ai/tools/ai-feedback-tool'; // Import for AI Feedback Tool
 import {
   TOOL_ID_WEB_SEARCH,
   TOOL_ID_CALCULATOR,
@@ -67,6 +71,8 @@ function getIconComponent(name?: string): LucideIcon {
     brain: Brain,
     globe: Globe,
     video: Video, // Added Video icon
+    smile: Smile, // Added Smile icon
+    thumbsup: ThumbsUp, // Added ThumbsUp icon
     // Adicione outros ícones conforme necessário
   };
   if (!name) return HelpCircle;
@@ -331,7 +337,9 @@ export const standardTools: AvailableTool[] = [
     category: "Utilities",
     value: fileIoTool, // The actual tool instance
     genkitTool: fileIoTool // Storing the actual tool for direct use
-  }
+  },
+  // Removed duplicate dateTimeTool, petStoreTool, fileIoTool which were above this
+  {
     id: TOOL_ID_VIDEO_STREAM_MONITOR,
     name: "Monitor de Stream de Vídeo (Simulado)",
     icon: Video, // Using Video icon
@@ -340,6 +348,46 @@ export const standardTools: AvailableTool[] = [
     genkitToolName: GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR,
     configFields: [] // No configuration fields initially
   },
+  {
+    id: 'imageClassifierTool',
+    name: 'Image Classifier (Simulated)',
+    icon: Video, // Using Video icon as Camera is not available and Video seems appropriate
+    description: 'Simulates image classification, returning a label and confidence.',
+    hasConfig: false,
+    genkitToolName: 'imageClassifier',
+    value: imageClassifierTool,
+    genkitTool: imageClassifierTool,
+  },
+  {
+    id: 'textSummarizerTool',
+    name: 'Text Summarizer (LLM)',
+    icon: Brain,
+    description: 'Summarizes long text using a Genkit LLM.',
+    hasConfig: false,
+    genkitToolName: 'textSummarizer',
+    value: textSummarizerTool,
+    genkitTool: textSummarizerTool,
+  },
+  {
+    id: 'sentimentAnalyzerTool',
+    name: 'Sentiment Analyzer (Simulated)',
+    icon: Smile,
+    description: 'Simulates sentiment analysis of text, returning positive, negative, or neutral.',
+    hasConfig: false,
+    genkitToolName: 'sentimentAnalyzer',
+    value: sentimentAnalyzerTool,
+    genkitTool: sentimentAnalyzerTool,
+  },
+  {
+    id: 'aiFeedbackTool',
+    name: 'AI Feedback Loop (Simulated)',
+    icon: ThumbsUp,
+    description: 'Simulates an AI feedback loop, allowing users to rate agent responses.',
+    hasConfig: false,
+    genkitToolName: 'aiFeedback',
+    value: aiFeedbackTool,
+    genkitTool: aiFeedbackTool,
+  }
 ];
 
 /**
