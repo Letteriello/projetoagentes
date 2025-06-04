@@ -1,9 +1,18 @@
-import { redirect } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export default function HomePage() {
-  redirect("/agent-builder");
-  // A função redirect() já lança um erro especial para o Next.js,
-  // então tecnicamente nada após ela será executado.
-  // Retornar null é uma boa prática para componentes que não renderizam nada.
-  return null;
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <Dialog>
+        <DialogTrigger>Open Dialog</DialogTrigger>
+        <DialogContent>
+          <p>This is the dialog content.</p>
+        </DialogContent>
+      </Dialog>
+    </main>
+  );
 }

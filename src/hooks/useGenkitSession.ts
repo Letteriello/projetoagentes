@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { genkitSessionService, Event, Session } from '@/services/GenkitSessionService';
 
-interface UseGenkitSessionOptions {
+export interface UseGenkitSessionOptions {
   initialSessionId?: string;
   onEvent?: (event: Event) => void;
   onError?: (error: Error) => void;

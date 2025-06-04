@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation } from "@/types/chat";
 import { cn } from "@/lib/utils";
+import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
+import { MessageSquarePlus } from "lucide-react"; // Import the icon
+import EmptyState from '@/components/shared/EmptyState'; // Import EmptyState
+
+// TODO: Move AgentSelectItem to a shared types file
+interface AgentSelectItem {
+  id: string;
+  displayName: string;
+}
 
 // Basic SVG Icons (Heroicons outlines)
 const PlusIcon = () => (
@@ -72,14 +81,23 @@ const ChevronLeftIcon = () => (
 );
 
 export interface ConversationSidebarProps {
+  isOpen: boolean;
   conversations: Conversation[];
   activeConversationId: string | null;
-  onSelectConversation: (id: string) => void;
-  onNewConversation: () => void;
+  isLoading: boolean;
+  currentUserId?: string; // Optional as it might not always be available initially
+
+  onSelectConversation: (conversationId: string) => void;
+  onNewConversation: () => Promise<Conversation | null>;
+  onDeleteConversation: (conversation: Conversation) => Promise<void>;
   onRenameConversation: (id: string, newTitle: string) => void;
-  onDeleteConversation: (conversation: Conversation) => void; // Updated prop type
-  isOpen: boolean;
-  onToggleSidebar: () => void;
+  onToggleSidebar?: () => void; // Optional, for internal close button
+
+  // Agent selection related
+  gems: Gem[];
+  savedAgents: SavedAgentConfigType[]; 
+  adkAgents: AgentSelectItem[]; 
+  onSelectAgent: (agent: AgentSelectItem | Gem | SavedAgentConfigType) => void;
 }
 
 export function ConversationSidebar({
@@ -91,6 +109,7 @@ export function ConversationSidebar({
   onDeleteConversation,
   isOpen,
   onToggleSidebar,
+  isLoading, // Destructure isLoading from props
 }: ConversationSidebarProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -174,13 +193,22 @@ export function ConversationSidebar({
             </button>
 
             {/* Conversation List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar-dark -mr-2 pr-2">
-              {" "}
-              {/* Negative margin for scrollbar */}
-              {conversations.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center mt-4">
-                  No chats yet. Click 'New Chat' to start.
-                </p>
+            <div className="flex-1 overflow-y-auto custom-scrollbar-dark -mr-2 pr-2 flex flex-col">
+              {isLoading ? (
+                <ul className="space-y-2 mt-1"> {/* Added mt-1 for spacing */}
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <li key={`skeleton-conv-${index}`} className="flex items-center w-full px-3 py-3 text-sm rounded-md bg-gray-700 animate-pulse">
+                      <div className="h-4 bg-gray-600 rounded w-3/4"></div>
+                    </li>
+                  ))}
+                </ul>
+              ) : conversations.length === 0 ? (
+                <EmptyState
+                  icon={<MessageSquarePlus className="w-12 h-12 text-gray-500" />} // Adjusted icon size to match original
+                  title="Inicie uma Nova Conversa"
+                  description="Clique no botão New Chat acima para começar um novo diálogo."
+                  className="flex-grow justify-center text-gray-400 bg-transparent border-none shadow-none px-0 py-0" // Override default styling to match original layout better
+                />
               ) : (
                 <ul className="space-y-1">
                   {conversations.map((conv) => (
@@ -230,7 +258,7 @@ export function ConversationSidebar({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onDeleteConversation(conv);
-                              }} // Pass the full conversation object
+                              }}
                               className="p-1 rounded-md hover:bg-red-500 text-gray-400 hover:text-red-100"
                               aria-label="Delete chat"
                             >

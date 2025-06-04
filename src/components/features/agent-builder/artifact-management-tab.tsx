@@ -15,6 +15,7 @@ import {
   Shield,
   FolderKey,
   Eye,
+  Edit3, // Added for Edit button
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileUploader } from "@/components/ui/file-uploader"; // Added
+import { useToast } from "@/hooks/use-toast"; // Added
 
 // Tipos de artefatos suportados pelo Google ADK
 export type ArtifactType =
@@ -86,6 +89,15 @@ export type ArtifactMimeType =
   | "application/octet-stream"
   | string; // Para tipos personalizados
 
+// Interface for a single version of an artifact
+export interface ArtifactVersion {
+  versionId: string;
+  name: string;
+  description: string;
+  mimeType: ArtifactMimeType;
+  timestamp: string; // ISO string for when this version was created
+  // Potentially other metadata like author, notes, etc.
+}
 export interface ArtifactDefinition {
   id: string;
   name: string;
@@ -97,6 +109,8 @@ export interface ArtifactDefinition {
   versioning: boolean;
   maxSizeKb?: number;
   allowedSourcePatterns?: string[]; // Para artefatos de referência, padrões de URI permitidos
+  versions?: ArtifactVersion[]; // Array to store historical versions
+  currentVersionId?: string; // ID of the currently active/displayed version (optional)
 }
 
 interface ArtifactManagementTabProps {
@@ -124,6 +138,8 @@ export function ArtifactManagementTab({
   localStoragePath,
   setLocalStoragePath,
 }: ArtifactManagementTabProps) {
+  const { toast } = useToast(); // Added
+  const [isUploading, setIsUploading] = React.useState(false); // Added
   const [showNewArtifactForm, setShowNewArtifactForm] = React.useState(false);
 
   // Estado para o novo artefato
@@ -138,7 +154,11 @@ export function ArtifactManagementTab({
     accessRoles: ["agent"],
     persist: true,
     versioning: false,
+    versions: [], // Initialize versions
+    currentVersionId: undefined, // Initialize currentVersionId
   });
+
+  const MAX_VERSIONS_TO_STORE = 5; // Max number of mock versions to keep
 
   // Função auxiliar para obter o ícone com base no tipo de artefato
   const getArtifactIcon = (type: ArtifactType) => {
@@ -264,26 +284,65 @@ export function ArtifactManagementTab({
 
   // Adicionar um novo artefato
   const handleAddArtifact = () => {
-    if (!newArtifact.name) return;
+    if (!newArtifact.name || !newArtifact.id) return;
 
-    const completeArtifact: ArtifactDefinition = {
-      id: newArtifact.id || `artifact-${Date.now()}`,
-      name: newArtifact.name,
-      description: newArtifact.description || "",
-      type: newArtifact.type || "document",
-      mimeType: newArtifact.mimeType || "text/plain",
-      accessRoles: newArtifact.accessRoles || ["agent"],
-      persist: newArtifact.persist !== undefined ? newArtifact.persist : true,
-      versioning: newArtifact.versioning || false,
-      maxSizeKb: newArtifact.maxSizeKb,
-      allowedSourcePatterns: newArtifact.allowedSourcePatterns,
-    };
+    const existingArtifactIndex = artifacts.findIndex(art => art.id === newArtifact.id);
 
-    setArtifacts([...artifacts, completeArtifact]);
+    let updatedArtifacts = [...artifacts];
+
+    if (existingArtifactIndex !== -1) { // Editing existing artifact
+      const originalArtifact = artifacts[existingArtifactIndex];
+      let newVersions = originalArtifact.versions ? [...originalArtifact.versions] : [];
+
+      if (newArtifact.versioning) {
+        // Create a version entry from the originalArtifact's current state (before update)
+        const versionEntry: ArtifactVersion = {
+          versionId: `v${Date.now()}`, // Simple version ID
+          name: originalArtifact.name,
+          description: originalArtifact.description,
+          mimeType: originalArtifact.mimeType,
+          timestamp: new Date().toISOString(),
+        };
+        newVersions.unshift(versionEntry); // Add to the beginning
+        if (newVersions.length > MAX_VERSIONS_TO_STORE) {
+          newVersions = newVersions.slice(0, MAX_VERSIONS_TO_STORE); // Keep only the last N versions
+        }
+      }
+
+      const updatedArtifactData: ArtifactDefinition = {
+        ...originalArtifact, // Preserve other fields not in the form if any
+        ...newArtifact, // Apply changes from the form
+        id: originalArtifact.id, // Ensure ID is not changed from newArtifact state if it was different
+        versions: newVersions,
+        // currentVersionId could be set here if a "latest" version is always active after edit
+      };
+      updatedArtifacts[existingArtifactIndex] = updatedArtifactData;
+      toast({ title: "Artefato Atualizado", description: `"${newArtifact.name}" foi atualizado.`, variant: "success" });
+
+    } else { // Adding new artifact
+      const completeNewArtifact: ArtifactDefinition = {
+        id: newArtifact.id, // Use ID from newArtifact (already has Date.now() or from edit)
+        name: newArtifact.name,
+        description: newArtifact.description || "",
+        type: newArtifact.type || "document",
+        mimeType: newArtifact.mimeType || "text/plain",
+        accessRoles: newArtifact.accessRoles || ["agent"],
+        persist: newArtifact.persist !== undefined ? newArtifact.persist : true,
+        versioning: newArtifact.versioning || false,
+        maxSizeKb: newArtifact.maxSizeKb,
+        allowedSourcePatterns: newArtifact.allowedSourcePatterns,
+        versions: [], // Initialize with empty versions
+        currentVersionId: undefined,
+      };
+      updatedArtifacts.push(completeNewArtifact);
+      toast({ title: "Artefato Adicionado", description: `"${newArtifact.name}" foi adicionado.`, variant: "success" });
+    }
+
+    setArtifacts(updatedArtifacts);
 
     // Resetar o formulário
     setNewArtifact({
-      id: `artifact-${Date.now() + 1}`,
+      id: `artifact-${Date.now()}`, // New ID for next potential new artifact
       name: "",
       description: "",
       type: "document",
@@ -291,14 +350,100 @@ export function ArtifactManagementTab({
       accessRoles: ["agent"],
       persist: true,
       versioning: false,
+      versions: [],
+      currentVersionId: undefined,
     });
-
     setShowNewArtifactForm(false);
   };
 
   // Remover um artefato
   const handleRemoveArtifact = (id: string) => {
     setArtifacts(artifacts.filter((artifact) => artifact.id !== id));
+  };
+
+  // Handler para iniciar a "edição" de um artefato (preenche o formulário)
+  const handleStartEditArtifact = (artifactToEdit: ArtifactDefinition) => {
+    console.log("Editing artifact (loading into form):", artifactToEdit.id, artifactToEdit);
+    // Deep copy to avoid direct state mutation if artifactToEdit is from state's artifacts array
+    setNewArtifact(JSON.parse(JSON.stringify(artifactToEdit)));
+    setShowNewArtifactForm(true);
+    const formCard = document.getElementById('new-artifact-form-card');
+    if (formCard) {
+      formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Handler para visualizar uma versão específica (mock)
+  const handleViewVersion = (artifactId: string, versionId: string) => {
+    const artifact = artifacts.find(art => art.id === artifactId);
+    if (artifact && artifact.versions) {
+      const version = artifact.versions.find(v => v.versionId === versionId);
+      if (version) {
+        console.log(`Viewing version ${versionId} for artifact ${artifactId}:`, version);
+        toast({
+          title: `Visualizando Versão ${versionId.substring(0, 6)}...`,
+          description: `Nome: ${version.name}, Descrição: ${version.description}, MIME: ${version.mimeType}, Data: ${new Date(version.timestamp).toLocaleString()}`,
+        });
+        // Optional: Pre-fill form with this version's data (read-only or marked)
+        // setNewArtifact({ ...artifact, ...version, id: artifact.id, currentVersionId: versionId }); // Spread version over artifact base
+        // setShowNewArtifactForm(true);
+      }
+    }
+  };
+
+  // Handler para arquivos selecionados no FileUploader
+  const handleFilesSelected = async (files: File[]) => {
+    if (!enableArtifacts || (artifactStorageType !== "filesystem" && artifactStorageType !== "cloud")) {
+      toast({
+        title: "Upload não permitido",
+        description: "O upload de artefatos só é permitido quando o armazenamento está configurado para 'Sistema de Arquivos' ou 'Nuvem'.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    if (files.length === 0) {
+      return;
+    }
+
+    const file = files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setIsUploading(true);
+    try {
+      const response = await fetch("/api/artifacts/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Erro desconhecido", details: response.statusText }));
+        throw new Error(errorData.details || errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Artifact URI:", data.uri); // Log para o console como solicitado
+      toast({
+        title: "Upload Concluído",
+        description: `Arquivo ${file.name} carregado. URI: ${data.uri}`,
+        variant: "success",
+      });
+      // Aqui você pode querer associar o URI a um artefato existente ou ao novo artefato
+      // Por exemplo, se 'newArtifact' estiver sendo editado e for do tipo 'reference',
+      // você poderia setar newArtifact.sourceUri = data.uri (ou similar)
+      // No entanto, a tarefa atual não especifica essa integração, apenas o upload.
+
+    } catch (error) {
+      console.error("Falha no upload do artefato:", error);
+      toast({
+        title: "Falha no Upload",
+        description: error instanceof Error ? error.message : "Ocorreu um erro desconhecido durante o upload.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -687,7 +832,10 @@ export function ArtifactManagementTab({
                             </TooltipContent>
                           </Tooltip>
                         </TableHead>
-                        <TableHead className="w-[80px] text-right">
+                        <TableHead className="w-[150px]"> {/* Increased width for version selector */}
+                          Histórico de Versões
+                        </TableHead>
+                        <TableHead className="w-[120px] text-right">
                           Ações
                         </TableHead>
                       </TableRow>
@@ -728,15 +876,69 @@ export function ArtifactManagementTab({
                           <TableCell>
                             {artifact.persist ? "Sim" : "Não"}
                           </TableCell>
+                          <TableCell>
+                            {artifact.versioning ? "Sim" : "Não"}
+                          </TableCell>
+                          <TableCell> {/* Cell for Version Selector */}
+                            {artifact.versioning && artifact.versions && artifact.versions.length > 0 ? (
+                              <Select
+                                onValueChange={(versionId) => handleViewVersion(artifact.id, versionId)}
+                                // value={artifact.currentVersionId || artifact.versions[0]?.versionId} // Optional: control current selection
+                              >
+                                <SelectTrigger className="h-8 text-xs w-full">
+                                  <SelectValue placeholder="Ver versões" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {artifact.versions.map(v => (
+                                    <SelectItem key={v.versionId} value={v.versionId} className="text-xs">
+                                      {`Ver ${v.versionId.substring(0,6)}... (${new Date(v.timestamp).toLocaleDateString()})`}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : artifact.versioning ? (
+                              <span className="text-xs text-muted-foreground">Nenhuma versão</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveArtifact(artifact.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Remover</span>
-                            </Button>
+                            <div className="flex justify-end space-x-1">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleStartEditArtifact(artifact)}
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                      <span className="sr-only">Editar</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Editar Definição do Artefato</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleRemoveArtifact(artifact.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      <span className="sr-only">Remover</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Remover Definição do Artefato</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -751,10 +953,36 @@ export function ArtifactManagementTab({
                   </div>
                 )}
 
+                {/* Seção de Upload de Arquivos de Artefato */}
+                {artifactStorageType !== "memory" && (
+                  <div className="my-6">
+                    <Label className="text-sm font-medium block mb-2">
+                      Carregar Arquivo de Artefato
+                    </Label>
+                    <FileUploader
+                      onFilesSelected={handleFilesSelected}
+                      maxFiles={1}
+                      label="Arraste e solte um arquivo aqui, ou clique para selecionar."
+                      disabled={isUploading || (artifactStorageType !== "filesystem" && artifactStorageType !== "cloud")}
+                      loading={isUploading}
+                    />
+                    {(artifactStorageType !== "filesystem" && artifactStorageType !== "cloud") && (
+                       <p className="text-xs text-muted-foreground mt-1">
+                         Para habilitar o upload, configure o "Tipo de Armazenamento" para "Sistema de Arquivos" ou "Nuvem" na seção de "Configuração de Artefatos".
+                       </p>
+                    )}
+                     {isUploading && <p className="text-xs text-muted-foreground mt-1">Enviando arquivo...</p>}
+                  </div>
+                )}
+
+                <Separator className="my-6" />
+
                 {showNewArtifactForm ? (
-                  <Card className="border border-dashed p-4">
+                  <Card className="border border-dashed p-4" id="new-artifact-form-card"> {/* Added id for potential scroll target */}
                     <CardHeader className="p-0 pb-4">
-                      <CardTitle className="text-sm">Novo Artefato</CardTitle>
+                      <CardTitle className="text-sm">
+                        {newArtifact.id && artifacts.find(art => art.id === newArtifact.id) ? "Editar Artefato" : "Novo Artefato"}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0 space-y-4">
                       <div className="grid grid-cols-2 gap-4">
@@ -888,51 +1116,93 @@ export function ArtifactManagementTab({
                       <div className="space-y-2">
                         <Label className="text-xs">Permissões de Acesso</Label>
                         <div className="flex space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="user-access"
-                              checked={newArtifact.accessRoles?.includes(
-                                "user",
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleAccessRoleChange("user", !!checked)
-                              }
-                            />
-                            <Label htmlFor="user-access" className="text-xs">
-                              Usuário
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="agent-access"
-                              checked={newArtifact.accessRoles?.includes(
-                                "agent",
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleAccessRoleChange("agent", !!checked)
-                              }
-                            />
-                            <Label htmlFor="agent-access" className="text-xs">
-                              Agente
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="sub-agent-access"
-                              checked={newArtifact.accessRoles?.includes(
-                                "sub-agent",
-                              )}
-                              onCheckedChange={(checked) =>
-                                handleAccessRoleChange("sub-agent", !!checked)
-                              }
-                            />
-                            <Label
-                              htmlFor="sub-agent-access"
-                              className="text-xs"
-                            >
-                              Sub-Agentes
-                            </Label>
-                          </div>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="user-access"
+                                    checked={newArtifact.accessRoles?.includes(
+                                      "user",
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAccessRoleChange("user", !!checked)
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor="user-access"
+                                    className="text-xs"
+                                  >
+                                    Usuário
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                  <p className="max-w-xs">
+                                    Permite que o usuário final (humano interagindo com o agente) leia ou escreva este tipo de artefato, dependendo das operações permitidas pelo agente.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="agent-access"
+                                    checked={newArtifact.accessRoles?.includes(
+                                      "agent",
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAccessRoleChange("agent", !!checked)
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor="agent-access"
+                                    className="text-xs"
+                                  >
+                                    Agente
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                  <p className="max-w-xs">
+                                    Permite que o próprio agente principal leia ou escreva este tipo de artefato.
+                                  </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="sub-agent-access"
+                                    checked={newArtifact.accessRoles?.includes(
+                                      "sub-agent",
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAccessRoleChange(
+                                        "sub-agent",
+                                        !!checked,
+                                      )
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor="sub-agent-access"
+                                    className="text-xs"
+                                  >
+                                    Sub-Agentes
+                                  </Label>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                  <p className="max-w-xs">
+                                    Permite que sub-agentes (agentes orquestrados por este agente principal) leiam ou escrevam este tipo de artefato.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
 
@@ -975,7 +1245,7 @@ export function ArtifactManagementTab({
                       {newArtifact.type === "reference" && (
                         <div className="space-y-2">
                           <Label htmlFor="allowed-patterns" className="text-xs">
-                            Padrões de URI/Caminhos Permitidos (opcional)
+                            Padrões de URI/Caminhos Permitidos para Referências
                           </Label>
                           <Textarea
                             id="allowed-patterns"
@@ -991,14 +1261,34 @@ export function ArtifactManagementTab({
                                   .filter(Boolean),
                               })
                             }
-                            placeholder="gs://bucket/**/*.pdf
-https://exemplo.com/**/*.docx
-/data/local/**/*.csv"
+                            placeholder={`gs://bucket-name/path/**.pdf
+https://meusite.com/documentos/**
+/diretorio/local/dados/*.csv`}
                             className="h-20 resize-none font-mono text-xs"
                           />
                           <p className="text-xs text-muted-foreground">
-                            Um padrão por linha. Use ** para diretórios
-                            recursivos.
+                            Especifique os padrões de URI ou caminhos de sistema
+                            de arquivos permitidos para artefatos do tipo 'referência'. <br />
+                            Use um padrão por linha. <br />
+                            - <code>*</code> corresponde a qualquer caractere
+                            exceto <code>/</code> em um segmento de caminho. <br />
+                            - <code>**</code> corresponde a qualquer caractere,
+                            incluindo <code>/</code>, abrangendo múltiplos
+                            diretórios. <br />
+                            Exemplos: <br />
+                            -{" "}
+                            <code>
+                              gs://meu-bucket/objetos/*
+                            </code>: Permite qualquer objeto direto dentro de
+                            'objetos' no bucket 'meu-bucket'. <br />
+                            -{" "}
+                            <code>
+                              https://exemplo.com/arquivos/**.docx
+                            </code>: Permite qualquer arquivo .docx em qualquer
+                            subdiretório de 'arquivos'. <br />
+                            - <code>/dados/relatorios/*.csv</code>: Permite
+                            qualquer arquivo .csv diretamente dentro de
+                            '/dados/relatorios/'.
                           </p>
                         </div>
                       )}

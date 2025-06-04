@@ -4,10 +4,15 @@ import { Button } from "@/components/ui/button";
 import {
   X,
   FileText,
-  FileType as FileIcon,
+  FileType as FileIcon, // Default icon
   FileJson,
-  FileBadge,
-  FileCode2,
+  FileBadge, // For CSV/Spreadsheet as per existing code
+  FileCode2, // For Markdown or general code files
+  Mic, // Added Mic icon for audio
+  // Explicitly adding FileSpreadsheet if FileBadge is not preferred for spreadsheets
+  // For now, we'll stick to FileBadge as it's already in use.
+  // If a specific PDF icon like FilePdf exists and is preferred, it would be imported here.
+  // For now, FileText will be used for PDF as per instructions.
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +21,7 @@ interface AttachmentPopoverContentProps {
   fileDataUri: string | null;
   fileType?: string;
   onRemoveAttachment: () => void;
+  isAudio?: boolean; // Added isAudio prop
 }
 
 export default function AttachmentPopoverContent({
@@ -23,10 +29,14 @@ export default function AttachmentPopoverContent({
   fileDataUri,
   fileType,
   onRemoveAttachment,
+  isAudio, // Destructure isAudio
 }: AttachmentPopoverContentProps) {
   const isImage = fileType?.startsWith("image/");
 
   const renderFilePreview = () => {
+    if (isAudio) {
+      return <Mic className="w-16 h-16 text-muted-foreground/70" />;
+    }
     if (isImage && fileDataUri) {
       return (
         <Image
@@ -37,29 +47,42 @@ export default function AttachmentPopoverContent({
         />
       );
     }
+    // PDF Icon
     if (fileType === "application/pdf") {
-      return <FileIcon className="w-16 h-16 text-muted-foreground/70" />;
-    }
-    if (fileType === "text/plain") {
       return <FileText className="w-16 h-16 text-muted-foreground/70" />;
     }
+    // DOC/DOCX Icon
+    if (fileType === "application/msword" || fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      return <FileText className="w-16 h-16 text-muted-foreground/70" />;
+    }
+    // JSON Icon
     if (fileType === "application/json") {
       return <FileJson className="w-16 h-16 text-muted-foreground/70" />;
     }
+    // Code Icons
     if (
-      fileType?.includes("csv") ||
-      fileType?.includes("excel") ||
-      fileType?.includes("spreadsheet")
-    ) {
-      return <FileBadge className="w-16 h-16 text-muted-foreground/70" />;
-    }
-    if (
-      fileType?.startsWith("text/") ||
-      fileType?.includes("script") ||
-      fileType?.includes("code")
+      fileType === "text/javascript" ||
+      fileType === "text/x-python" ||
+      fileType === "application/xml" ||
+      fileType === "text/css" ||
+      fileType === "text/html" ||
+      fileType === "text/markdown" // Keep existing markdown rule
     ) {
       return <FileCode2 className="w-16 h-16 text-muted-foreground/70" />;
     }
+    // CSV Icon (using FileBadge as per existing code)
+    if (fileType === "text/csv" || fileType === "application/vnd.ms-excel" || fileType?.includes("spreadsheet")) {
+      return <FileBadge className="w-16 h-16 text-muted-foreground/70" />;
+    }
+    // TXT Icon
+    if (fileType === "text/plain") {
+      return <FileText className="w-16 h-16 text-muted-foreground/70" />;
+    }
+    // Fallback for other text-based or code-like files (refined existing logic)
+    if (fileType?.startsWith("text/") || fileType?.includes("script") || fileType?.includes("code")) {
+      return <FileCode2 className="w-16 h-16 text-muted-foreground/70" />;
+    }
+    // Default Icon for any other recognized file types
     return <FileIcon className="w-16 h-16 text-muted-foreground/70" />;
   };
 

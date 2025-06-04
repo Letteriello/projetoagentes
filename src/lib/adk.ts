@@ -1,3 +1,7 @@
+// DEPRECATED: This file seems to be superseded by src/ai/genkit.ts and the Genkit AI flows.
+// The `sendMessageToAI` function was only found to be used in a .BAK (backup) file.
+// Verify no active critical dependencies before actual removal.
+
 // Placeholder for ADK integration with streaming
 export const sendMessageToAI = async (
   message: string,

@@ -1,387 +1,404 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, Suspense, lazy } from "react"; // Added Suspense, lazy
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, Plus, SparklesIcon, Bug } from "lucide-react";
+import { Menu, Plus, Bug, Settings2 } from "lucide-react"; // Added Settings2
 import { useAgents } from "@/contexts/AgentsContext";
 import { v4 as uuidv4 } from "uuid";
-import { useGenkitSession } from "@/hooks/useGenkitSession";
+import { useGenkitSession, UseGenkitSessionOptions } from "@/hooks/useGenkitSession";
 import { toast } from "@/hooks/use-toast";
-import { GenkitSessionService } from "@/services/GenkitSessionService";
+// import { GenkitSessionService } from "@/services/GenkitSessionService"; // Not directly used
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import type { TestRunConfig } from "@/types/chat-types"; // Added TestRunConfig
+// import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
 import { StreamingMessageList } from "@/components/features/chat/streaming/StreamingMessageList";
 import { StreamingInputArea } from "@/components/features/chat/streaming/StreamingInputArea";
 import { EventDebugPanel } from "@/components/features/chat/streaming/EventDebugPanel";
-import ChatHeader from "@/components/features/chat/ChatHeader";
+import SimpleChatHeader from "@/components/features/chat/SimpleChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
-import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
-import { SavedAgentConfiguration } from "@/app/agent-builder/page";
+// import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
+import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs-fixed';
 import { getToolsByIds } from "@/ai/tools";
-
-// Mapa de ferramentas disponíveis
-// Mapa de ferramentas disponíveis - será implementado posteriormente
-const availableTools = {
-  // webSearch: performWebSearchTool,
-};
+import type { Tool } from '@genkit-ai/sdk';
 
 export function ChatUIStreaming() {
-  // Estado para gestão de agentes e UI
   const { savedAgents } = useAgents();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [isLoadingAgents, setIsLoadingAgents] = useState(true);
+  // const [isLoadingAgents, setIsLoadingAgents] = useState(true); // Not strictly used, can be removed if not needed for UI
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [conversationId, setConversationId] = useState<string>(uuidv4());
+  const [currentConversationId, setCurrentConversationId] = useState<string>(uuidv4());
+
+  const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
+  const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
+  const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
+    temperature: undefined, // Or a default like 0.7
+    streamingEnabled: true, // Default to true for streaming UI
+  });
+  const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
 
-  // Referências para o scroll e controle de UI
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  // Selecionar o primeiro agente quando a lista é carregada
-  useEffect(() => {
-    if (savedAgents && savedAgents.length > 0 && !selectedAgentId) {
-      setSelectedAgentId(savedAgents[0].id);
-    }
-  }, [savedAgents, selectedAgentId]);
-
-  // Obter o agente selecionado
-  const selectedAgent = savedAgents?.find(
-    (agent) => agent.id === selectedAgentId,
-  );
 
   const selectedAgent = React.useMemo<SavedAgentConfiguration | undefined>(() => {
     return savedAgents?.find(agent => agent.id === selectedAgentId);
   }, [savedAgents, selectedAgentId]);
-  
-  // Criar um agente padrão se não houver agentes
-  const defaultAgent: Partial<SavedAgentConfiguration> = {
-    agentName: 'Assistente Padrão',
-    agentDescription: 'Assistente de IA para conversas',
-    agentModel: 'googleai/gemini-1.5-flash-latest',
-    agentTools: [],
-    agentType: 'llm' as const,
-    agentTemperature: 0.7
-  };
-  
-  // Callback para processar eventos Genkit
+
+  const getConfiguredTools = useCallback((): Tool[] => {
+    if (!selectedAgent?.tools) return [];
+    return getToolsByIds(selectedAgent.tools);
+  }, [selectedAgent]);
+
+  useEffect(() => {
+    if (savedAgents.length > 0 && !selectedAgentId) {
+      setSelectedAgentId(savedAgents[0].id);
+    }
+    // setIsLoadingAgents(false);
+  }, [savedAgents, selectedAgentId]);
+
   const handleEvent = useCallback((event: any) => {
     setEvents((prev) => [
       ...prev,
       { ...event, timestamp: new Date().toISOString() },
     ]);
-
-    // Log de eventos importante para depuração
-    console.log(`[Genkit Event] ${event.type}:`, event);
   }, []);
 
-  // Hook de sessão Genkit com captura de eventos
-  const {
-    sessionId,
-    messages,
-    isProcessing,
-    sessionState,
-    error,
-    sendMessage,
-    clearMessages,
-    createNewSession,
-  } = useGenkitSession({
-    initialSessionId: `conversation-${conversationId}`,
+  const genkitSessionOptions: UseGenkitSessionOptions = React.useMemo(() => ({
+    initialSessionId: `conversation-${currentConversationId}`,
+    context: { tools: getConfiguredTools() },
     onEvent: handleEvent,
-    onError: (error) => {
+    onError: (genkitError: Error) => {
       toast({
-        title: "Erro na sessão",
-        description: error.message,
+        title: "Erro na sessão Genkit",
+        description: genkitError.message,
         variant: "destructive",
       });
     },
-  });
+    // Conditionally set flowName if an agent is selected and it's a Genkit agent
+    // Adjust this logic based on how flows are identified/named in your system
+    flowName: selectedAgent?.config?.framework === 'genkit' ? selectedAgent.agentName : undefined,
+  }), [currentConversationId, getConfiguredTools, handleEvent, selectedAgent]);
 
-  // Efeito para notificar erros
+  const {
+    messages,
+    isProcessing,
+    sessionState,
+    error: genkitError, // Renamed to avoid conflict with other error variables if any
+    sendMessage,
+    clearMessages,
+    updateMessageExtras, // Added from useGenkitSession
+    // createNewSession, // Not directly used, session re-initializes with options change
+  } = useGenkitSession(genkitSessionOptions);
+
+  const getAgentConfigForMessage = () => {
+    let modelId = "googleai/gemini-1.5-flash-latest";
+    let systemPrompt = "Você é um assistente útil.";
+    // Use temperature from testRunConfig if available, otherwise agent's, then default
+    let temperature = testRunConfig.temperature !== undefined
+                      ? testRunConfig.temperature
+                      : 0.7; // Default if not in testRunConfig or agent config
+
+    const currentAgentTools = getConfiguredTools();
+
+    if (selectedAgent?.config?.type === "llm") {
+      const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>;
+      modelId = llmConfig.agentModel || modelId;
+      systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
+      // Prioritize testRunConfig, then agent config, then default
+      temperature = testRunConfig.temperature !== undefined
+                    ? testRunConfig.temperature
+                    : (llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature);
+    }
+    // Note: The streamingEnabled from testRunConfig is not directly used here yet,
+    // as useGenkitSession inherently streams. This would be part of Step 5 if we were to
+    // dynamically switch streaming behavior.
+    return { modelId, systemPrompt, tools: currentAgentTools, temperature };
+  };
+
   useEffect(() => {
-    if (error) {
+    if (genkitError) {
       toast({
-        title: "Erro",
-        description: error.message,
+        title: "Erro na Sessão",
+        description: genkitError.message,
         variant: "destructive",
       });
-
-      // Adicionar erro ao log de eventos
       setEvents((prev) => [
         ...prev,
-        {
-          type: "error",
-          message: error.message,
-          timestamp: new Date().toISOString(),
-        },
+        { type: "error-hook", message: genkitError.message, timestamp: new Date().toISOString() },
       ]);
     }
-  }, [error, toast]);
+  }, [genkitError]);
 
-  // Efeito para rolar para o fim quando novas mensagens chegam
   useEffect(() => {
     if (scrollAreaRef.current && messages.length > 0) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages]);
-
-  // Processar ferramentas configuradas do agente
-  const getConfiguredTools = useCallback(() => {
-    if (!selectedAgent?.config.tools) return [];
-
-    const enabledToolIds = selectedAgent.config.tools
-      .filter((tool) => tool.enabled)
-      .map((tool) => tool.id);
-
-    return getToolsByIds(enabledToolIds);
-  }, [selectedAgent]);
-
-    const tools = selectedAgent?.agentTools || [];
-    if (!Array.isArray(tools) || tools.length === 0) return [];
-    
-    // Usar as ferramentas diretamente do agente
-    return getToolsByIds(tools);
-  }, [selectedAgent, getToolsByIds]);
   
-  // Manipular envio de mensagem
-  const handleSendMessage = async (message: string, fileDataUri?: string) => {
-    if (!message.trim() && !fileDataUri) return;
-
+  const handleSendMessage = async (messageText: string, fileDataUri?: string) => {
+    if (!messageText.trim() && !fileDataUri) return;
     try {
-      // Registrar o evento de envio de mensagem no log
       setEvents((prev) => [
         ...prev,
-        {
-          type: "user-message",
-          content: message,
-          timestamp: new Date().toISOString(),
-        },
+        { type: "user-message", content: messageText, timestamp: new Date().toISOString() },
       ]);
 
-      await sendMessage(message, {
-        modelId:
-          selectedAgent?.config.model || "googleai/gemini-1.5-flash-latest",
-        systemPrompt: selectedAgent?.config.systemPrompt,
-        tools: getConfiguredTools(),
-        temperature: selectedAgent?.config.temperature || 0.7,
-        fileDataUri,
-      setEvents(prev => [...prev, {
-        type: 'user-message',
-        content: message,
-        timestamp: new Date().toISOString()
-      }]);
+      let modelId = "googleai/gemini-1.5-flash-latest";
+      // let systemPrompt = "Você é um assistente útil.";
+      // let temperature = 0.7;
+      // const currentAgentTools = getConfiguredTools();
+
+      // if (selectedAgent?.config?.type === "llm") {
+      //   const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>; // Type assertion
+      //   modelId = llmConfig.agentModel || modelId;
+      //   systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
+      //   temperature = llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature;
+      // }
+      const agentConfigForMessage = getAgentConfigForMessage(); // Call it once
       
-      const agent = selectedAgent || defaultAgent;
-      
-      await sendMessage(message, {
-        modelId: agent.agentModel || 'googleai/gemini-1.5-flash-latest',
-        systemPrompt: agent.systemPromptGenerated || '',
-        tools: getConfiguredTools(),
-        temperature: agent.agentTemperature || 0.7,
-        fileDataUri: fileDataUri || undefined
+      await sendMessage(messageText, {
+        // modelId, // from agentConfigForMessage
+        // systemPrompt, // from agentConfigForMessage
+        // tools, // from agentConfigForMessage
+        // temperature, // from agentConfigForMessage
+        ...agentConfigForMessage, // Spread the config object
+        fileDataUri: fileDataUri || undefined,
       });
 
-      // Atualizar o scroll depois da resposta
       setTimeout(() => {
         if (scrollAreaRef.current) {
           scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
         }
       }, 100);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao processar mensagem:", err);
-
-      // Registrar erro no log de eventos
       setEvents((prev) => [
         ...prev,
-        {
-          type: "error",
-          message: err instanceof Error ? err.message : "Erro desconhecido",
-          timestamp: new Date().toISOString(),
-        },
+        { type: "error-send-message", message: err instanceof Error ? err.message : "Erro desconhecido", timestamp: new Date().toISOString() },
       ]);
     }
   };
 
-  // Limpar todos os eventos do log
-  const clearEvents = () => {
+  const clearEventsLog = () => {
     setEvents([]);
   };
 
-  // Manipular sugestão clicada
+  const handleRegenerate = async (messageId: string) => {
+    const agentMessageIndex = messages.findIndex(msg => msg.id === messageId);
+
+    if (agentMessageIndex === -1) {
+      toast({ title: "Error", description: "Agent message to regenerate not found.", variant: "destructive" });
+      return;
+    }
+
+    const agentMessage = messages[agentMessageIndex];
+    if (agentMessage.role !== 'model') {
+      toast({ title: "Error", description: "Only model responses can be regenerated.", variant: "destructive" });
+      return;
+    }
+
+    // Find the last user message before this agent message
+    let userMessageIndex = -1;
+    for (let i = agentMessageIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        userMessageIndex = i;
+        break;
+      }
+    }
+
+    if (userMessageIndex === -1) {
+      toast({ title: "Error", description: "Could not find the original user prompt for this message.", variant: "destructive" });
+      return;
+    }
+
+    const userPromptMessage = messages[userMessageIndex];
+
+    // History is all messages UP TO (but not including) the user prompt message
+    const historyForRegeneration = messages.slice(0, userMessageIndex);
+
+    const agentConfig = getAgentConfigForMessage();
+
+    try {
+      setEvents((prev) => [
+        ...prev,
+        { type: "user-message-regenerate", originalPrompt: userPromptMessage.content, fromMessageId: messageId, timestamp: new Date().toISOString() },
+      ]);
+
+      // As per subtask, assume sendMessage appends. Old message remains.
+      await sendMessage(userPromptMessage.content, {
+        ...agentConfig,
+        // fileDataUri: userPromptMessage.fileDataUri || undefined, // Assuming no re-attachment for now
+      }, historyForRegeneration); // Pass history as the third argument
+
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }, 100);
+
+    } catch (err: any) {
+      console.error("Erro ao regenerar mensagem:", err);
+      setEvents((prev) => [
+        ...prev,
+        { type: "error-regenerate-message", message: err instanceof Error ? err.message : "Erro desconhecido", timestamp: new Date().toISOString() },
+      ]);
+       toast({ title: "Error", description: "Failed to regenerate response.", variant: "destructive" });
+    }
+  };
+
   const handleSuggestionClick = (suggestion: string) => {
     handleSendMessage(suggestion);
   };
 
-  // Iniciar nova conversa
   const handleNewConversation = () => {
-    const newConversationId = uuidv4();
-    setConversationId(newConversationId);
-    clearMessages();
-    createNewSession();
-    clearEvents();
+    const newConvId = uuidv4();
+    setCurrentConversationId(newConvId); // This will trigger re-memoization of genkitSessionOptions
+    clearMessages(); 
+    // createNewSession(); // Call if useGenkitSession needs explicit re-init beyond options change
+    clearEventsLog();
+  };
+
+  const handleFeedback = (messageId: string, feedback: 'liked' | 'disliked' | null) => {
+    console.log("Feedback for streaming message:", { messageId, feedback });
+    if (updateMessageExtras) {
+      updateMessageExtras(messageId, { feedback });
+    } else {
+      // Fallback or error if updateMessageExtras is not available
+      // This might involve manually updating the messages array if it were directly state managed here
+      console.warn("updateMessageExtras is not available from useGenkitSession. Cannot update feedback in state.");
+      // As a temporary workaround if messages were local state:
+      // setMessages(prevMessages => prevMessages.map(m => m.id === messageId ? { ...m, feedback } : m));
+      toast({
+        title: "Warning",
+        description: "Could not persist feedback change in the UI state directly. The hook needs an update mechanism.",
+        variant: "default",
+      });
+    }
+  };
+
+  const handleTestConfigChange = (newConfig: Partial<TestRunConfig>) => {
+    setTestRunConfig(prev => ({ ...prev, ...newConfig }));
+  };
+
+  const handleApplyTestConfig = () => {
+    setIsTestConfigPanelOpen(false);
+    toast({ title: "Test Settings Applied", description: "Temporary settings will be used for the next interaction." });
+    // Potentially inform useGenkitSession or re-evaluate options if streamingEnabled changed
+    if (testRunConfig.streamingEnabled === false) {
+        // Handle logic for disabling streaming if possible,
+        // or inform user they might need to switch to non-streaming chat.
+        toast({ title: "Streaming Disabled", description: "Consider switching to the non-streaming chat if issues occur.", variant: "default"});
+    }
   };
 
   return (
-    <div className="grid h-full grid-cols-1 md:grid-cols-[280px_1fr] gap-0">
-      {/* Sidebar para agentes e conversas */}
-      <ConversationSidebar
-        selectedAgentId={selectedAgentId}
-        setSelectedAgentId={setSelectedAgentId}
-        savedAgents={savedAgents}
-        handleNewConversation={handleNewConversation}
-        isSidebarOpen={isSidebarOpen}
-        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-      />
+    <div className="flex h-full flex-col bg-background">
+      <Suspense fallback={<div>Carregando painel de configuração...</div>}>
+        {isTestConfigPanelOpen && (
+          <TestRunConfigPanel
+            isOpen={isTestConfigPanelOpen}
+            onClose={() => setIsTestConfigPanelOpen(false)}
+            config={testRunConfig}
+            onConfigChange={handleTestConfigChange}
+            onApply={handleApplyTestConfig}
+          />
+        )}
+      </Suspense>
+      <Suspense fallback={<div className="w-64 p-4 bg-gray-800 text-gray-200">Carregando sidebar...</div>}>
+        {isSidebarOpen && ( // Conditionally render based on isSidebarOpen for Suspense to work correctly
+          <ConversationSidebar
+            // Props seem mismatched with ConversationSidebar's definition.
+            // Passing what's currently used in this file.
+            // TODO: Reconcile props for ConversationSidebar.
+            // Expected: isOpen, conversations, activeConversationId, onSelectConversation, etc.
+            // Current pass: selectedAgentId, setSelectedAgentId, savedAgents, handleNewConversation, isSidebarOpen, onMenuToggle
+            isOpen={isSidebarOpen}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            conversations={[]} // Placeholder - this component manages its own conversations via useChatStore or similar
+            activeConversationId={null} // Placeholder
+            onSelectConversation={() => {}} // Placeholder
+            onNewConversation={handleNewConversation}
+            onDeleteConversation={async () => {}} // Placeholder
+            onRenameConversation={() => {}} // Placeholder
+            isLoading={false} // Placeholder
+            gems={[]} // Placeholder
+            savedAgents={savedAgents}
+            adkAgents={[]} // Placeholder
+            onSelectAgent={() => {}} // Placeholder
+            // Original props from this file's usage:
+            // selectedAgentId={selectedAgentId}
+            // setSelectedAgentId={setSelectedAgentId} - This should be handled internally or via onSelectAgent
+            // handleNewConversation={handleNewConversation} - Correctly passed to onNewConversation
+            // isSidebarOpen={isSidebarOpen} - Correctly passed to isOpen
+            // onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} - Correctly passed to onToggleSidebar
+          />
+        )}
+      </Suspense>
 
-      {/* Área principal de chat */}
-      <Card className="flex flex-col h-full overflow-hidden border-0 rounded-none md:border md:rounded-lg md:ml-2">
-        {/* Cabeçalho do chat */}
-        <ChatHeader
-          title={selectedAgent?.name || "Chat com IA"}
-          description={selectedAgent?.description || "AgentVerse Chat"}
-          modelInfo={selectedAgent?.config.model || "Modelo padrão"}
-          tools={
-            selectedAgent?.config.tools?.filter((t) => t.enabled).length || 0
-          }
-        >
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="md:hidden"
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
-            className="ml-2"
-            title="Painel de depuração"
-          >
-            <Bug className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewConversation}
-            className="ml-2"
-          >
-            <Plus className="h-4 w-4 mr-2" /> Nova conversa
-          </Button>
-        </ChatHeader>
-
-      <div className={cn(
-        'fixed inset-y-0 left-0 z-30 w-72 bg-background border-r transition-transform duration-300 ease-in-out md:relative md:translate-x-0',
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
-        <div className="flex flex-col h-full">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Conversas</h2>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="md:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <Menu className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {/* Lista de conversas aqui */}
-            <div className="p-4 text-center text-muted-foreground">
-              Nenhuma conversa ainda
+      <Card className="flex flex-col flex-1 h-full overflow-hidden border-0 rounded-none md:border md:rounded-lg md:ml-0">
+        <div className="flex items-center justify-between p-2 border-b">
+            <SimpleChatHeader
+                title={selectedAgent?.agentName || "Chat com IA"}
+                description={selectedAgent?.agentDescription || "AgentVerse Chat"}
+                modelInfo={(selectedAgent?.config?.type === "llm" ? (selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>).agentModel : undefined) || "Modelo padrão"}
+                tools={(selectedAgent?.tools || []).length}
+            />
+            <div className="flex items-center space-x-2">
+                <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className="md:hidden" // Only show on small screens to toggle sidebar
+                    title="Toggle Sidebar"
+                >
+                    <Menu className="w-4 h-4" />
+                </Button>
+                <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
+                    title="Painel de depuração"
+                >
+                    <Bug className="w-4 h-4" />
+                </Button>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsTestConfigPanelOpen(true)}
+                    title="Test Settings"
+                >
+                    <Settings2 className="w-4 h-4" />
+                </Button>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleNewConversation}
+                >
+                    <Plus className="w-4 h-4 mr-2" /> Nova conversa
+                </Button>
             </div>
-          </div>
-          <div className="p-4 border-t">
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={handleNewConversation}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Nova conversa
-            </Button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Overlay para fechar a sidebar em mobile */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 z-20 bg-black/50 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-      
-      {/* Área principal de chat */}
-      <Card className="flex flex-col h-full overflow-hidden border-0 rounded-none md:border md:rounded-lg md:ml-2">
-        {/* Cabeçalho do chat */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div>
-            <h2 className="text-xl font-semibold">{selectedAgent?.agentName || 'Chat com IA'}</h2>
-            <p className="text-sm text-muted-foreground">
-              {selectedAgent?.agentDescription || 'AgentVerse Chat'}
-            </p>
-            <div className="flex items-center mt-1 text-xs text-muted-foreground">
-              <span>Modelo: {selectedAgent?.agentModel || 'Modelo padrão'}</span>
-              <span className="mx-2">•</span>
-              <span>Ferramentas: {selectedAgent?.agentTools?.length || 0}</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => setIsDebugPanelOpen(!isDebugPanelOpen)}
-              title="Painel de depuração"
-            >
-              <Bug className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleNewConversation}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Nova conversa
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="md:hidden"
-            >
-              <Menu className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
         
-        {/* Área de mensagens */}
         <div className="flex-1 overflow-hidden">
-          <ScrollArea
-            ref={scrollAreaRef}
-            className="h-full overflow-auto"
-            id="message-scroll-area"
-          >
-            <div
-              className={cn(
-                "flex flex-col gap-6 p-4 pb-20",
-                messages.length === 0 && "h-full",
-              )}
-            >
+          <ScrollArea ref={scrollAreaRef} className="h-full" id="message-scroll-area">
+            <div className={cn("flex flex-col gap-4 p-4 pb-20", messages.length === 0 && "h-full")}>
               {messages.length === 0 ? (
                 <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
               ) : (
                 <StreamingMessageList
                   messages={messages}
                   isProcessing={isProcessing}
+                  onRegenerate={handleRegenerate}
+                  onFeedback={handleFeedback}
                 />
               )}
             </div>
           </ScrollArea>
         </div>
 
-        {/* Área de entrada de mensagem */}
         <StreamingInputArea
           onSubmit={handleSendMessage}
           isProcessing={isProcessing}
@@ -389,12 +406,12 @@ export function ChatUIStreaming() {
         />
       </Card>
 
-      {/* Painel de depuração */}
       <EventDebugPanel 
         events={events}
-        sessionState={{}}
+        sessionState={sessionState}
         isVisible={isDebugPanelOpen}
         onClose={() => setIsDebugPanelOpen(false)}
-      /></div>
+      />
+    </div>
   );
 }

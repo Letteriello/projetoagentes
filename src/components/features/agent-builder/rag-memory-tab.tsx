@@ -56,30 +56,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-
-// Tipos de fontes de conhecimento para RAG
-export type KnowledgeSourceType =
-  | "document"
-  | "website"
-  | "api"
-  | "database"
-  | "custom";
-
-// Interface para uma fonte de conhecimento RAG
-export interface KnowledgeSource {
-  id: string;
-  name: string;
-  type: KnowledgeSourceType;
-  description: string;
-  location: string; // URI, URL, ou caminho de arquivo
-  credentials?: string; // Opcional, para fontes que requerem autenticação
-  format?: string; // Formato do conteúdo (PDF, HTML, JSON, etc.)
-  updateFrequency?: "static" | "daily" | "weekly" | "monthly" | "custom"; // Frequência de atualização
-  enabled: boolean;
-}
+import { KnowledgeSource, KnowledgeSourceType } from "../../../types/agent-configs-new";
+import { useToast } from "@/hooks/use-toast";
 
 // Tipos de serviços de memória/RAG suportados
-export type MemoryServiceType = "in-memory" | "vertex-ai-rag" | "custom";
+export type MemoryServiceType =
+  | "in-memory"
+  | "vertex-ai-rag"
+  | "custom"
+  | "filesystem"
+  | "vertexAISearch"
+  | "pinecone"
+  | "localFaiss"
+  | "googleSearch";
 
 // Configuração do serviço de memória/RAG
 export interface RagMemoryConfig {
@@ -91,15 +80,19 @@ export interface RagMemoryConfig {
   similarityTopK: number; // Número de resultados similares a recuperar
   vectorDistanceThreshold: number; // Limiar de distância para considerar resultados relevantes (0-1)
   embeddingModel?: string; // Modelo de embeddings a usar
-  knowledgeSources: KnowledgeSource[]; // Fontes de conhecimento
+  // knowledgeSources: KnowledgeSource[]; // Fontes de conhecimento << MOVED TO PROPS
   includeConversationContext: boolean; // Incluir contexto da conversa atual
   persistentMemory: boolean; // Manter memória entre sessões
 }
 
 interface RagMemoryTabProps {
   // Configuração principal
-  ragMemoryConfig: RagMemoryConfig;
-  setRagMemoryConfig: (config: RagMemoryConfig) => void;
+  ragMemoryConfig: Omit<RagMemoryConfig, "knowledgeSources">; // knowledgeSources is now a direct prop
+  setRagMemoryConfig: (config: Omit<RagMemoryConfig, "knowledgeSources">) => void;
+
+  // Knowledge Sources props
+  knowledgeSources: KnowledgeSource[];
+  setKnowledgeSources: (sources: KnowledgeSource[]) => void;
 
   // Propriedades de Estado e Memória
   enableStatePersistence: boolean;
@@ -131,6 +124,8 @@ interface RagMemoryTabProps {
 export function RagMemoryTab({
   ragMemoryConfig,
   setRagMemoryConfig,
+  knowledgeSources, // New prop
+  setKnowledgeSources, // New prop
   enableStatePersistence,
   setEnableStatePersistence,
   statePersistenceType,
@@ -144,6 +139,7 @@ export function RagMemoryTab({
   enableRAG,
   setEnableRAG,
 }: RagMemoryTabProps) {
+  const { toast } = useToast(); // Added for toast notifications
   // Estado para o componente de adição de fonte de conhecimento
   const [showNewSourceForm, setShowNewSourceForm] = React.useState(false);
   const [newSource, setNewSource] = React.useState<Partial<KnowledgeSource>>({
@@ -197,9 +193,10 @@ export function RagMemoryTab({
       enabled: newSource.enabled !== undefined ? newSource.enabled : true,
     };
 
-    updateConfig({
-      knowledgeSources: [...ragMemoryConfig.knowledgeSources, completeSource],
-    });
+    // updateConfig({
+    //   knowledgeSources: [...ragMemoryConfig.knowledgeSources, completeSource],
+    // });
+    setKnowledgeSources([...knowledgeSources, completeSource]);
 
     // Resetar o formulário
     setNewSource({
@@ -216,19 +213,95 @@ export function RagMemoryTab({
 
   // Remover uma fonte de conhecimento
   const handleRemoveSource = (id: string) => {
-    updateConfig({
-      knowledgeSources: ragMemoryConfig.knowledgeSources.filter(
-        (source) => source.id !== id,
-      ),
-    });
+    // updateConfig({
+    //   knowledgeSources: ragMemoryConfig.knowledgeSources.filter(
+    //     (source) => source.id !== id,
+    //   ),
+    // });
+    setKnowledgeSources(knowledgeSources.filter(source => source.id !== id));
   };
 
   // Alternar o estado de habilitado/desabilitado de uma fonte
   const toggleSourceEnabled = (id: string) => {
-    updateConfig({
-      knowledgeSources: ragMemoryConfig.knowledgeSources.map((source) =>
+    // updateConfig({
+    //   knowledgeSources: ragMemoryConfig.knowledgeSources.map((source) =>
+    //     source.id === id ? { ...source, enabled: !source.enabled } : source,
+    //   ),
+    // });
+    setKnowledgeSources(
+      knowledgeSources.map((source) =>
         source.id === id ? { ...source, enabled: !source.enabled } : source,
       ),
+    );
+  };
+
+  const handleSourceFieldUpdate = (sourceId: string, field: keyof KnowledgeSource, value: string | undefined) => {
+    const updatedSources = knowledgeSources.map(s =>
+      s.id === sourceId ? { ...s, [field]: value } : s
+    );
+    setKnowledgeSources(updatedSources);
+  };
+
+  const handleTestConnection = (
+    type: KnowledgeSourceType | undefined,
+    location: string | undefined,
+    credentials?: string,
+  ) => {
+    if (!type || !location) {
+      toast({
+        title: "Teste de Conexão Falhou",
+        description: "Tipo e Localização da fonte são obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let message = "";
+    let success = true; // Simulate success by default
+
+    switch (type) {
+      case "website":
+        message = `Simulando conexão com website: ${location}... Conexão bem-sucedida!`;
+        break;
+      case "api":
+        message = `Simulando conexão com API: ${location}... `;
+        if (credentials) {
+          message += "Credenciais fornecidas. Conexão bem-sucedida!";
+        } else {
+          message += "Nenhuma credencial fornecida. Conexão pode ser limitada ou falhar.";
+          // success = false; // Optionally simulate failure if credentials are required but missing
+        }
+        break;
+      case "database":
+        message = `Simulando conexão com Banco de Dados: ${location}... `;
+        if (credentials) {
+          message += "Credenciais fornecidas. Conexão bem-sucedida!";
+        } else {
+          message += "Nenhuma credencial fornecida. Conexão falhou!";
+          success = false; // Simulate failure if credentials needed
+        }
+        break;
+      case "document":
+        toast({
+          title: "Teste de Conexão Não Aplicável",
+          description: "Para fontes do tipo 'Documento', o teste de conexão não é aplicável aqui. Verifique o caminho/URI.",
+        });
+        return; // Early exit
+      case "custom":
+        toast({
+          title: "Teste de Conexão Não Implementado",
+          description: "Para fontes do tipo 'Personalizado', a lógica de teste de conexão específica seria necessária.",
+        });
+        return; // Early exit
+      default:
+        message = "Tipo de fonte desconhecido para teste de conexão.";
+        success = false;
+    }
+
+    toast({
+      title: success ? "Teste de Conexão (Simulado)" : "Teste de Conexão Falhou (Simulado)",
+      description: message,
+      variant: success ? "default" : "destructive",
     });
   };
 
@@ -545,7 +618,7 @@ export function RagMemoryTab({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {ragMemoryConfig.knowledgeSources.length > 0 ? (
+                {knowledgeSources.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -561,27 +634,47 @@ export function RagMemoryTab({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ragMemoryConfig.knowledgeSources.map((source) => (
+                      {knowledgeSources.map((source) => (
                         <TableRow key={source.id}>
-                          <TableCell>{getSourceIcon(source.type)}</TableCell>
-                          <TableCell className="font-medium">
-                            {source.name}
-                            {source.description && (
-                              <p
-                                className="text-xs text-muted-foreground truncate max-w-[150px]"
-                                title={source.description}
-                              >
-                                {source.description}
-                              </p>
-                            )}
+                          <TableCell className="align-top">{getSourceIcon(source.type)}</TableCell>
+                          <TableCell className="font-medium align-top"> {/* Added align-top for consistency if rows have different heights */}
+                            <Input
+                              defaultValue={source.name}
+                              onBlur={(e) => {
+                                if (e.target.value !== source.name) {
+                                  handleSourceFieldUpdate(source.id, 'name', e.target.value);
+                                }
+                              }}
+                              className="h-8 mb-1 w-full" // Added w-full
+                              placeholder="Source Name"
+                            />
+                            <Textarea
+                              defaultValue={source.description || ''}
+                              onBlur={(e) => {
+                                const newValue = e.target.value;
+                                const oldValue = source.description || '';
+                                if (newValue !== oldValue) {
+                                  handleSourceFieldUpdate(source.id, 'description', newValue === '' ? undefined : newValue);
+                                }
+                              }}
+                              placeholder="Description (optional)"
+                              className="h-16 text-xs w-full resize-none"
+                              rows={2}
+                            />
                           </TableCell>
-                          <TableCell
-                            className="max-w-[200px] truncate"
-                            title={source.location}
-                          >
-                            {source.location}
+                          <TableCell className="max-w-[200px] align-top"> {/* Added align-top, removed truncate */}
+                            <Input
+                              defaultValue={source.location}
+                              onBlur={(e) => {
+                                if (e.target.value !== source.location) {
+                                  handleSourceFieldUpdate(source.id, 'location', e.target.value);
+                                }
+                              }}
+                              className="h-8 w-full"
+                              placeholder="Location (URI/URL)"
+                            />
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center align-top">
                             <Switch
                               checked={source.enabled}
                               onCheckedChange={() =>
@@ -590,7 +683,7 @@ export function RagMemoryTab({
                               className="data-[state=checked]:bg-green-500"
                             />
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right align-top">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -682,17 +775,19 @@ export function RagMemoryTab({
                               location: e.target.value,
                             })
                           }
-                          placeholder={
-                            newSource.type === "document"
-                              ? "ex: gs://bucket/docs/*.pdf"
-                              : newSource.type === "website"
-                                ? "ex: https://exemplo.com/docs"
-                                : newSource.type === "api"
-                                  ? "ex: https://api.exemplo.com/v1/data"
-                                  : newSource.type === "database"
-                                    ? "ex: mysql://user:pass@localhost:3306/db"
-                                    : "ex: URI ou caminho para a fonte"
-                          }
+                          placeholder={(() => {
+                            let placeholder = "ex: URI ou caminho para a fonte";
+                            if (newSource.type === "document") {
+                              placeholder = "ex: gs://bucket/docs/*.pdf ou /local/path/to/docs";
+                            } else if (newSource.type === "website") {
+                              placeholder = "ex: https://exemplo.com/docs";
+                            } else if (newSource.type === "api") {
+                              placeholder = "ex: https://api.exemplo.com/v1/data";
+                            } else if (newSource.type === "database") {
+                              placeholder = "ex: postgresql://user:pass@host:port/db";
+                            }
+                            return placeholder;
+                          })()}
                           className="h-8"
                         />
                       </div>
@@ -741,6 +836,19 @@ export function RagMemoryTab({
                             Por segurança, credenciais devem ser gerenciadas via
                             variáveis de ambiente em produção.
                           </p>
+                        </div>
+                      )}
+
+                      {(newSource.type === "website" || newSource.type === "api" || newSource.type === "database") && (
+                        <div className="pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTestConnection(newSource.type, newSource.location, newSource.credentials)}
+                            className="w-full"
+                          >
+                            Testar Conexão (Simulado)
+                          </Button>
                         </div>
                       )}
 

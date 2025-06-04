@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -68,17 +69,40 @@ import { A2AConfig as A2AConfigComponent } from "@/components/features/agent-bui
 import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
 // import type { A2AConfig as A2AConfigType } from "@/types/a2a-types"; // Already imported and aliased
 import { convertToGoogleADKConfig } from "@/lib/google-adk-utils"; // Assuming this is used or will be
+
+import * as React from 'react';
+import { lazy, Suspense } from 'react';
+import { useForm, FormProvider, useFormContext, Controller, SubmitHandler, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+// import { z } from 'zod'; // z is imported via savedAgentConfigurationSchema
+
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge'; // Import Badge
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
+import { Switch } from "@/components/ui/switch"; // Added Switch
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
+import JsonEditorField from '@/components/ui/JsonEditorField'; // Added JsonEditorField
+// Label replaced by FormLabel where appropriate
+import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
+import { toast } from '@/hooks/use-toast';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import {
+
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -110,7 +134,93 @@ import type {
   CustomAgentConfig, // Keep CustomAgentConfig from agent-types.ts
   ToolConfigData, // Keep ToolConfigData from agent-types.ts
   AgentConfigBase, // Keep AgentConfigBase from agent-types.ts
+
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form"; // Import Form components
+import {
+  UploadCloud,
+  Wand2,
+  Info,
+  Settings,
+  Check,
+  PlusCircle,
+  Trash2,
+  Save,
+  ListChecks,
+  Plus,
+  Search,
+  FileText,
+  FileJson,
+  Binary,
+  Share2,
+  Users,
+  Layers,
+  ChevronsUpDown,
+  Brain,
+  Settings2,
+  Loader2,
+  ClipboardCopy,
+  Undo2, // Import Undo2
+  AlertTriangle, // Import AlertTriangle
+  Download, // Import Download icon
+  // Wand2 // Already imported
+} from 'lucide-react';
+
+import { HelpModal } from '@/components/ui/HelpModal';
+import { generateAgentCardJson, generateAgentCardYaml } from '../../../lib/agent-utils'; // Added import
+import { aiConfigurationAssistantFlow, AiConfigurationAssistantOutput } from '@/ai/flows/aiConfigurationAssistantFlow';
+import AISuggestionDisplay from './AISuggestionDisplay';
+import { runFlow } from 'genkit';
+import { InfoIcon } from '@/components/ui/InfoIcon'; // Though used in tabs, modal logic is here
+import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
+
+import GeneralTab from './tabs/general-tab';
+// Lazy load tab components
+const ToolsTab = lazy(() => import('./tabs/tools-tab'));
+const BehaviorTab = lazy(() => import('./tabs/behavior-tab'));
+const StateMemoryTab = lazy(() => import('./tabs/state-memory-tab'));
+const RagTab = lazy(() => import('./tabs/rag-tab'));
+const ArtifactsTab = lazy(() => import('./tabs/artifacts-tab'));
+const A2AConfig = lazy(() => import('./tabs/a2a-config'));
+const MultiAgentTab = lazy(() => import('./tabs/multi-agent-tab'));
+const ReviewTab = lazy(() => import('./tabs/review-tab'));
+const DeployTab = lazy(() => import('./tabs/DeployTab')); // Import DeployTab
+const CallbacksTab = lazy(() => import('./tabs/CallbacksTab'));
+const AdvancedSettingsTab = lazy(() => import('./tabs/AdvancedSettingsTab'));
+
+import { SubAgentSelector } from './sub-agent-selector';
+import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
+import useApiKeyVault from '../../../hooks/use-api-key-vault'; // Import default está correto, pois o hook exporta default
+
+import type {
+  SavedAgentConfiguration,
+  AgentConfig as AgentConfigUnion, // Keep alias
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig,
+  A2AAgentSpecialistConfig,
+  ToolConfigData,
+  StatePersistenceConfig,
+  RagMemoryConfig,
+  ArtifactsConfig, // Existing import
+  ArtifactStorageType, // Import for DEFAULT_ARTIFACTS_CONFIG
+  A2AConfig as AgentA2AConfig, // Keep alias
+  AvailableTool, // Now from agent-types
+  AgentType, // Added as per subtask example
+  AgentFramework, // Added as per subtask example
+  // WorkflowStep // Removed from here if it was, will be specifically imported
+  // Add any other specific config types that were imported from agent-configs-fixed if they were missed
+  // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
+  // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
+
 } from '@/types/agent-types';
+// Import WorkflowStep directly from agent-configs-new
+import { WorkflowStep } from '@/types/agent-configs-new';
+
 
 import { type A2AConfig as SharedA2AConfigType, type CommunicationChannel as SharedCommunicationChannel } from "@/types/a2a-types";
 import { type ArtifactDefinition as SharedArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
@@ -251,8 +361,19 @@ export function AgentBuilderDialog({
       enabled: false, serviceType: 'in-memory' as MemoryServiceType, projectId: "", location: "", ragCorpusName: "",
       similarityTopK: 5, vectorDistanceThreshold: 0.7, embeddingModel: "", knowledgeSources: [],
       includeConversationContext: true, persistentMemory: false,
+
+// Helper function to generate a tool usage snippet from JSON schema
+const generateToolSnippet = (toolName: string, jsonSchemaString: string | undefined): string => {
+  if (!jsonSchemaString) {
+    return `${toolName}(...args)`; // Fallback if no schema
+  }
+  try {
+    const schema = JSON.parse(jsonSchemaString);
+    if (schema.type !== 'object' || !schema.properties) {
+      return `${toolName}(...args)`; // Fallback if schema is not an object with properties
+
     }
-  );
+
 
   const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(editingAgent?.enableArtifacts || false);
   const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>(editingAgent?.artifactStorageType || 'memory');
@@ -327,105 +448,95 @@ export function AgentBuilderDialog({
     setLoopExitStateValue(config.loopExitStateValue);
   };
 
-  const resetCustomLogicFields = (config: Partial<PageCustomAgentConfig | A2AAgentConfig> = {}) => {
-    setCustomLogicDescription(config.customLogicDescription || defaultCustomConfigValues.customLogicDescription || "");
-    if ('a2aConfig' in config && config.a2aConfig) {
-        setA2AConfig(config.a2aConfig);
-    } else if (agentType === 'a2a' && !config.a2aConfig) { // Ensure A2A defaults if switching to A2A
-        setA2AConfig(defaultA2AAgentConfigValues.a2aConfig!);
+    const params = Object.entries(schema.properties).map(([name, propDetails]) => {
+      const type = (propDetails as any).type || 'any';
+      const isRequired = schema.required && schema.required.includes(name);
+      return `${name}${isRequired ? '' : '?'}: ${type}`;
+    });
+
+    return `${toolName}(${params.join(', ')})`;
+  } catch (error) {
+    console.warn(`Failed to parse JSON schema for tool ${toolName}:`, error);
+    return `${toolName}(...args)`; // Fallback on parsing error
+  }
+};
+
+
+/**
+ * Constructs a system prompt string based on the agent's configuration.
+ * This prompt is typically used to guide the behavior of an LLM agent.
+ * It incorporates AI suggestions for personality, tasks, and restrictions if available,
+ * otherwise, it falls back to the manually configured values.
+ *
+ * @param config The agent's configuration object (LLMAgentConfig or WorkflowAgentConfig).
+ * @param availableAgents A list of available agents, used for resolving agent IDs in workflow steps.
+ * @param aiSuggestions Optional AI-generated suggestions that can override parts of the manual config.
+ * @param allAvailableTools Full list of tools available in the system.
+ * @param selectedToolsDetails List of tools currently selected/configured for this agent.
+ * @returns A string representing the constructed system prompt.
+ */
+const constructSystemPrompt = (
+  config: AgentConfigUnion | null | undefined,
+  availableAgents: Array<{ id: string; agentName: string }>,
+  aiSuggestions?: AiConfigurationAssistantOutput | null,
+  allAvailableTools?: AvailableTool[], // Added: Full list of tools
+  selectedToolsDetails?: Array<{ id: string; name: string; description: string }> // Added: Selected tools for the agent
+): string => {
+  if (!config) return "No configuration provided."; // Should not happen with proper form initialization
+
+  let promptParts: string[] = [];
+
+  if (config.type === 'llm') {
+    const llmConfig = config as LLMAgentConfig;
+
+    // --- Personality ---
+    // Use AI suggested personality if available, otherwise use the one from the form.
+    const personality = aiSuggestions?.suggestedPersonality || llmConfig.agentPersonality;
+    promptParts.push(`You are an AI agent${personality ? ` with the personality of a ${personality}` : ''}.`);
+
+    // --- Goal ---
+    // The agent's goal is fundamental and primarily driven by manual configuration.
+    // AI suggestions could refine it, but that's not implemented here.
+    if (llmConfig.agentGoal) {
+      promptParts.push(`Your primary goal is: ${llmConfig.agentGoal}.`);
     }
-  };
-  
-  const resetFormFields = (selectedType: DialogAgentType) => {
-    const typeOption = propAgentTypeOptions.find(opt => opt.id === selectedType);
-    const isEditingCurrentType = editingAgent?.agentType === selectedType;
-    const baseEditingAgent = editingAgent as PageSavedAgentConfiguration | null; // Cast for easier access
 
-    setAgentName(isEditingCurrentType ? baseEditingAgent!.agentName : "");
-    setAgentDescription(isEditingCurrentType ? baseEditingAgent!.agentDescription : (typeOption?.description || ""));
-    setAgentVersion(isEditingCurrentType ? baseEditingAgent!.agentVersion : "1.0.0");
-    setAgentFramework(isEditingCurrentType ? baseEditingAgent!.agentFramework || 'custom' : 'custom');
-    setCurrentAgentTools(isEditingCurrentType ? baseEditingAgent!.agentTools : []);
-    setToolConfigurations(isEditingCurrentType ? baseEditingAgent!.toolConfigsApplied || {} : {});
-
-    setIsRootAgent(isEditingCurrentType ? baseEditingAgent!.isRootAgent || false : false);
-    setSubAgents(isEditingCurrentType ? baseEditingAgent!.subAgents || [] : []);
-    setGlobalInstruction(isEditingCurrentType ? baseEditingAgent!.globalInstruction || "" : "");
-
-    setEnableStatePersistence(isEditingCurrentType ? baseEditingAgent!.enableStatePersistence || false : false);
-    setStatePersistenceType(isEditingCurrentType ? baseEditingAgent!.statePersistenceType || 'memory' : 'memory');
-    setInitialStateValues(isEditingCurrentType ? baseEditingAgent!.initialStateValues || [] : []);
-    setEnableStateSharing(isEditingCurrentType ? baseEditingAgent!.enableStateSharing || false : false);
-    setStateSharingStrategy(isEditingCurrentType ? baseEditingAgent!.stateSharingStrategy || 'explicit' : 'explicit');
-    setEnableRAG(isEditingCurrentType ? baseEditingAgent!.enableRAG || false : false);
-    setRagMemoryConfig(isEditingCurrentType ? baseEditingAgent!.ragMemoryConfig || ragMemoryConfig : { enabled: false, serviceType: 'in-memory', projectId: "", location: "", ragCorpusName: "", similarityTopK: 5, vectorDistanceThreshold: 0.7, embeddingModel: "", knowledgeSources: [], includeConversationContext: true, persistentMemory: false });
-    
-    setEnableArtifacts(isEditingCurrentType ? baseEditingAgent!.enableArtifacts || false : false);
-    setArtifactStorageType(isEditingCurrentType ? baseEditingAgent!.artifactStorageType || 'memory' : 'memory');
-    setArtifacts(isEditingCurrentType ? baseEditingAgent!.artifacts || [] : []);
-    setCloudStorageBucket(isEditingCurrentType ? baseEditingAgent!.cloudStorageBucket || "" : "");
-    setLocalStoragePath(isEditingCurrentType ? baseEditingAgent!.localStoragePath || "" : "");
-
-    setA2AConfig(isEditingCurrentType ? baseEditingAgent!.a2aConfig || a2aConfig : { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', maxMessageSize: 1024 * 1024, loggingEnabled: false });
-
-
-    if (selectedType === 'llm') {
-      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : defaultLLMConfigValues);
-      resetWorkflowFields(); // Clear other type fields
-      resetCustomLogicFields();
-    } else if (selectedType === 'workflow' || selectedType === 'sequential' || selectedType === 'parallel' || selectedType === 'loop') {
-      resetWorkflowFields(isEditingCurrentType ? baseEditingAgent as PageWorkflowAgentConfig : defaultWorkflowConfigValues);
-      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {}); // Allow optional LLM fields
-      resetCustomLogicFields();
-    } else if (selectedType === 'custom' ) {
-      resetCustomLogicFields(isEditingCurrentType ? baseEditingAgent as PageCustomAgentConfig : defaultCustomConfigValues);
-      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {});
-      resetWorkflowFields();
-    } else if (selectedType === 'a2a') {
-        resetCustomLogicFields(isEditingCurrentType ? baseEditingAgent as A2AAgentConfig : defaultA2AConfigValues); // A2A uses customLogicDescription and its own a2aConfig
-        resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : {});
-        resetWorkflowFields();
-    } else { // task or other unhandled - treat as simple LLM for now or clear all
-      resetLLMFields(isEditingCurrentType ? baseEditingAgent as PageLLMAgentConfig : defaultLLMConfigValues); // Sensible default
-      resetWorkflowFields();
-      resetCustomLogicFields();
+    // --- Tasks ---
+    // Use AI suggested tasks if available and they are not empty, otherwise use form tasks.
+    const tasksToUse = (aiSuggestions?.suggestedTasks && aiSuggestions.suggestedTasks.length > 0)
+      ? aiSuggestions.suggestedTasks
+      : llmConfig.agentTasks;
+    if (tasksToUse && tasksToUse.length > 0) {
+      promptParts.push("To achieve this goal, you must perform the following tasks:");
+      promptParts.push(...tasksToUse.map(task => `- ${task}`));
     }
-  };
 
-  React.useEffect(() => {
-    if (editingAgent) {
-      const currentType = editingAgent.agentType as DialogAgentType;
-      setAgentType(currentType);
-      setSelectedAgentTypeUI(toBaseAgentTypeUI(currentType));
-      resetFormFields(currentType);
-    } else {
-      // For new agent, reset to the initially selected type (or the first in the list)
-      const typeToReset = agentType || (propAgentTypeOptions.length > 0 ? propAgentTypeOptions[0].id : 'llm');
-      resetFormFields(typeToReset as DialogAgentType);
+    // --- Restrictions ---
+    // Use AI suggested restrictions if available and not empty, otherwise use form restrictions.
+    const restrictionsToUse = (aiSuggestions?.suggestedRestrictions && aiSuggestions.suggestedRestrictions.length > 0)
+      ? aiSuggestions.suggestedRestrictions
+      : llmConfig.agentRestrictions;
+    if (restrictionsToUse && restrictionsToUse.length > 0) {
+      promptParts.push("\nYou must adhere to the following restrictions:");
+      promptParts.push(...restrictionsToUse.map(restriction => `- ${restriction}`));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingAgent]); // Removed agentType from dependency array to avoid loop with setAgentType in handleAgentTypeChange
 
-  const handleAgentTypeChange = (newAgentTypeValue: string) => {
-    const newAgentType = newAgentTypeValue as DialogAgentType;
-    setAgentType(newAgentType);
-    setSelectedAgentTypeUI(toBaseAgentTypeUI(newAgentType));
-    // When type changes for a new agent or even during editing, reset fields according to the new type
-    resetFormFields(newAgentType);
-  };
-
-  // ... (constructSystemPrompt, handleInternalSave, handleToolSelectionChange, resetModalInputs, openToolConfigModal, handleSaveToolConfiguration remain largely the same for now)
-  // But handleInternalSave will need careful type alignment for finalConfig
-  // And handleFieldChange calls need to be implemented or removed
-
-  // Placeholder for handleFieldChange - this needs proper implementation based on how state is structured
-  const handleFieldChange = (field: string, value: any) => {
-    console.warn(`handleFieldChange called for ${field} with value ${value} - needs implementation.`);
-    // Example: if (field === 'agentFramework') setAgentFramework(value as AgentFramework);
-    if (field === 'agentFramework') {
-        setAgentFramework(value as AgentFramework);
+    // --- Available Tools ---
+    if (allAvailableTools && selectedToolsDetails && selectedToolsDetails.length > 0) {
+      promptParts.push("\nFerramentas Disponíveis:");
+      selectedToolsDetails.forEach(selectedToolInfo => {
+        const fullToolDetail = allAvailableTools.find(t => t.id === selectedToolInfo.id);
+        if (fullToolDetail) {
+          promptParts.push(`- Nome: ${fullToolDetail.name}`);
+          promptParts.push(`  Descrição: ${fullToolDetail.description}`);
+          // Assuming AvailableTool now has inputSchema: string (as per plan)
+          const snippet = generateToolSnippet(fullToolDetail.name, fullToolDetail.inputSchema);
+          if (snippet) {
+            promptParts.push(`  Uso: ${snippet}`);
+          }
+        }
+      });
     }
-  };
 
 
   const constructSystemPrompt = () => {
@@ -490,7 +601,7 @@ export function AgentBuilderDialog({
         if (agentPersonality) systemPromptText += `PERSONALIDADE/TOM DE COMUNICAÇÃO:\n${agentPersonality}\n\n`;
         if (agentRestrictions) systemPromptText += `RESTRIÇÕES E DIRETRIZES IMPORTANTES A SEGUIR RIGOROSAMENTE:\n${agentRestrictions}\n\n`;
     }
-=======
+
   // handleSaveToolConfiguration is defined later in the file, so we'll remove this duplicate
 
   const handleInternalSave = () => {
@@ -524,164 +635,505 @@ export function AgentBuilderDialog({
         }
     });
 
-    // Construct the base config ensuring AgentType from page.tsx is used where SavedAgentConfiguration expects it.
-    // The internal 'dialogAgentType' might be more specific (e.g. 'loop') but needs to map to a valid 'agentType' for saving.
-    let finalAgentTypeForSave: PageAgentConfig['agentType'] = 'custom'; // Default
-    if (agentType === 'llm' || agentType === 'workflow' || agentType === 'custom' || agentType === 'a2a') {
-        finalAgentTypeForSave = agentType as PageAgentConfig['agentType'];
-    } else if (['sequential', 'parallel', 'loop', 'task'].includes(agentType)) {
-        // Map specific workflow/task types if necessary or handle as 'workflow' or 'custom'
-        // For now, let's assume these can be mapped to 'workflow' or 'custom' if page.tsx AgentType is limited
-        // Based on Phase 2, page.tsx AgentType was expanded.
-        finalAgentTypeForSave = agentType as PageAgentConfig['agentType'];
+    return promptParts.join('\n');
+  } else if (config.type === 'workflow') {
+    const wfConfig = config as WorkflowAgentConfig;
+    promptParts.push("You are a workflow orchestrator agent.");
+    if (wfConfig.agentGoal) {
+      promptParts.push(`Your primary goal is: ${wfConfig.agentGoal}.`);
     }
-
-
-    let agentSpecificConfig: Partial<PageAgentConfig> = {};
-    if (finalAgentTypeForSave === 'llm') {
-        agentSpecificConfig = {
-            agentGoal, agentTasks, agentPersonality, agentRestrictions, agentModel,
-            agentTemperature: agentTemperature[0],
-        };
-    } else if (finalAgentTypeForSave === 'workflow' ||
-               ['sequential', 'parallel', 'loop'].includes(agentType) ) { // Map detailed types to workflow
-        agentSpecificConfig = {
-            workflowDescription, detailedWorkflowType, loopMaxIterations, loopTerminationConditionType,
-            loopExitToolName, loopExitStateKey, loopExitStateValue,
-            // Optional LLM fields for workflow
-            agentGoal: agentGoal || undefined, agentTasks: agentTasks || undefined, agentPersonality: agentPersonality || undefined,
-            agentRestrictions: agentRestrictions || undefined, agentModel: agentModel || undefined, agentTemperature: agentTemperature[0] ?? undefined,
-        };
-    } else if (finalAgentTypeForSave === 'custom' || finalAgentTypeForSave === 'a2a' || agentType === 'task') {
-        agentSpecificConfig = {
-            customLogicDescription,
-             // Optional LLM fields
-            agentGoal: agentGoal || undefined, agentTasks: agentTasks || undefined, agentPersonality: agentPersonality || undefined,
-            agentRestrictions: agentRestrictions || undefined, agentModel: agentModel || undefined, agentTemperature: agentTemperature[0] ?? undefined,
-        };
-        if (finalAgentTypeForSave === 'a2a') {
-            (agentSpecificConfig as A2AAgentConfig).a2aConfig = a2aConfig;
+    if (wfConfig.workflowType) {
+      promptParts.push(`This is a '${wfConfig.workflowType}' workflow, executing the following steps:`);
+    }
+    if (wfConfig.workflowSteps && wfConfig.workflowSteps.length > 0) {
+      const stepDescriptions = wfConfig.workflowSteps.map((step, index) => {
+        const agentName = availableAgents.find(a => a.id === step.agentId)?.agentName || step.agentId || "Unknown Agent";
+        let inputMappingStr = typeof step.inputMapping === 'string' ? step.inputMapping : JSON.stringify(step.inputMapping);
+        try {
+          // Attempt to parse and re-stringify for consistent formatting if it's a JSON string
+          inputMappingStr = JSON.stringify(JSON.parse(inputMappingStr), null, 2);
+        } catch (e) {
+          // If it's not a valid JSON string, use it as is
         }
+
+        return `\nStep ${index + 1}: ${step.name || 'Unnamed Step'}
+  Description: ${step.description || 'N/A'}
+  Agent: ${agentName}
+  Input Mapping: ${inputMappingStr}
+  Output Key: ${step.outputKey || 'N/A'}`;
+      });
+      promptParts.push(...stepDescriptions);
+    } else {
+      promptParts.push("No workflow steps defined.");
     }
+    return promptParts.join('\n');
+  }
 
-    const completeAgentConfig: PageSavedAgentConfiguration = {
-      id: editingAgent?.id || `agent-${Date.now()}`,
-      templateId: editingAgent?.templateId || "custom",
-      agentName,
-      agentDescription,
-      agentVersion,
-      agentTools: currentAgentTools,
-      agentType: finalAgentTypeForSave,
-      agentFramework,
-      isRootAgent,
-      subAgents: isRootAgent ? subAgents : [],
-      globalInstruction: isRootAgent ? globalInstruction : "",
-      enableStatePersistence, statePersistenceType, initialStateValues,
-      enableStateSharing, stateSharingStrategy, enableRAG,
-      ragMemoryConfig: ragMemoryConfig.enabled ? ragMemoryConfig : undefined,
-      enableArtifacts, artifactStorageType, artifacts,
-      cloudStorageBucket: artifactStorageType === 'cloud' ? cloudStorageBucket : undefined,
-      localStoragePath: artifactStorageType === 'filesystem' ? localStoragePath : undefined,
+  return "System prompt generation for this agent type is not yet configured.";
+};
 
-      ...agentSpecificConfig, // Spread the type-specific properties
+// Fallback component for lazy loading
+const LoadingFallback = () => <div>Loading tab...</div>;
 
-      systemPromptGenerated: systemPrompt,
-      toolsDetails: selectedToolsDetails,
-      toolConfigsApplied: appliedToolConfigs,
+// Define a default for ArtifactsConfig to ensure it's always present
+const DEFAULT_ARTIFACTS_CONFIG: ArtifactsConfig = {
+  enabled: false,
+  storageType: 'memory' as ArtifactStorageType, // Default to 'memory'
+  cloudStorageBucket: '',
+  localStoragePath: '',
+  definitions: [],
+};
+
+// Local AgentConfig type is removed.
+// Import the Zod schema
+import { savedAgentConfigurationSchema } from '../../../lib/zod-schemas'; // Adjusted path
+
+interface AgentBuilderDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingAgent?: SavedAgentConfiguration | null;
+  onSave: (config: SavedAgentConfiguration) => void;
+  availableTools: Array<{ id: string; name: string; description: string }>;
+  agentTypeOptions: string[];
+  agentToneOptions: string[];
+  iconComponents: Record<string, React.ComponentType>;
+  availableAgentsForSubSelector: Array<{ id: string; agentName: string }>;
+}
+
+const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
+  isOpen,
+  onOpenChange,
+  editingAgent,
+  onSave,
+  availableTools,
+  agentTypeOptions,
+  agentToneOptions,
+  iconComponents,
+  availableAgentsForSubSelector,
+}) => {
+  const { apiKeys: availableApiKeys, isLoading: apiKeysLoading, error: apiKeysError } = useApiKeyVault();
+  // TODO: Handle apiKeysLoading and apiKeysError appropriately
+  if (apiKeysLoading) console.log("API Keys Loading...");
+  if (apiKeysError) console.error("Error loading API Keys:", apiKeysError);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [activeEditTab, setActiveEditTab] = React.useState('general');
+  const [currentStep, setCurrentStep] = React.useState(0);
+  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'deploy', 'callbacks', 'review'];
+
+  const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
+  const [helpModalContent, setHelpModalContent] = React.useState<{ title: string; body: React.ReactNode } | null>(null);
+
+  // State for AI Suggestions
+  const [aiSuggestions, setAiSuggestions] = React.useState<AiConfigurationAssistantOutput | null>(null);
+  const [isSuggesting, setIsSuggesting] = React.useState(false);
+  const [suggestionError, setSuggestionError] = React.useState<string | null>(null);
+
+  // State for manual system prompt editing
+  const [isSystemPromptManuallyEdited, setIsSystemPromptManuallyEdited] = React.useState(false);
+
+  const showHelpModal = (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => {
+    const content = agentBuilderHelpContent[contentKey.tab]?.[contentKey.field]?.modal;
+    if (content) {
+      let modalBody = content.body;
+      if (typeof modalBody === 'string') {
+        // Ensure agent-builder-help-content.ts provides sanitized HTML or preferably JSX.
+        modalBody = <div dangerouslySetInnerHTML={{ __html: modalBody }} />;
+      }
+      setHelpModalContent({ title: content.title, body: modalBody });
+      setIsHelpModalOpen(true);
+    }
+  };
+
+  const createDefaultSavedAgentConfiguration = (): SavedAgentConfiguration => {
+    const newId = uuidv4();
+    const now = new Date().toISOString();
+    return {
+      id: newId,
+      agentName: '',
+      agentDescription: '',
+      agentVersion: '1.0.0',
+      icon: '', // Default icon
+      templateId: '',
+      isTemplate: false,
+      isFavorite: false,
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+      userId: '', // This might be set by the backend or context
+      config: {
+        type: 'llm', // Default agent type
+        framework: 'genkit', // Default framework
+        agentGoal: '',
+        agentTasks: [],
+        agentPersonality: 'neutral', // Default personality
+        agentRestrictions: [],
+        agentModel: 'gemini-1.5-flash-latest', // Default model
+        agentTemperature: 0.7,
+        systemPromptGenerated: '', // Will be generated based on fields
+        safetySettings: [],
+        enableCompositionalFunctionCalling: false, // Initialize CFC to false
+        // Initialize other optional base fields with default 'disabled' states
+        statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
+        rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
+        artifacts: { ...DEFAULT_ARTIFACTS_CONFIG }, // Use the defined default
+        a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', maxMessageSize: 1024, loggingEnabled: false },
+        adkCallbacks: {}, // Initialize empty ADK callbacks
+      } as LLMAgentConfig, // Type assertion for the default config
+      tools: [],
+      toolConfigsApplied: {},
+      toolsDetails: [],
+      internalVersion: 1,
+      isLatest: true,
+      originalAgentId: newId, // For new agents, originalId is the same as id
+      // Initialize deploymentConfig
+      deploymentConfig: {
+        targetPlatform: undefined,
+        environmentVariables: [],
+        resourceRequirements: {
+          cpu: '',
+          memory: '',
+        },
+      },
+    };
+  };
+
+  // Helper function to prepare default values ensuring artifacts config is present
+  const prepareFormDefaultValues = (agent?: SavedAgentConfiguration | null): SavedAgentConfiguration => {
+    const baseConfig = agent || createDefaultSavedAgentConfiguration();
+  // Ensure LLM-specific fields like enableCompositionalFunctionCalling are preserved or defaulted
+  // if the baseConfig.config is already an LLMAgentConfig.
+  // If baseConfig.config is not an LLMAgentConfig (e.g., workflow), these fields wouldn't apply.
+  const isLLM = baseConfig.config?.type === 'llm';
+
+  const preparedConfig = {
+      ...baseConfig,
+      config: {
+        ...baseConfig.config,
+        artifacts: baseConfig.config?.artifacts || { ...DEFAULT_ARTIFACTS_CONFIG },
+        // Explicitly ensure CFC field for LLM agents
+        ...(isLLM && { enableCompositionalFunctionCalling: (baseConfig.config as LLMAgentConfig).enableCompositionalFunctionCalling || false }),
+      },
     };
 
-    onSave(completeAgentConfig);
-    onOpenChange(false);
+  // Ensure workflowSteps is initialized for workflow agents
+  if (preparedConfig.config.type === 'workflow') {
+    const workflowConfig = preparedConfig.config as WorkflowAgentConfig;
+    if (workflowConfig.workflowSteps === undefined) {
+      workflowConfig.workflowSteps = [];
+    }
+  }
+
+  return preparedConfig;
   };
 
-  const handleToolSelectionChange = (toolId: string, checked: boolean) => {
-    setCurrentAgentTools(prevTools => {
-        if (checked) {
-            return [...prevTools, toolId];
-        } else {
-            const newToolConfigs = { ...toolConfigurations };
-            delete newToolConfigs[toolId]; 
-            setToolConfigurations(newToolConfigs);
-            return prevTools.filter(id => id !== toolId);
+  const methods = useForm<SavedAgentConfiguration>({
+    defaultValues: prepareFormDefaultValues(editingAgent),
+    resolver: zodResolver(savedAgentConfigurationSchema), // Use Zod schema for validation
+  });
+
+  React.useEffect(() => {
+    const defaultVals = prepareFormDefaultValues(editingAgent);
+    methods.reset(defaultVals);
+    // Initialize isSystemPromptManuallyEdited based on the new default values from the form after reset
+    // Ensure this reflects the actual persisted state if manualSystemPromptOverride has content
+    setIsSystemPromptManuallyEdited(!!methods.getValues('config.manualSystemPromptOverride'));
+  }, [editingAgent, methods]); // methods is stable, editingAgent triggers this.
+
+  const { control, watch, setValue, getValues } = methods; // Get control, watch,setValue, getValues from methods
+  const agentType = watch("config.type");
+  const agentGoal = watch("config.agentGoal");
+  const agentTasks = watch("config.agentTasks");
+  const agentPersonality = watch("config.agentPersonality");
+  const agentRestrictions = watch("config.agentRestrictions");
+  const workflowType = watch("config.workflowType");
+  const workflowSteps = watch("config.workflowSteps");
+  // Watch fields related to system prompt. These can be passed to BehaviorTab or used here.
+  // const systemPromptGenerated = watch("config.systemPromptGenerated"); // Not strictly needed to watch at this level if BehaviorTab handles its display via useFormContext
+  // const manualSystemPromptOverride = watch("config.manualSystemPromptOverride"); // Same as above
+
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "config.workflowSteps",
+  });
+
+  /**
+   * Effect to automatically update the `systemPromptGenerated` field in the form
+   * whenever relevant configuration fields change or AI suggestions are updated.
+   * This provides a live preview of the system prompt that would be used by the agent.
+   */
+  React.useEffect(() => {
+    // Only auto-generate system prompt if not in manual edit mode
+    if (!isSystemPromptManuallyEdited) {
+      const currentFullConfig = getValues(); // Includes 'tools' and 'toolsDetails'
+      const currentAgentConfig = currentFullConfig.config;
+
+      if (currentAgentConfig) {
+        const newPromptString = constructSystemPrompt(
+          currentAgentConfig,
+          availableAgentsForSubSelector,
+          aiSuggestions, // Pass current AI suggestions to the prompt constructor
+          availableTools, // Pass the master list of all available tools
+          currentFullConfig.toolsDetails // Pass the details of currently selected tools for this agent
+        );
+        // Check if the new prompt is different before setting to avoid unnecessary re-renders/dirtying
+        if (newPromptString !== getValues('config.systemPromptGenerated')) {
+          setValue('config.systemPromptGenerated', newPromptString, {
+            shouldDirty: false, // Auto-generation should not dirty the form initially
+            shouldValidate: false,
+          });
         }
-    });
-  };
-
-  const resetModalInputs = () => {
-    setModalGoogleApiKey(""); setModalGoogleCseId(""); setModalOpenapiSpecUrl("");
-    setModalOpenapiApiKey(""); setModalDbType(""); setModalDbConnectionString("");
-    setModalDbUser(""); setModalDbPassword(""); setModalDbName("");
-    setModalDbHost(""); setModalDbPort(""); setModalDbDescription("");
-    setModalKnowledgeBaseId(""); setModalCalendarApiEndpoint("");
-  };
-
-  const openToolConfigModal = (tool: AvailableTool) => {
-  const openToolConfigModal = (tool: PageAvailableTool) => {
-    setConfiguringTool(tool);
-    setIsToolConfigModalOpen(true);
-    
-    // Load existing configuration if available
-    const existingConfig = toolConfigurations[tool.id];
-    if (existingConfig) {
-      if (tool.id === "webSearch") {
-        setModalGoogleApiKey(existingConfig.googleApiKey || "");
-        setModalGoogleCseId(existingConfig.googleCseId || "");
-      } else if (tool.id === "customApiIntegration") {
-        setModalOpenapiSpecUrl(existingConfig.openapiSpecUrl || "");
-        setModalOpenapiApiKey(existingConfig.apiKey || "");
-        setModalApiEndpoint(existingConfig.apiEndpoint || "");
-      } else if (tool.id === "databaseAccess") {
-        setModalDbType(existingConfig.dbType || "");
-        setModalDbHost(existingConfig.dbHost || "");
-        setModalDbPort(existingConfig.dbPort || "");
-        setModalDbName(existingConfig.dbName || "");
-        setModalDbUser(existingConfig.dbUser || "");
-        setModalDbPassword(existingConfig.dbPassword || "");
-        setModalDbConnectionString(existingConfig.dbConnectionString || "");
-        setModalDbDescription(existingConfig.dbDescription || "");
-      } else if (tool.id === "knowledgeBase") {
-        setModalKnowledgeBaseId(existingConfig.knowledgeBaseId || "");
-      } else if (tool.id === "calendarAccess") {
-        setModalCalendarApiEndpoint(existingConfig.calendarApiEndpoint || "");
-      }
-    } else {
-      // Reset form fields if no existing configuration
-      setModalGoogleApiKey("");
-      setModalGoogleCseId("");
-      setModalOpenapiSpecUrl("");
-      setModalOpenapiApiKey("");
-      setModalApiEndpoint("");
-      setModalDbType("");
-      setModalDbHost("");
-      setModalDbPort("");
-      setModalDbName("");
-      setModalDbUser("");
-      setModalDbPassword("");
-      setModalDbConnectionString("");
-      setModalDbDescription("");
-      setModalKnowledgeBaseId("");
-      setModalCalendarApiEndpoint("");
-      setModalGoogleCseId(existingConfig.googleCseId || "");
-    } else if (tool.id === "customApiIntegration") {
-        setModalOpenapiSpecUrl(existingConfig.openapiSpecUrl || "");
-        setModalOpenapiApiKey(existingConfig.openapiApiKey || "");
-      } else if (tool.id === "databaseAccess") {
-        setModalDbType(existingConfig.dbType || "");
-        setModalDbHost(existingConfig.dbHost || "");
-        setModalDbPort(existingConfig.dbPort || "");
-        setModalDbName(existingConfig.dbName || "");
-        setModalDbUser(existingConfig.dbUser || "");
-        setModalDbPassword(existingConfig.dbPassword || "");
-        setModalDbConnectionString(existingConfig.dbConnectionString || "");
-        setModalDbDescription(existingConfig.dbDescription || "");
-      } else if (tool.id === "knowledgeBase") {
-        setModalKnowledgeBaseId(existingConfig.knowledgeBaseId || "");
-      } else if (tool.id === "calendarAccess") {
-        setModalCalendarApiEndpoint(existingConfig.calendarApiEndpoint || "");
       }
     }
-    setIsToolConfigModalOpen(true);
+  }, [
+    // Dependencies that trigger system prompt regeneration:
+    agentType,
+    agentGoal,
+    agentTasks,
+    agentPersonality,
+    agentRestrictions,
+    workflowType,
+    workflowSteps,
+    availableAgentsForSubSelector,
+    aiSuggestions,
+    setValue,
+    getValues,
+    isSystemPromptManuallyEdited, // Key dependency to control auto-generation
+    availableTools, // Added: Master list of tools from props
+    watch('toolsDetails') // Added: Watch selected tools details, as this influences the prompt
+  ]);
+
+  const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (submittedData) => {
+    // It's crucial to get the absolute latest values from the form,
+    // especially if setValue was called recently without an immediate re-render cycle.
+    const currentFormData = methods.getValues();
+    let finalData: SavedAgentConfiguration = { ...currentFormData }; // Make a mutable copy
+
+    // Ensure config exists, should always be true due to form structure
+    if (!finalData.config) {
+        // This case should ideally not happen if form is initialized correctly
+        console.error("Agent config is missing in onSubmit!");
+        // Potentially initialize to a default base config if absolutely necessary
+        // For now, we'll assume config is present.
+    }
+
+
+    if (isSystemPromptManuallyEdited && typeof finalData.config.manualSystemPromptOverride === 'string') {
+      finalData.config.systemPromptGenerated = finalData.config.manualSystemPromptOverride;
+    }
+    // According to the plan, manualSystemPromptOverride IS saved to the DB.
+    // If we wanted to NOT save it, we would uncomment the next line:
+    // delete finalData.config.manualSystemPromptOverride;
+
+    // Update system prompt history
+    const currentConfig = finalData.config; // Already type asserted or will be AgentConfigUnion
+    const finalSystemPromptForHistory = currentConfig.systemPromptGenerated;
+
+    if (finalSystemPromptForHistory) {
+      let history = currentConfig.systemPromptHistory || [];
+      // Avoid adding duplicate of the most recent prompt
+      if (history.length === 0 || history[0].prompt !== finalSystemPromptForHistory) {
+        history.unshift({ prompt: finalSystemPromptForHistory, timestamp: new Date().toISOString() });
+      }
+      // Keep last 3 versions (or whatever number is desired)
+      currentConfig.systemPromptHistory = history.slice(0, 3);
+    }
+
+    const { id: saveToastId, update: updateSaveToast, dismiss: dismissSaveToast } = toast({
+      title: "Saving Agent...",
+      description: "Please wait while the configuration is being saved.",
+      variant: "default",
+    });
+
+    try {
+      // Ensure timestamps and versions are correctly handled before saving
+      const now = new Date().toISOString();
+      finalData.updatedAt = now; // Use finalData
+      if (!finalData.createdAt) { // If it's a new agent (though default function sets it)
+        finalData.createdAt = now; // Use finalData
+      }
+      // internalVersion could be incremented here if logic requires
+      await onSave(finalData); // Use the potentially modified finalData
+
+      updateSaveToast({
+        title: "Success!",
+        description: "Agent configuration saved successfully.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Failed to save agent configuration:", error);
+      updateSaveToast({
+        title: "Error Saving",
+        description: "Failed to save agent configuration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTimeout(() => dismissSaveToast(), 5000);
+    }
   };
+
+  /**
+   * Fetches AI-generated suggestions for the agent's configuration.
+   * It uses the current agent's goal and tasks as input for the AI flow.
+   * Updates the `aiSuggestions` state with the response or an error message.
+   */
+  const handleGetAiSuggestions = async () => {
+    // Start loading state and clear previous errors/suggestions
+    setIsSuggesting(true);
+    setSuggestionError(null);
+    setAiSuggestions(null);
+    const { id: suggestionToastId, update: updateSuggestionToast, dismiss: dismissSuggestionToast } = toast({
+      title: "Fetching AI Suggestions...",
+      description: "Please wait while we generate suggestions.",
+    });
+
+    try {
+      // Get current agent goal and tasks from the form (assuming LLM type for these fields)
+      const currentFormValues = methods.getValues();
+      const currentConfig = currentFormValues.config as LLMAgentConfig;
+      const agentGoalValue = currentConfig?.agentGoal;
+      const agentTasksValue = currentConfig?.agentTasks;
+      const currentToolsValue = currentFormValues.toolsDetails?.map(td => ({ // Get currently selected tools with their data
+        id: td.id,
+        name: td.name,
+        description: td.description,
+        configData: currentFormValues.toolConfigsApplied?.[td.id] // Include existing config
+      }));
+
+
+      // Basic validation: Ensure goal and tasks are defined before calling the AI.
+      if (!agentGoalValue || !agentTasksValue || agentTasksValue.length === 0) {
+        setSuggestionError("Por favor, defina o objetivo e as tarefas do agente primeiro para obter sugestões relevantes.");
+        updateSuggestionToast({ title: "Input Required", description: "Goal and tasks must be set.", variant: "destructive" });
+        setIsSuggesting(false);
+        return;
+      }
+
+      // Call the AI configuration assistant flow
+      // console.log("Requesting AI suggestions with goal:", agentGoalValue, "tasks:", agentTasksValue, "currentTools:", currentToolsValue);
+      const response = await runFlow(aiConfigurationAssistantFlow, {
+        agentGoal: agentGoalValue,
+        agentTasks: agentTasksValue,
+        suggestionContext: 'fullConfig', // Requesting a comprehensive set of suggestions
+        currentTools: currentToolsValue, // Provide context of already selected/configured tools
+        fullAgentConfig: methods.getValues() // Provide full config for broader context if needed by the flow
+      });
+
+      // console.log("AI suggestions received:", response);
+      setAiSuggestions(response); // Store the suggestions
+      updateSuggestionToast({ title: "Suggestions Ready", description: "AI suggestions have been loaded.", variant: "default" });
+
+    } catch (error) {
+      console.error("Failed to get AI suggestions:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      setSuggestionError(`Falha ao obter sugestões da IA. ${errorMessage}`);
+      updateSuggestionToast({ title: "Error Fetching Suggestions", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsSuggesting(false); // Reset loading state
+      setTimeout(() => dismissSuggestionToast(), 5000); // Dismiss toast after 5 seconds
+    }
+  };
+
+
+  /**
+   * Applies the AI-generated suggestions to the form fields.
+   * Iterates through the `suggestionsToApply` object and updates the form
+   * using `methods.setValue` for each relevant field.
+   * @param suggestionsToApply The AI suggestions object from `aiSuggestions` state.
+   */
+  const handleApplySuggestions = (suggestionsToApply: AiConfigurationAssistantOutput) => {
+    // console.log("Applying AI suggestions to form:", suggestionsToApply);
+    const configPath = 'config'; // Base path for LLMAgentConfig fields within the form
+
+    // Apply suggested personality
+    if (suggestionsToApply.suggestedPersonality) {
+      methods.setValue(`${configPath}.agentPersonality` as any, suggestionsToApply.suggestedPersonality, { shouldValidate: true, shouldDirty: true });
+    }
+    // Apply suggested restrictions
+    if (suggestionsToApply.suggestedRestrictions) {
+      methods.setValue(`${configPath}.agentRestrictions` as any, suggestionsToApply.suggestedRestrictions, { shouldValidate: true, shouldDirty: true });
+    }
+    // Apply suggested AI model
+    if (suggestionsToApply.suggestedModel) {
+      methods.setValue(`${configPath}.agentModel` as any, suggestionsToApply.suggestedModel, { shouldValidate: true, shouldDirty: true });
+    }
+    // Apply suggested temperature
+    if (suggestionsToApply.suggestedTemperature !== undefined) {
+      methods.setValue(`${configPath}.agentTemperature` as any, suggestionsToApply.suggestedTemperature, { shouldValidate: true, shouldDirty: true });
+    }
+
+    // Apply suggested tools and their configurations
+    if (suggestionsToApply.suggestedTools && suggestionsToApply.suggestedTools.length > 0) {
+      // Extract IDs of suggested tools
+      const toolIds = suggestionsToApply.suggestedTools.map(t => t.id);
+      methods.setValue('tools', toolIds, { shouldValidate: true, shouldDirty: true });
+
+      // Update toolsDetails (name, description - assuming these are part of the suggestion)
+      const toolsDetails = suggestionsToApply.suggestedTools.map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description
+      }));
+      methods.setValue('toolsDetails', toolsDetails, { shouldValidate: true, shouldDirty: true });
+
+      // Apply suggested configuration data for each tool
+      const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+      let updatedToolConfigs = { ...currentToolConfigs };
+      suggestionsToApply.suggestedTools.forEach(toolSuggestion => {
+        if (toolSuggestion.id && toolSuggestion.suggestedConfigData) {
+          // This will merge suggested config with existing, or add new if toolId wasn't there.
+          // For a more sophisticated merge, you might need a deep merge utility.
+          updatedToolConfigs[toolSuggestion.id] = {
+            ...(updatedToolConfigs[toolSuggestion.id] || {}),
+            ...toolSuggestion.suggestedConfigData
+          };
+        }
+      });
+      methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
+    }
+
+    // TODO: Apply other suggestions like suggestedName, suggestedDescription, suggestedTasks if the UI/flow supports it directly.
+    // For example, if there's a button to apply suggested tasks:
+    // if (suggestionsToApply.suggestedTasks && suggestionsToApply.suggestedTasks.length > 0) {
+    //   methods.setValue(`${configPath}.agentTasks`, suggestionsToApply.suggestedTasks, { shouldValidate: true, shouldDirty: true });
+    // }
+
+    setAiSuggestions(null); // Clear suggestions after applying them, closing the suggestion display
+    toast({ title: "Suggestions Applied", description: "AI suggestions have been applied to the form.", variant: "default" });
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Process the file
+    }
+  };
+
+  const handleNext = () => {
+    setCurrentStep(prev => Math.min(prev + 1, tabOrder.length - 1));
+  };
+
+  const handlePrevious = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 0));
+  };
+
+  const handleExport = () => {
+    // Handle export logic
+  };
+
+  const triggerDownload = (content: string, fileName: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
 
   const handleSaveToolConfiguration = () => {
     if (!configuringTool) return;
@@ -708,65 +1160,124 @@ export function AgentBuilderDialog({
       newConfig.knowledgeBaseId = modalKnowledgeBaseId;
     } else if (configuringTool.id === "calendarAccess") {
       newConfig.calendarApiEndpoint = modalCalendarApiEndpoint;
+
+  const handleGenerateAgentCard = (format: 'json' | 'yaml') => {
+    const agentData = methods.getValues();
+    const agentName = agentData.name || 'agent'; // Use agent name for the file
+    if (format === 'json') {
+      const jsonString = generateAgentCardJson(agentData);
+      triggerDownload(jsonString, `${agentName}-agent-card.json`, 'application/json');
+    } else {
+      const yamlString = generateAgentCardYaml(agentData);
+      triggerDownload(yamlString, `${agentName}-agent-card.yaml`, 'application/x-yaml');
+
     }
-    setToolConfigurations(prev => ({ ...prev, [configuringTool.id!]: newConfigData as PageToolConfigData, }));
-    setIsToolConfigModalOpen(false); setConfiguringTool(null);
-    // Use configuringTool.name if it's a string, otherwise fallback to id or a generic name
-    const toolDisplayName = typeof configuringTool.name === 'string' ? configuringTool.name : configuringTool.id;
-    toast({ title: `Configuração salva para ${toolDisplayName}`});
+    toast({
+      title: "Agent Card Gerado",
+      description: `O Agent Card (${format.toUpperCase()}) foi baixado.`,
+    });
   };
 
-  const selectedAgentTypeOption = propAgentTypeOptions.find(opt => opt.id === agentType); // Use propAgentTypeOptions
-  // const selectedAgentTypeDescription = selectedAgentTypeOption?.description || "Configure seu agente."; // Unused
-  // const selectedAgentTypeLabel = selectedAgentTypeOption?.label.split(' (')[0].trim() || "Agente"; // Unused
+  // const handleToolConfigure = (toolId: string) => { // REMOVED
+  //   // Handle tool configuration
+  // };
 
-  const isLLMConfigRelevant = agentType === 'llm' || agentType === 'a2a' ||
-                             ((agentType === 'workflow' || agentType === 'custom' || agentType === 'task' || agentType === 'sequential' || agentType === 'parallel' || agentType === 'loop') &&
-                               (agentGoal || agentTasks || agentPersonality || agentRestrictions || agentModel)
-                             );
-  const showLLMSections = agentType === 'llm' || agentType === 'a2a' || agentType === 'task';
-  const showWorkflowDescriptionFields = agentType === 'workflow' || agentType === 'sequential' || agentType === 'parallel' || agentType === 'loop';
-  const showCustomLogicDescription = agentType === 'custom' || agentType === 'a2a';
+  const getTabStatusIcon = (tab: string) => {
+    // Return appropriate icon based on tab status
+    return null;
+  };
 
-  const agentFrameworkOptions = [
-    { id: "custom", label: "Customizado / Padrão", description: "Configuração padrão ou customizada sem um framework específico.", icon: <Settings2 className="h-4 w-4" /> },
-    { id: "genkit", label: "Google Genkit", description: "Agente construído com o Google Genkit.", icon: <Brain className="h-4 w-4 text-blue-500" /> },
-    { id: "langchain", label: "Langchain", description: "Agente construído com Langchain.", icon: <Layers className="h-4 w-4 text-green-500" /> },
-    { id: "crewai", label: "Crew AI", description: "Agente construído com Crew AI para colaboração.", icon: <Users className="h-4 w-4 text-purple-500" /> },
-  ];
+  const options = availableTools.map(item => ({ value: item.id, label: item.name }));
 
-  // Removed problematic JSX block: const prepareWorkflowConfig = () => { ... } </>
+  const tools: AvailableTool[] = availableTools.map(tool => ({
+    ...tool,
+    label: tool.name,
+    type: tool.type || 'default',
+    requiresAuth: tool.requiresAuth || false,
+    serviceTypeRequired: tool.serviceTypeRequired || undefined
+  }));
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open && configuringTool) { 
-            setIsToolConfigModalOpen(false); 
-            setConfiguringTool(null);
-        } else if (!open) {
-            setConfiguringTool(null); 
-        }
-        onOpenChange(open);
-    }}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-4 border-b">
-          <DialogTitle className="text-2xl">
-            {editingAgent ? `Editar Agente: ${agentName || 'Agente'}` : "Novo Agente"}
-          </DialogTitle>
-          <DialogDescription>
-            {editingAgent ? "Modifique as propriedades e configurações do seu agente." : "Defina as propriedades e configurações para seu novo agente."}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Changed main content wrapper to allow Tabs to control its own scrolling for content */}
-        <div className="flex-grow p-6 space-y-6 overflow-hidden">
-            <Tabs defaultValue="configPrincipal" value={activeTab} onValueChange={(value) => setActiveTab(value)} className="w-full h-full flex flex-col">
-                <TabsList className="grid w-full grid-cols-5 mb-6 h-auto shrink-0"> {/* TabsList should not shrink */}
-                    <TabsTrigger value="configPrincipal" className="py-2">Principal</TabsTrigger>
-                    <TabsTrigger value="ferramentas" className="py-2">Ferramentas</TabsTrigger>
-                    <TabsTrigger value="memoriaConhecimento" className="py-2">Memória/RAG</TabsTrigger>
-                    <TabsTrigger value="artefatos" className="py-2">Artefatos</TabsTrigger>
-                    <TabsTrigger value="a2a" className="py-2">A2A</TabsTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange as (open: boolean) => void}>
+      <DialogContent className="max-w-4xl p-0">
+        <FormProvider {...methods}>
+          <form onSubmit={methods.handleSubmit(onSubmit)}>
+            <DialogHeader className="p-6 pb-4 border-b">
+              <div className="flex items-center">
+                <DialogTitle>{editingAgent ? "Editar Agente IA" : "Criar Novo Agente IA"}</DialogTitle>
+                {editingAgent && (
+                  <Badge variant="outline" className="ml-3 text-sm">
+                    Editando: {editingAgent.agentName}
+                  </Badge>
+                )}
+              </div>
+              <DialogDescription>
+                {editingAgent ? `Modifique as configurações do agente.` : "Configure um novo agente inteligente para suas tarefas."}
+              </DialogDescription>
+              <input
+                type="file"
+                accept=".json"
+                style={{ display: "none" }}
+                onChange={handleFileImport}
+                ref={fileInputRef}
+              />
+              <Button variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} className="mt-2 ml-auto"> {/* Added ml-auto to push to right */}
+                <UploadCloud className="mr-2 h-4 w-4" /> {/* Or FileInput icon */}
+                Importar Configuração
+              </Button>
+            </DialogHeader>
+            <div className="p-6"> {/* This div will contain Tabs and its content, allowing padding */}
+              <Tabs
+                value={editingAgent === undefined ? tabOrder[currentStep] : activeEditTab}
+                // defaultValue="general" // defaultValue might conflict with controlled value
+                onValueChange={(value) => {
+                  if (editingAgent === undefined) {
+                    // In wizard mode, tab navigation is controlled by currentStep and Next/Previous buttons.
+                    // Direct tab clicking is disabled by the 'disabled' prop on TabsTrigger.
+                  } else {
+                    // Edit mode: update activeEditTab when a tab is clicked.
+                    setActiveEditTab(value);
+                  }
+                }}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-11 mb-6"> {/* Adjusted for 11 tabs */}
+                  {/* Updated TabsTrigger props */}
+                  {tabOrder.map((tab, index) => (
+                    <TabsTrigger
+                      key={tab}
+                      value={tab}
+                      disabled={editingAgent === undefined && index > currentStep && tab !== "review"} // Keep review tab accessible if others are disabled
+                      // onClick is not needed here as onValueChange on Tabs handles it.
+                      // However, if you need specific logic per trigger click beyond what onValueChange provides:
+                      // onClick={() => {
+                      //   if (editingAgent !== undefined) {
+                      //     setActiveEditTab(tab);
+                      //   } else {
+                      //     // Wizard mode logic if needed, though disabled prop should prevent most clicks
+                      //     if (index <= currentStep) {
+                      //       // Potentially allow jumping back in wizard
+                      //       // setCurrentStep(index); // This would make tabs navigable in wizard
+                      //     }
+                      //   }
+                      // }}
+                      statusIcon={getTabStatusIcon(tab)}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1).replace(/_/g, " ")} {/* Format tab name */}
+                    </TabsTrigger>
+                  ))}
+                  {/* Original TabsTriggers are replaced by the map above */}
+                  {/* <TabsTrigger value="general" statusIcon={getTabStatusIcon("general")} disabled={editingAgent === undefined}>Geral</TabsTrigger>
+                  <TabsTrigger value="behavior" statusIcon={getTabStatusIcon("behavior")} disabled={editingAgent === undefined}>Comportamento</TabsTrigger>
+                  <TabsTrigger value="tools" statusIcon={getTabStatusIcon("tools")} disabled={editingAgent === undefined}>Ferramentas</TabsTrigger>
+                  <TabsTrigger value="memory_knowledge" statusIcon={getTabStatusIcon("memory_knowledge")} disabled={editingAgent === undefined}>Memória & Conhecimento</TabsTrigger>
+                  <TabsTrigger value="artifacts" statusIcon={getTabStatusIcon("artifacts")} disabled={editingAgent === undefined}>Artefatos</TabsTrigger>
+                  <TabsTrigger value="a2a" statusIcon={getTabStatusIcon("a2a")} disabled={editingAgent === undefined}>Comunicação A2A</TabsTrigger>
+                  <TabsTrigger value="multi_agent_advanced" statusIcon={getTabStatusIcon("multi_agent_advanced")} disabled={editingAgent === undefined}>Multi-Agente</TabsTrigger>
+                  <TabsTrigger value="advanced" statusIcon={getTabStatusIcon("advanced")} disabled={editingAgent === undefined}>Avançado</TabsTrigger>
+                  <TabsTrigger value="review" statusIcon={getTabStatusIcon("review")} disabled={editingAgent === undefined}>Revisar</TabsTrigger> */}
                 </TabsList>
+
                 
                 {/* This div will contain all TabsContent and allow scrolling */}
                 <div className="flex-grow overflow-y-auto pr-2 space-y-6">
@@ -800,46 +1311,35 @@ export function AgentBuilderDialog({
                                 </Select>
                             </div>
 
-                            {selectedAgentTypeOption?.description && (
-                                <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 mt-1">
-                                    <div></div>
-                                    <Alert variant="default" className="bg-card border-border/60">
-                                        {selectedAgentTypeOption.icon ? React.cloneElement(selectedAgentTypeOption.icon as React.ReactElement, { className: "h-4 w-4 text-primary/80" }) : <Cpu className="h-4 w-4 text-primary/80" />}
-                                        <AlertTitle>{selectedAgentTypeOption.label.split(' (')[0].trim()}</AlertTitle>
-                                        <AlertDescription>{selectedAgentTypeOption.description}</AlertDescription>
-                                    </Alert>
-                                </div>
-                            )}
 
-                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                <Label htmlFor="agentFramework" className="text-left flex items-center">
-                                    <Settings2 className="mr-2 h-5 w-5 text-primary/80" />Framework
-                                    <Tooltip>
-                                        <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                        <TooltipContent className="max-w-xs"><p>Framework base para o agente (opcional).</p></TooltipContent>
-                                    </Tooltip>
-                                </Label>
-                                <Select value={agentFramework} onValueChange={(value) => handleFieldChange('agentFramework', value as AgentFramework)}>
-                                    <SelectTrigger id="agentFramework" className="h-10"><SelectValue placeholder="Selecione o framework" /></SelectTrigger>
-                                    <SelectContent>
-                                        {agentFrameworkOptions.map(framework => (
-                                            <SelectItem key={framework.id} value={framework.id}>
-                                                <div className="flex items-center gap-2">
-                                                    {framework.icon}<span>{framework.label}</span>
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+
+                {/* General Tab */}
+                <TabsContent value="general">
+                  <GeneralTab
+                    agentTypeOptions={agentTypeOptions}
+                    // agentFrameworkOptions={agentFrameworkOptions} // This prop seems to be missing in GeneralTab's definition based on previous files
+                    availableTools={availableTools} // For AI suggestions
+                    SparklesIcon={Wand2}
+                    showHelpModal={showHelpModal}
+                  />
+
+                  {/* Workflow Steps UI - Rendered conditionally within General Tab Content */}
+                  {agentType === 'workflow' && (
+                    <Card className="mt-6">
+                      <CardHeader>
+                        <CardTitle>Passos do Workflow</CardTitle>
+                        <CardDescription>Defina os passos sequenciais para este agente workflow.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {fields.map((item, index) => (
+                          <Card key={item.id} className="p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <h4 className="font-semibold">Passo {index + 1}</h4>
+                              <Button variant="ghost" size="sm" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
 
-                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                <Label htmlFor="agentName" className="text-left">Nome do Agente</Label>
-                                <Input id="agentName" placeholder="ex: Suporte Nível 1" value={agentName} onChange={(e) => setAgentName(e.target.value)} className="h-10"/>
-
-                                <Label htmlFor="agentDescription" className="text-left flex items-start pt-2.5">Descrição Geral</Label>
-                                <Textarea id="agentDescription" placeholder="Descreva a função principal..." value={agentDescription} onChange={(e) => setAgentDescription(e.target.value)} rows={3}/>
-                            </div>
 
                             {showWorkflowDescriptionFields && ( // Changed variable name
                                 <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-3">
@@ -888,461 +1388,411 @@ export function AgentBuilderDialog({
                                         <div className="grid grid-cols-[200px_1fr] items-start gap-x-4"><Label htmlFor="globalInstruction" className="text-left pt-2">Instrução Global</Label><Textarea id="globalInstruction" placeholder="Instrução para todos os sub-agentes..." value={globalInstruction} onChange={(e) => setGlobalInstruction(e.target.value)} className="min-h-20 resize-y"/></div>
                                         <div className="space-y-2"><Label className="text-sm font-medium">Sub-Agentes</Label><Card className="border-border/50"><CardContent className="p-4"><SubAgentSelector selectedAgents={subAgents} onChange={setSubAgents} availableAgents={savedAgents || []}/></CardContent></Card></div>
                                     </div></>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={control}
+                                name={`config.workflowSteps.${index}.name`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Nome do Passo (Opcional)</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="Ex: Validar Pedido" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
                                 )}
+                              />
+                              <FormField
+                                control={control}
+                                name={`config.workflowSteps.${index}.agentId`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Agente ID</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Selecione um agente" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {availableAgentsForSubSelector.map(agent => (
+                                          <SelectItem key={agent.id} value={agent.id}>
+                                            {agent.agentName}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+
+                                )}
+                              />
                             </div>
-                            
-                            {showWorkflowDescriptionFields && ( // Changed variable name
-                                <> <Separator className="my-6" />
-                                <div className="space-y-4"> <div className="flex items-center gap-2"> <Workflow className="h-5 w-5 text-primary/80" /> <h3 className="text-lg font-medium">Definição do Fluxo</h3></div>
-                                    {propAgentTypeOptions.find(opt => opt.id === agentType) && (<Alert variant="default" className="mb-4 bg-card border-border/60"> {propAgentTypeOptions.find(opt => opt.id === agentType)!.icon ? React.cloneElement(propAgentTypeOptions.find(opt => opt.id === agentType)!.icon as React.ReactElement, { className: "h-4 w-4 text-primary/80" }) : <Cpu className="h-4 w-4 text-primary/80" />} <AlertTitle>{propAgentTypeOptions.find(opt => opt.id === agentType)!.label.split(' (')[0].trim()}</AlertTitle><AlertDescription>{propAgentTypeOptions.find(opt => opt.id === agentType)!.description}</AlertDescription></Alert>)}
-                                    <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mb-4"> <Label htmlFor="detailedWorkflowType" className="text-left">Tipo Detalhado</Label>
-                                        <Select value={detailedWorkflowType} onValueChange={(value) => setDetailedWorkflowType(value as 'sequential' | 'parallel' | 'loop' | undefined)}> <SelectTrigger id="detailedWorkflowType" className="h-10"><SelectValue placeholder="Selecione o tipo de fluxo" /></SelectTrigger>
-                                        <SelectContent><SelectItem value="sequential">Sequencial</SelectItem><SelectItem value="parallel">Paralelo</SelectItem><SelectItem value="loop">Loop</SelectItem></SelectContent></Select></div>
-                                    <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3"><Label htmlFor="workflowDescription" className="text-left pt-2">Descrição do Fluxo (Interno)</Label><Textarea id="workflowDescription" placeholder="Descreva como as ferramentas serão executadas..." value={workflowDescription} onChange={(e) => setWorkflowDescription(e.target.value)} className="min-h-24 resize-y"/></div>
-                                    {detailedWorkflowType === 'loop' && (<>
-                                        <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3 mt-6"><Label htmlFor="loopMaxIterations" className="text-left">Max Iterações</Label><Input id="loopMaxIterations" type="number" placeholder="ex: 10" value={loopMaxIterations?.toString() || ""} onChange={(e) => setLoopMaxIterations(e.target.value ? parseInt(e.target.value) : undefined)} className="h-10"/></div>
-                                        <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3"><Label className="text-left pt-1">Condição de Término</Label>
-                                            <RadioGroup value={loopTerminationConditionType || 'tool'} onValueChange={(value) => setLoopTerminationConditionType(value as 'tool' | 'state')} className="pt-1">
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="tool" id="tool-condition" /><Label htmlFor="tool-condition" className="font-normal">Baseado em Ferramenta</Label></div>
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="state" id="state-condition" /><Label htmlFor="state-condition" className="font-normal">Baseado em Estado</Label></div></RadioGroup></div>
-                                        {loopTerminationConditionType === 'tool' && (<div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3"><Label htmlFor="loopExitToolName" className="text-left">Nome Ferramenta Saída</Label><Input id="loopExitToolName" placeholder="ex: exitLoop" value={loopExitToolName || ""} onChange={(e) => setLoopExitToolName(e.target.value)} className="h-10"/></div>)}
-                                        {loopTerminationConditionType === 'state' && (<>
-                                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3"><Label htmlFor="loopExitStateKey" className="text-left">Chave do Estado</Label><Input id="loopExitStateKey" placeholder="ex: loopComplete" value={loopExitStateKey || ""} onChange={(e) => setLoopExitStateKey(e.target.value)} className="h-10"/></div>
-                                            <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3"><Label htmlFor="loopExitStateValue" className="text-left">Valor Estado Saída</Label><Input id="loopExitStateValue" placeholder="ex: true" value={loopExitStateValue || ""} onChange={(e) => setLoopExitStateValue(e.target.value)} className="h-10"/></div></>
-                                        )}</>
-                                    )}</div></>
-                            )}
-                        </TooltipProvider>
-                    </TabsContent>
-
-                    <TabsContent value="ferramentas" className="space-y-6 mt-0"><TooltipProvider><div> <h3 className="text-lg font-medium mb-1 flex items-center gap-2"> <Network className="w-5 h-5 text-primary/80" /> Ferramentas do Agente</h3> <p className="text-sm text-muted-foreground mb-4">Capacite seu agente com funcionalidades para interagir com o mundo exterior.</p><ToolsTab availableTools={availableTools} selectedToolIds={currentAgentTools} onToolSelectionChange={handleToolSelectionChange} onConfigureTool={openToolConfigModal} toolConfigsApplied={toolConfigurations}/></div></TooltipProvider></TabsContent>
-                    <TabsContent value="memoriaConhecimento" className="space-y-6 mt-0"><TooltipProvider><RagMemoryTab enableStatePersistence={enableStatePersistence} setEnableStatePersistence={setEnableStatePersistence} statePersistenceType={statePersistenceType} setStatePersistenceType={setStatePersistenceType} initialStateValues={initialStateValues} setInitialStateValues={setInitialStateValues} enableStateSharing={enableStateSharing} setEnableStateSharing={setEnableStateSharing} stateSharingStrategy={stateSharingStrategy} setStateSharingStrategy={setStateSharingStrategy} enableRAG={enableRAG} setEnableRAG={setEnableRAG} ragMemoryConfig={ragMemoryConfig} setRagMemoryConfig={setRagMemoryConfig}/></TooltipProvider></TabsContent>
-                    <TabsContent value="artefatos" className="space-y-6 mt-0"><TooltipProvider><ArtifactManagementTab enableArtifacts={enableArtifacts} setEnableArtifacts={setEnableArtifacts} artifactStorageType={artifactStorageType} setArtifactStorageType={setArtifactStorageType} artifacts={artifacts} setArtifacts={setArtifacts} cloudStorageBucket={cloudStorageBucket} setCloudStorageBucket={setCloudStorageBucket} localStoragePath={localStoragePath} setLocalStoragePath={setLocalStoragePath}/></TooltipProvider></TabsContent>
-                    <TabsContent value="a2a" className="space-y-6 mt-0"><TooltipProvider><A2AConfigComponent a2aConfig={a2aConfig} setA2AConfig={setA2AConfig} savedAgents={(savedAgents || []) as any}/></TooltipProvider></TabsContent>
-                </div> {/* End of scrolling div for TabsContent */}
-    
-    setToolConfigurations(prev => ({
-      ...prev,
-      [configuringTool.id]: newConfig
-    }));
-    
-    setIsToolConfigModalOpen(false);
-    setConfiguringTool(null);
-    
-    toast({
-      title: "Configuração salva",
-      description: `Configuração da ferramenta ${configuringTool.label} foi salva.`
-    });
-  };
-
-  // Define baseConfig at component level to be accessible in the switch statement
-  const baseConfig: AgentConfigBase = {
-    agentName: "Novo Agente", // This would be populated from a form field
-    agentDescription: "Descrição do agente", // This would be populated from a form field
-    agentVersion: "1.0.0",
-    agentTools: currentAgentTools || []
-  };
-  
-  // Define agentConfigData at component level
-  const [agentConfigData, setAgentConfigData] = React.useState<AgentConfig | null>(null);
-  
-  const handleInternalSave = () => {
-    // Implementation for saving the agent configuration
-    // Prepare the final configuration based on agent type
-    let finalConfig: PageSavedAgentConfiguration;
-    
-    // Prepare workflow config if applicable
-    const workflowConfig = prepareWorkflowConfig();
-    
-    // Create the final configuration to save
-    finalConfig = {
-      id: editingAgent?.id || `agent-${Date.now()}`,
-      agentType: selectedAgentType,
-      agentName: agentName,
-      agentDescription: agentDescription,
-      agentVersion: "1.0.0",
-      templateId: editingAgent?.templateId || "custom",
-      agentTools: currentAgentTools,
-      toolsDetails: currentAgentTools.map(toolId => {
-        const tool = availableTools.find(t => t.id === toolId);
-        return {
-          id: toolId,
-          label: tool?.label || toolId,
-          iconName: getToolIconName(tool),
-          needsConfiguration: getNeedsConfiguration(tool),
-          genkitToolName: getToolGenkitName(tool)
-        };
-      }),
-      agentGoal: "",
-      agentTasks: "",
-      agentPersonality: "",
-      agentRestrictions: "",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.7
-    };
-    
-    // Call the onSave callback with the prepared configuration
-    onSave(finalConfig);
-  };
-
-  const defaultLLMConfigValues: Omit<LLMAgentConfig, 'agentType'> = {
-    agentGoal: "",
-    agentTasks: "",
-    agentPersonality: "", // Will be filled by the first agentToneOptions
-    agentRestrictions: "",
-    agentModel: "googleai/gemini-1.5-flash-latest",
-    agentTemperature: 0.7,
-    agentTools: [],
-    agentName: "",
-    agentDescription: "",
-    agentVersion: "1.0.0"
-  };
-
-const defaultWorkflowConfigValues: Omit<WorkflowAgentConfig, 'agentType'> = {
-    workflowDescription: "",
-    detailedWorkflowType: "sequential",
-    loopMaxIterations: 3,
-    loopTerminationConditionType: "none",
-    loopExitToolName: "",
-    loopExitStateKey: "",
-    loopExitStateValue: "",
-    agentGoal: "Coordenar e gerenciar um fluxo de trabalho de múltiplas etapas.",
-    agentTasks: "1. \n2. \n3. ",
-    agentPersonality: "Sistemático e Organizado",
-    agentRestrictions: "",
-    agentModel: "googleai/gemini-1.5-pro-latest",
-    agentTemperature: 0.3,
-    agentTools: [],
-    agentName: "",
-    agentDescription: "",
-    agentVersion: "1.0.0"
-};
-
-// ...
-
-const handleWorkflowTypeChange = (type: 'sequential' | 'parallel' | 'loop') => {
-    setDetailedWorkflowType(type);
-    // Reset loop-specific states when changing away from loop
-    if (type !== 'loop') {
-      setLoopMaxIterations(3);
-      setLoopTerminationConditionType('none');
-      setLoopExitToolName('');
-      setLoopExitStateKey('');
-      setLoopExitStateValue('');
-    } else {
-      // Set default values when switching to loop
-      setLoopTerminationConditionType('tool');
-    }
-  };
-
-  // Handle loop termination condition type change with proper type safety
-  const handleLoopTerminationChange = (value: "none" | "subagent_signal") => {
-    setLoopTerminationConditionType(value);
-  };
-
-// Workflow Fields
-  const [workflowDescription, setWorkflowDescription] = React.useState(editingAgent?.agentType === 'workflow' ? editingAgent.workflowDescription : (editingAgent?.workflowDescription || defaultWorkflowConfigValues.workflowDescription || ""));
-  const [detailedWorkflowType, setDetailedWorkflowType] = React.useState<'sequential' | 'parallel' | 'loop' | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.detailedWorkflowType : defaultWorkflowConfigValues.detailedWorkflowType);
-  const [loopMaxIterations, setLoopMaxIterations] = React.useState<number | undefined>(editingAgent?.agentType === 'workflow' ? editingAgent.loopMaxIterations : defaultWorkflowConfigValues.loopMaxIterations);
-  const [loopTerminationConditionType, setLoopTerminationConditionType] = React.useState<"none" | "subagent_signal">(
-    (editingAgent?.agentType === 'workflow' && editingAgent.loopTerminationConditionType) 
-      ? (editingAgent.loopTerminationConditionType as "none" | "subagent_signal") 
-      : 'none'
-  );
-  
-  const [loopExitToolName, setLoopExitToolName] = React.useState<string>(
-    (editingAgent?.agentType === 'workflow' && editingAgent.loopExitToolName) 
-      ? editingAgent.loopExitToolName 
-      : ''
-  );
-  
-  const [loopExitStateKey, setLoopExitStateKey] = React.useState<string>(
-    (editingAgent?.agentType === 'workflow' && editingAgent.loopExitStateKey) 
-      ? editingAgent.loopExitStateKey 
-      : ''
-  );
-  
-  const [loopExitStateValue, setLoopExitStateValue] = React.useState<string>(
-    (editingAgent?.agentType === 'workflow' && editingAgent.loopExitStateValue) 
-      ? editingAgent.loopExitStateValue 
-      : ''
-  );
-  
-  // Ensure agentType is properly typed and initialized
-  const [agentType, setAgentType] = React.useState<AgentType>(
-    editingAgent?.agentType || 'llm'
-  );
-  
-  // Track if we should show custom logic description
-  const showCustomLogicDescription = agentType === 'custom' || agentType === 'a2a';
-  
-  // Ensure we have a valid agent type
-  const safeAgentType = isAgentType(agentType) ? agentType : 'llm';
-
-  // Function to render loop configuration UI
-  const renderLoopConfiguration = () => {
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="loopMaxIterations">Número Máximo de Iterações</Label>
-            <Input
-              id="loopMaxIterations"
-              type="number"
-              min="1"
-              value={loopMaxIterations}
-              onChange={(e) => setLoopMaxIterations(Number(e.target.value))}
-              placeholder="Ex: 5"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="loopTerminationCondition">Condição de Término</Label>
-            <Select
-              value={loopTerminationConditionType}
-              onValueChange={handleLoopTerminationChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma condição" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma (executa até o final)</SelectItem>
-                <SelectItem value="tool">Quando uma ferramenta específica for chamada</SelectItem>
-                <SelectItem value="state">Quando o estado atender uma condição</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-// Function to prepare workflow config
-const prepareWorkflowConfig = () => {
-  if (['workflow', 'sequential', 'parallel', 'loop'].includes(agentType)) {
-    const workflowConfig: WorkflowAgentConfig = {
-      ...baseConfig,
-      agentType: 'workflow',
-      detailedWorkflowType: agentType === 'workflow' ? detailedWorkflowType || 'sequential' : agentType as any,
-      workflowDescription: workflowDescription || '',
-    };
-    
-    // Add loop-specific properties if this is a loop workflow
-    if (agentType === 'loop') {
-      workflowConfig.loopMaxIterations = loopMaxIterations || 3;
-      workflowConfig.loopTerminationConditionType = loopTerminationConditionType;
-      workflowConfig.loopExitToolName = loopExitToolName || '';
-      workflowConfig.loopExitStateKey = loopExitStateKey || '';
-      workflowConfig.loopExitStateValue = loopExitStateValue || '';
-    }
-    
-    setAgentConfigData(workflowConfig);
-    return workflowConfig;
-  }
-  return null;
-};
-                                                <>
-                                                    <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                                        <Label htmlFor="loopExitStateKey" className="text-left flex items-center">
-                                                            Chave do Estado
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                                                <TooltipContent className="max-w-xs"><p>Nome da variável de estado que determina o fim do loop.</p></TooltipContent>
-                                                            </Tooltip>
-                                                        </Label>
-                                                        <Input 
-                                                            id="loopExitStateKey" 
-                                                            placeholder="ex: loopComplete" 
-                                                            value={loopExitStateKey || ""} 
-                                                            onChange={(e) => setLoopExitStateKey(e.target.value)}
-                                                            className="h-10"
-                                                        />
-                                                    </div>
-                                                    <div className="grid grid-cols-[200px_1fr] items-center gap-x-4 gap-y-3">
-                                                        <Label htmlFor="loopExitStateValue" className="text-left flex items-center">
-                                                            Valor do Estado para Saída
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                                                <TooltipContent className="max-w-xs"><p>Valor da chave de estado que termina o loop.</p></TooltipContent>
-                                                            </Tooltip>
-                                                        </Label>
-                                                        <Input 
-                                                            id="loopExitStateValue" 
-                                                            placeholder="ex: true" 
-                                                            value={loopExitStateValue || ""} 
-                                                            onChange={(e) => setLoopExitStateValue(e.target.value)}
-                                                            className="h-10"
-                                                        />
-                                                    </div>
-                                                </>
-                                            </>
-                                        )}
-                                    </>
-                                </div>
-                            </>
-                        )}
-                        {showCustomLogicDescription && (
-                            <div className="grid grid-cols-[200px_1fr] items-start gap-x-4 gap-y-3 mt-3">
-                                <Label htmlFor="customLogicDescription" className="text-left pt-2.5 flex items-center">
-                                    {safeAgentType === 'a2a' ? "Descrição da Interação A2A" : "Descrição da Lógica Personalizada"}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground">
-                                                <Info size={14} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                            {safeAgentType === 'a2a' ? (
-                                                <p>Descreve padrões de interação A2A e protocolos.</p>
-                                            ) : (
-                                                <p>Descreve a funcionalidade do fluxo Genkit customizado.</p>
-                                            )}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </Label>
-                                <Textarea 
-                                    id="customLogicDescription" 
-                                    placeholder={
-                                        safeAgentType === 'a2a' 
-                                            ? "Descreva como este agente deve interagir com outros agentes, quais informações ele troca, etc..."
-                                            : "Descreva a funcionalidade principal e a lógica que seu fluxo Genkit customizado implementará..."
-                                    } 
-                                    value={customLogicDescription} 
-                                    onChange={(e) => setCustomLogicDescription(e.target.value)} 
-                                    rows={safeAgentType === 'a2a' ? 4 : 6}
-                                />
-                            </div>
-                        )}
-                    </TooltipProvider>
-                </TabsContent>
-
-                <TabsContent value="ferramentas" className="space-y-6">
-                    <TooltipProvider>
-                        <div>
-                            <h3 className="text-lg font-medium mb-1 flex items-center gap-2">
-                                <Network className="w-5 h-5 text-primary/80" /> 
-                                Ferramentas do Agente
-                                <Tooltip>
-                                    <TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 ml-1 p-0 text-muted-foreground hover:text-foreground"><Info size={14} /></Button></TooltipTrigger>
-                                    <TooltipContent className="max-w-xs"><p>Capacidades (via Genkit) para interagir com sistemas externos ou executar ações.</p></TooltipContent>
-                                </Tooltip>
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                Capacite seu agente com funcionalidades para interagir com o mundo exterior. 
-                                A execução real de cada ferramenta é gerenciada por um fluxo Genkit no backend.
-                            </p>
-                            
-                            <ToolsTab
-                                availableTools={availableTools}
-                                selectedToolIds={currentAgentTools}
-                                onToolSelectionChange={handleToolSelectionChange}
-                                onConfigureTool={openToolConfigModal}
-                                toolConfigsApplied={toolConfigurations}
+                            <FormField
+                              control={control}
+                              name={`config.workflowSteps.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem className="mt-4">
+                                  <FormLabel>Descrição do Passo (Opcional)</FormLabel>
+                                  <FormControl>
+                                    <Textarea {...field} placeholder="Ex: Este passo verifica os detalhes do pedido..." />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                        </div>
-                    </TooltipProvider>
+                            <FormField
+                              control={control}
+                              name={`config.workflowSteps.${index}.inputMapping`}
+                              render={({ field }) => (
+                                <FormItem className="mt-4">
+                                  <FormLabel>Mapeamento de Input (JSON)</FormLabel>
+                                  <FormControl>
+                                    <JsonEditorField
+                                      value={field.value as string | Record<string, any>} // Expects string or object
+                                      onChange={(value) => field.onChange(typeof value === 'object' ? JSON.stringify(value) : value)}
+                                      height="150px"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={control}
+                              name={`config.workflowSteps.${index}.outputKey`}
+                              render={({ field }) => (
+                                <FormItem className="mt-4">
+                                  <FormLabel>Chave de Saída</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="Ex: resultadoValidacao" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </Card>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => append({ agentId: '', inputMapping: '{}', outputKey: '', name: '', description: '' } as WorkflowStep)}
+                          className="mt-4"
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Adicionar Passo
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="memoriaConhecimento" className="space-y-6">
-                    <TooltipProvider>
-                        <RagMemoryTab
-                            // Propriedades de Estado e Memória
-                            enableStatePersistence={enableStatePersistence}
-                            setEnableStatePersistence={setEnableStatePersistence}
-                            statePersistenceType={statePersistenceType}
-                            setStatePersistenceType={setStatePersistenceType}
-                            initialStateValues={initialStateValues}
-                            setInitialStateValues={setInitialStateValues}
-                            enableStateSharing={enableStateSharing}
-                            setEnableStateSharing={setEnableStateSharing}
-                            stateSharingStrategy={stateSharingStrategy}
-                            setStateSharingStrategy={setStateSharingStrategy}
-                            enableRAG={enableRAG}
-                            setEnableRAG={setEnableRAG}
-                            // Propriedades de RAG e Conhecimento
-                            ragMemoryConfig={ragMemoryConfig}
-                            setRagMemoryConfig={setRagMemoryConfig}
-                        />
-                    </TooltipProvider>
+                {/* Tools Tab */}
+                <TabsContent value="tools">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ToolsTab
+                      availableTools={availableTools}
+                      // selectedTools, setSelectedTools, toolConfigurations, setToolConfiguration are managed by useFormContext in ToolsTab
+                      iconComponents={iconComponents}
+                      InfoIconComponent={InfoIcon} // Pass the imported InfoIcon, ToolsTab expects InfoIconComponent
+                      SettingsIcon={Settings}
+                    CheckIcon={Check}
+                    PlusCircleIcon={PlusCircle} // Keep passing for now, ToolsTabProps includes it
+                    Trash2Icon={Trash2} // Keep passing for now, ToolsTabProps includes it
+                    showHelpModal={showHelpModal}
+                    availableApiKeys={availableApiKeys || []}
+                    />
+                  </Suspense>
                 </TabsContent>
 
-                <TabsContent value="artefatos" className="space-y-6">
-                    <TooltipProvider>
-                        <ArtifactManagementTab
-                            enableArtifacts={enableArtifacts}
-                            setEnableArtifacts={setEnableArtifacts}
-                            artifactStorageType={artifactStorageType}
-                            setArtifactStorageType={setArtifactStorageType}
-                            artifacts={artifacts}
-                            setArtifacts={setArtifacts}
-                            cloudStorageBucket={cloudStorageBucket}
-                            setCloudStorageBucket={setCloudStorageBucket}
-                            localStoragePath={localStoragePath}
-                            setLocalStoragePath={setLocalStoragePath}
-                        />
-                    </TooltipProvider>
-                </TabsContent>
-                
-                <TabsContent value="a2a" className="space-y-6">
-                    <TooltipProvider>
-                        <A2AConfig
-                            a2aConfig={a2aConfig}
-                            setA2AConfig={setA2AConfig}
-                            savedAgents={savedAgents || []}
-                        />
-                    </TooltipProvider>
+                {/* Behavior Tab - Now uses RHF context */}
+                <TabsContent value="behavior">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <BehaviorTab
+                      agentToneOptions={agentToneOptions}
+                      showHelpModal={showHelpModal}
+                      onGetAiSuggestions={handleGetAiSuggestions}
+                      isSuggesting={isSuggesting}
+                      // Props for manual system prompt editing passed to BehaviorTab
+                      isSystemPromptManuallyEdited={isSystemPromptManuallyEdited}
+                      setIsSystemPromptManuallyEdited={setIsSystemPromptManuallyEdited}
+                    />
+                  </Suspense>
                 </TabsContent>
 
+                {/* Memory & Knowledge Tab */}
+                <TabsContent value="memory_knowledge" className="space-y-6 mt-4">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Alert>
+                      <Brain className="h-4 w-4" />
+                      <AlertTitle>Memória & Conhecimento</AlertTitle>
+                    <AlertDescription>
+                      Configure a persistência de estado do agente e a capacidade de usar RAG (Retrieval Augmented Generation) para acesso a conhecimento externo.
+                    </AlertDescription>
+                  </Alert>
+                  <StateMemoryTab
+                    // Form-related props removed. StateMemoryTab will use useFormContext.
+                    // It needs to be updated to watch "config.statePersistence.enabled",
+                    // and use Controller for fields like "config.statePersistence.type",
+                    // "config.statePersistence.initialStateValues" etc.
+                    // The types for persistenceType 'local' | 'indexedDB' also need to align with StatePersistenceType ('session' | 'memory' | 'database')
+                    // from agent-configs.ts. This will be part of StateMemoryTab's own refactoring.
+                    SaveIcon={Save}
+                    ListChecksIcon={ListChecks}
+                    PlusIcon={Plus}
+                    Trash2Icon={Trash2}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                    showHelpModal={showHelpModal}
+                  />
+                    <Separator className="my-6" />
+                    <RagTab
+                      // Form-related props removed. RagTab will use useFormContext.
+                      // It needs to be updated to watch "config.rag.enabled" and use Controller
+                    // for fields within "config.rag.*".
+                    // The structure of ragMemoryConfig also needs to align with RagMemoryConfig from agent-configs.ts.
+                    SearchIcon={Search}
+                    UploadCloudIcon={UploadCloud}
+                    FileTextIcon={FileText}
+                    PlusIcon={Plus}
+                    Trash2Icon={Trash2}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                    showHelpModal={showHelpModal}
+                    />
+                  </Suspense>
+                </TabsContent>
 
-            </Tabs>
-        </div>
+                {/* Artifacts Tab */}
+                <TabsContent value="artifacts">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ArtifactsTab
+                      // Form-related props removed. ArtifactsTab will use useFormContext.
+                      // It needs to be updated to use Controller for fields like "config.artifacts.enabled",
+                    // "config.artifacts.storageType", "config.artifacts.definitions", etc.
+                    // The type for artifactStorageType ('local' | 'cloud') needs to align with
+                    // ArtifactStorageType ('local' | 'cloud' | 'memory' | 'filesystem') from agent-configs.ts.
+                    FileJsonIcon={FileJson}
+                    UploadCloudIcon={UploadCloud}
+                    BinaryIcon={Binary}
+                    PlusIcon={Plus}
+                    Trash2Icon={Trash2}
+                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                    showHelpModal={showHelpModal}
+                    />
+                  </Suspense>
+                </TabsContent>
 
-        <DialogFooter className="p-6 pt-4 border-t shrink-0"> {/* Footer should not shrink */}
-          <DialogClose asChild><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button></DialogClose>
-          <Button onClick={handleInternalSave} className="button-live-glow">
-            <Save className="mr-2 h-4 w-4" /> {editingAgent ? "Salvar Alterações" : "Salvar e Criar Agente"}
-          </Button>
-        </DialogFooter>
+                {/* A2A Communication Tab */}
+                <TabsContent value="a2a" className="space-y-6 mt-4">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Alert>
+                      <Share2 className="h-4 w-4" />
+                      <AlertTitle>Comunicação Agente-Agente (A2A)</AlertTitle>
+                    <AlertDescription>
+                      Configure como este agente se comunica com outros agentes no sistema, incluindo canais e protocolos.
+                    </AlertDescription>
+                  </Alert>
+                  <Card>
+                    <CardHeader>
+                      {/* Title and Description are now part of A2AConfigComponent */}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* The A2AConfigComponent will have its own internal switch for enabling/disabling */}
+                      {/* It will use useFormContext to manage config.a2a directly */}
+                      {/* savedAgents prop removed as A2AConfigTab uses useAppContext for agent list */}
+                      <A2AConfig
+                        showHelpModal={showHelpModal}
+                        PlusIcon={Plus} // Added PlusIcon
+                        Trash2Icon={Trash2} // Added Trash2Icon
+                      />
+                    </CardContent>
+                    </Card>
+                  </Suspense>
+                </TabsContent>
 
-        {isToolConfigModalOpen && configuringTool && (
-            <Dialog open={isToolConfigModalOpen} onOpenChange={(open) => { if (!open) setConfiguringTool(null); setIsToolConfigModalOpen(open); }}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader> <DialogTitle>Configurar: {getToolDisplayName(configuringTool)}</DialogTitle> <DialogDescription>{getToolDescription(configuringTool)} Forneça os detalhes abaixo.</DialogDescription></DialogHeader>
-            <Dialog 
-                open={isToolConfigModalOpen} 
-                onOpenChange={(open) => {
-                    if (!open) setConfiguringTool(null);
-                    setIsToolConfigModalOpen(open);
-                }}
-            >
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Configurar: {configuringTool.name}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {configuringTool.description} Forneça os detalhes de configuração abaixo.
-                        </DialogDescription>
-                    </DialogHeader>
-                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-                {configuringTool.id === "webSearch" && ( <> <div className="space-y-2"> <Label htmlFor="modalGoogleApiKey">Chave API Google Custom Search</Label> <Input id="modalGoogleApiKey" value={modalGoogleApiKey} onChange={(e) => setModalGoogleApiKey(e.target.value)} placeholder="Cole sua chave API" type="password"/> <p className="text-xs text-muted-foreground">Necessária para autenticar.</p></div> <div className="space-y-2"> <Label htmlFor="modalGoogleCseId">ID Mecanismo de Busca (CSE ID)</Label> <Input id="modalGoogleCseId" value={modalGoogleCseId} onChange={(e) => setModalGoogleCseId(e.target.value)} placeholder="Cole seu CSE ID"/> <p className="text-xs text-muted-foreground">Identifica seu mecanismo.</p></div></>)}
-                {configuringTool.id === "customApiIntegration" && ( <> <div className="space-y-2"> <Label htmlFor="modalOpenapiSpecUrl">URL Esquema OpenAPI (JSON/YAML)</Label> <Input id="modalOpenapiSpecUrl" value={modalOpenapiSpecUrl} onChange={(e) => setModalOpenapiSpecUrl(e.target.value)} placeholder="ex: https://petstore.swagger.io/v2/swagger.json"/> <p className="text-xs text-muted-foreground">Link para especificação da API.</p></div> <div className="space-y-2"> <Label htmlFor="modalOpenapiApiKey">Chave API Externa (Opcional)</Label> <Input id="modalOpenapiApiKey" value={modalOpenapiApiKey} onChange={(e) => setModalOpenapiApiKey(e.target.value)} placeholder="Se API requer autenticação" type="password"/> <p className="text-xs text-muted-foreground">Usada para interagir com API externa.</p></div></>)}
-                {configuringTool.id === "databaseAccess" && ( <> <div className="space-y-2"> <Label htmlFor="modalDbType">Tipo de Banco</Label> <Select value={modalDbType} onValueChange={setModalDbType}><SelectTrigger id="modalDbType" className="h-10"><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent><SelectItem value="postgresql">PostgreSQL</SelectItem><SelectItem value="mysql">MySQL</SelectItem><SelectItem value="sqlserver">SQL Server</SelectItem><SelectItem value="sqlite">SQLite</SelectItem><SelectItem value="other">Outro</SelectItem></SelectContent></Select></div>
-                    {(modalDbType !== 'other' && modalDbType !== 'sqlite' && modalDbType !== "") && (<> <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="modalDbHost">Host</Label><Input id="modalDbHost" value={modalDbHost} onChange={(e) => setModalDbHost(e.target.value)} placeholder="ex: localhost" className="h-10"/></div><div className="space-y-2"><Label htmlFor="modalDbPort">Porta</Label><Input id="modalDbPort" type="number" value={modalDbPort} onChange={(e) => setModalDbPort(e.target.value)} placeholder="ex: 5432" className="h-10"/></div></div><div className="space-y-2"><Label htmlFor="modalDbName">Nome Banco</Label><Input id="modalDbName" value={modalDbName} onChange={(e) => setModalDbName(e.target.value)} placeholder="ex: meu_banco" className="h-10"/></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="modalDbUser">Usuário</Label><Input id="modalDbUser" value={modalDbUser} onChange={(e) => setModalDbUser(e.target.value)} className="h-10"/></div><div className="space-y-2"><Label htmlFor="modalDbPassword">Senha</Label><Input id="modalDbPassword" type="password" value={modalDbPassword} onChange={(e) => setModalDbPassword(e.target.value)} className="h-10"/></div></div></>)}
-                    {(modalDbType === 'other' || modalDbType === 'sqlite') && (<div className="space-y-2"><Label htmlFor="modalDbConnectionString">String Conexão/Caminho</Label><Input id="modalDbConnectionString" value={modalDbConnectionString} onChange={(e) => setModalDbConnectionString(e.target.value)} placeholder={modalDbType === 'sqlite' ? "ex: /path/to/db.sqlite" : "driver://user:pass@host/db"} className="h-10"/><p className="text-xs text-muted-foreground">{modalDbType === 'sqlite' ? 'Caminho SQLite.' : 'String de conexão.'}</p></div>)}
-                    <div className="space-y-2"><Label htmlFor="modalDbDescription">Descrição Banco/Tabelas (Opcional)</Label><Textarea id="modalDbDescription" value={modalDbDescription} onChange={(e) => setModalDbDescription(e.target.value)} placeholder="Ex: Tabela 'usuarios' (id, nome, email)." rows={3}/><p className="text-xs text-muted-foreground">Ajuda o agente a entender o contexto.</p></div></>)}
-                {configuringTool.id === "knowledgeBase" && ( <div className="space-y-2"><Label htmlFor="modalKnowledgeBaseId">ID/Nome Base Conhecimento</Label><Input id="modalKnowledgeBaseId" value={modalKnowledgeBaseId} onChange={(e) => setModalKnowledgeBaseId(e.target.value)} placeholder="ex: docs_produto_xyz" className="h-10"/><p className="text-xs text-muted-foreground">Identificador para base (RAG).</p></div>)}
-                {configuringTool.id === "calendarAccess" && ( <div className="space-y-2"><Label htmlFor="modalCalendarApiEndpoint">Endpoint API/ID Fluxo Genkit</Label><Input id="modalCalendarApiEndpoint" value={modalCalendarApiEndpoint} onChange={(e) => setModalCalendarApiEndpoint(e.target.value)} placeholder="ex: https://api.example.com/calendar" className="h-10"/><p className="text-xs text-muted-foreground">URL ou ID do fluxo Genkit para agenda.</p></div>)}
+                {/* Multi-Agent & Advanced Tab */}
+                <TabsContent value="multi_agent_advanced" className="space-y-6 mt-4">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Alert>
+                      <Users className="h-4 w-4" />
+                      <AlertTitle>Multi-Agente & Configurações Avançadas</AlertTitle>
+                    <AlertDescription>
+                      Defina o papel deste agente em uma colaboração (raiz ou sub-agente), configure sub-agentes e outras configurações avançadas do sistema.
+                    </AlertDescription>
+                  </Alert>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Configurações de Hierarquia e Colaboração Multi-Agente</CardTitle>
+                      <CardDescription>
+                        Defina o papel do agente (raiz ou sub-agente) e gerencie seus colaboradores.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <MultiAgentTab
+                        // Form-related props removed. MultiAgentTab will use useFormContext.
+                        // It needs to be updated to use Controller for "config.isRootAgent", "config.subAgentIds".
+                        // The previous mapping of isRootAgent to "config.a2a.enabled" was incorrect for SavedAgentConfiguration.
+                        availableAgentsForSubSelector={availableAgentsForSubSelector}
+                        SubAgentSelectorComponent={SubAgentSelector} // Keep passing component
+                        UsersIcon={Users}
+                        LayersIcon={Layers}
+                        InfoIcon={InfoIcon} // Pass the imported InfoIcon
+                        ChevronsUpDownIcon={ChevronsUpDown}
+                        PlusCircleIcon={PlusCircle}
+                        Trash2Icon={Trash2}
+                        showHelpModal={showHelpModal}
+                      />
+                      {/* The globalInstruction field is now handled within MultiAgentTab.tsx */}
+                    </CardContent>
+                    </Card>
+                    {/* This section seems to be a placeholder, no RHF fields to change here yet */}
+                    <Card className="mt-6">
+                      <CardHeader>
+                        <CardTitle className="text-muted-foreground/70">Outras Configurações Avançadas (Não Multi-Agente)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                          Configurações adicionais...
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Suspense>
+                </TabsContent>
+
+                {/* Review Tab */}
+                <TabsContent value="review">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <ReviewTab
+                      setActiveEditTab={setActiveEditTab}
+                      showHelpModal={showHelpModal}
+                      availableTools={availableTools} // Pass availableTools
+                    />
+                  </Suspense>
+                </TabsContent>
+
+                {/* Deploy Tab */}
+                <TabsContent value="deploy">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <DeployTab />
+                  </Suspense>
+                </TabsContent>
+
+                {/* Callbacks Tab */}
+                <TabsContent value="callbacks" className="space-y-6 mt-4">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <CallbacksTab />
+                  </Suspense>
+                </TabsContent>
+
+                {/* Advanced Tab (ADK Callbacks) */}
+                <TabsContent value="advanced" className="space-y-6 mt-4">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdvancedSettingsTab />
+                  </Suspense>
+                </TabsContent>
+
+              </Tabs>
+            </div>
+
+            <DialogFooter className="p-6 pt-4 border-t">
+              {helpModalContent && (
+                <HelpModal
+                  isOpen={isHelpModalOpen}
+                  onClose={() => setIsHelpModalOpen(false)}
+                  title={helpModalContent.title}
+                >
+                  {helpModalContent.body}
+                </HelpModal>
+              )}
+              {editingAgent === undefined ? (
+                // New agent wizard flow
+                <div className="flex justify-between w-full">
+                  <Button variant="outline" type="button" onClick={() => { onOpenChange(false); setCurrentStep(0); }}>Cancelar</Button>
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={handlePrevious} disabled={currentStep === 0}>
+                      Anterior
+                    </Button>
+                    {/* Show "Next" if not the step before "review" and not the last step overall */}
+                    {currentStep < tabOrder.length - 1 && tabOrder[currentStep + 1] !== "review" && (
+                      <Button type="button" onClick={handleNext}>
+                        Próximo
+                      </Button>
+                    )}
+                    {/* Show "Revisar" if the next step is "review" */}
+                    {currentStep < tabOrder.length - 1 && tabOrder[currentStep + 1] === "review" && (
+                      <Button type="button" onClick={handleNext}>
+                        Revisar
+                      </Button>
+                    )}
+                    {/* Show "Salvar Agente" only on the "review" tab */}
+                    {tabOrder[currentStep] === "review" && (
+                      <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
+                        {methods.formState.isSubmitting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="mr-2 h-4 w-4" />
+                        )}
+                        Salvar Agente
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <DialogFooter><DialogClose asChild><Button variant="outline" onClick={() => { setIsToolConfigModalOpen(false); setConfiguringTool(null);}}>Cancelar</Button></DialogClose><Button onClick={handleSaveToolConfiguration} className="button-live-glow">Salvar Configuração</Button></DialogFooter>
-            </DialogContent>
-                <DialogFooter>
-                <DialogClose asChild><Button variant="outline" onClick={() => { setIsToolConfigModalOpen(false); setConfiguringTool(null);}}>Cancelar</Button></DialogClose>
-                <Button onClick={handleSaveToolConfiguration} className="button-live-glow">Salvar Configuração</Button>
-                </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        )}
+              ) : (
+                // Editing existing agent
+                <>
+                  <div className="mr-auto flex gap-2"> {/* Container for left-aligned buttons */}
+                    <Button variant="outline" type="button" onClick={handleExport}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Exportar Config.
+                    </Button>
+                    <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('json')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Gerar Agent Card (JSON)
+                    </Button>
+                    {/* <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('yaml')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Gerar Agent Card (YAML)
+                    </Button> */}
+                  </div>
+                  <DialogClose asChild>
+                    <Button variant="outline" type="button">Cancelar</Button>
+                  </DialogClose>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      if (editingAgent) {
+                        const defaultVals = prepareFormDefaultValues(editingAgent);
+                        methods.reset(defaultVals);
+                        // Also reset the manual edit state based on the override field from default values
+                        setIsSystemPromptManuallyEdited(!!defaultVals.config.manualSystemPromptOverride);
+                        toast({
+                          title: "Alterações Revertidas",
+                          description: "Os dados do formulário foram revertidos para o original.",
+                        });
+                      }
+                    }}
+                    className="mr-2" // Added margin for spacing
+                  >
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Reverter
+                  </Button>
+                  <Button type="submit" disabled={methods.formState.isSubmitting}>
+                    {methods.formState.isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Salvar Agente
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default AgentBuilderDialog;

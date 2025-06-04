@@ -1,46 +1,13 @@
 "use client";
 
-import { Button } from "@/components/ui/button"; // Keep for now, FeatureButton uses it
-import { Input } from "@/components/ui/input"; // Keep for now, passed to MessageInputArea
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Send,
-  User,
-  Bot,
-  // SparklesIcon, // Removed
-  Cpu,
-  // RefreshCcw, // Removed
-  // MessageSquare, // Removed
-  // Paperclip, // Keep, for MessageInputArea
-  // Search as SearchIcon, // Keep, for possible search features
-  // X, // Keep, for closable elements
-  // UploadCloud, // Keep, for MessageInputArea
-  // FileUp, // Keep, for MessageInputArea
-  // Code2, // Keep, for possible code blocks
-  // Image as ImageIcon, // Keep, for image messages
-  // Mic, // Keep, for voice input
+  LogIn,
   Menu,
-  Plus,
-  Sparkles,
-  // Added Send, User, Bot from previous step if they were removed
-  Send,
-  User,
-  Bot,
-  Paperclip, // Explicitly keep
-  SearchIcon, // Explicitly keep
-  X, // Explicitly keep
-  UploadCloud, // Explicitly keep
-  FileUp, // Explicitly keep
-  Code2, // Explicitly keep
-  ImageIcon, // Explicitly keep
-  Mic, // Explicitly keep
+  Save,
+  Trash2,
+  Settings2, // Or another icon
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -49,1059 +16,712 @@ import {
   useEffect,
   ChangeEvent,
   useCallback,
-  useOptimistic,
+  // useOptimistic, // Removed
   useMemo,
+  Suspense,
+  lazy,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
-import { useAuth } from "@/contexts/AuthContext"; // Added
-import type { AgentConfig, LLMAgentConfig } from "@/app/agent-builder/page";
+import { useAuth } from "@/contexts/AuthContext";
+import { saveAgentConfiguration } from "@/lib/agentServices";
+import { auth } from "@/lib/firebaseClient";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import type { AgentConfig, LLMAgentConfig, SavedAgentConfiguration as SavedAgentConfigType, AgentFramework } from '@/types/agent-configs-fixed';
+// Data imports from "@/data/agentBuilderConfig" are problematic as the file is missing.
+// const { initialGems, iconComponents, availableTools: builderAvailableTools } = await import("@/data/agentBuilderConfig"); // This will fail if file doesn't exist
+// Placeholder for data that would come from agentBuilderConfig.ts - USER NEEDS TO FIX THIS MISSING FILE OR PATH
+const initialGems: Gem[] = []; 
+const iconComponents: any = {};
+const builderAvailableTools: any[] = [];
 
-// Define SavedAgentConfiguration interface to match actual structure used in the app
-interface SavedAgentConfiguration {
-  id: string;
+
+export type ADKAgentConfig = {
   name: string;
   description?: string;
-  icon?: string;
-  config: AgentConfig;
+  model?: { name?: string; temperature?: number };
+  tools?: Array<ADKTool>;
+  agentModel?: string;
+  agentTemperature?: number;
+  [key: string]: any;
+};
+
+// Interface auxiliar para tipos de configuração de agentes com propriedades adicionais
+// Não podemos estender diretamente um tipo union, então criamos uma interface separada
+export interface ExtendedAgentConfig {
+  description?: string;
+  name: string;
+  type: string;
+  framework: AgentFramework;
+  // Outras propriedades opcionais que podem estar presentes em qualquer tipo de agente
+  [key: string]: any;
+};
+
+export type ADKTool = {
+  name: string;
+  description?: string;
+  [key: string]: any;
+};
+
+interface AgentSelectItem {
+  id: string;
+  displayName: string;
+  // Add other properties if AgentSelector expects them, e.g., description, icon
 }
-// cn unused
-// Image unused
-// Popover unused
-// Separator unused
-// Label unused
-import { AgentSelector } from "@/components/agent-selector";
-import {
-  googleADK,
-  // GoogleADKType, // Unused
-  // sendMessageToAgent, // Unused
-} from "@/lib/google-adk";
+
+// Adicionando uma interface para ADKAgent que é compatível com AgentSelectItem
+export interface ADKAgent extends AgentSelectItem {
+  // Propriedades adicionais que ADKAgent pode ter
+  config?: ADKAgentConfig;
+  [key: string]: any;
+}
+
+// Temporary Gem definition - ideally should be in a shared types file and its data source (initialGems) resolved
+interface Gem {
+  id: string;
+  name: string;
+  prompt?: string;
+  // Add other properties if necessary, like 'description' or 'iconName' if used by AgentSelectItem mapping
+}
+
+// Define the action type for optimistic updates - MOVED TO useChatStore
+// Adicionando isStreaming à interface ChatMessageUI - This specific interface is now in useChatStore
+// interface ExtendedChatMessageUI extends ChatMessageUI {
+//   isStreaming?: boolean;
+// }
+
+// type OptimisticUpdateAction =
+//   | { type: "add_message"; message: ExtendedChatMessageUI }
+//   | { type: "update_message_content"; id: string; content: string } // content, not text
+//   | { type: "update_message_status"; id: string; status: ChatMessageUI['status']; isStreaming?: boolean }
+//   | { type: "remove_message"; id: string }
+//   | { type: "set_messages"; messages: ExtendedChatMessageUI[] }
+//   | { type: "update_message_feedback"; id: string; feedback: 'liked' | 'disliked' | null }; // Added feedback action
+
 import ChatHeader from "@/components/features/chat/ChatHeader";
+// Corrigindo a importação do tipo ChatHeaderProps
+import type ChatHeaderProps from "@/components/features/chat/ChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
-import { ChatMessageUI, Conversation } from "@/types/chat";
-import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
-import { BasicChatInput } from "@/ai/flows/chat-flow";
-import { ADKAgentConfig, ADKTool } from "@/lib/google-adk"; // Import ADK types
-import * as cs from "@/lib/firestoreConversationStorage"; // Firestore Conversation Storage
+// import { Message } from "@/types/chat"; // Message type is used by useChatStore
+import { Conversation, ChatMessageUI, TestRunConfig, ChatRunConfig } from "@/types/chat"; // Added ChatRunConfig
+import LoadingState from "@/components/shared/LoadingState"; // Import LoadingState
+// import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
+// import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label"; 
+import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
+// import * as cs from "@/lib/firestoreConversationStorage"; // No longer directly used here
+import { useRouter, useParams } from "next/navigation";
+import { useChatStore, ActiveChatTarget } from '@/hooks/use-chat-store'; // IMPORT THE STORE
 
-// DEBUG: Inspect the imported googleADK object
-console.log("Inspecting imported googleADK (top level):", googleADK);
+const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex flex-col items-center gap-1.5 p-2 feature-button-hover rounded-lg transition-all duration-200 cursor-pointer group"
+  >
+    <div className="p-2.5 feature-button-bg rounded-full shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-200">
+      {icon}
+    </div>
+    <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors duration-200">{label}</span>
+  </button>
+);
 
-// Define currentUserId - replace with actual auth context later
-// const currentUserId = "TEMP_USER_ID"; // Replaced by auth context
-
-interface ChatHistoryMessage {
-  role: "user" | "model";
-  content: any;
+export default function ChatPage() {
+  return <ChatUI />;
 }
-
-// ServerMessage interface is unused
-
-const initialGems = [
-  {
-    id: "general",
-    name: "Assistente Geral",
-    prompt: "Você é um assistente prestativo e conciso.",
-  },
-  {
-    id: "creative",
-    name: "Escritor Criativo",
-    prompt:
-      "Você é um escritor criativo, ajude a gerar ideias e textos com um tom inspirador.",
-  },
-  {
-    id: "code",
-    name: "Programador Expert",
-    prompt:
-      "Você é um programador expert, forneça explicações claras e exemplos de código eficientes.",
-  },
-  {
-    id: "researcher",
-    name: "Pesquisador Analítico",
-    prompt:
-      "Você é um pesquisador analítico, foque em dados e informações factuais.",
-  },
-];
-
-// Define ChatFormState based on the return type of submitChatMessage from actions.ts
-interface ChatFormState {
-  message: string;
-  agentResponse?: string | null;
-  errors?: { [key: string]: string[] } | null;
-}
-
-// initialChatFormState is unused (ChatFormState interface is kept as it's referenced in a comment, but could be removed too)
-// initialActionState is unused
-// FeatureButton component is unused
-// OptimisticMessageAction type is unused
 
 export function ChatUI() {
-  const { currentUser, loading: authLoading } = useAuth(); // Added
-  const currentUserId = currentUser?.uid; // Added
+  const router = useRouter();
+  const params = useParams();
+  const { currentUser } = useAuth();
+  // const currentUserId = currentUser?.uid; // Now from store.currentUserId
 
-  const [messages, setMessages] = useState<ChatMessageUI[]>([]);
-  const [optimisticMessages, setOptimisticMessages] = useOptimistic<
-    ChatMessageUI[],
-    ChatMessageUI
-  >(messages, (currentMessages, optimisticUpdateMessage) => {
-    const existingMessageIndex = currentMessages.findIndex(
-      (msg) => msg.id === optimisticUpdateMessage.id,
-    );
+  const store = useChatStore(); // USE THE STORE
 
-    if (existingMessageIndex !== -1) {
-      // Update existing message: Merge new properties.
-      const updatedMessage = {
-        ...currentMessages[existingMessageIndex],
-        ...optimisticUpdateMessage,
-        text:
-          optimisticUpdateMessage.text !== undefined
-            ? optimisticUpdateMessage.text
-            : currentMessages[existingMessageIndex].text,
-      };
-      return currentMessages.map((msg, index) =>
-        index === existingMessageIndex ? updatedMessage : msg,
-      );
-    } else {
-      // Add new message
-      return [...currentMessages, optimisticUpdateMessage];
+  const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
+  const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
+
+  // State for current agent and conversation context
+  // Definindo uma interface estendida de SavedAgentConfigType que inclui todas as propriedades necessárias
+  interface ExtendedSavedAgentConfigType {
+    id: string;
+    agentName: string;
+    agentDescription: string;
+    agentVersion: string;
+    // Campos adicionais que podem estar presentes
+    agentModel?: string;
+    globalInstruction?: string;
+    agentTemperature?: number;
+    // O config não pode ser opcional para ser compatível com SavedAgentConfigType
+    config: AgentConfig;
+    tools: string[];
+    toolConfigsApplied?: boolean;
+    toolsDetails?: any[];
+    userId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    templateId?: string;
+    isFavorite?: boolean;
+    tags?: string[];
+    icon?: string;
+  }
+  
+  const [currentAgent, setCurrentAgent] = useState<ExtendedSavedAgentConfigType | Gem | ADKAgentConfig | null>(null);
+  // const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null); // From store
+
+  const activeChatTargetName = useMemo(() => {
+    if (currentAgent) {
+      if ('name' in currentAgent) return currentAgent.name;
+      if ('agentName' in currentAgent) return currentAgent.agentName;
     }
-  });
+    const activeConv = store.conversations.find(c => c.id === store.activeConversationId);
+    if (activeConv?.title) return activeConv.title;
+    return "New Chat";
+  }, [currentAgent, store.conversations, store.activeConversationId]);
 
-  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]);
-  const [selectedGemId, setSelectedGemId] = useState<string | null>(
-    initialGems[0].id,
-  );
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>("none");
-  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(
-    null,
-  );
-  const [activeChatTarget, setActiveChatTarget] = useState<string>(
-    initialGems[0].name,
-  );
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [usingADKAgent, setUsingADKAgent] = useState(false);
+  const {
+    savedAgents,
+    setSavedAgents, // This might be an issue if useAgents context also uses its own state management
+    addAgent,
+    updateAgent,
+    deleteAgent,
+    // isLoadingAgents // This might be an issue if useAgents context also uses its own state management
+  } = useAgents();
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(
-    null,
-  );
-
-  const [adkAgents, setAdkAgents] = useState<ADKAgentConfig[]>([]);
-  const [isADKInitializing, setIsADKInitializing] = useState(true);
-
-  // States for ConversationSidebar
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<
-    string | null
-  >(null);
-  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-
-  const { savedAgents } = useAgents();
-  // Removed useActionState for submitChatMessage
-  // const [formState, runFormAction, isActionPending] = useActionState(
-  //   submitChatMessage,
-  //   initialChatFormState
-  // );
-
-  const [isPending, setIsPending] = useState<boolean>(false); // For streaming fetch. This is the primary pending state now.
-
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const [inputValue, setInputValue] = useState("");
+  // UI State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isVerboseMode, setIsVerboseMode] = useState<boolean>(false); // Added verbose mode state
+  // const [inputValue, setInputValue] = useState(""); // From store
+  // const [isPending, setIsPending] = useState(false); // From store
+  // const [isLoadingMessages, setIsLoadingMessages] = useState(false); // From store
+  const [isADKInitializing, setIsADKInitializing] = useState<boolean>(false); // Keep for ADK specific UI
 
-  // const [lastSentUserMessageInfo, setLastSentUserMessageInfo] = useState<{ id: string; text: string; imageUrl?: string; fileName?: string; timestamp: Date } | null>(null); // For reconciliation
+  // Test Run Config State
+  const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
+    temperature: undefined,
+    streamingEnabled: true,
+  });
+  const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
 
-  // Load initial conversations
-  useEffect(() => {
-    const loadConversations = async () => {
-      if (!currentUserId) {
-        // Added check for currentUserId
-        setIsLoadingConversations(false);
-        setConversations([]); // Clear conversations if no user
-        return;
-      }
-      setIsLoadingConversations(true);
-      try {
-        const fetchedConversations =
-          await cs.getAllConversations(currentUserId);
-        setConversations(fetchedConversations);
-        if (fetchedConversations.length > 0) {
-          // Automatically select the first conversation
-          // setActiveConversationId(fetchedConversations[0].id); // This will trigger another effect to load messages
-        }
-      } catch (error) {
-        console.error("Error loading conversations:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load conversations.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingConversations(false);
-      }
-    };
-    loadConversations();
-  }, []);
-
-  // Load messages when activeConversationId changes
-  useEffect(() => {
-    if (activeConversationId) {
-      const loadMessages = async () => {
-        setIsLoadingMessages(true);
-        setMessages([]); // Clear previous messages
-        try {
-          const conversationWithMessages =
-            await cs.getConversationById(activeConversationId);
-          if (conversationWithMessages && conversationWithMessages.messages) {
-            const uiMessages: ChatMessageUI[] =
-              conversationWithMessages.messages.map((msg) => ({
-                id: msg.id || uuidv4(),
-                text: msg.content || msg.text || "",
-                sender: msg.isUser ? "user" : "agent",
-                isStreaming: msg.isLoading,
-                imageUrl: msg.imageUrl,
-                fileName: msg.fileName,
-                // map other fields if necessary
-              }));
-            setMessages(uiMessages);
-          } else {
-            setMessages([]); // No messages or conversation not found
-          }
-        } catch (error) {
-          console.error(
-            `Error loading messages for conversation ${activeConversationId}:`,
-            error,
-          );
-          toast({
-            title: "Error",
-            description: "Failed to load messages.",
-            variant: "destructive",
-          });
-          setMessages([]);
-        } finally {
-          setIsLoadingMessages(false);
-        }
-      };
-      loadMessages();
-    } else {
-      setMessages([]); // No active conversation, so no messages
-    }
-  }, [activeConversationId]);
-
-  const handleFileChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        // Validação de tipo (exemplo expandido)
-        const allowedImageTypes = [
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-        ];
-        // Adicionar outros tipos permitidos, ex: PDF, TXT
-        const allowedOtherTypes = ["application/pdf", "text/plain"];
-        const allAllowedTypes = [...allowedImageTypes, ...allowedOtherTypes];
-        const maxFileSizeMB = 10; // Exemplo: 10MB
-
-        if (!allAllowedTypes.includes(file.type)) {
-          toast({
-            title: "Tipo de arquivo inválido",
-            description: `Por favor, selecione um tipo de arquivo suportado (${allAllowedTypes.join(", ")}).`,
-            variant: "destructive",
-          });
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          removeSelectedFile();
-          return;
-        }
-
-        if (file.size > maxFileSizeMB * 1024 * 1024) {
-          toast({
-            title: "Arquivo muito grande",
-            description: `O tamanho máximo do arquivo é ${maxFileSizeMB}MB.`,
-            variant: "destructive",
-          });
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          removeSelectedFile();
-          return;
-        }
-
-        setSelectedFile(file);
-        setSelectedFileName(file.name);
-        // Preview para imagens
-        if (allowedImageTypes.includes(file.type)) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setSelectedFileDataUri(reader.result as string);
-          };
-          reader.readAsDataURL(file);
-        } else {
-          // Para outros tipos de arquivo, não geramos data URI por padrão para preview,
-          // mas você pode querer armazenar o arquivo de outra forma ou mostrar um ícone.
-          setSelectedFileDataUri(null); // Limpa se não for imagem, ou define um placeholder/ícone
-        }
-        // Limpa o valor do input para permitir selecionar o mesmo arquivo novamente após remoção
-        // event.target.value = ''; // Cuidado: isso pode ser feito no removeSelectedFile
-      } else {
-        removeSelectedFile();
-      }
+  // User-facing chat configuration state
+  const [userChatConfig, setUserChatConfig] = useState<ChatRunConfig>({
+    streamingEnabled: true,
+    simulatedVoiceConfig: {
+      voice: 'alloy',
+      speed: 1.0,
     },
-    [],
+  });
+
+  const handleUserChatConfigChange = (newConfig: Partial<ChatRunConfig>) => {
+    setUserChatConfig(prev => ({
+      ...prev,
+      ...newConfig,
+      simulatedVoiceConfig: newConfig.simulatedVoiceConfig
+        ? { ...prev.simulatedVoiceConfig, ...newConfig.simulatedVoiceConfig }
+        : prev.simulatedVoiceConfig,
+    }));
+  };
+
+  // Message and Conversation State - MOVED TO useChatStore
+  // const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]);
+  // const [conversations, setConversations] = useState<Conversation[]>([]);
+  // const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  // const [inputContinuation, setInputContinuation] = useState<any>(null);
+
+  // File Handling State - REMOVED as it's now in MessageInputArea.tsx
+  // const [selectedFile, setSelectedFile] = useState<File | null>(null); // REMOVED
+  // const [selectedFileName, setSelectedFileName] = useState<string | null>(null); // REMOVED
+  // const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); // REMOVED
+
+  // Agent and Gem Selection State
+  const [selectedGemId, setSelectedGemId] = useState<string | null>(
+    initialGems[0]?.id ?? null
   );
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null);
+  const [adkAgents, setADKAgents] = useState<ADKAgent[]>([]);
+  const [pendingAgentConfig, setPendingAgentConfig] = useState<AgentConfig | ExtendedSavedAgentConfigType | null>(null); // Keep for Agent Creator UI
+  const [selectedAgentConfig, setSelectedAgentConfig] = useState<ExtendedSavedAgentConfigType | null>(null);
+  const mappedAdkAgents: AgentSelectItem[] = adkAgents.map((agentConfig: ADKAgent): AgentSelectItem => ({
+    id: agentConfig.id, 
+    displayName: agentConfig.displayName,
+  }));
 
-  const removeSelectedFile = useCallback(() => {
-    setSelectedFile(null);
-    setSelectedFileName(null);
-    setSelectedFileDataUri(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  const usingADKAgent = useMemo(() => !!selectedADKAgentId, [selectedADKAgentId]);
+
+  // activeChatTarget is now a prop for store functions, but its computation logic can remain here
+  const activeChatTarget = useMemo((): ActiveChatTarget | null => {
+    if (usingADKAgent && selectedADKAgentId && adkAgents.length > 0) {
+      const adkAgent = adkAgents.find((agent: ADKAgent) => agent.id === selectedADKAgentId);
+      if (adkAgent && adkAgent.config) return { id: adkAgent.id, name: adkAgent.displayName, type: 'adk-agent' as const, config: adkAgent.config };
     }
-  }, []);
-
-  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    // formData is unused
-    const currentInput = inputValue.trim();
-
-    if (!currentUserId) {
-      // Added check for currentUserId
-      toast({
-        title: "Authentication Error",
-        description: "You are not logged in. Please log in to send messages.",
-        variant: "destructive",
-      });
-      setIsPending(false);
-      return;
+    if (selectedAgentId && savedAgents.length > 0) {
+      const currentSavedAgent = savedAgents.find((a: SavedAgentConfigType) => a.id === selectedAgentId);
+      if (currentSavedAgent) return { id: currentSavedAgent.id, name: currentSavedAgent.name, type: 'agent' as const, config: currentSavedAgent };
     }
-
-    if (!currentInput && !selectedFile) {
-      toast({
-        title: "Input required",
-        description: "Please type a message or select a file.",
-        variant: "destructive",
-      });
-      return;
+    if (selectedGemId && initialGems.length > 0) {
+      const gem = initialGems.find((g: Gem) => g.id === selectedGemId);
+      if (gem) return { id: gem.id, name: gem.name, type: 'gem' as const, config: gem };
     }
+    return initialGems.length > 0 ? { id: initialGems[0].id, name: initialGems[0].name, type: 'gem' as const, config: initialGems[0] } : null;
+  }, [selectedAgentId, savedAgents, selectedGemId, selectedADKAgentId, adkAgents, usingADKAgent]);
 
-    setIsPending(true); // For streaming UI indication
 
-    const currentSelectedFile = selectedFile;
-    const currentSelectedFileDataUri = selectedFileDataUri;
+  // Optimistic messages logic MOVED TO useChatStore
+  // const [optimisticMessages, addOptimisticMessage] = useOptimistic(...)
 
-    const userMessageId = uuidv4();
-    const agentMessageId = uuidv4();
-    const messageTimestamp = new Date();
+  // isLoadingConversations is now store.isLoadingConversations
 
-    const userMessage: ChatMessageUI = {
-      id: userMessageId,
-      sender: "user",
-      text: currentInput,
-      imageUrl:
-        currentSelectedFile && currentSelectedFile.type.startsWith("image/")
-          ? currentSelectedFileDataUri
-          : undefined,
-      fileName: currentSelectedFile ? currentSelectedFile.name : undefined,
-      fileDataUri:
-        currentSelectedFile && !currentSelectedFile.type.startsWith("image/")
-          ? currentSelectedFileDataUri
-          : undefined,
-      isStreaming: false,
-      timestamp: messageTimestamp, // Add timestamp for UI consistency
-    };
-    setOptimisticMessages(userMessage);
+  useEffect(() => {
+    setPendingAgentConfig(null); // This can remain if pendingAgentConfig is UI specific for agent creator
+  }, [selectedGemId, selectedAgentId, selectedADKAgentId]);
 
-    // Save user message to Firestore
-    if (activeConversationId) {
-      const userMessageForStorage: Omit<cs.Message, "id" | "timestamp"> = {
-        sender: currentUserId, // Save actual user ID as sender
-        text: currentInput,
-        content: currentInput, // Ensure content is populated
-        isUser: true,
-        isLoading: false,
-        isError: false,
-        imageUrl: userMessage.imageUrl,
-        fileName: userMessage.fileName,
-        // Timestamp will be server-generated
-      };
-      cs.addMessageToConversation(activeConversationId, userMessageForStorage)
-        .then((savedUserMsg) => {
-          if (savedUserMsg) {
-            console.log("User message saved to Firestore:", savedUserMsg.id);
-            setConversations((prev) =>
-              prev.map((c) =>
-                c.id === activeConversationId
-                  ? { ...c, updatedAt: new Date() }
-                  : c,
-              ),
-            );
-            // Optionally, update userMessage in messages state with server ID/timestamp
-            // For optimistic updates, this might not be strictly necessary if UI uses client ID
-            // e.g., setMessages(prev => prev.map(m => m.id === userMessageId ? {...m, id: savedUserMsg.id, timestamp: savedUserMsg.timestamp} : m));
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to save user message to Firestore:", err);
-          toast({
-            title: "Error",
-            description: "Failed to save your message.",
-            variant: "destructive",
-          });
-          // Mark the optimistic message as having an error
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === userMessageId ? { ...m, isError: true } : m,
-            ),
-          );
-        });
-    } else if (!activeConversationId) {
-      toast({
-        title: "No Active Conversation",
-        description:
-          "Please select or start a new conversation to send messages.",
-        variant: "warning",
-      });
-      setIsPending(false); // Reset pending state
-      return; // Stop if no active conversation
+  // useEffect for loading conversations - MOVED TO useChatStore
+
+  // handleSelectConversation is now store.handleSelectConversation
+  // No need to call addOptimisticMessage or router.push here, store handles it.
+
+  // useEffect for loading messages - MOVED TO useChatStore
+
+  // useEffect to sync activeConversationId from URL params
+  useEffect(() => {
+    const pathConvId = params.conversationId as string | undefined;
+    if (pathConvId && pathConvId !== store.activeConversationId) {
+      store.handleSelectConversation(pathConvId);
     }
+  }, [params.conversationId, store.activeConversationId, store.handleSelectConversation]);
 
-    setInputValue("");
-    removeSelectedFile();
-    inputRef.current?.focus();
-    setIsPending(true); // Set pending state for UI feedback
 
-    // Prepare data for the API route
-    const chatInputForStream: BasicChatInput = {
-      userMessage: currentInput,
-      history: messages.map((msg) => ({
-        role: msg.sender === "user" ? "user" : "model",
-        content: msg.text, // Assuming msg.text holds the content for history
-      })),
-      fileDataUri: currentSelectedFile ? currentSelectedFileDataUri : undefined,
-      // Cast to LLMAgentConfig
-      modelName:
-        usingADKAgent && selectedADKAgent
-          ? selectedADKAgent.model
-          : (selectedSavedAgent?.config as LLMAgentConfig)?.agentModel ||
-            undefined,
-      // Cast to AgentConfig
-      systemPrompt:
-        usingADKAgent && selectedADKAgent
-          ? selectedADKAgent.description
-          : (selectedSavedAgent?.config as AgentConfig)?.agentDescription ||
-            undefined,
-      // Cast to LLMAgentConfig
-      temperature:
-        usingADKAgent && selectedADKAgent
-          ? (selectedADKAgent as any).temperature
-          : (selectedSavedAgent?.config as LLMAgentConfig)?.agentTemperature ||
-            undefined,
-      agentToolsDetails:
-        usingADKAgent && selectedADKAgent
-          ? selectedADKAgent.tools?.map((t: ADKTool) => ({
-              id: t.name,
-              name: t.name,
-              description: t.description || "",
-              enabled: true,
-            }))
-          : (selectedSavedAgent?.config as AgentConfig)?.agentTools?.map(
-              (toolId: string) => ({
-                id: toolId,
-                name: toolId,
-                description: `Tool: ${toolId}`,
-                enabled: true,
-              }),
-            ),
-    };
-
-    const pendingAgentMessage: ChatMessageUI = {
-      id: agentMessageId,
-      sender: "agent",
-      text: "",
-      isStreaming: true,
-      timestamp: new Date(), // Add timestamp for UI consistency
-    };
-    setOptimisticMessages(pendingAgentMessage);
-
-    let agentMessageStorageId: string | null = null;
-    if (activeConversationId) {
-      const agentPlaceholderForStorage: Omit<cs.Message, "id" | "timestamp"> = {
-        sender: "agent", // Or specific agent ID, e.g., selectedADKAgent?.id || selectedSavedAgent?.id
-        text: "",
-        content: "",
-        isUser: false,
-        isLoading: true,
-        isError: false,
-      };
-      try {
-        const savedPlaceholder = await cs.addMessageToConversation(
-          activeConversationId,
-          agentPlaceholderForStorage,
-        );
-        if (savedPlaceholder && savedPlaceholder.id) {
-          agentMessageStorageId = savedPlaceholder.id;
-          console.log(
-            "Agent placeholder message saved to Firestore:",
-            savedPlaceholder.id,
-          );
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === activeConversationId
-                ? { ...c, updatedAt: new Date() }
-                : c,
-            ),
-          );
-        } else {
-          throw new Error(
-            "Failed to save agent placeholder message or ID is missing.",
-          );
-        }
-      } catch (placeholderError) {
-        console.error(
-          "Error saving agent placeholder to Firestore:",
-          placeholderError,
-        );
-        toast({
-          title: "Error",
-          description: "Failed to initiate agent response saving.",
-          variant: "destructive",
-        });
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === agentMessageId
-              ? {
-                  ...m,
-                  text: "Error: Could not save placeholder.",
-                  isStreaming: false,
-                  isError: true,
-                }
-              : m,
-          ),
-        );
-        setIsPending(false);
-        return;
-      }
-    }
-
+  const handleLogin = async () => { // This can remain as UI specific logic
+    const provider = new GoogleAuthProvider();
     try {
-      const response = await fetch("/api/chat-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(chatInputForStream),
-      });
-
-      if (!response.ok) {
-        let errorMessageText = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          if (errorData && errorData.error) {
-            errorMessageText = errorData.error;
-          }
-        } catch (e) {
-          console.warn("Could not parse error response as JSON:", e);
-        }
-        throw new Error(errorMessageText);
-      }
-
-      if (!response.body) {
-        throw new Error("Failed to get readable stream body.");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("Failed to get readable stream reader.");
-      }
-
-      const decoder = new TextDecoder();
-      let done = false;
-      let accumulatedContent = "";
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          accumulatedContent += chunk;
-          setOptimisticMessages({
-            id: agentMessageId,
-            sender: "agent",
-            text: accumulatedContent,
-            isStreaming: true,
-          });
-          // Scroll as new content arrives
-        }
-      }
-      // Finalize the message after stream ends
-      const finalAgentOptimisticMessage: ChatMessageUI = {
-        id: agentMessageId, // Keep client-side optimistic ID for UI mapping
-        sender: "agent",
-        text: accumulatedContent,
-        isStreaming: false,
-        timestamp: new Date(),
-      };
-      setOptimisticMessages(finalAgentOptimisticMessage);
-
-      if (activeConversationId && agentMessageStorageId) {
-        cs.finalizeMessageInConversation(
-          activeConversationId,
-          agentMessageStorageId,
-          accumulatedContent,
-          false,
-        )
-          .then(() => {
-            console.log(
-              "Agent message finalized in Firestore:",
-              agentMessageStorageId,
-            );
-            setConversations((prev) =>
-              prev.map((c) =>
-                c.id === activeConversationId
-                  ? { ...c, updatedAt: new Date() }
-                  : c,
-              ),
-            );
-          })
-          .catch((err) => {
-            console.error(
-              "Failed to finalize agent message in Firestore:",
-              err,
-            );
-            toast({
-              title: "Error Saving Response",
-              description: "Agent's full response could not be saved.",
-              variant: "destructive",
-            });
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === agentMessageId
-                  ? {
-                      ...m,
-                      text:
-                        accumulatedContent + "\n(Error saving final response)",
-                      isError: true,
-                      isStreaming: false,
-                    }
-                  : m,
-              ),
-            );
-          });
-      } else if (!activeConversationId) {
-        console.warn("No active conversation to finalize agent message.");
-      }
-
-      // Update main messages state after stream completion
-      setMessages((prevMessages) => {
-        // Ensure user message is in main state
-        const userMessageInState = prevMessages.find(
-          (msg) => msg.id === userMessageId,
-        );
-        let messagesWithUser = prevMessages;
-        if (!userMessageInState) {
-          messagesWithUser = [...prevMessages, userMessage];
-        }
-
-        // Update or add the agent message
-        const agentMsgIndex = messagesWithUser.findIndex(
-          (m) => m.id === agentMessageId,
-        );
-        if (agentMsgIndex !== -1) {
-          const updatedMessages = [...messagesWithUser];
-          updatedMessages[agentMsgIndex] = {
-            ...finalAgentOptimisticMessage,
-            id: agentMessageStorageId || agentMessageId,
-          }; // Prefer storage ID if available
-          return updatedMessages;
-        } else {
-          return [
-            ...messagesWithUser,
-            {
-              ...finalAgentOptimisticMessage,
-              id: agentMessageStorageId || agentMessageId,
-            },
-          ];
-        }
-      });
-    } catch (error: any) {
-      let caughtErrorMessage =
-        "Failed to get agent response. Please try again.";
-      if (error instanceof Error) {
-        caughtErrorMessage = error.message;
-      }
-      console.error("Error during agent response streaming:", error);
+      await signInWithPopup(auth, provider);
+      toast({ title: "Login Successful", variant: "default" });
+    } catch (error) {
+      console.error("Error during Google sign-in:", error);
       toast({
-        title: "Error",
-        description: caughtErrorMessage,
+        title: "Login Failed",
+        description: "Could not sign in with Google. Please try again.",
         variant: "destructive",
-      });
-
-      const errorAgentOptimisticMessage: ChatMessageUI = {
-        id: agentMessageId, // Keep client-side optimistic ID
-        sender: "agent",
-        text: `Error: ${caughtErrorMessage}`,
-        isStreaming: false,
-        isError: true,
-        timestamp: new Date(),
-      };
-      setOptimisticMessages(errorAgentOptimisticMessage);
-
-      if (activeConversationId && agentMessageStorageId) {
-        cs.finalizeMessageInConversation(
-          activeConversationId,
-          agentMessageStorageId,
-          `Error: ${caughtErrorMessage}`,
-          true,
-        )
-          .then(() => {
-            console.log(
-              "Agent error message finalized in Firestore:",
-              agentMessageStorageId,
-            );
-            setConversations((prev) =>
-              prev.map((c) =>
-                c.id === activeConversationId
-                  ? { ...c, updatedAt: new Date() }
-                  : c,
-              ),
-            );
-          })
-          .catch((err) => {
-            console.error(
-              "Failed to finalize agent error message in Firestore:",
-              err,
-            );
-          });
-      } else if (!activeConversationId) {
-        console.warn("No active conversation to finalize agent error message.");
-      }
-
-      // Update main messages state with the error
-      setMessages((prevMessages) => {
-        const userMessageInState = prevMessages.find(
-          (msg) => msg.id === userMessageId,
-        );
-        let messagesWithUser = prevMessages;
-        if (!userMessageInState) {
-          messagesWithUser = [...prevMessages, userMessage];
-        }
-
-        const agentMsgIndex = messagesWithUser.findIndex(
-          (m) => m.id === agentMessageId,
-        );
-        if (agentMsgIndex !== -1) {
-          const updatedMessages = [...messagesWithUser];
-          updatedMessages[agentMsgIndex] = {
-            ...errorAgentOptimisticMessage,
-            id: agentMessageStorageId || agentMessageId,
-          };
-          return updatedMessages;
-        } else {
-          return [
-            ...messagesWithUser,
-            {
-              ...errorAgentOptimisticMessage,
-              id: agentMessageStorageId || agentMessageId,
-            },
-          ];
-        }
-      });
-    } finally {
-      setIsPending(false);
-      // Final check to ensure user message is in main state
-      setMessages((prevMessages) => {
-        if (!prevMessages.find((msg) => msg.id === userMessageId)) {
-          return [...prevMessages, userMessage];
-        }
-        return prevMessages;
       });
     }
   };
 
-  // Removed useEffect for formState as it's considered redundant
-
-  // Scroll to bottom when messages change or pending state changes
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: "smooth",
-      });
+  const handleLogout = async () => { // This can remain as UI specific logic
+    try {
+      await signOut(auth);
+      toast({ title: "Logout Successful", variant: "default" });
+      // Resetting store state related to user might be needed if not handled by auth context listeners
+      // For now, assuming useAuth and useChatStore handle this appropriately
+      // store.setMessages([]); // Example, if store needs explicit reset
+      // store.setConversations([]);
+      // store.setActiveConversationId(null);
+      setPendingAgentConfig(null); // UI specific state
+    } catch (error) {
+      console.error("Error during logout:", error);
+      toast({ title: "Logout Failed", variant: "destructive" });
     }
-  }, [optimisticMessages]);
+  };
 
-  const handleNewConversation = useCallback(async () => {
-    if (!currentUserId) {
-      // Added check for currentUserId
-      toast({
-        title: "Authentication Error",
-        description: "Please log in to start a new conversation.",
-        variant: "destructive",
-      });
+  // handleFileChange is now INTERNAL to MessageInputArea.tsx
+  // removeSelectedFile is now INTERNAL to MessageInputArea.tsx
+
+  // handleFormSubmit is now largely store.submitMessage
+  // It now needs to accept the file and audio data from MessageInputArea
+  const handleFormSubmitWrapper = async (
+    event: React.FormEvent<HTMLFormElement>,
+    file?: File | null,
+    audioDataUri?: string | null,
+    attachmentType?: 'file' | 'audio'
+  ) => {
+    event.preventDefault();
+    if (pendingAgentConfig && store.isPending) { // Check store.isPending
+      toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
       return;
     }
-    // Consider adding a loading state specific to creating a new conversation if preferred
-    setIsLoadingConversations(true); // Re-use general loading state for now
+    setPendingAgentConfig(null); // UI specific state for agent creator
+
+    const { id: msgToastId, update: updateMsgToast, dismiss: dismissMsgToast } = toast({
+      title: "Sending Message...",
+      description: "Please wait.",
+      variant: "default"
+    });
+
     try {
-      const newConv = await cs.createNewConversation(
-        currentUserId,
-        "Nova Conversa",
-      ); // Default title
-      if (newConv) {
-        setConversations((prev) => [newConv, ...prev]); // Add to the top
-        setActiveConversationId(newConv.id); // This will trigger message loading via useEffect
-        // messages will be cleared by the useEffect for activeConversationId
-        setChatHistory([]);
-        setInputValue("");
-        setSelectedFile(null);
-        setSelectedFileName(null);
-        setSelectedFileDataUri(null);
-        toast({
-          title: "Nova Conversa Criada",
-          description: `"${newConv.title}" iniciada.`,
-        });
+      // Pass the file, audioDataUri, userChatConfig, and testRunConfig to submitMessage.
+      await store.submitMessage(
+        store.inputValue,
+        activeChatTarget,
+        // testRunConfig, // testRunConfig is now passed as the fourth argument
+        attachmentType === 'audio' ? undefined : file,
+        attachmentType === 'audio' ? audioDataUri : undefined,
+        userChatConfig, // Pass the current userChatConfig
+        testRunConfig // Pass the current testRunConfig
+      );
+      updateMsgToast({
+        title: "Message Sent!",
+        // description: "Your message has been sent.", // Optional description
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error submitting message:", error);
+      updateMsgToast({
+        title: "Error Sending Message",
+        description: "Failed to send your message. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Dismiss the toast after a short delay
+      setTimeout(() => {
+        dismissMsgToast();
+      }, 3000); // 3 seconds
+    }
+    inputRef.current?.focus(); // Keep UI focus logic
+  };
+
+
+  // handleNewConversation is now store.handleNewConversation
+  // handleDeleteConversation is now store.handleDeleteConversation
+
+  // fetchADKAgents can remain UI specific for fetching ADK agents list
+  const fetchADKAgents = async () => {
+    setIsADKInitializing(true);
+    try {
+      const response = await fetch('/api/adk-agents');
+      if (!response.ok) throw new Error('Failed to fetch ADK agents');
+      const data = await response.json();
+      const formattedAgents: ADKAgent[] = (data.agents || []).map((agent: ADKAgentConfig) => ({
+        id: agent.name,
+        displayName: agent.name,
+        config: agent,
+        description: agent.description
+      }));
+      setADKAgents(formattedAgents);
+    } catch (error: any) {
+      console.error('Error fetching ADK agents:', error);
+      toast({ title: 'Error Fetching ADK Agents', variant: 'destructive' });
+    } finally {
+      setIsADKInitializing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchADKAgents(); // This can remain as UI specific logic
+  }, []);
+
+  // handleSaveAgent and related pendingAgentConfig logic remains UI specific for agent creator
+  const handleSaveAgent = (configToSave: ExtendedAgentConfig | ExtendedSavedAgentConfigType) => {
+    if (!currentUser) { /* ... */ return; }
+    try {
+      if ('agentName' in configToSave) {
+        saveAgentConfiguration(
+          { /* ... config ... */
+            id: configToSave.id || uuidv4(), // Ensure ID if new
+            agentName: configToSave.agentName || '',
+            agentDescription: configToSave.agentDescription || '',
+            agentVersion: configToSave.agentVersion || '1.0.0',
+            config: configToSave.config,
+            tools: configToSave.tools || [],
+            toolConfigsApplied: configToSave.toolConfigsApplied || {}, // ensure it's an object
+            toolsDetails: configToSave.toolsDetails || [],
+            createdAt: configToSave.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isFavorite: configToSave.isFavorite,
+            tags: configToSave.tags,
+           },
+          currentUser.uid
+        ).then(() => toast({ title: "Agent Saved" }))
+         .catch((error: Error) => toast({ title: "Save Failed", description: error.message, variant: "destructive" }));
+      } else if ('name' in configToSave) {
+        saveAgentConfiguration(
+          { /* ... config ... */
+            id: uuidv4(),
+            agentName: configToSave.name || "New Agent",
+            agentDescription: configToSave.description || "",
+            agentVersion: "1.0.0",
+            config: { 
+              type: 'custom', 
+              framework: 'genkit' as AgentFramework,
+              customLogicDescription: configToSave.description,
+              globalInstruction: configToSave.description
+            },
+            tools: [],
+            toolConfigsApplied: {},
+            toolsDetails: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            templateId: undefined,
+            isFavorite: false,
+            tags: [],
+          },
+          currentUser.uid
+        ).then(() => toast({ title: "Agent Saved" }))
+         .catch((error: Error) => toast({ title: "Save Failed", description: error.message, variant: "destructive" }));
       } else {
-        toast({
-          title: "Erro",
-          description: "Não foi possível criar uma nova conversa.",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Unknown agent configuration type", variant: "destructive" });
       }
     } catch (error) {
-      console.error("Error creating new conversation:", error);
-      toast({
-        title: "Erro ao Criar",
-        description: "Falha ao iniciar uma nova conversa.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingConversations(false);
+      toast({ title: "Error Saving Agent", variant: "destructive" });
     }
-  }, [
-    setConversations,
-    setActiveConversationId,
-    setChatHistory,
-    setInputValue,
-    setSelectedFile,
-    setSelectedFileName,
-    setSelectedFileDataUri,
-  ]); // Dependencies for useCallback
-
-  // handleSelectConversation removed as handleSelectConversationById is used by ConversationSidebar
-
-  const handleRenameConversation = useCallback(
-    async (id: string, newTitle: string) => {
-      try {
-        await cs.renameConversationInStorage(id, newTitle);
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === id ? { ...c, title: newTitle, updatedAt: new Date() } : c,
-          ),
-        );
-        toast({
-          title: "Conversa Renomeada",
-          description: `Conversa renomeada para ${newTitle}.`,
-        });
-      } catch (error) {
-        console.error("Error renaming conversation:", error);
-        toast({
-          title: "Erro",
-          description: "Falha ao renomear conversa.",
-          variant: "destructive",
-        });
-      }
-    },
-    [],
-  );
-
-  const handleDeleteConversation = useCallback(
-    async (conversationToDelete: Conversation) => {
-      if (!conversationToDelete || !conversationToDelete.id) {
-        toast({
-          title: "Erro",
-          description: "Tentativa de apagar conversa inválida.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const { id } = conversationToDelete;
-
-      try {
-        await cs.deleteConversationFromStorage(id);
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        if (activeConversationId === id) {
-          setActiveConversationId(null); // This will trigger useEffect to clear messages
-        }
-        toast({ title: "Conversa Apagada", variant: "default" });
-      } catch (error) {
-        console.error("Error deleting conversation:", error);
-        toast({
-          title: "Erro",
-          description: "Falha ao apagar conversa.",
-          variant: "destructive",
-        });
-      }
-    },
-    [activeConversationId],
-  );
-
-  // Callback for ConversationSidebar that expects (id: string) => void
-  // This function is now the primary way to select a conversation from the sidebar.
-  const handleSelectConversationById = useCallback(
-    (id: string): void => {
-      if (!id) {
-        console.error("handleSelectConversationById called with invalid id");
-        toast({
-          title: "Erro",
-          description: "ID da conversa inválido.",
-          variant: "destructive",
-        });
-        return;
-      }
-      setActiveConversationId(id); // This will trigger the useEffect to load messages for this conversation
-      // The actual loading of messages is handled by the useEffect watching activeConversationId
-    },
-    [setActiveConversationId],
-  );
-
-  // handleSetActiveIdExplicitly removed as it's unused
-  // loadConversationMessages removed as its logic is covered by useEffect[activeConversationId]
-
-  // Handle input change
-  const handleInputChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    setInputValue(event.target.value);
   };
 
-  // Handle suggestion click (placeholder)
+  const handleSavePendingAgent = () => {
+    if (pendingAgentConfig) {
+      if ('agentName' in pendingAgentConfig || 'name' in pendingAgentConfig) {
+        handleSaveAgent(pendingAgentConfig as ExtendedAgentConfig | ExtendedSavedAgentConfigType);
+      } else {
+        toast({ title: "Error", description: "Invalid agent configuration format", variant: "destructive"});
+      }
+    }
+  };
+
+  const handleDiscardPendingAgent = () => {
+    setPendingAgentConfig(null);
+    toast({ title: "Draft Discarded" });
+  };
+
+  // handleExportChatLog remains UI specific
+  const handleExportChatLog = () => {
+    if (!store.activeConversationId) { /* ... */ return; }
+    if (store.optimisticMessages.length === 0) { /* ... */ return; }
+    const conversationName = activeChatTargetName || `conversation_${store.activeConversationId}`;
+    const safeConversationName = conversationName.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filename = `${safeConversationName}_log.json`;
+    const exportData = {
+      conversationId: store.activeConversationId,
+      conversationTitle: activeChatTargetName,
+      exportedAt: new Date().toISOString(),
+      userId: store.currentUserId,
+      messages: store.optimisticMessages.map(msg => ({
+        id: msg.id, text: msg.text, sender: msg.sender,
+        timestamp: msg.timestamp ? (msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp) : undefined,
+        status: msg.status, isStreaming: msg.isStreaming, feedback: msg.feedback,
+        imageUrl: msg.imageUrl, fileName: msg.fileName,
+      })),
+    };
+    const jsonData = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = filename;
+    document.body.appendChild(link); link.click();
+    document.body.removeChild(link); URL.revokeObjectURL(url);
+    toast({ title: "Exportado", description: `Histórico da conversa salvo em ${filename}` });
+  };
+
+  // handleSuggestionClick remains UI specific
   const handleSuggestionClick = (suggestion: string) => {
-    setInputValue(suggestion);
-    // Optionally, auto-submit the form
-    // formRef.current?.requestSubmit(); // Or call handleFormSubmit directly if appropriate
+    store.setInputValue(suggestion);
+    inputRef.current?.focus();
   };
 
-  // Load ADK agents from localStorage
+  // handleFeedback is now store.handleFeedback
+  // handleRegenerate is now store.handleRegenerate
+
+  // handleInputChange is now store.setInputValue
+
+  // Scroll to bottom effect remains, but uses store's optimisticMessages and isPending
   useEffect(() => {
-    const storedADKAgents = localStorage.getItem("adkAgents");
-    if (storedADKAgents) {
-      setAdkAgents(JSON.parse(storedADKAgents));
+    if (scrollAreaRef.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('div');
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
     }
-  }, []);
+  }, [store.optimisticMessages, store.isPending]);
 
-  const selectedADKAgent = useMemo(() => {
-    if (!selectedADKAgentId || adkAgents.length === 0) return null;
-    // Map ADKAgentConfig to include id property needed by ADKAgent
-    return (
-      adkAgents.find(
-        (agent) => (agent.agentId ?? agent.displayName) === selectedADKAgentId,
-      ) || null
-    );
-  }, [selectedADKAgentId, adkAgents]);
 
-  const selectedSavedAgent = useMemo(() => {
-    if (
-      !selectedAgentId ||
-      selectedAgentId === "none" ||
-      savedAgents.length === 0
-    )
-      return null;
-    return savedAgents.find((agent) => agent.id === selectedAgentId) || null;
-  }, [selectedAgentId, savedAgents]);
+  // Test config related functions remain UI specific
+  const handleTestConfigChange = (newConfig: Partial<TestRunConfig>) => {
+    setTestRunConfig(prev => ({ ...prev, ...newConfig }));
+  };
+  const handleApplyTestConfig = () => {
+    setIsTestConfigPanelOpen(false);
+    toast({ title: "Test Settings Applied" });
+  };
 
-  if (authLoading) {
-    // Added authLoading check
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p>Loading authentication...</p>
-      </div>
-    );
-  }
+  // handleFileChange needs to be added to the store if not already.
+  // For now, assuming store.handleFileChange exists. If it's just simple state updates,
+  // store.setSelectedFile, store.setSelectedFileName, store.setSelectedFileDataUri can be used.
+  // Let's assume a simple version for now if handleFileChange is not in the store:
+  // const handleFileChangeForStore = (event: ChangeEvent<HTMLInputElement>) => { // REMOVED
+  //   const file = event.target.files?.[0];
+  //   if (file) {
+  //     store.setSelectedFile(file);
+  //     store.setSelectedFileName(file.name);
+  //     const reader = new FileReader();
+  //     reader.onloadend = () => store.setSelectedFileDataUri(reader.result as string);
+  //     reader.readAsDataURL(file);
+  //   } else {
+  //     store.clearSelectedFile();
+  //   }
+  // };
 
-  if (!currentUser && !authLoading) {
-    // Added currentUser check
-    return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <p className="mb-4 text-lg">Please log in to use the chat.</p>
-        {/* Login button will be in ChatHeader */}
-      </div>
-    );
-  }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background text-foreground">
-      <ConversationSidebar
-        isOpen={isSidebarOpen}
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        onSelectConversation={handleSelectConversationById}
-        onNewConversation={handleNewConversation}
-        onRenameConversation={handleRenameConversation}
-        onDeleteConversation={handleDeleteConversation}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} // Added onToggleSidebar
-      />
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <ChatHeader
-          activeChatTarget={activeChatTarget}
-          usingADKAgent={usingADKAgent}
-          setUsingADKAgent={setUsingADKAgent}
-          selectedADKAgentId={selectedADKAgentId}
-          setSelectedADKAgentId={setSelectedADKAgentId}
-          adkAgents={adkAgents.map((agent) => ({
-            ...agent,
-            id: agent.agentId || agent.displayName, // Ensure id property is present
-          }))}
-          isADKInitializing={isADKInitializing}
-          selectedAgentId={selectedAgentId}
-          setSelectedAgentId={setSelectedAgentId}
-          savedAgents={savedAgents}
-          selectedGemId={selectedGemId}
-          setSelectedGemId={setSelectedGemId}
-          initialGems={initialGems}
-          handleNewConversation={handleNewConversation}
-          isSidebarOpen={isSidebarOpen}
-          onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        />
-        <div className="flex-1 overflow-hidden">
-          {/* Messages Area */}
-          <ScrollArea
-            ref={scrollAreaRef}
-            className="flex-1 p-4 space-y-4"
-            id="message-scroll-area"
-          >
-            {optimisticMessages.length === 0 && !isPending ? (
-              <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
-            ) : (
-              <MessageList
-                messages={optimisticMessages}
-                isPending={isPending}
-              />
+    <div className="flex h-screen w-full overflow-hidden">
+      <Suspense fallback={<div>Carregando painel de configuração...</div>}>
+        {isTestConfigPanelOpen && (
+          <TestRunConfigPanel
+            isOpen={isTestConfigPanelOpen}
+            onClose={() => setIsTestConfigPanelOpen(false)}
+            config={testRunConfig}
+            onConfigChange={handleTestConfigChange}
+            onApply={handleApplyTestConfig}
+          />
+        )}
+      </Suspense>
+      <Suspense fallback={<div className="fixed md:relative inset-y-0 left-0 z-20 w-72 h-full bg-gray-800 text-gray-200 p-4">Carregando sidebar...</div>}>
+        {isClient && isSidebarOpen && ( // Ensure isClient and isSidebarOpen are true for Suspense
+          <div
+            className={cn(
+              "fixed md:relative inset-y-0 left-0 z-20 w-72 h-full transition-transform duration-300 ease-in-out bg-gray-800",
+              isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
             )}
-          </ScrollArea>
+          >
+            <ConversationSidebar
+              isOpen={isSidebarOpen}
+              onToggleSidebar={() => setIsSidebarOpen(false)}
+              conversations={store.conversations}
+              activeConversationId={store.activeConversationId}
+              onSelectConversation={store.handleSelectConversation}
+              onNewConversation={() => store.handleNewConversation()}
+              onDeleteConversation={(conversation) => store.handleDeleteConversation(conversation.id)}
+              onRenameConversation={store.handleRenameConversation}
+              isLoading={store.isLoadingConversations}
+              currentUserId={store.currentUserId}
+              gems={initialGems} // Keep UI specific props
+              savedAgents={savedAgents} // Keep UI specific props
+              adkAgents={adkAgents} // Keep UI specific props
+              onSelectAgent={(agent) => { // Keep UI specific logic
+                if ('displayName' in agent) setSelectedADKAgentId(agent.id);
+                else if ('prompt' in agent) setSelectedGemId(agent.id);
+                else if ('agentName' in agent || 'id' in agent) setSelectedAgentId(agent.id);
+              }}
+            />
+          </div>
+        )}
+      </Suspense>
+
+      <div className="flex flex-col flex-1 w-full md:w-auto overflow-hidden">
+        <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <ChatHeader
+            isSidebarOpen={isSidebarOpen}
+            activeChatTargetDetails={activeChatTarget}
+            onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            handleLogin={handleLogin}
+            handleLogout={handleLogout}
+            adkAgents={adkAgents}
+            usingADKAgent={!!selectedADKAgentId}
+            setUsingADKAgent={(value) => { if (!value) setSelectedADKAgentId(null); }}
+            selectedADKAgentId={selectedADKAgentId}
+            setSelectedADKAgentId={setSelectedADKAgentId}
+            selectedGemId={selectedGemId}
+            setSelectedGemId={setSelectedGemId}
+            initialGems={initialGems}
+            handleNewConversation={() => store.handleNewConversation()}
+            isADKInitializing={isADKInitializing}
+            onExportChatLog={handleExportChatLog}
+            isVerboseMode={isVerboseMode} // Pass verbose mode state
+            onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)} // Pass toggle function
+            // User Chat Config props
+            userChatConfig={userChatConfig}
+            onUserChatConfigChange={handleUserChatConfigChange}
+          >
+            {/* Test settings button can remain or be moved if header gets too cluttered */}
+            <Button variant="outline" size="icon" onClick={() => setIsTestConfigPanelOpen(true)} title="Test Settings" className="ml-2">
+              <Settings2 className="h-5 w-5" />
+            </Button>
+          </ChatHeader>
+        </div>
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea ref={scrollAreaRef} className="h-full p-4 pt-2">
+              <LoadingState
+                isLoading={store.isLoadingMessages}
+                loadingText="Carregando mensagens..."
+                loadingType="spinner"
+                // No explicit error state managed here for messages, so error prop is omitted
+              >
+                {!currentUser ? (
+                  <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
+                    <LogIn size={48} className="mb-4 text-primary" />
+                    <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
+                    <p className="mb-4 text-lg">Por favor, faça login para usar o chat.</p>
+                    <Button onClick={handleLogin} variant="default" size="lg">
+                      <LogIn className="mr-2 h-5 w-5" /> Entrar com Google
+                    </Button>
+                  </div>
+                ) : store.optimisticMessages.length === 0 && !store.isPending && !pendingAgentConfig ? (
+                  <div className="min-h-[calc(100vh-180px)]">
+                    <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
+                  </div>
+                ) : (
+                  <div className="pb-20">
+                    <MessageList
+                      messages={store.optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
+                      isPending={store.isPending}
+                      onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
+                      onFeedback={store.handleFeedback}
+                      isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
+                    />
+                  </div>
+                )}
+              </LoadingState>
+            </ScrollArea>
+          </div>
+
+          {pendingAgentConfig && ( // Keep pendingAgentConfig UI for agent creator
+            <Card className="m-4 border-primary shadow-lg absolute bottom-0 left-0 right-0 mb-20 bg-background z-10">
+              <CardHeader>
+                <CardTitle>Revisar Configuração Proposta do Agente</CardTitle>
+                <CardDescription>
+                  O Assistente de Criação de Agentes elaborou a seguinte configuração. Você pode salvá-la ou descartá-la e continuar conversando para refiná-la.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="max-h-60 overflow-y-auto bg-muted/30 p-4 rounded-md">
+                <pre className="text-xs whitespace-pre-wrap">
+                  {JSON.stringify(pendingAgentConfig, null, 2)}
+                </pre>
+              </CardContent>
+              <CardFooter className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={handleDiscardPendingAgent}>
+                    <Trash2 className="mr-2 h-4 w-4"/> Descartar e Continuar
+                </Button>
+                <Button onClick={handleSavePendingAgent}>
+                    <Save className="mr-2 h-4 w-4"/> Salvar Este Agente
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
         </div>
 
-        {/* Message Input Area */}
-        <MessageInputArea
-          formRef={formRef} // Pass formRef if MessageInputArea needs to submit the form directly
-          inputRef={inputRef}
-          fileInputRef={fileInputRef}
-          onSubmit={handleFormSubmit} // This now handles fetch-based streaming
-          isPending={isPending} // Use only isPending from useState
-          selectedFile={selectedFile}
-          selectedFileName={selectedFileName ?? ""}
-          selectedFileDataUri={selectedFileDataUri}
-          onRemoveAttachment={removeSelectedFile}
-          handleFileChange={handleFileChange}
-          inputValue={inputValue}
-          onInputChange={handleInputChange} // Pass handleInputChange
-        />
+        <div className="sticky bottom-0 w-full bg-background border-t p-2 z-10">
+          <div className="mx-auto max-w-4xl flex items-end gap-2">
+            <MessageInputArea
+              formRef={useRef<HTMLFormElement>(null)}
+              inputRef={inputRef}
+              fileInputRef={fileInputRef}
+              onSubmit={handleFormSubmitWrapper} // Pass the updated wrapper
+              isPending={store.isPending || !!pendingAgentConfig} // Combine store pending with UI pending for agent creator
+              // selectedFile, selectedFileName, selectedFileDataUri, onRemoveAttachment, handleFileChange props are removed
+              inputValue={store.inputValue}
+              onInputChange={(e) => store.setInputValue(typeof e === 'string' ? e : e.target.value)}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

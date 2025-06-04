@@ -8,7 +8,7 @@ export interface MCPServerConfig {
   name: string;
   url: string;
   description?: string;
-  status?: 'connected' | 'disconnected' | 'error';
+  status?: 'connected' | 'disconnected' | 'error' | 'loading';
 }
 
 /**
@@ -28,7 +28,7 @@ export interface ToolParameter {
 export interface ToolConfigField {
   id: string;
   label: string;
-  type: 'text' | 'password' | 'select' | 'textarea' | 'checkbox' | 'number';
+  type: 'text' | 'password' | 'select' | 'textarea' | 'checkbox' | 'number' | 'json';
   required?: boolean;
   options?: Array<{ label: string; value: string }>;
   placeholder?: string;
@@ -79,4 +79,11 @@ export interface AvailableTool {
 
   // Campo de compatibilidade com implementação existente
   genkitToolName?: string;
+
+  // Schema for custom tools
+  // Primarily for tools where type === 'custom'
+  inputSchema?: string;
+  outputSchema?: string;
+
+  serviceTypeRequired?: string; // Added to address usage in ToolConfigModal
 }

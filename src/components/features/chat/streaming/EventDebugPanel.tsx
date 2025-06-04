@@ -23,16 +23,34 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Define more specific types for props
+export interface DebugEvent {
+  type: string;
+  id?: string;
+  timestamp?: string | number;
+  [key: string]: any; // Allow other properties
+}
+
+export interface ActiveToolInfo {
+  name?: string;
+  [key: string]: any; // Allow other properties
+}
+
+export interface SessionStateData {
+  tools?: ActiveToolInfo[];
+  [key: string]: any; // Allow other arbitrary state properties
+}
+
 export interface EventDebugPanelProps {
-  events: any[];
-  sessionState: Record<string, any>;
+  events: DebugEvent[]; // Use defined type
+  sessionState: SessionStateData; // Use defined type
   isVisible: boolean;
   onClose: () => void;
 }
 
 export function EventDebugPanel({
   events = [],
-  sessionState = {},
+  sessionState = { tools: [] }, // Provide a default that matches SessionStateData structure
   isVisible,
   onClose,
 }: EventDebugPanelProps) {
@@ -116,7 +134,7 @@ export function EventDebugPanel({
             <div className="space-y-4">
               <h4 className="font-medium">Ferramentas Ativas</h4>
               {sessionState.tools && sessionState.tools.length > 0 ? (
-                sessionState.tools.map((tool: any, index: number) => (
+                sessionState.tools.map((tool: ActiveToolInfo, index: number) => ( // Use defined type
                   <Collapsible key={index} className="border rounded-md">
                     <CollapsibleTrigger className="flex items-center justify-between w-full p-3 text-sm">
                       <div className="flex items-center">
@@ -150,7 +168,7 @@ export function EventDebugPanel({
 }
 
 interface EventItemProps {
-  event: any;
+  event: DebugEvent; // Use defined type
   index: number;
 }
 
