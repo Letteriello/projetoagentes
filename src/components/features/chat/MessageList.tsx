@@ -1,122 +1,139 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { FixedSizeList, ListOnScrollProps } from 'react-window';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChatMessageUI } from '@/types/chat';
-import { forwardRef, useRef, useEffect } from 'react';
-// import SimplerChatMessage from './SimplerChatMessage'; // Original import
-import ChatMessageDisplay from './ChatMessageDisplay'; // Import ChatMessageDisplay
+import ChatMessageDisplay from './ChatMessageDisplay';
+
+const ITEM_SIZE = 85; // Average item height in pixels - ADJUST AS NEEDED
 
 interface MessageListProps {
-  /** Array of messages to display */
   messages: ChatMessageUI[];
-  /** Whether the chat is currently loading/processing a message */
   isPending: boolean;
-  /** Optional class name for the container */
   className?: string;
-  /** Optional ref for the messages container */
+  // containerRef is now managed by FixedSizeList's outerRef,
+  // but if parent needs it for other reasons, it can be passed to outerRef
   containerRef?: React.RefObject<HTMLDivElement>;
-  /** Callback when the messages container is scrolled */
-  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
-  /** Callback to regenerate a message */
+  onScroll?: (event: React.UIEvent<HTMLDivElement> | ListOnScrollProps) => void; // Adjusted type
   onRegenerate?: (messageId: string) => void;
-  /** Callback for message feedback */
   onFeedback?: (messageId: string, feedback: 'liked' | 'disliked' | null) => void;
 }
 
-/**
- * A component that displays a list of chat messages with animations
- */
-const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({ 
-  messages, 
-  isPending, 
-  className = '',
-  onScroll,
-  onRegenerate,
-  onFeedback, // Destructure onFeedback
-  ...props 
-}, ref) => {
-  // Animation variants for message entry
+// Row component for react-window
+const Row = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: { messages: ChatMessageUI[], onRegenerate?: MessageListProps['onRegenerate'], onFeedback?: MessageListProps['onFeedback'] } }) => {
+  const message = data.messages[index];
+
+  // Animation variants for message entry (can be simplified if complex animations are problematic with react-window)
+  // The original delay: 0.05 might not work as expected due to virtualization.
+  // For items that scroll into view, they are mounted then, so animation will run on mount.
   const messageVariants = {
-    hidden: (isUser: boolean) => ({
+    hidden: {
       opacity: 0,
-      x: isUser ? 20 : -20,
-      y: 10,
-    }),
+      x: message.sender === "user" ? 20 : -20,
+      // y: 10, // y might be problematic with fixed item heights
+    },
     visible: {
       opacity: 1,
       x: 0,
-      y: 0,
+      // y: 0,
       transition: {
-        type: 'spring',
+        type: "spring",
         stiffness: 260,
         damping: 20,
       },
     },
   };
 
-  // Internal ref to handle scrolling when new messages arrive
-  const internalRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = ref || internalRef;
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
   return (
-    <div className={cn('flex-1 overflow-y-auto', className)} ref={scrollContainerRef} onScroll={onScroll} {...props}>
-      <div className="flex flex-col gap-4 p-4">
-        <AnimatePresence initial={false}>
-          {messages.map((msg, idx) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, x: msg.sender === "user" ? 20 : -20, y: 10 }}
-              animate={{ opacity: 1, x: 0, y: 0 }}
-              transition={{
-                type: "spring",
-                stiffness: 260,
-                damping: 20,
-                delay: 0.05,
-              }}
-              className="w-full"
-            >
-              {/* Use ChatMessageDisplay instead of SimplerChatMessage */}
-              <ChatMessageDisplay message={msg} onRegenerate={onRegenerate} />
-            </motion.div>
-          ))}
-          {isPending && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className={cn("flex items-end gap-2.5 justify-start w-full")}
-            >
-              <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
-                <Bot className="h-5 w-5 text-primary" />
-              </div>
-              <div className="p-3 rounded-lg bg-card max-w-[70%] shadow-sm rounded-bl-none border border-border/50 space-y-2">
-                <Skeleton className="h-4 w-4/5" />
-                <Skeleton className="h-4 w-3/5" />
-                {/* Optional: Keep "Digitando..." alongside or remove if Skeleton is enough */}
-                {/* <span className="flex gap-1 items-center text-xs text-muted-foreground/80 animate-pulse">
-                  <span>D</span><span>i</span><span>g</span><span>i</span><span>t</span><span>a</span><span>n</span><span>d</span><span>o</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0s" }}>.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0.15s" }}>.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0.3s" }}>.</span>
-                </span> */}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <div ref={messagesEndRef} />
-      </div>
+    <div style={style}>
+      <motion.div
+        key={message.id} // key is important for framer-motion if elements are ever re-ordered/changed significantly
+        variants={messageVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full h-full flex items-center" // Ensure motion.div fills the style space and centers content
+      >
+        <ChatMessageDisplay
+          message={message}
+          onRegenerate={data.onRegenerate}
+          onFeedback={data.onFeedback} // Pass onFeedback
+        />
+      </motion.div>
     </div>
   );
 });
+Row.displayName = 'MessageRow';
+
+
+const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  isPending,
+  className = '',
+  containerRef, // This ref will be for the outer scrollable container of FixedSizeList
+  onScroll,
+  onRegenerate,
+  onFeedback,
+}) => {
+  const listRef = useRef<FixedSizeList>(null);
+
+  // Auto-scroll to bottom when new messages arrive or pending state changes
+  useEffect(() => {
+    if (messages.length > 0) {
+      // When pending is true, we might not want to scroll if the user scrolled up.
+      // However, if a new message just arrived, we typically do.
+      // For simplicity, scroll to the last actual message.
+      // If isPending is true and it's the only thing, listRef might not scroll to it.
+      listRef.current?.scrollToItem(messages.length - 1, 'end');
+    }
+  }, [messages, messages.length]); // Removed isPending from deps for now to avoid scrolling issues when user scrolls up and pending appears
+
+  const handleScroll = useCallback((scrollProps: ListOnScrollProps) => {
+    if (onScroll) {
+      // FixedSizeList's onScroll provides different props than a native div scroll event.
+      // Adapt or inform the parent component about this change if necessary.
+      onScroll(scrollProps);
+    }
+  }, [onScroll]);
+
+  // TODO: The height of FixedSizeList (e.g., 600px) should be dynamic.
+  // Consider using a library like 'react-virtualized-auto-sizer'
+  // or calculate based on parent dimensions.
+  const listHeight = 600;
+
+  return (
+    <div className={cn('flex flex-col flex-1 overflow-hidden', className)}> {/* Changed overflow-y-auto to overflow-hidden as FixedSizeList handles its own scrolling */}
+      <div className="flex-1"> {/* This div will be targeted by AutoSizer or for height calculation */}
+        <FixedSizeList
+          ref={listRef}
+          outerRef={containerRef} // Pass the containerRef to outerRef of FixedSizeList
+          height={listHeight}
+          itemCount={messages.length}
+          itemSize={ITEM_SIZE}
+          itemData={{ messages, onRegenerate, onFeedback }}
+          width="100%"
+          onScroll={handleScroll}
+          className="custom-scrollbar" // Optional: if you have custom scrollbar styles
+        >
+          {Row}
+        </FixedSizeList>
+      </div>
+      {isPending && (
+        <div className={cn("flex items-end gap-2.5 justify-start w-full p-4")}> {/* Added padding for pending indicator */}
+          <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
+            <Bot className="h-5 w-5 text-primary" />
+          </div>
+          <div className="p-3 rounded-lg bg-card max-w-[70%] shadow-sm rounded-bl-none border border-border/50 space-y-2">
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-4 w-3/5" />
+          </div>
+        </div>
+      )}
+      {/* messagesEndRef is no longer needed as FixedSizeList.scrollToItem is used */}
+    </div>
+  );
+};
 
 MessageList.displayName = 'MessageList';
 

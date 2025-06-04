@@ -31,6 +31,7 @@ import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
 import { useAgentStorage } from "@/hooks/use-agent-storage"; // Import useAgentStorage
 import { cn } from "@/lib/utils";
+import { FixedSizeList } from 'react-window'; // Import FixedSizeList
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
 import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog";
@@ -61,6 +62,9 @@ import { FeedbackButton } from "@/components/features/agent-builder/feedback-but
 import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal"; // Import ConfirmationModal
+
+// Moved ViewMode type definition here to be accessible by AgentRow
+type ViewMode = 'grid' | 'list';
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
@@ -98,9 +102,10 @@ export default function AgentBuilderPage() {
   const { saveAgentOrder } = useAgentStorage(); // Get saveAgentOrder directly
 
   // View Mode state and persistence
-  type ViewMode = 'grid' | 'list';
+  // type ViewMode = 'grid' | 'list'; // Moved to top-level
   const VIEW_MODE_STORAGE_KEY = 'agentViewMode_v1';
   const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
+  const listRef = React.useRef<FixedSizeList>(null); // Ref for FixedSizeList
 
   React.useEffect(() => {
     const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as ViewMode | null;
@@ -544,37 +549,65 @@ export default function AgentBuilderPage() {
           )}
           {!isLoadingAgents && orderedAgents && orderedAgents.length > 0 ? (
             <div className="space-y-6">
-              <div
-                className={cn(
-                  viewMode === 'grid'
-                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
-                    : "flex flex-col gap-4" // Single column for list view
-                )}
-              >
-                {orderedAgents.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    agentId={agent.id} // Pass agentId for drag and drop handlers
-                    viewMode={viewMode} // Pass current viewMode
-                    onEdit={() => handleEditAgent(agent)}
-                    onSaveAsTemplate={handleSaveAsTemplate}
-                    onViewMonitoring={() => handleViewAgentMonitoring(agent)}
-                    onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
-                    onDelete={() => handleDeleteAgent(agent.id)}
-                    availableTools={defaultAvailableTools}
-                    agentTypeOptions={agentTypeOptions}
-                    isFavorite={agent.isFavorite}
-                    onToggleFavorite={handleToggleFavorite}
-                    // Drag and Drop props
-                    draggable // This will be used by the AgentCard's div
-                    onDragStart={(e) => handleDragStart(e, agent.id)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, agent.id)}
-                    onDragEnd={handleDragEnd}
-                  />
-                ))}
-              </div>
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {orderedAgents.map((agent) => (
+                    <AgentCard
+                      key={agent.id}
+                      agent={agent}
+                      agentId={agent.id}
+                      viewMode={viewMode}
+                      onEdit={() => handleEditAgent(agent)}
+                      onSaveAsTemplate={handleSaveAsTemplate}
+                      onViewMonitoring={() => handleViewAgentMonitoring(agent)}
+                      onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
+                      onDelete={() => handleDeleteAgent(agent.id)}
+                      availableTools={defaultAvailableTools}
+                      agentTypeOptions={agentTypeOptions}
+                      isFavorite={agent.isFavorite}
+                      onToggleFavorite={handleToggleFavorite}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, agent.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, agent.id)}
+                      onDragEnd={handleDragEnd}
+                    />
+                  ))}
+                </div>
+              ) : (
+                // List View using FixedSizeList
+                // TODO: The height of FixedSizeList (e.g., 700px) should be dynamic.
+                // Consider using a library like 'react-virtualized-auto-sizer'
+                // or calculate based on parent dimensions.
+                // AGENT_CARD_LIST_ITEM_SIZE and AgentRow will be defined outside this component.
+                <div style={{ height: '700px', width: '100%' }} className="flex flex-col"> {/* Removed gap-4 from here, apply spacing in AgentRow if needed */}
+                  <FixedSizeList
+                    ref={listRef}
+                    height={700} // Example fixed height
+                    itemCount={orderedAgents.length}
+                    itemSize={AGENT_CARD_LIST_ITEM_SIZE}
+                    width="100%"
+                    itemData={{
+                      agents: orderedAgents,
+                      viewMode, // Should be 'list'
+                      handleEditAgent,
+                      handleSaveAsTemplate,
+                      handleViewAgentMonitoring,
+                      toast,
+                      handleDeleteAgent,
+                      defaultAvailableTools,
+                      agentTypeOptions,
+                      handleToggleFavorite,
+                      handleDragStart,
+                      handleDragOver,
+                      handleDrop,
+                      handleDragEnd,
+                    }}
+                  >
+                    {AgentRow}
+                  </FixedSizeList>
+                </div>
+              )}
             </div>
           ) : (
             !isLoadingAgents && (
@@ -714,3 +747,7 @@ export default function AgentBuilderPage() {
     </div>
   );
 }
+
+// AgentRow and AGENT_CARD_LIST_ITEM_SIZE will be appended here by the next operation.
+// Placeholder comment to ensure this line is unique for the next replace/append.
+[end of src/app/agent-builder/page.tsx]

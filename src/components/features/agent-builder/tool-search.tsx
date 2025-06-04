@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useMemo } from "react"; // Import useMemo
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { debounce } from "../../../lib/utils"; // Import debounce
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,10 @@ export const ToolSearch: React.FC<ToolSearchProps> = ({
   onFilterChange,
   filters,
 }) => {
+  const debouncedSearch = useMemo(() => {
+    return debounce(onSearch, 300);
+  }, [onSearch]);
+
   return (
     <div className="flex flex-col space-y-3 mb-4">
       <div className="relative">
@@ -34,7 +40,7 @@ export const ToolSearch: React.FC<ToolSearchProps> = ({
           type="search"
           placeholder="Buscar ferramentas..."
           className="pl-8"
-          onChange={(e) => onSearch(e.target.value)}
+          onChange={(e) => debouncedSearch(e.target.value)}
         />
       </div>
 
