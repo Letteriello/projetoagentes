@@ -8,6 +8,9 @@
 
 import { ai } from '@/ai/genkit'; 
 import { performWebSearchTool } from '@/ai/tools/web-search-tool';
+import { dateTimeTool } from '../tools/date-time-tool'; // Import dateTimeTool
+import { petStoreTool } from '../tools/openapi-tool'; // Import petStoreTool
+import { fileIoTool } from '../tools/file-io-tool'; // Import fileIoTool
 
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
@@ -15,6 +18,9 @@ import { ReadableStream } from 'node:stream/web';
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
 const allAvailableTools = {
   performWebSearch: performWebSearchTool,
+  dateTimeTool: dateTimeTool,
+  petStoreTool: petStoreTool,
+  fileIoTool: fileIoTool, // Add fileIoTool
 };
 
 export interface BasicChatInput {

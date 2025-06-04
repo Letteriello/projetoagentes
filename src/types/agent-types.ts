@@ -77,6 +77,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
   systemPromptGenerated?: string;
   toolsDetails?: AvailableTool[];
   toolConfigsApplied?: Record<string, ToolConfigData>;
+  tool_trajectory_avg_score?: number; // New optional property
 }
 
 // Tipos específicos para diferentes tipos de agente

@@ -16,17 +16,17 @@ export interface SearchResult {
  */
 export const performWebSearchTool: Tool = {
   name: "perform_web_search",
-  description: "Permite buscar informações atualizadas na web para responder perguntas sobre eventos recentes, dados ou fatos que podem não estar no conhecimento do modelo.",
+  description: "Performs a web search to find up-to-date information on various topics, events, or facts. Useful when the model's internal knowledge might be outdated. Returns a list of search results including titles, URLs, and snippets. (Simulated if API key is not set).",
   parameters: {
     type: "object",
     properties: {
       query: {
         type: "string",
-        description: "A consulta de pesquisa a ser executada",
+        description: "The search query string (e.g., 'latest AI advancements').",
       },
       num_results: {
         type: "number",
-        description: "Número de resultados a serem retornados (máximo 10)",
+        description: "The desired number of search results to return (integer, max 10, defaults to 5).",
       }
     },
     required: ["query"],
