@@ -4,6 +4,7 @@
  * of API keys and endpoints for a web search service.
  */
 import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
+import { winstonLogger } from '../../lib/winston-logger'; // Import Winston Logger
 import { ToolDefinition } from '@genkit-ai/core'; // Import ToolDefinition
 import { z } from 'zod';
 import axios from 'axios'; // For actual HTTP calls if implemented
@@ -60,7 +61,11 @@ export function createPerformWebSearchTool(
     config.description ||
     "Performs a web search for up-to-date information to answer questions about recent events, data, or facts that may not be in the model's training data.";
 
-  console.log(`[${toolName}] Initialized. API URL: ${config.apiUrl || 'Default (e.g., DuckDuckGo simulation)'}, API Key Provided: ${!!config.apiKey}`);
+  winstonLogger.info(`[${toolName}] Initialized.`, {
+    toolName,
+    apiUrl: config.apiUrl || 'Default (e.g., DuckDuckGo simulation)',
+    apiKeyProvided: !!config.apiKey
+  });
 
   return ai.defineTool(
     {
@@ -75,11 +80,18 @@ export function createPerformWebSearchTool(
         const searchApiUrl = config.apiUrl || 'https://api.duckduckgo.com/'; // Default URL if not provided
         const searchApiKey = config.apiKey;
 
-        console.log(`[${toolName}] Executing web search for: "${query}" (num_results: ${num_results}). API URL: ${searchApiUrl}. Flow: ${flowName}, Agent: ${agentId}`);
+        winstonLogger.info(`[${toolName}] Executing web search`, {
+          toolName,
+          query,
+          num_results,
+          apiUrl: searchApiUrl,
+          flowName,
+          agentId
+        });
         
         // If no API key is provided, return simulated results (as in original code)
         if (!searchApiKey) {
-          console.log(`[${toolName}] API key not provided in config - returning simulated results.`);
+          winstonLogger.warn(`[${toolName}] API key not provided. Returning simulated results.`, { toolName, flowName, agentId });
           const simulatedResults: SearchResult[] = Array.from({ length: Math.min(num_results, 10) }, (_, i) => ({
             title: `Simulated Result ${i + 1} for "${query}" (No API Key)`,
             url: `https://example.com/simulated-search?q=${encodeURIComponent(query)}&index=${i}`,
@@ -129,7 +141,7 @@ export function createPerformWebSearchTool(
         // If the actual API implementation (commented block above) is not used,
         // continue returning detailed simulated results when an API key IS provided.
         // This helps confirm the flow with an API key is being reached.
-        console.log(`[${toolName}] API key WAS provided. Simulating call to a real API endpoint.`);
+        winstonLogger.info(`[${toolName}] API key provided. Simulating call to real API endpoint.`, { toolName, flowName, agentId });
         const simulatedResultsWithApiKey: SearchResult[] = Array.from({ length: Math.min(num_results, 10) }, (_, i) => ({
             title: `REAL API Result (Simulated) ${i + 1} for: ${query}`,
             url: `${config.apiUrl || 'https://api.example.com'}/search?q=${encodeURIComponent(query)}&key=${config.apiKey}&index=${i}`,
@@ -141,24 +153,37 @@ export function createPerformWebSearchTool(
         };
 
       } catch (error) {
-        console.error(`[${toolName}] Error during web search:`, error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during web search.';
-
         let errorCode = 'UNKNOWN_TOOL_ERROR';
         let errorDetailsData: any = undefined;
+        let logMetadata: Record<string, any> = {
+          toolName,
+          flowName,
+          agentId,
+          query,
+          error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error),
+        };
 
         if (axios.isAxiosError(error)) {
           errorCode = error.response?.status ? `AXIOS_${error.response.status}` : 'AXIOS_ERROR';
           errorDetailsData = error.response?.data;
-          console.error(`[${toolName}] Axios error details:`, errorDetailsData);
+          // Add Axios-specific details to the log metadata
+          logMetadata.axiosError = {
+            status: error.response?.status,
+            data: errorDetailsData,
+            code: error.code,
+          };
         } else if (error instanceof z.ZodError) {
           errorCode = 'INPUT_VALIDATION_ERROR';
           errorDetailsData = error.issues;
+          logMetadata.zodErrorIssues = error.issues;
         }
         // Example for custom error types, can be extended
         // else if (error.name === 'SimulatedError') {
         //   errorCode = 'SIMULATED_TOOL_ERROR';
         // }
+
+        winstonLogger.error(`[${toolName}] Error during web search`, logMetadata);
 
         return {
           results: [], // Always return empty results array on error
@@ -166,7 +191,7 @@ export function createPerformWebSearchTool(
           errorDetails: {
             code: errorCode,
             message: errorMessage,
-            details: errorDetailsData,
+            details: errorDetailsData, // This will include Axios response data or Zod issues
           },
         };
       }

@@ -28,6 +28,7 @@ import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensage
 // Define a estrutura esperada para uma mensagem de chat.
 interface ChatMessageDisplayProps {
   message: ChatMessageUI; // Objeto da mensagem, incluindo se está sendo transmitida (isStreaming).
+  onRegenerate?: (messageId: string) => void; // Função para tentar novamente o envio da mensagem.
 }
 
 // Componente para exibir um cursor piscante, usado para indicar que o agente está digitando.
@@ -237,6 +238,21 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
       {isUser && (
         <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
           <User className="h-5 w-5 text-foreground" />
+        </div>
+      )}
+      )}
+      {/* Error display and retry button */}
+      {message.status === "error" && !isUser && onRegenerate && (
+        <div className="flex flex-col items-center ml-2 self-center"> {/* Adjusted to be outside the main message bubble for agent errors and vertically centered */}
+          <XCircle className="h-5 w-5 text-red-500 mb-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onRegenerate(message.id)} // Use the onRegenerate prop from ChatMessageDisplayProps
+            className="text-xs px-2 py-1 h-auto" // Adjusted padding and height for a smaller button
+          >
+            Tentar novamente
+          </Button>
         </div>
       )}
     </div>
