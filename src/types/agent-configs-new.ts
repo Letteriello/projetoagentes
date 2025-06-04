@@ -108,6 +108,7 @@ export interface AgentConfigBase {
   ragMemoryConfig?: RagMemoryConfig;
   artifacts?: ArtifactsConfig;
   systemPromptGenerated?: string; // Added field for auto-generated system prompt
+  sandboxedCodeExecution?: boolean;
 }
 
 export interface ModelSafetySettingItem {
