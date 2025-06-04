@@ -34,8 +34,13 @@ const Row = React.memo(({ index, style, data }: { index: number; style: React.CS
           eventTitle={item.eventTitle}
           eventDetails={item.eventDetails}
           eventType={item.eventType}
-          isVerboseMode={data.isVerboseMode} // Pass isVerboseMode
-          rawEventData={item} // Pass the whole item as rawEventData
+          isVerboseMode={data.isVerboseMode}
+          rawEventData={item}
+          // Events typically don't have their own applied configs,
+          // they would be displayed in context of a message that does.
+          // If an event message itself could have configs, pass them here:
+          // appliedUserChatConfig={item.appliedUserChatConfig}
+          // appliedTestRunConfig={item.appliedTestRunConfig}
         />
       </div>
     );
@@ -69,10 +74,12 @@ const Row = React.memo(({ index, style, data }: { index: number; style: React.CS
         className="w-full h-full flex items-center"
       >
         <ChatMessageDisplay
-          message={item}
+          message={item} // item here is ChatMessageUI, which will have the configs
           onRegenerate={data.onRegenerate}
           onFeedback={data.onFeedback}
-          isVerboseMode={data.isVerboseMode} // Pass isVerboseMode
+          isVerboseMode={data.isVerboseMode}
+          // appliedUserChatConfig and appliedTestRunConfig are part of 'item' (message)
+          // and ChatMessageDisplay will need to be updated to accept them.
         />
       </motion.div>
     </div>

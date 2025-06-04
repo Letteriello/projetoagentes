@@ -8,6 +8,7 @@ import {
   FileJson,
   FileBadge, // For CSV/Spreadsheet as per existing code
   FileCode2, // For Markdown or general code files
+  Mic, // Added Mic icon for audio
   // Explicitly adding FileSpreadsheet if FileBadge is not preferred for spreadsheets
   // For now, we'll stick to FileBadge as it's already in use.
   // If a specific PDF icon like FilePdf exists and is preferred, it would be imported here.
@@ -20,6 +21,7 @@ interface AttachmentPopoverContentProps {
   fileDataUri: string | null;
   fileType?: string;
   onRemoveAttachment: () => void;
+  isAudio?: boolean; // Added isAudio prop
 }
 
 export default function AttachmentPopoverContent({
@@ -27,10 +29,14 @@ export default function AttachmentPopoverContent({
   fileDataUri,
   fileType,
   onRemoveAttachment,
+  isAudio, // Destructure isAudio
 }: AttachmentPopoverContentProps) {
   const isImage = fileType?.startsWith("image/");
 
   const renderFilePreview = () => {
+    if (isAudio) {
+      return <Mic className="w-16 h-16 text-muted-foreground/70" />;
+    }
     if (isImage && fileDataUri) {
       return (
         <Image

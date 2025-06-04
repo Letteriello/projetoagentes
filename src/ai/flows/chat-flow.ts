@@ -16,6 +16,7 @@ import { createDatabaseAccessTool } from '@/ai/tools/database-access-tool';
 // Import static tools
 import { calculatorTool } from '@/ai/tools/calculator-tool';
 import { codeExecutorTool } from '@/ai/tools/code-executor-tool';
+import { videoStreamMonitorTool, GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR } from '@/ai/tools/video-stream-tool'; // Added videoStreamMonitorTool
 
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
@@ -90,7 +91,8 @@ const allAvailableTools: Record<string, AppTool> = {
     dbConnectionString: process.env.DB_CONNECTION,
     dbType: 'postgresql' // Definindo um tipo padrão, ajuste conforme necessário
   }),
-  codeExecutor: codeExecutorTool()
+  codeExecutor: codeExecutorTool(),
+  [GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR]: videoStreamMonitorTool, // Added videoStreamMonitorTool
 };
 
 /**
@@ -119,6 +121,7 @@ interface GeneratedArtifactInfo {
  */
 interface ChatFlowParams {
   fileDataUri?: string;
+  audioDataUri?: string; // Added for audio data
   history?: MessageData[];
   modelName: 'geminiPro' | 'gemini15Pro' | string;
   systemPrompt?: string;
@@ -160,6 +163,7 @@ const ChatFlowParamsSchema = z.object({
   topK: z.number().int().min(1).optional(),
   maxOutputTokens: z.number().int().min(1).optional(),
   forceToolUsage: z.boolean().optional(),
+  audioDataUri: z.string().optional(), // Added for audio data
   // For now, using z.any() as a placeholder if specific Zod schemas are not readily available.
   // It's better to define these properly if possible.
   ragMemoryConfig: z.any().optional(), // Placeholder: Replace with RagMemoryConfigSchema if available
@@ -173,6 +177,7 @@ export interface BasicChatInput extends ChatFlowParams {
   agentId?: string; // Optional agentId for logging/context
   userMessage: string;
   callbacks?: Record<string, string>; // Added for callback configuration
+  audioDataUri?: string; // Explicitly adding here for clarity, though ChatFlowParams has it
   // New fields should be implicitly part of BasicChatInput if it extends ChatFlowParams
   // If BasicChatInput is a distinct type definition that duplicates fields, it would need them too.
   // Assuming BasicChatInput directly uses/extends ChatFlowParams, so no explicit additions here.
@@ -284,8 +289,29 @@ async function basicChatFlowInternal(
       }
     }
 
-    const userMessageText = retrievedContextForLLM ? `${retrievedContextForLLM}${input.userMessage}` : input.userMessage;
+    let userMessageText = retrievedContextForLLM ? `${retrievedContextForLLM}${input.userMessage}` : input.userMessage;
     const userMessageContent: Part[] = [{ text: userMessageText }];
+
+    // Handle audio data if present
+    if (input.audioDataUri) {
+      winstonLogger.info(`Chat Flow: Received audioDataUri (first 30 chars): ${input.audioDataUri.substring(0, 30)}`, { agentId, flowName });
+      // Simulate basic processing: append a message or include in chatEvents
+      // Option 1: Append to userMessageText (will be part of the LLM prompt)
+      // userMessageText += ` [Audio processed: ${input.audioDataUri.substring(0, 30)}...]`;
+      // Re-initialize userMessageContent if userMessageText was modified:
+      // userMessageContent = [{ text: userMessageText }];
+
+      // Option 2: Add a chat event (more for meta-information, not directly in LLM prompt unless added separately)
+      chatEvents.push({
+        id: `evt-audio-${Date.now()}`,
+        timestamp: new Date(),
+        eventType: 'AGENT_CONTROL', // Or a new specific eventType like 'AUDIO_INPUT_RECEIVED'
+        eventTitle: 'Audio Data Received',
+        eventDetails: `Processed mock audio: ${input.audioDataUri.substring(0, 30)}...`
+      });
+      // For this simulation, we'll log and add a chat event.
+      // If the audio was meant to be transcribed and added to the prompt, userMessageText modification would be better.
+    }
 
     // Simulate beforeModel callback
     const { logic: beforeModelLogic, enabled: beforeModelEnabled } = getCallbackConfig('beforeModel');
@@ -1126,6 +1152,7 @@ export const basicChatFlow = createLoggableFlow(
       agentId: input.agentId || "unknown_agent",
       userMessageLength: input.userMessage.length,
       hasFileDataUri: !!input.fileDataUri,
+      hasAudioDataUri: !!input.audioDataUri, // Added for logging
       modelName: input.modelName,
       systemPromptLength: input.systemPrompt?.length,
       temperature: input.temperature,

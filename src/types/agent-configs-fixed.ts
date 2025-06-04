@@ -44,6 +44,7 @@ export interface LLMAgentConfig {
   agentPersonality?: string;
   agentRestrictions?: string[];
   modelSafetySettings?: Array<{ category: string; threshold: string }>;
+  enableCompositionalFunctionCalling?: boolean; // Added for CFC
 }
 
 export interface WorkflowAgentConfig {
