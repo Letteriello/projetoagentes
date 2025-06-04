@@ -79,6 +79,12 @@ export interface RagMemoryConfig {
   vectorStoreType?: string;
 }
 
+export interface EvaluationGuardrails {
+  prohibitedKeywords?: string[];
+  maxResponseLength?: number;
+  checkForToxicity?: boolean;
+}
+
 export interface AgentConfigBase {
   type: AgentType;
   framework: AgentFramework;
@@ -93,8 +99,9 @@ export interface AgentConfigBase {
   manualSystemPromptOverride?: string;
   sandboxedCodeExecution?: boolean;
   systemPromptHistory?: Array<{ prompt: string; timestamp: string }>;
-  prompt: string;
-  timestamp: string;
+  prompt: string; // This seems like a duplicate or misplaced field, often prompts are part of LLMConfig. Review.
+  timestamp: string; // This seems like a metadata field, not typically part of base config. Review.
+  evaluationGuardrails?: EvaluationGuardrails; // Added for Task 9.4
 }
 
 export interface ModelSafetySettingItem {
@@ -102,7 +109,7 @@ export interface ModelSafetySettingItem {
   threshold: string;
 }
 
-export interface LLMAgentConfig extends Omit<AgentConfigBase, 'type'> {
+export interface LLMAgentConfig extends Omit<AgentConfigBase, 'type' | 'prompt' | 'timestamp'> { // Removed prompt and timestamp if they are truly base, otherwise they should be here
   type: "llm";
   agentModel: string;
   agentTemperature: number;
@@ -111,6 +118,8 @@ export interface LLMAgentConfig extends Omit<AgentConfigBase, 'type'> {
   modelSafetySettings?: ModelSafetySettingItem[];
   maxHistoryTokens?: number;
   maxTokensPerResponse?: number;
+  // Re-add prompt if it's specific to LLM and not base
+  // prompt?: string;
 }
 
 export interface WorkflowStep {
@@ -121,7 +130,7 @@ export interface WorkflowStep {
   description?: string;
 }
 
-export interface WorkflowAgentConfig extends Omit<AgentConfigBase, 'type'> {
+export interface WorkflowAgentConfig extends Omit<AgentConfigBase, 'type' | 'prompt' | 'timestamp'> {
   type: "workflow";
   workflowType: WorkflowDetailedType;
   subAgents?: string[];
@@ -129,13 +138,13 @@ export interface WorkflowAgentConfig extends Omit<AgentConfigBase, 'type'> {
   workflowSteps?: WorkflowStep[];
 }
 
-export interface CustomAgentConfig extends Omit<AgentConfigBase, 'type'> {
+export interface CustomAgentConfig extends Omit<AgentConfigBase, 'type' | 'prompt' | 'timestamp'> {
   type: "custom";
   scriptPath?: string;
   customConfig?: Record<string, any>;
 }
 
-export interface A2AAgentSpecialistConfig extends Omit<AgentConfigBase, 'type'> {
+export interface A2AAgentSpecialistConfig extends Omit<AgentConfigBase, 'type' | 'prompt' | 'timestamp'> {
   type: "a2a";
   specialistRole: string;
   specialistSkills: string[];
@@ -177,7 +186,7 @@ export interface SavedAgentConfiguration {
   config: AgentConfig;
   tools: string[];
   toolsDetails?: Array<{
-    id: string;
+    id:string;
     name: string;
     description: string;
     icon?: string;

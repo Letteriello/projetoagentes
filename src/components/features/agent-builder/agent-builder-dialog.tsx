@@ -191,9 +191,10 @@ const ReviewTab = lazy(() => import('./tabs/review-tab'));
 const DeployTab = lazy(() => import('./tabs/DeployTab')); // Import DeployTab
 const CallbacksTab = lazy(() => import('./tabs/CallbacksTab'));
 const AdvancedSettingsTab = lazy(() => import('./tabs/AdvancedSettingsTab'));
+const EvaluationSecurityTab = lazy(() => import('./tabs/evaluation-security-tab')); // Added for Task 9.4
 
 import { SubAgentSelector } from './sub-agent-selector';
-import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
+import { v4 as uuidv4 } from 'uuid';
 import useApiKeyVault from '../../../hooks/use-api-key-vault'; // Import default está correto, pois o hook exporta default
 
 import type {
@@ -211,6 +212,7 @@ import type {
   A2AConfig as AgentA2AConfig, // Keep alias
   AvailableTool, // Now from agent-types
   AgentType, // Added as per subtask example
+  EvaluationGuardrails, // Added for Task 9.4
   AgentFramework, // Added as per subtask example
   // WorkflowStep // Removed from here if it was, will be specifically imported
   // Add any other specific config types that were imported from agent-configs-fixed if they were missed
@@ -718,8 +720,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeEditTab, setActiveEditTab] = React.useState('general');
-  const [currentStep, setCurrentStep] = React.useState(0);
-  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'deploy', 'callbacks', 'review'];
+  const [currentStep, setCurrentStep] = React.useState(0); // tabOrder updated below
+  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'evaluation_security', 'advanced', 'deploy', 'callbacks', 'review']; // Added evaluation_security
 
   const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
   const [helpModalContent, setHelpModalContent] = React.useState<{ title: string; body: React.ReactNode } | null>(null);
@@ -778,6 +780,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
         artifacts: { ...DEFAULT_ARTIFACTS_CONFIG }, // Use the defined default
         a2a: { enabled: false, communicationChannels: [], defaultResponseFormat: 'json', maxMessageSize: 1024, loggingEnabled: false },
+        evaluationGuardrails: { // Default for Task 9.4
+          prohibitedKeywords: [],
+          checkForToxicity: false,
+          maxResponseLength: undefined, // Explicitly undefined or a sensible default like 500
+        },
         adkCallbacks: {}, // Initialize empty ADK callbacks
       } as LLMAgentConfig, // Type assertion for the default config
       tools: [],
@@ -1241,7 +1248,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 }}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-11 mb-6"> {/* Adjusted for 11 tabs */}
+                <TabsList className="grid w-full grid-cols-12 mb-6"> {/* Adjusted for 12 tabs */}
                   {/* Updated TabsTrigger props */}
                   {tabOrder.map((tab, index) => (
                     <TabsTrigger
@@ -1656,6 +1663,13 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         </p>
                       </CardContent>
                     </Card>
+                  </Suspense>
+                </TabsContent>
+
+                {/* Evaluation and Security Tab (Task 9.4) */}
+                <TabsContent value="evaluation_security">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <EvaluationSecurityTab /> {/* Assume this new component is created */}
                   </Suspense>
                 </TabsContent>
 
