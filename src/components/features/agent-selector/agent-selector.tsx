@@ -71,6 +71,7 @@ export function AgentSelector({
   triggerClassName = "",
 }: AgentSelectorProps) {
   const [agents, setAgents] = useState<AgentData[]>([]);
+  const [agentsMap, setAgentsMap] = useState<Map<string, AgentData>>(new Map());
   // const [isConfiguring, setIsConfiguring] = useState(false); // Related to removed API key config
   // const [apiKey, setApiKey] = useState(""); // Related to removed API key config
   // const googleADK = new GoogleADK(); // Removed deprecated ADK instantiation
@@ -100,6 +101,11 @@ export function AgentSelector({
           capabilities: agent.capabilities,
         }));
         setAgents(agentsList);
+        const newAgentsMap = new Map<string, AgentData>();
+        for (const agent of agentsList) {
+          newAgentsMap.set(agent.id, agent);
+        }
+        setAgentsMap(newAgentsMap);
       } catch (error) {
         console.error("Erro ao carregar agentes ADK do localStorage:", error);
         setAgents([]);
@@ -185,11 +191,12 @@ export function AgentSelector({
       )}
 
       {/* Detalhes do Agente Selecionado */}
-      {selectedAgentId && agents.length > 0 && (
+      {selectedAgentId && agentsMap.has(selectedAgentId) && (
         <div className="mt-2">
-          {agents
-            .filter((a) => a.id === selectedAgentId)
-            .map((agent) => (
+          {(() => {
+            const agent = agentsMap.get(selectedAgentId);
+            if (!agent) return null;
+            return (
               <Card key={agent.id} className="bg-accent/5 border-accent/10">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -232,7 +239,8 @@ export function AgentSelector({
                   )}
                 </CardContent>
               </Card>
-            ))}
+            );
+          })()}
         </div>
       )}
 

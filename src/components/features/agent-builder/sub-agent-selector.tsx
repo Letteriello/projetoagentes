@@ -48,6 +48,14 @@ export function SubAgentSelector({
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
 
+  const availableAgentsMap = React.useMemo(() => {
+    const map = new Map<string, SavedAgentConfiguration>();
+    for (const agent of availableAgents) {
+      map.set(agent.id, agent);
+    }
+    return map;
+  }, [availableAgents]);
+
   const handleSelect = (agentId: string) => {
     if (disabled) return;
 
@@ -113,7 +121,7 @@ export function SubAgentSelector({
       <div className="flex flex-wrap gap-2 mb-2">
         {selectedAgents.length > 0 ? (
           selectedAgents.map((agentId) => {
-            const agent = availableAgents.find((a) => a.id === agentId);
+            const agent = availableAgentsMap.get(agentId);
             return (
               <Badge
                 key={agentId}

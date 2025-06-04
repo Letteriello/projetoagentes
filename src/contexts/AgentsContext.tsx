@@ -13,12 +13,14 @@ interface AgentsContextType {
   deleteAgent: (agentId: string) => Promise<boolean>;
   fetchAgents: () => Promise<void>;
   isLoadingAgents: boolean;
+  agentsMap: Map<string, SavedAgentConfiguration>; // Added agentsMap
 }
 
 const AgentsContext = React.createContext<AgentsContextType | undefined>(undefined);
 
 export function AgentsProvider({ children }: { children: React.ReactNode }) {
   const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
+  const [agentsMap, setAgentsMap] = React.useState<Map<string, SavedAgentConfiguration>>(new Map()); // Added agentsMap state
   const [isLoadingAgents, setIsLoadingAgents] = React.useState<boolean>(true);
   const { toast } = useToast();
   const { loadAgents, saveAgent: saveAgentToStorage, updateAgent: updateAgentInStorage, deleteAgent: deleteAgentFromStorage } = useAgentStorage(); // Use the hook
@@ -35,6 +37,11 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
           })
         : [];
       setSavedAgents(processedAgents);
+      const newAgentsMap = new Map<string, SavedAgentConfiguration>();
+      for (const agent of processedAgents) {
+        newAgentsMap.set(agent.id, agent);
+      }
+      setAgentsMap(newAgentsMap);
     } catch (error) {
       console.error("Erro ao buscar agentes do localStorage:", error);
       setSavedAgents([]);
@@ -60,6 +67,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
       if (newAgent) {
         // Update state, ensuring it's sorted
         setSavedAgents(prev => [newAgent, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+        setAgentsMap(prevMap => new Map(prevMap).set(newAgent.id, newAgent)); // Update agentsMap
         toast({ title: "Agente Adicionado", description: `"${newAgent.agentName}" foi salvo com sucesso localmente.` });
         return newAgent;
       }
@@ -87,6 +95,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
           prev.map(agent => (agent.id === agentId ? updatedAgent : agent))
               .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
         );
+        setAgentsMap(prevMap => new Map(prevMap).set(updatedAgent.id, updatedAgent)); // Update agentsMap
         toast({ title: "Agente Atualizado", description: "As alterações foram salvas localmente." });
         return updatedAgent;
       }
@@ -111,6 +120,11 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
       const success = deleteAgentFromStorage(agentId);
       if (success) {
         setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
+        setAgentsMap(prevMap => { // Update agentsMap
+          const newMap = new Map(prevMap);
+          newMap.delete(agentId);
+          return newMap;
+        });
         toast({ title: "Agente Deletado", description: "O agente foi removido com sucesso localmente." });
         return true;
       }
@@ -135,7 +149,7 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AgentsContext.Provider value={{ savedAgents, addAgent, updateAgent, deleteAgent, fetchAgents, isLoadingAgents }}>
+    <AgentsContext.Provider value={{ savedAgents, agentsMap, addAgent, updateAgent, deleteAgent, fetchAgents, isLoadingAgents }}>
       {children}
     </AgentsContext.Provider>
   );
