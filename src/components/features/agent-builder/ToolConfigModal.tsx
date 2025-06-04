@@ -12,13 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button, type ButtonProps } from "@/components/ui/button";
+import { Button, type ButtonProps, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AvailableTool } from '@/types/tool-types'; // Corrected import path
+import { cn } from "@/lib/utils";
 
 // Define ToolConfigData based on the state managed by the modal
 export interface ToolConfigData {
@@ -263,7 +264,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
                   {availableApiKeys.filter(key => key.serviceType === configuringTool.serviceTypeRequired || key.serviceType === "Generic").length === 0 && (
                     <div className="px-2 py-1.5 text-sm text-muted-foreground">
                       Nenhuma chave compatível encontrada no cofre para o tipo '{configuringTool.serviceTypeRequired}' ou 'Generic'.
-                      <Button variant="link" className="p-0 h-auto ml-1" onClick={() => { /* TODO: Link to vault page */ }}>Adicionar Chave</Button>
+                      <button className={cn(buttonVariants({ variant: "link", className: "p-0 h-auto ml-1" }))} onClick={() => { /* TODO: Link to vault page */ }}>Adicionar Chave</button>
                     </div>
                   )}
                 </SelectContent>

@@ -1,7 +1,6 @@
 "use client"; // Required for hooks like useEffect, useState, useCommandPalette
 
 import * as React from 'react'; // Import React
-import type { Metadata } from "next"; // Keep metadata type if still used elsewhere, or remove if RootLayout is fully client
 import "./globals.css";
 import { Inter } from 'next/font/google';
 import { useRouter } from 'next/navigation'; // For navigation commands
@@ -29,46 +28,54 @@ import { useCommandPalette, CommandAction } from "@/hooks/use-command-palette";
 import { Cpu, MessageSquare, Plus, Settings as SettingsIcon } from "lucide-react"; // Icons for commands
 import { useToast } from '@/hooks/use-toast';
 
-
 // Import polyfills for Node.js modules in browser environment
 import '@/lib/polyfills';
 import '@/lib/node-polyfills';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-// Metadata can remain here as it's a static export
-export const metadata: Metadata = {
-  title: "AgentVerse",
-  description: "Crie, configure e monitore agentes de IA com AgentVerse.",
-};
-
 // Script to polyfill Node.js modules early in the page lifecycle
 function NodePolyfillScript() {
-  // ... (NodePolyfillScript content remains the same)
   return (
     <script
       dangerouslySetInnerHTML={{
         __html: `
           // Polyfill Node.js modules in browser
           if (typeof window !== 'undefined') {
+            // @ts-ignore
             window.process = window.process || { env: {}, nextTick: function(fn) { setTimeout(fn, 0); } };
+            // @ts-ignore
             window.Buffer = window.Buffer || { isBuffer: function() { return false; } };
+            // @ts-ignore
             window.fs = window.fs || {};
+            // @ts-ignore
             window.path = window.path || { 
-              join: function() { return Array.from(arguments).join('/').replace(/\\/+/g, '/'); }, 
-              resolve: function() { return Array.from(arguments).join('/').replace(/\\/+/g, '/'); } 
+              join: function() { return Array.from(arguments).join('/').replace(/\\\\/+/g, '/'); }, 
+              resolve: function() { return Array.from(arguments).join('/').replace(/\\\\/+/g, '/'); } 
             };
+            // @ts-ignore
             window.child_process = window.child_process || {};
+            // @ts-ignore
             window.net = window.net || {};
+            // @ts-ignore
             window.tls = window.tls || {};
+            // @ts-ignore
             window.http = window.http || {};
+            // @ts-ignore
             window.https = window.https || {};
+            // @ts-ignore
             window.crypto = window.crypto || {};
+            // @ts-ignore
             window.stream = window.stream || {};
+            // @ts-ignore
             window.zlib = window.zlib || {};
+            // @ts-ignore
             window.util = window.util || {};
+            // @ts-ignore
             window.url = window.url || {};
+            // @ts-ignore
             window.os = window.os || {};
+            // @ts-ignore
             window.assert = window.assert || function() {};
             console.log('[Polyfills] Node.js module polyfills loaded for browser');
           }
@@ -77,7 +84,6 @@ function NodePolyfillScript() {
     />
   );
 }
-
 
 export default function RootLayout({
   children,
@@ -90,7 +96,6 @@ export default function RootLayout({
     closePalette,
     actions,
     registerCommand,
-    // unregisterCommand // Not used for initial global commands in this setup
   } = useCommandPalette();
   const router = useRouter();
   const { toast } = useToast();
@@ -112,7 +117,7 @@ export default function RootLayout({
     registerCommand({
       id: 'new-agent',
       label: 'Novo Agente',
-      onSelect: () => { router.push('/agent-builder'); /* Consider opening modal directly if possible */ },
+      onSelect: () => { router.push('/agent-builder'); },
       icon: Plus,
       section: 'Ações Rápidas',
       keywords: ['criar', 'novo', 'agente', 'construtor'],
@@ -151,10 +156,7 @@ export default function RootLayout({
       section: 'Configurações',
       keywords: ['config', 'preferencias', 'ajustes'],
     });
-
-    // No need to unregister these global commands as they live with the app lifecycle
   }, [registerCommand, router, toast]);
-
 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
