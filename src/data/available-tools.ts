@@ -18,6 +18,16 @@ export const availableTools: AvailableTool[] = [
     ],
     requiresAuth: true,
     serviceTypeRequired: "Google Search",
+    inputSchema: `{
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query."
+        }
+      },
+      "required": ["query"]
+    }`
   },
   {
     id: 'openapi-custom',
@@ -34,6 +44,20 @@ export const availableTools: AvailableTool[] = [
     ],
     requiresAuth: true, // Assuming most OpenAPI specs might need auth
     serviceTypeRequired: "Custom API", // Or could be more specific if known
+    inputSchema: `{
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "The specific API endpoint to call."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Parameters to pass to the API endpoint."
+        }
+      },
+      "required": ["endpoint"]
+    }`
   },
   {
     id: 'database-connector',
@@ -55,6 +79,21 @@ export const availableTools: AvailableTool[] = [
     ],
     requiresAuth: true, // Assuming credentials might be sensitive and stored in vault
     serviceTypeRequired: "Database",
+    inputSchema: `{
+      "type": "object",
+      "properties": {
+        "sql_query": {
+          "type": "string",
+          "description": "The SQL query to execute."
+        },
+        "params": {
+          "type": "array",
+          "description": "Parameters for the SQL query.",
+          "items": { "type": "any" }
+        }
+      },
+      "required": ["sql_query"]
+    }`
   },
   {
     id: 'simple-calculator',
@@ -67,6 +106,16 @@ export const availableTools: AvailableTool[] = [
     hasConfig: false,
     requiresAuth: false,
     serviceTypeRequired: "N/A",
+    inputSchema: `{
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "The mathematical expression to evaluate."
+        }
+      },
+      "required": ["expression"]
+    }`
   },
   {
     id: 'chat-tool',

@@ -119,7 +119,9 @@ export interface AgentConfigBase {
   ragMemoryConfig?: RagMemoryConfig;
   artifacts?: ArtifactsConfig;
   systemPromptGenerated?: string; // Added field for auto-generated system prompt
+  manualSystemPromptOverride?: string; // Manually overridden system prompt
   sandboxedCodeExecution?: boolean;
+  systemPromptHistory?: Array<{ prompt: string; timestamp: string }>; // History of system prompts
 }
 
 export interface ModelSafetySettingItem {

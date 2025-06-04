@@ -109,6 +109,30 @@ import type {
 // Import WorkflowStep directly from agent-configs-new
 import { WorkflowStep } from '@/types/agent-configs-new';
 
+// Helper function to generate a tool usage snippet from JSON schema
+const generateToolSnippet = (toolName: string, jsonSchemaString: string | undefined): string => {
+  if (!jsonSchemaString) {
+    return `${toolName}(...args)`; // Fallback if no schema
+  }
+  try {
+    const schema = JSON.parse(jsonSchemaString);
+    if (schema.type !== 'object' || !schema.properties) {
+      return `${toolName}(...args)`; // Fallback if schema is not an object with properties
+    }
+
+    const params = Object.entries(schema.properties).map(([name, propDetails]) => {
+      const type = (propDetails as any).type || 'any';
+      const isRequired = schema.required && schema.required.includes(name);
+      return `${name}${isRequired ? '' : '?'}: ${type}`;
+    });
+
+    return `${toolName}(${params.join(', ')})`;
+  } catch (error) {
+    console.warn(`Failed to parse JSON schema for tool ${toolName}:`, error);
+    return `${toolName}(...args)`; // Fallback on parsing error
+  }
+};
+
 /**
  * Constructs a system prompt string based on the agent's configuration.
  * This prompt is typically used to guide the behavior of an LLM agent.
@@ -118,12 +142,16 @@ import { WorkflowStep } from '@/types/agent-configs-new';
  * @param config The agent's configuration object (LLMAgentConfig or WorkflowAgentConfig).
  * @param availableAgents A list of available agents, used for resolving agent IDs in workflow steps.
  * @param aiSuggestions Optional AI-generated suggestions that can override parts of the manual config.
+ * @param allAvailableTools Full list of tools available in the system.
+ * @param selectedToolsDetails List of tools currently selected/configured for this agent.
  * @returns A string representing the constructed system prompt.
  */
 const constructSystemPrompt = (
   config: AgentConfigUnion | null | undefined,
   availableAgents: Array<{ id: string; agentName: string }>,
-  aiSuggestions?: AiConfigurationAssistantOutput | null
+  aiSuggestions?: AiConfigurationAssistantOutput | null,
+  allAvailableTools?: AvailableTool[], // Added: Full list of tools
+  selectedToolsDetails?: Array<{ id: string; name: string; description: string }> // Added: Selected tools for the agent
 ): string => {
   if (!config) return "No configuration provided."; // Should not happen with proper form initialization
 
@@ -163,6 +191,24 @@ const constructSystemPrompt = (
       promptParts.push("\nYou must adhere to the following restrictions:");
       promptParts.push(...restrictionsToUse.map(restriction => `- ${restriction}`));
     }
+
+    // --- Available Tools ---
+    if (allAvailableTools && selectedToolsDetails && selectedToolsDetails.length > 0) {
+      promptParts.push("\nFerramentas Disponíveis:");
+      selectedToolsDetails.forEach(selectedToolInfo => {
+        const fullToolDetail = allAvailableTools.find(t => t.id === selectedToolInfo.id);
+        if (fullToolDetail) {
+          promptParts.push(`- Nome: ${fullToolDetail.name}`);
+          promptParts.push(`  Descrição: ${fullToolDetail.description}`);
+          // Assuming AvailableTool now has inputSchema: string (as per plan)
+          const snippet = generateToolSnippet(fullToolDetail.name, fullToolDetail.inputSchema);
+          if (snippet) {
+            promptParts.push(`  Uso: ${snippet}`);
+          }
+        }
+      });
+    }
+
     return promptParts.join('\n');
   } else if (config.type === 'workflow') {
     const wfConfig = config as WorkflowAgentConfig;
@@ -257,6 +303,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const [isSuggesting, setIsSuggesting] = React.useState(false);
   const [suggestionError, setSuggestionError] = React.useState<string | null>(null);
 
+  // State for manual system prompt editing
+  const [isSystemPromptManuallyEdited, setIsSystemPromptManuallyEdited] = React.useState(false);
+
   const showHelpModal = (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => {
     const content = agentBuilderHelpContent[contentKey.tab]?.[contentKey.field]?.modal;
     if (content) {
@@ -350,10 +399,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   });
 
   React.useEffect(() => {
-    methods.reset(prepareFormDefaultValues(editingAgent));
-  }, [editingAgent, methods]); // methods should be in dependency array if it could change, but typically it doesn't for useForm.
+    const defaultVals = prepareFormDefaultValues(editingAgent);
+    methods.reset(defaultVals);
+    // Initialize isSystemPromptManuallyEdited based on the new default values from the form after reset
+    // Ensure this reflects the actual persisted state if manualSystemPromptOverride has content
+    setIsSystemPromptManuallyEdited(!!methods.getValues('config.manualSystemPromptOverride'));
+  }, [editingAgent, methods]); // methods is stable, editingAgent triggers this.
 
-  const { control, watch, setValue, getValues } = methods; // Get control, watch, setValue, getValues from methods
+  const { control, watch, setValue, getValues } = methods; // Get control, watch,setValue, getValues from methods
   const agentType = watch("config.type");
   const agentGoal = watch("config.agentGoal");
   const agentTasks = watch("config.agentTasks");
@@ -361,6 +414,9 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const agentRestrictions = watch("config.agentRestrictions");
   const workflowType = watch("config.workflowType");
   const workflowSteps = watch("config.workflowSteps");
+  // Watch fields related to system prompt. These can be passed to BehaviorTab or used here.
+  // const systemPromptGenerated = watch("config.systemPromptGenerated"); // Not strictly needed to watch at this level if BehaviorTab handles its display via useFormContext
+  // const manualSystemPromptOverride = watch("config.manualSystemPromptOverride"); // Same as above
 
 
   const { fields, append, remove } = useFieldArray({
@@ -374,37 +430,82 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
    * This provides a live preview of the system prompt that would be used by the agent.
    */
   React.useEffect(() => {
-    const currentFullConfig = getValues();
-    const currentAgentConfig = currentFullConfig.config;
+    // Only auto-generate system prompt if not in manual edit mode
+    if (!isSystemPromptManuallyEdited) {
+      const currentFullConfig = getValues(); // Includes 'tools' and 'toolsDetails'
+      const currentAgentConfig = currentFullConfig.config;
 
-    if (currentAgentConfig) {
-      const newPromptString = constructSystemPrompt(
-        currentAgentConfig,
-        availableAgentsForSubSelector,
-        aiSuggestions // Pass current AI suggestions to the prompt constructor
-      );
-      setValue('config.systemPromptGenerated', newPromptString, {
-        shouldDirty: false,
-        shouldValidate: false,
-      });
+      if (currentAgentConfig) {
+        const newPromptString = constructSystemPrompt(
+          currentAgentConfig,
+          availableAgentsForSubSelector,
+          aiSuggestions, // Pass current AI suggestions to the prompt constructor
+          availableTools, // Pass the master list of all available tools
+          currentFullConfig.toolsDetails // Pass the details of currently selected tools for this agent
+        );
+        // Check if the new prompt is different before setting to avoid unnecessary re-renders/dirtying
+        if (newPromptString !== getValues('config.systemPromptGenerated')) {
+          setValue('config.systemPromptGenerated', newPromptString, {
+            shouldDirty: false, // Auto-generation should not dirty the form initially
+            shouldValidate: false,
+          });
+        }
+      }
     }
   }, [
     // Dependencies that trigger system prompt regeneration:
-    agentType,          // Type of agent (LLM, Workflow)
-    agentGoal,          // LLM agent's goal
-    agentTasks,         // LLM agent's tasks
-    agentPersonality,   // LLM agent's personality
-    agentRestrictions,  // LLM agent's restrictions
-    workflowType,       // Workflow agent's type (sequential, parallel, etc.)
-    workflowSteps,      // Steps in a workflow agent
-    availableAgentsForSubSelector, // List of agents for workflow step resolution
-    aiSuggestions,      // AI-generated suggestions which can override manual settings
-    setValue,           // React Hook Form's setValue function (stable)
-    getValues           // React Hook Form's getValues function (stable)
-    // Note: `control` is implicitly a dependency for `watch` and `getValues`, but not directly used in the callback.
+    agentType,
+    agentGoal,
+    agentTasks,
+    agentPersonality,
+    agentRestrictions,
+    workflowType,
+    workflowSteps,
+    availableAgentsForSubSelector,
+    aiSuggestions,
+    setValue,
+    getValues,
+    isSystemPromptManuallyEdited, // Key dependency to control auto-generation
+    availableTools, // Added: Master list of tools from props
+    watch('toolsDetails') // Added: Watch selected tools details, as this influences the prompt
   ]);
 
-  const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (data) => {
+  const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (submittedData) => {
+    // It's crucial to get the absolute latest values from the form,
+    // especially if setValue was called recently without an immediate re-render cycle.
+    const currentFormData = methods.getValues();
+    let finalData: SavedAgentConfiguration = { ...currentFormData }; // Make a mutable copy
+
+    // Ensure config exists, should always be true due to form structure
+    if (!finalData.config) {
+        // This case should ideally not happen if form is initialized correctly
+        console.error("Agent config is missing in onSubmit!");
+        // Potentially initialize to a default base config if absolutely necessary
+        // For now, we'll assume config is present.
+    }
+
+
+    if (isSystemPromptManuallyEdited && typeof finalData.config.manualSystemPromptOverride === 'string') {
+      finalData.config.systemPromptGenerated = finalData.config.manualSystemPromptOverride;
+    }
+    // According to the plan, manualSystemPromptOverride IS saved to the DB.
+    // If we wanted to NOT save it, we would uncomment the next line:
+    // delete finalData.config.manualSystemPromptOverride;
+
+    // Update system prompt history
+    const currentConfig = finalData.config; // Already type asserted or will be AgentConfigUnion
+    const finalSystemPromptForHistory = currentConfig.systemPromptGenerated;
+
+    if (finalSystemPromptForHistory) {
+      let history = currentConfig.systemPromptHistory || [];
+      // Avoid adding duplicate of the most recent prompt
+      if (history.length === 0 || history[0].prompt !== finalSystemPromptForHistory) {
+        history.unshift({ prompt: finalSystemPromptForHistory, timestamp: new Date().toISOString() });
+      }
+      // Keep last 3 versions (or whatever number is desired)
+      currentConfig.systemPromptHistory = history.slice(0, 3);
+    }
+
     const { id: saveToastId, update: updateSaveToast, dismiss: dismissSaveToast } = toast({
       title: "Saving Agent...",
       description: "Please wait while the configuration is being saved.",
@@ -414,12 +515,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     try {
       // Ensure timestamps and versions are correctly handled before saving
       const now = new Date().toISOString();
-      data.updatedAt = now;
-      if (!data.createdAt) { // If it's a new agent (though default function sets it)
-        data.createdAt = now;
+      finalData.updatedAt = now; // Use finalData
+      if (!finalData.createdAt) { // If it's a new agent (though default function sets it)
+        finalData.createdAt = now; // Use finalData
       }
       // internalVersion could be incremented here if logic requires
-      await onSave(data); // Assuming onSave might be async
+      await onSave(finalData); // Use the potentially modified finalData
 
       updateSaveToast({
         title: "Success!",
@@ -838,10 +939,13 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 <TabsContent value="behavior">
                   <Suspense fallback={<LoadingFallback />}>
                     <BehaviorTab
-                      agentToneOptions={agentToneOptions} // Pass only necessary static options
+                      agentToneOptions={agentToneOptions}
                       showHelpModal={showHelpModal}
-                    onGetAiSuggestions={handleGetAiSuggestions}
-                    isSuggesting={isSuggesting}
+                      onGetAiSuggestions={handleGetAiSuggestions}
+                      isSuggesting={isSuggesting}
+                      // Props for manual system prompt editing passed to BehaviorTab
+                      isSystemPromptManuallyEdited={isSystemPromptManuallyEdited}
+                      setIsSystemPromptManuallyEdited={setIsSystemPromptManuallyEdited}
                     />
                   </Suspense>
                 </TabsContent>
@@ -1174,7 +1278,10 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     type="button"
                     onClick={() => {
                       if (editingAgent) {
-                        methods.reset(prepareFormDefaultValues(editingAgent));
+                        const defaultVals = prepareFormDefaultValues(editingAgent);
+                        methods.reset(defaultVals);
+                        // Also reset the manual edit state based on the override field from default values
+                        setIsSystemPromptManuallyEdited(!!defaultVals.config.manualSystemPromptOverride);
                         toast({
                           title: "Alterações Revertidas",
                           description: "Os dados do formulário foram revertidos para o original.",
@@ -1186,7 +1293,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     <Undo2 className="mr-2 h-4 w-4" />
                     Reverter
                   </Button>
-                  <Button type="submit" disabled={!methods.formState.isValid || methods.formState.isSubmitting}>
+                  <Button type="submit" disabled={methods.formState.isSubmitting}>
                     {methods.formState.isSubmitting ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (

@@ -15,18 +15,24 @@ import { Textarea } from '@/components/ui/textarea';
 import type { SavedAgentConfiguration } from '@/types/agent-types'; // Changed import
 import { aiModels, AIModel } from '@/data/ai-models'; // Import AI Models
 import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for now, verify if needed
-import { InfoIcon } from '@/components/ui/InfoIcon';
+import { InfoIcon } from '@/components/ui/InfoIcon'; // Keep for other uses if any
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import { Button } from '@/components/ui/button';
-import { Wand2, Loader2, ClipboardCopy } from 'lucide-react'; // Added ClipboardCopy
+import { Wand2, Loader2, ClipboardCopy, Info, History } from 'lucide-react'; // Added Info, History, ClipboardCopy
 import { toast } from '@/hooks/use-toast'; // Added toast
 import { debounce } from '../../../../lib/utils'; // Import debounce
+import { MAX_SYSTEM_PROMPT_LENGTH } from '@/lib/zod-schemas'; // Import MAX_SYSTEM_PROMPT_LENGTH
+import { Controller } from 'react-hook-form'; // Import Controller
+import { CodeBlock } from '@/components/features/chat/CodeBlock'; // Import CodeBlock
 
 interface BehaviorTabProps {
   agentToneOptions: string[];
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
   onGetAiSuggestions?: () => void;
   isSuggesting?: boolean;
+  // New props for manual system prompt editing
+  isSystemPromptManuallyEdited: boolean;
+  setIsSystemPromptManuallyEdited: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 type FormContextType = SavedAgentConfiguration;
@@ -34,16 +40,28 @@ type FormContextType = SavedAgentConfiguration;
 // Enum values for WorkflowDetailedType - ensure this matches your type definition
 const workflowDetailedTypeOptions: { label: string; value: WorkflowDetailedType }[] = [
   { label: "Sequential", value: "sequential" },
+  // Removed Label component from here as it's not used directly, FormLabel is used.
+  // import { Label } from '@/components/ui/label';
   { label: "Parallel", value: "parallel" },
   { label: "Loop", value: "loop" },
   { label: "Graph", value: "graph" },
   { label: "State Machine", value: "stateMachine" },
 ];
 
-export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSuggestions, isSuggesting }: BehaviorTabProps) {
+export default function BehaviorTab({
+  agentToneOptions,
+  showHelpModal,
+  onGetAiSuggestions,
+  isSuggesting,
+  isSystemPromptManuallyEdited,
+  setIsSystemPromptManuallyEdited,
+}: BehaviorTabProps) {
   const methods = useFormContext<FormContextType>();
-  const { control, watch, getValues } = methods; // Destructure getValues here
+  const { control, watch, getValues, setValue } = methods; // Destructure getValues and setValue
   const agentType = watch('config.type');
+  const systemPromptGenerated = watch('config.systemPromptGenerated');
+  const manualSystemPromptOverride = watch('config.manualSystemPromptOverride');
+  const systemPromptHistory = watch('config.systemPromptHistory'); // Watch history
 
   const handleCopySystemPrompt = () => {
     const systemPrompt = getValues().config?.systemPromptGenerated;
@@ -70,11 +88,22 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
         render={({ field }) => (
           <FormItem>
             <div className="flex items-center space-x-2">
-              <FormLabel>Agent Goal</FormLabel>
-              <InfoIcon
-                tooltipText={agentBuilderHelpContent.behaviorTab.agentGoal.tooltip}
-                onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'agentGoal' })}
-              />
+              <FormLabel className="flex items-center">
+                Agent Goal
+                <TooltipProvider>
+                  <Tooltip delayDuration={300}>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="ml-1.5 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p className="max-w-xs">
+                        Defina a meta primária que o agente deve alcançar. Isso será usado para formar a declaração de objetivo principal no prompt do sistema. Ex: "Ajudar usuários a encontrar informações sobre produtos."
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </FormLabel>
+              {/* Modal onClick InfoIcon can be added back if needed, or integrated into the new Info icon's onClick */}
             </div>
             <FormControl>
               <Textarea {...field} placeholder="Define the primary goal for this agent..." />
@@ -84,17 +113,29 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
         )}
       />
 
+      {/* Agent Tasks - Assuming it's part of LLMAgentConfig and thus rendered when agentType === 'llm' */}
+      {/* If it's truly common, it stays outside. If LLM specific, it should be inside the agentType === 'llm' block */}
       <FormField
         control={control}
-        name="config.agentTasks" // This will be a string from textarea, Zod schema expects string[]
+        name="config.agentTasks"
         render={({ field }) => (
           <FormItem>
             <div className="flex items-center space-x-2">
-              <FormLabel>Agent Tasks (one per line)</FormLabel>
-               <InfoIcon
-                tooltipText={agentBuilderHelpContent.behaviorTab.agentTasks.tooltip}
-                onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'agentTasks' })}
-              />
+              <FormLabel className="flex items-center">
+                Agent Tasks (one per line)
+                <TooltipProvider>
+                  <Tooltip delayDuration={300}>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="ml-1.5 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p className="max-w-xs">
+                        Liste as tarefas específicas que o agente deve executar para atingir seu objetivo. Cada tarefa será detalhada no prompt do sistema. Ex: "Coletar requisitos do usuário", "Buscar documentação relevante".
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </FormLabel>
             </div>
             <FormControl>
               <Textarea
@@ -190,11 +231,21 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center space-x-2">
-                  <FormLabel>Agent Personality/Tone</FormLabel>
-                  <InfoIcon
-                    tooltipText={agentBuilderHelpContent.behaviorTab.agentPersonality.tooltip}
-                    onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'agentPersonality' })}
-                  />
+                  <FormLabel className="flex items-center">
+                    Agent Personality/Tone
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <Info size={14} className="ml-1.5 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p className="max-w-xs">
+                            Escolha a personalidade que o agente deve adotar. Isso influenciará o tom e o estilo de suas respostas no prompt. Ex: "Um assistente amigável e prestativo".
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormLabel>
                 </div>
                 <Select onValueChange={field.onChange} value={field.value || ""}>
                   <FormControl>
@@ -251,7 +302,51 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
             );
           }}
           />
-          {/* TODO: Add fields for agentRestrictions, modelSafetySettings, maxHistoryTokens, maxTokensPerResponse */}
+          {/* Agent Restrictions Field - To be added if not present, or modified if it is */}
+          {/* Assuming agentRestrictions is an array of strings, typically handled by a TagInput or similar */}
+          {/* For now, let's represent it with a Textarea similar to agentTasks for simplicity if TagInput isn't used */}
+          <FormField
+            control={control}
+            name="config.agentRestrictions"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center space-x-2">
+                  <FormLabel className="flex items-center">
+                    Agent Restrictions (one per line)
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <Info size={14} className="ml-1.5 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p className="max-w-xs">
+                            Defina quaisquer restrições ou regras que o agente deve seguir estritamente. Estas serão listadas como diretivas no prompt. Ex: "Não fornecer aconselhamento financeiro", "Manter as respostas concisas".
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormLabel>
+                </div>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    placeholder="List the specific restrictions for the agent, one per line."
+                    rows={3}
+                    value={Array.isArray(field.value) ? field.value.join('\n') : field.value || ''}
+                    onChange={(e) => {
+                      // field.onChange(e.target.value.split('\n').filter(restriction => restriction.trim() !== '')); // Example for array
+                      field.onChange(e.target.value); // Send string for now
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+                 <p className="text-xs text-muted-foreground">
+                    Note: Restrictions are expected as a direct string input here.
+                </p>
+              </FormItem>
+            )}
+          />
+          {/* End of Agent Restrictions Field */}
 
           {/* AI Suggestions Button */}
           {onGetAiSuggestions && agentType === 'llm' && (
@@ -286,6 +381,138 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
                 <ClipboardCopy className="mr-2 h-4 w-4" />
                 Copiar Prompt do Sistema
               </Button>
+            </div>
+          )}
+
+          {/* System Prompt Preview and Edit Section */}
+          {agentType === 'llm' && (
+            <div className="mt-6 pt-6 border-t">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <FormLabel>Preview do Prompt do Sistema</FormLabel>
+                  <InfoIcon
+                    tooltipText="Este é o prompt do sistema que será usado pelo agente. Você pode editá-lo manualmente."
+                    // Optional: Add modal content if more detailed help is needed
+                    // onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'systemPromptPreview' })}
+                  />
+                </div>
+                {!isSystemPromptManuallyEdited ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setValue('config.manualSystemPromptOverride', getValues('config.systemPromptGenerated') || '', { shouldValidate: true, shouldDirty: true });
+                      setIsSystemPromptManuallyEdited(true);
+                    }}
+                  >
+                    Editar Prompt
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setValue('config.manualSystemPromptOverride', '', { shouldValidate: false, shouldDirty: true }); // Clear the override
+                      setIsSystemPromptManuallyEdited(false); // Triggers regeneration in parent
+                      // Optionally, explicitly trigger re-validation or re-generation if needed,
+                      // though the change in isSystemPromptManuallyEdited should handle it via useEffect in parent.
+                    }}
+                  >
+                    Resetar para Gerado Automaticamente
+                  </Button>
+                )}
+              </div>
+              <FormField
+                control={control}
+                // The 'name' for FormField is primarily for RHF to connect to the schema for validation errors.
+                // Since we display errors for both fields separately using Controller below,
+                // we can use a common or even one of the two names here.
+                // Let's use manualSystemPromptOverride as it's the one being actively edited.
+                name={"config.manualSystemPromptOverride"}
+                render={({ field }) => ( // field might not be directly used here if value/onChange are handled by Textarea/CodeBlock
+                  <FormItem>
+                    {/* No FormLabel needed here as it's part of the outer structure */}
+                    <FormControl>
+                      {isSystemPromptManuallyEdited ? (
+                        <Textarea
+                          value={manualSystemPromptOverride || ''}
+                          onChange={(e) => {
+                            setValue('config.manualSystemPromptOverride', e.target.value, { shouldValidate: true, shouldDirty: true });
+                          }}
+                          placeholder="Edite o prompt do sistema manualmente..."
+                          rows={10}
+                          className="font-mono text-xs bg-muted/20 border-primary" // Highlight when editing
+                        />
+                      ) : (
+                        <div className="rounded-md border bg-background p-1 min-h-[160px]"> {/* Adjusted min-height */}
+                          <CodeBlock
+                            language="markdown"
+                            value={systemPromptGenerated || 'O prompt do sistema gerado aparecerá aqui...'}
+                            className="text-xs max-h-[210px] overflow-y-auto" // Max height to match Textarea approx.
+                            showLineNumbers={false}
+                            wrapLines={true}
+                          />
+                        </div>
+                      )}
+                    </FormControl>
+                    {/* Validation messages using Controller */}
+                    <Controller
+                      name="config.manualSystemPromptOverride"
+                      control={control}
+                      render={({ fieldState }) => (isSystemPromptManuallyEdited && fieldState.error) ? <FormMessage>{fieldState.error.message}</FormMessage> : null}
+                    />
+                    <Controller
+                      name="config.systemPromptGenerated"
+                      control={control}
+                      render={({ fieldState }) => (!isSystemPromptManuallyEdited && fieldState.error) ? <FormMessage>{fieldState.error.message}</FormMessage> : null}
+                    />
+                  </FormItem>
+                )}
+              />
+              {/* Character Counter */}
+              <p className="text-xs text-muted-foreground mt-1">
+                {(isSystemPromptManuallyEdited ? manualSystemPromptOverride : systemPromptGenerated)?.length || 0} / {MAX_SYSTEM_PROMPT_LENGTH} caracteres
+              </p>
+              {isSystemPromptManuallyEdited && (
+                 <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
+                  Você está editando manualmente o prompt do sistema. As alterações automáticas baseadas em outros campos não serão aplicadas até você resetar.
+                </p>
+              )}
+
+              {/* Prompt History Select */}
+              {systemPromptHistory && systemPromptHistory.length > 0 && (
+                <div className="mt-4">
+                  <FormLabel className="flex items-center mb-1 text-sm">
+                    <History size={14} className="mr-1.5" />
+                    Restaurar Prompt Anterior:
+                  </FormLabel>
+                  <Select
+                    onValueChange={(promptValue) => {
+                      if (promptValue) {
+                        setValue('config.manualSystemPromptOverride', promptValue, { shouldValidate: true, shouldDirty: true });
+                        // Ensure setIsSystemPromptManuallyEdited is callable
+                        if (typeof setIsSystemPromptManuallyEdited === 'function') {
+                          setIsSystemPromptManuallyEdited(true);
+                        }
+                        toast({ title: "Prompt Histórico Restaurado", description: "O prompt selecionado foi carregado no editor." });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full text-xs">
+                      <SelectValue placeholder="Selecione uma versão para restaurar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {systemPromptHistory.map((entry, index) => (
+                        <SelectItem key={index} value={entry.prompt} className="text-xs">
+                          {new Date(entry.timestamp).toLocaleString()} - {entry.prompt.substring(0, 50)}...
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           )}
         </>

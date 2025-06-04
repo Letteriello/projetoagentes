@@ -11,6 +11,9 @@ import type {
   CommunicationChannel as CommunicationChannelType // For A2A
 } from '@/types/agent-configs-new';
 
+// Maximum length for system prompts
+export const MAX_SYSTEM_PROMPT_LENGTH = 10000;
+
 // Enums defined from TypeScript types
 const AgentFrameworkEnum = z.enum(["genkit", "crewai", "langchain", "custom", "none"]);
 const AgentTypeEnum = z.enum(["llm", "workflow", "custom", "a2a"]);
@@ -150,11 +153,24 @@ export const agentConfigBaseSharedSchema = z.object({
   statePersistence: statePersistenceConfigSchema.optional(),
   ragMemoryConfig: ragMemoryConfigSchema.optional(),
   artifacts: artifactsConfigSchema.optional(),
+  systemPromptGenerated: z.string().optional().refine(
+    (val) => val === undefined || val === null || val.length <= MAX_SYSTEM_PROMPT_LENGTH,
+    { message: `O prompt gerado excede o limite de ${MAX_SYSTEM_PROMPT_LENGTH} caracteres.` }
+  ),
+  manualSystemPromptOverride: z.string().optional().refine(
+    (val) => val === undefined || val === null || val.length <= MAX_SYSTEM_PROMPT_LENGTH,
+    { message: `O prompt manual excede o limite de ${MAX_SYSTEM_PROMPT_LENGTH} caracteres.` }
+  ),
   a2a: a2aSettingsSchema.optional(),
   isRootAgent: z.boolean().optional().default(true),
   subAgentIds: z.array(z.string()).optional(),
   globalInstruction: z.string().optional(),
+  sandboxedCodeExecution: z.boolean().optional(), // Added from AgentConfigBase in types
   adkCallbacks: adkCallbacksConfigSchema, // Added ADK Callbacks here
+  systemPromptHistory: z.array(z.object({
+    prompt: z.string(),
+    timestamp: z.string().datetime(),
+  })).optional(),
 });
 
 export const llmAgentConfigSchema = agentConfigBaseSharedSchema.extend({
