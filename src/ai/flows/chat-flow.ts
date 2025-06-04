@@ -20,6 +20,10 @@ import { createDatabaseAccessTool } from '@/ai/tools/database-access-tool';
 // Import static tools
 import { calculatorTool } from '@/ai/tools/calculator-tool';
 import { codeExecutorTool } from '@/ai/tools/code-executor-tool';
+import { imageClassifierTool } from '../tools/image-classifier-tool'; // Added Image Classifier Tool
+import { textSummarizerTool } from '../tools/text-summarizer-tool'; // Added Text Summarizer Tool
+import { sentimentAnalyzerTool } from '../tools/sentiment-analyzer-tool'; // Added Sentiment Analyzer Tool
+import { aiFeedbackTool } from '../tools/ai-feedback-tool'; // Added AI Feedback Tool
 import { videoStreamMonitorTool, GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR } from '@/ai/tools/video-stream-tool'; // Added videoStreamMonitorTool
 
 import process from 'node:process';
@@ -110,6 +114,10 @@ const allAvailableTools: Record<string, AppTool> = {
   }),
   codeExecutor: codeExecutorTool(),
   [GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR]: videoStreamMonitorTool, // Added videoStreamMonitorTool
+  imageClassifier: imageClassifierTool, // Added Image Classifier Tool
+  textSummarizer: textSummarizerTool, // Added Text Summarizer Tool
+  sentimentAnalyzer: sentimentAnalyzerTool, // Added Sentiment Analyzer Tool
+  aiFeedback: aiFeedbackTool, // Added AI Feedback Tool
 };
 
 /**
@@ -755,8 +763,12 @@ async function basicChatFlowInternal(
       }
 
       const toolResponsePartsForNextIteration: ToolResponsePart[] = [];
+      let numToolsSuccessfullyProcessedInCurrentBatch = 0; // Initialize counter for chained call simulation
+
       // Use toolRequestsFromCurrentLLMResponse which might have been cleared by simulation
-      for (const toolRequest of toolRequestsFromCurrentLLMResponse) {
+      // Changed to index-based loop to allow modification of toolRequestsFromCurrentLLMResponse for chaining
+      for (let toolIdx = 0; toolIdx < toolRequestsFromCurrentLLMResponse.length; toolIdx++) {
+        const toolRequest = toolRequestsFromCurrentLLMResponse[toolIdx]; // Current tool being processed
         let toolExecutionFailed = false;
         let resultOutput: any;
         let errorMessage: string | undefined;
@@ -1011,12 +1023,12 @@ async function basicChatFlowInternal(
               eventDetails: toolErrorDetails.message + (toolErrorDetails.details ? ` Details: ${JSON.stringify(toolErrorDetails.details)}` : ''),
             });
             resultOutput = { error: toolErrorDetails.message, code: toolErrorDetails.code, details: toolErrorDetails.details };
-            toolResponseParts.push({ toolRequest, output: resultOutput });
+            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
           } else {
-            resultOutput = toolRawOutput;
+            resultOutput = finalToolOutput; // Use potentially modified output by afterTool callback
             executedToolResults.push({
               name: toolRequest.name,
-              input: toolRequest.input as Record<string, unknown>,
+              input: toolRequest.input as Record<string, unknown>, // Log original input for this specific request
               output: resultOutput,
               status: 'success',
               ref: toolRequest.ref,
@@ -1029,7 +1041,91 @@ async function basicChatFlowInternal(
               eventTitle: `Ferramenta ${toolRequest.name} executada`,
               eventDetails: typeof resultOutput === 'string' ? resultOutput : JSON.stringify(resultOutput),
             });
-            toolResponseParts.push({ toolRequest, output: resultOutput });
+            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
+
+            // Start of Chained Call Simulation Block
+            if (!toolExecutionFailed) { // Ensure tool was successful before considering chaining
+                numToolsSuccessfullyProcessedInCurrentBatch++;
+
+                const simulateChainedCall = true; // Hardcoded true for this simulation context
+
+                if (simulateChainedCall &&
+                    numToolsSuccessfullyProcessedInCurrentBatch === 1 &&
+                    toolRequestsFromCurrentLLMResponse.length === (toolIdx + 1) && // Check if this is the last of the *currently queued* tools (originally from LLM or already chained)
+                                                                                  // This is to ensure we only chain if the *current* set of requests is about to be exhausted by this success.
+                                                                                  // More accurately, this condition means: if the LLM asked for 1 tool, it succeeded, then we chain.
+                                                                                  // Or, if LLM asked for A,B; A succeeded, B succeeded, then we chain after B.
+                                                                                  // The problem description's intent was "LLM initially requested only one tool".
+                                                                                  // To match that specific intent, we'd need to store the original length of toolRequestsFromCurrentLLMResponse
+                                                                                  // before this inner tool execution loop.
+                                                                                  // For this implementation, we'll use a simplified condition focusing on current state:
+                                                                                  // If this is the first successful tool in THIS batch AND it's the only one currently in the queue from LLM.
+                                                                                  // This means `toolRequestsFromCurrentLLMResponse` should have had length 1 initially for this to trigger on the first success.
+                    toolRequestsFromCurrentLLMResponse.length === 1 && // This check ensures the LLM *initially* only requested one tool for this batch for the simulation to trigger
+                    genkitTools.length > 1) {
+
+                    winstonLogger.info(`[Simulation] Chained function calling triggered after tool '${toolRequest.name}' succeeded. Original batch size was 1. Processed in batch: ${numToolsSuccessfullyProcessedInCurrentBatch}. Current queue length before adding chain: ${toolRequestsFromCurrentLLMResponse.length}`, { agentId, flowName });
+
+                    let nextToolToChain: AppTool | undefined = undefined;
+                    for (const availableTool of genkitTools) {
+                        if (availableTool.name !== toolRequest.name) { // Find a *different* tool
+                            nextToolToChain = availableTool;
+                            break;
+                        }
+                    }
+
+                    if (nextToolToChain) {
+                        let fabricatedInput: any = { simulatedChainedInput: true };
+
+                        if (nextToolToChain.inputSchema && nextToolToChain.inputSchema.isZod) {
+                            const schemaShape = (nextToolToChain.inputSchema as z.ZodObject<any,any,any>).shape;
+                            if (schemaShape) {
+                                const tempInput: any = {};
+                                Object.keys(schemaShape).forEach(key => {
+                                    const fieldDef = schemaShape[key]._def;
+                                    const fieldTypeName = fieldDef.typeName;
+
+                                    if (fieldTypeName === 'ZodString') tempInput[key] = `Chained from ${toolRequest.name}`;
+                                    else if (fieldTypeName === 'ZodNumber') tempInput[key] = 123;
+                                    else if (fieldTypeName === 'ZodBoolean') tempInput[key] = true;
+                                    else if (fieldDef.innerType && fieldDef.innerType._def) {
+                                        const innerTypeName = fieldDef.innerType._def.typeName;
+                                        if (innerTypeName === 'ZodString') tempInput[key] = `Chained optional from ${toolRequest.name}`;
+                                        else if (innerTypeName === 'ZodNumber') tempInput[key] = 456;
+                                        else if (innerTypeName === 'ZodBoolean') tempInput[key] = false;
+                                        else tempInput[key] = "simulated_optional_chained_value";
+                                    }
+                                    else tempInput[key] = "simulated_chained_value";
+                                });
+                                fabricatedInput = tempInput;
+                            }
+                        } else if (nextToolToChain.name.toLowerCase().includes('search') || nextToolToChain.name.toLowerCase().includes('query')) {
+                            fabricatedInput = { query: `Chained query after ${toolRequest.name}` };
+                        } else {
+                            fabricatedInput = { text: `Chained text from ${toolRequest.name}` };
+                        }
+
+                        const chainedToolRequest: ToolRequest = {
+                            name: nextToolToChain.name,
+                            input: fabricatedInput,
+                            ref: `sim_chain_${Date.now()}`
+                        };
+
+                        toolRequestsFromCurrentLLMResponse.push(chainedToolRequest);
+
+                        winstonLogger.info(`[Simulation] Added chained request for tool: ${nextToolToChain.name}. Current tool queue length: ${toolRequestsFromCurrentLLMResponse.length}`, { agentId, flowName });
+                        chatEvents.push({
+                            id: `evt-sim-chain-added-${Date.now()}`,
+                            timestamp: new Date(),
+                            eventType: 'AGENT_CONTROL',
+                            eventTitle: 'Simulated Chained Call Added',
+                            eventDetails: `Tool ${toolRequest.name} completed. Adding forced call to ${nextToolToChain.name} to current tool execution queue. New queue length: ${toolRequestsFromCurrentLLMResponse.length}.`,
+                            toolName: nextToolToChain.name
+                        });
+                    }
+                }
+            }
+            // End of Chained Call Simulation Block
           }
 
         } catch (e: any) {
@@ -1057,41 +1153,18 @@ async function basicChatFlowInternal(
             eventTitle: `Crash na ferramenta ${toolRequest.name}`,
             eventDetails: errorMessage + (e.stack ? ` Stack: ${e.stack}`: ''),
           });
-          toolResponseParts.push({ toolRequest, output: resultOutput });
+          toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
         }
-      }
+      } // End of index-based for loop for toolRequestsFromCurrentLLMResponse
 
       // Add tool responses to messages for the next iteration
       // Only add if there were actual tool responses generated.
-      if (toolResponseParts.length > 0) {
-        currentMessages.push({
-          role: 'tool',
-          content: toolResponseParts.map(part => {
-            // Ensure that the 'output' being stringified is appropriate,
-            // especially if it's an error object.
-            // For Genkit, the 'output' in ToolResponsePart is what's sent to the LLM.
-            // If 'part.output' is an error, it should be represented in a way the LLM can understand.
-            // For now, we assume JSON.stringify will handle it, but this might need refinement
-            // based on how the LLM expects tool error messages.
-
-          // This part constructs the message for the *next* LLM iteration.
-          // The actual `tool_response` Part should be structured correctly.
-          // Genkit expects `Part.toolResponse({ name: string, output: any, ref?: string })`
-          // Let's try to use that, assuming `resultOutput` is the raw data for `output`.
-          toolResponsePartsForNextIteration.push({
-            toolRequest: toolRequest, // Keep original request for reference if needed, though Genkit uses 'ref'
-            output: resultOutput, // This is the actual output to be sent back to the LLM
-          });
-        }
-      }
-
-      // Add tool responses to messages for the next iteration
       if (toolResponsePartsForNextIteration.length > 0) {
         currentMessages.push({
           role: 'tool',
           content: toolResponsePartsForNextIteration.map(tr => ({
             toolResponse: { // Using Genkit's defined Part.toolResponse structure
-              name: tr.toolRequest.name,
+              name: tr.toolRequest.name, // This should be tr.toolRequest.name, not toolRequest.name
               ref: tr.toolRequest.ref || '', // Ensure ref is a string
               output: tr.output,
             }
