@@ -51,6 +51,7 @@ const BlinkingCursor = () => (
 // Responsável por renderizar o conteúdo da mensagem, incluindo texto, imagens e anexos de arquivo.
 
 import { Skeleton } from "@/components/ui/skeleton"; // Added import for Skeleton
+import { useTypewriter } from "@/hooks/useTypewriter"; // Import the useTypewriter hook
 
 // Helper function to get the appropriate attachment icon
 const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
@@ -112,6 +113,15 @@ export default function ChatMessageDisplay({
 }: ChatMessageDisplayProps) {
   const isUser = message.sender === "user"; // Verifica se o remetente é o usuário.
   const isAgent = message.sender === "agent"; // Verifica se o remetente é o agente.
+
+  // Use the typewriter hook for agent's streaming messages
+  const displayedMessageText = useTypewriter({
+    text: message.text || "", // Ensure text is not undefined
+    isStreaming: !!message.isStreaming, // Ensure isStreaming is boolean
+    isAgent: isAgent,
+    speed: 30, // Optional: adjust speed
+  });
+
   const isUploadingAttachment = message.status === 'pending' && (!!message.imageUrl || !!message.fileName);
 
   // Função para lidar com o download de arquivos anexados.
@@ -186,17 +196,19 @@ export default function ChatMessageDisplay({
                     // Componente customizado para renderizar parágrafos.
                     // Adiciona o cursor piscante se a mensagem for do agente e estiver sendo transmitida.
                     p: ({ children }) => {
+                      // The BlinkingCursor should only appear at the very end of the streaming message.
+                      // We check if the displayed text is still shorter than the full text.
+                      const showCursor = isAgent && message.isStreaming && displayedMessageText.length < (message.text || "").length;
                       return (
                         <p>
                           {children}
-                          {/* Adiciona o cursor piscante aqui, verificando message.isStreaming diretamente do objeto message */}
-                          {isAgent && message.isStreaming && <BlinkingCursor />}
+                          {showCursor && <BlinkingCursor />}
                         </p>
                       );
                     },
                   }}
                 >
-                  {message.text}
+                  {displayedMessageText}
                 </ReactMarkdown>
               </div>
             )}

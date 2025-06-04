@@ -1,9 +1,10 @@
 "use client"; // Required for hooks like useEffect, useState, useCommandPalette
 
 import * as React from 'react';
+import { motion, AnimatePresence } from 'framer-motion'; // Added framer-motion imports
 import "./globals.css";
 import { Inter } from 'next/font/google';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { AppLayout } from "@/components/layout/app-layout";
 import { ErrorBoundaryClient } from '@/components/error-boundary-client';
 import { Toaster } from "@/components/ui/toaster";
@@ -101,7 +102,8 @@ export default function RootLayout({
     actions,
     registerCommand,
   } = useCommandPalette();
-  const router = useRouter();
+  const router = useRouter(); // Keep for command palette navigation
+  const pathname = usePathname(); // Get current pathname for animations
   const { toast } = useToast(); // This instance is for the layout's own toast needs like command palette
 
   // Register global keyboard shortcut for Command Palette
@@ -168,6 +170,9 @@ export default function RootLayout({
         <NodePolyfillScript />
       </head>
       <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:border focus:rounded-md">
+          Pular para o conteúdo principal
+        </a>
         <ThemeProvider>
           <LoggerProvider>
             <AuthProvider>
@@ -176,7 +181,19 @@ export default function RootLayout({
                   <SidebarProvider>
                     <AppLayout>
                       <ErrorBoundaryClient>
-                        {children}
+                        <AnimatePresence mode="wait">
+                          <motion.div
+                            key={pathname} // Use pathname from usePathname()
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                          >
+                            <main id="main-content" tabIndex={-1}>
+                              {children}
+                            </main>
+                          </motion.div>
+                        </AnimatePresence>
                       </ErrorBoundaryClient>
                     </AppLayout>
                   </SidebarProvider>
