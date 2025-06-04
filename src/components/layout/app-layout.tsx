@@ -248,6 +248,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                         <SidebarMenuButton
                           asChild
                           isActive={pathname === item.href}
+                          {...(item.href === "/agent-builder" && { 'data-tour': "agent-builder-link" })}
+                          {...(item.href === "/chat" && { 'data-tour': "chat-link" })}
                           className={cn(
                             isSidebarIconOnly ? "justify-center" : "justify-start",
                           )}
@@ -344,7 +346,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                       </DropdownMenuItem>
                     </Link>
                     <Link href="/api-key-vault" passHref>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem data-tour="api-keys-link">
                         <KeyRound className="mr-2 h-4 w-4" />
                         <span>Chaves API</span>
                       </DropdownMenuItem>

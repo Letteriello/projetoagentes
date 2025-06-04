@@ -337,6 +337,7 @@ if (!open) setOpen(true);
                 : "!-right-[var(--sidebar-width)] opacity-0 pointer-events-none"),
           )}
           data-sidebar="sidebar"
+          data-tour="sidebar"
           {...props}
         >
           {children}
