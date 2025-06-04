@@ -26,7 +26,8 @@ import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed w
 import { winstonLogger } from '../../lib/winston-logger';
 import { z } from 'zod';
 import { ActionContext } from 'genkit';
-import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/agent-configs-new'; // Adjust path as needed
+import { AgentConfig, KnowledgeSource, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
+import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
 
 // Define sensitive keywords for guardrails
 const SENSITIVE_KEYWORDS = ["conteúdo sensível", "excluir dados", "informação confidencial", "apagar tudo", "dados pessoais", "senha", "segredo"];
@@ -122,14 +123,17 @@ interface ChatFlowParams {
   modelName: 'geminiPro' | 'gemini15Pro' | string;
   systemPrompt?: string;
   temperature?: number;
-  topK?: number;
-  topP?: number;
-  maxOutputTokens?: number;
+  // topK, topP, maxOutputTokens will be added here by subtask
   stopSequences?: string[];
   agentToolsDetails?: ToolDetail[];
   // Added for RAG
   ragMemoryConfig?: RagMemoryConfig;
   knowledgeSources?: KnowledgeSource[];
+  // New fields from subtask
+  topP?: number;
+  topK?: number;
+  maxOutputTokens?: number;
+  forceToolUsage?: boolean;
 }
 
 // Zod validation schemas
@@ -147,12 +151,15 @@ const ChatFlowParamsSchema = z.object({
   modelName: z.string(),
   systemPrompt: z.string().optional(),
   temperature: z.number().optional(),
-  topK: z.number().optional(),
-  topP: z.number().optional(),
-  maxOutputTokens: z.number().optional(),
+  // topK, topP, maxOutputTokens will be added here by subtask for Zod
   stopSequences: z.array(z.string()).optional(),
   agentToolsDetails: z.array(ToolDetailSchema).optional(),
   // Added for RAG - Zod types for these would ideally come from agent-configs-new.ts if they exist
+  // New fields for Zod schema
+  topP: z.number().min(0).max(1).optional(),
+  topK: z.number().int().min(1).optional(),
+  maxOutputTokens: z.number().int().min(1).optional(),
+  forceToolUsage: z.boolean().optional(),
   // For now, using z.any() as a placeholder if specific Zod schemas are not readily available.
   // It's better to define these properly if possible.
   ragMemoryConfig: z.any().optional(), // Placeholder: Replace with RagMemoryConfigSchema if available
@@ -166,6 +173,9 @@ export interface BasicChatInput extends ChatFlowParams {
   agentId?: string; // Optional agentId for logging/context
   userMessage: string;
   callbacks?: Record<string, string>; // Added for callback configuration
+  // New fields should be implicitly part of BasicChatInput if it extends ChatFlowParams
+  // If BasicChatInput is a distinct type definition that duplicates fields, it would need them too.
+  // Assuming BasicChatInput directly uses/extends ChatFlowParams, so no explicit additions here.
 }
 
 /**
@@ -204,6 +214,9 @@ async function basicChatFlowInternal(
   const flowName = 'basicChatFlowInternal'; // For logging context
   const agentId = input.agentId || 'unknown_agent'; // For logging context
   const callbacks = input.callbacks || {}; // Extract callbacks
+
+  const selectedModelDetails = llmModels.find(m => m.id === input.modelName);
+  winstonLogger.info(`Chat Flow: Model selected - Name: ${selectedModelDetails?.name}, ID: ${input.modelName}, Tools Capability: ${selectedModelDetails?.capabilities?.tools}`, { agentId, flowName });
 
   // Helper function to get callback configuration
   const getCallbackConfig = (callbackName: 'beforeModel' | 'afterModel' | 'beforeTool' | 'afterTool') => {
@@ -379,9 +392,10 @@ async function basicChatFlowInternal(
       messages: messages,
       config: {
         temperature: input.temperature,
-        topK: input.topK,
-        topP: input.topP,
-        maxOutputTokens: input.maxOutputTokens,
+        // Pass new params if they exist
+        ...(input.topP !== undefined && { topP: input.topP }),
+        ...(input.topK !== undefined && { topK: input.topK }),
+        ...(input.maxOutputTokens !== undefined && { maxOutputTokens: input.maxOutputTokens }),
         stopSequences: input.stopSequences
       },
       tools: genkitTools.length > 0 ? genkitTools.map(tool => ({
@@ -468,6 +482,7 @@ async function basicChatFlowInternal(
       const contentParts = choice.message.content;
       let hasToolRequestInThisResponse = false;
       let textFromThisResponse = "";
+      let toolRequestsFromCurrentLLMResponse: ToolRequest[] = [];
 
       for (const part of contentParts) {
         if (part.text) {
@@ -475,19 +490,112 @@ async function basicChatFlowInternal(
         }
         if (part.toolRequest) {
           hasToolRequestInThisResponse = true;
-          executedToolRequests.push(part.toolRequest); // Store for output
-          // The actual tool execution will happen outside this loop based on these requests
-          // For simplicity in this example, we'll assume Genkit's `generate` handles the tool execution
-          // if the tool is defined and its `func` is called by Genkit internally.
-          // If Genkit `generate` doesn't auto-execute and just returns requests,
-          // then explicit tool execution logic would be needed here.
-          // However, standard Genkit flow with tools in `generateOptions` implies Genkit handles this.
+          toolRequestsFromCurrentLLMResponse.push(part.toolRequest);
+          // executedToolRequests.push(part.toolRequest); // Store all attempts, will be pushed later if not overridden
         }
       }
 
-      if (!hasToolRequest || choice.finishReason === 'stop') {
-        // If no tool requests in this response, or if LLM decided to stop, then we are done.
-        break; 
+      // SIMULATION: Tool Usage Failure
+      if (hasToolRequestInThisResponse && selectedModelDetails?.capabilities?.tools === false) {
+        winstonLogger.warn(`[Simulation] Model ${selectedModelDetails.name} attempted to use tools but is not capable. Simulating tool usage failure.`, { agentId, flowName });
+        const originalToolNames = toolRequestsFromCurrentLLMResponse.map(tr => tr.name).join(', ');
+        finalOutputText = `This model (${selectedModelDetails.name}) attempted to use a tool(s) (${originalToolNames}) but is not configured to do so.`;
+
+        toolRequestsFromCurrentLLMResponse.forEach(tr => {
+          executedToolResults.push({
+            name: tr.name,
+            input: tr.input as Record<string, unknown>,
+            errorDetails: { message: `Simulated: Model ${selectedModelDetails.name} cannot use tools.`, code: 'SIMULATED_TOOL_CAPABILITY_FAILURE' },
+            status: 'error',
+            ref: tr.ref,
+          });
+        });
+
+        chatEvents.push({
+          id: `evt-sim-${Date.now()}`, timestamp: new Date(), eventType: 'TOOL_ERROR', // Or a custom eventType
+          eventTitle: `Simulated Tool Failure: ${selectedModelDetails.name}`,
+          eventDetails: `Model attempted to use tool(s) '${originalToolNames}' but capabilities.tools is false.`,
+          toolName: originalToolNames
+        });
+
+        hasToolRequestInThisResponse = false; // Prevent actual tool execution
+        toolRequestsFromCurrentLLMResponse = []; // Clear requests
+        // choice.finishReason = 'stop'; // Force stop after this simulation
+        // The loop should break naturally now as hasToolRequestInThisResponse is false and no new tool responses will be added
+        // finalOutputText is set, so it will be returned.
+        // We need to ensure that the main loop breaks correctly.
+        // If textFromThisResponse was also part of the LLM's message, it might be lost if we just set finalOutputText.
+        // For this simulation, we are replacing any text output with the error message.
+        if (choice.finishReason !== 'stop') choice.finishReason = 'stop'; // Ensure loop termination
+      }
+
+      // Push successful tool requests to executedToolRequests if not overridden by simulation
+      if (toolRequestsFromCurrentLLMResponse.length > 0) {
+        executedToolRequests.push(...toolRequestsFromCurrentLLMResponse);
+      }
+
+      // SIMULATION: Force Tool Usage
+      if (
+        input.forceToolUsage === true &&
+        selectedModelDetails?.capabilities?.tools === true &&
+        genkitTools.length > 0 &&
+        toolRequestsFromCurrentLLMResponse.length === 0 && // Only if LLM didn't already request a tool
+        choice.finishReason !== 'stop' // And if the LLM doesn't want to stop yet
+      ) {
+        const firstTool = genkitTools[0]; // Pick the first available tool
+        let fabricatedInput: any = {};
+
+        // Try to make a somewhat relevant input based on tool's inputSchema or name
+        if (firstTool.inputSchema && firstTool.inputSchema.isZod) { // Check if Zod schema
+            const schemaShape = (firstTool.inputSchema as z.ZodObject<any,any,any>).shape;
+            if (schemaShape) {
+                Object.keys(schemaShape).forEach(key => {
+                    // A very basic attempt to populate based on common query/text fields
+                    if (key.toLowerCase().includes('query') || key.toLowerCase().includes('text') || key.toLowerCase().includes('message')) {
+                        fabricatedInput[key] = input.userMessage.substring(0, 50); // Use part of user message
+                    } else if (key.toLowerCase().includes('num')) { // For calculator like tools
+                        fabricatedInput[key] = Math.floor(Math.random() * 10) + 1;
+                    } else {
+                         fabricatedInput[key] = "simulated_value"; // Default placeholder
+                    }
+                });
+            } else {
+                 fabricatedInput = { query: input.userMessage.substring(0,50) }; // Fallback input
+            }
+        } else if (firstTool.name.toLowerCase().includes('search') || firstTool.name.toLowerCase().includes('query')) {
+          fabricatedInput = { query: input.userMessage.substring(0,50) };
+        } else {
+          fabricatedInput = { text: "Forced tool execution with default input" };
+        }
+
+        const fabricatedToolRequest: ToolRequest = {
+          name: firstTool.name,
+          input: fabricatedInput,
+          ref: `sim_force_${Date.now()}` // Unique ref for simulated request
+        };
+
+        winstonLogger.info(`[Simulation] Forcing tool usage. Fabricated request for tool: ${firstTool.name} with input: ${JSON.stringify(fabricatedInput)}`, { agentId, flowName });
+        toolRequestsFromCurrentLLMResponse.push(fabricatedToolRequest);
+        executedToolRequests.push(fabricatedToolRequest); // Also add to overall executed requests
+        hasToolRequestInThisResponse = true; // Ensure the tool execution loop runs
+
+        chatEvents.push({
+          id: `evt-sim-force-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL', // Or a custom eventType
+          eventTitle: `Simulated Force Tool Usage`,
+          eventDetails: `Agent forced to use tool: ${firstTool.name} with input ${JSON.stringify(fabricatedInput)}.`,
+          toolName: firstTool.name
+        });
+        // Do not append textFromThisResponse to finalOutputText yet, as we are now processing a tool.
+        // textFromThisResponse might be an LLM refusal that we are overriding.
+        textFromThisResponse = ""; // Clear any text from LLM as we are forcing a tool.
+      }
+
+
+      if (!hasToolRequestInThisResponse || choice.finishReason === 'stop') {
+        // If no tool requests in this response (either originally or due to simulation),
+        // or if LLM decided to stop, then we are done.
+        finalOutputText += textFromThisResponse; // Append any text from this response (could be empty if tool was forced)
+        break;
       }
 
       // If there were tool requests, Genkit's `generate` (when tools are provided)
@@ -579,10 +687,8 @@ async function basicChatFlowInternal(
       }
 
       const toolResponsePartsForNextIteration: ToolResponsePart[] = [];
-      const toolRequestsFromThisResponse = contentParts.filter(p => p.toolRequest).map(p => p.toolRequest as ToolRequest);
-      // executedToolRequests.push(...toolRequestsFromThisResponse); // Already pushed above if we want all attempts
-
-      for (const toolRequest of toolRequestsFromThisResponse) {
+      // Use toolRequestsFromCurrentLLMResponse which might have been cleared by simulation
+      for (const toolRequest of toolRequestsFromCurrentLLMResponse) {
         let toolExecutionFailed = false;
         let resultOutput: any;
         let errorMessage: string | undefined;
@@ -928,6 +1034,30 @@ async function basicChatFlowInternal(
 
   // const stream = llmResponse.stream ? llmResponse.stream() : null; // Stream handling would need rework with this loop, as llmResponse is from the last call
     // if (stream) { return { stream }; }
+
+    // SIMULATIONS for Concise and Creative models (affecting finalOutputText)
+    if (selectedModelDetails?.customProperties?.behavior === 'concise') {
+      const concisenessThreshold = selectedModelDetails.maxOutputTokens || 50; // Use model's maxOutputTokens or default
+      if (finalOutputText.length > concisenessThreshold) {
+        const originalLength = finalOutputText.length;
+        finalOutputText = finalOutputText.substring(0, concisenessThreshold) + "... (simulated conciseness)";
+        winstonLogger.info(`[Simulation] Concise model behavior: Output truncated from ${originalLength} to ${finalOutputText.length} chars.`, { agentId, flowName });
+        chatEvents.push({
+          id: `evt-sim-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL',
+          eventTitle: 'Simulated Conciseness',
+          eventDetails: `Output truncated to meet concise behavior. Original length: ${originalLength}. New length: ${finalOutputText.length}.`
+        });
+      }
+    } else if (selectedModelDetails?.customProperties?.behavior === 'creative') {
+      const creativeFlourish = " And that's the world in a nutshell, with a sprinkle of stardust!";
+      finalOutputText += creativeFlourish;
+      winstonLogger.info(`[Simulation] Creative model behavior: Added flourish.`, { agentId, flowName });
+      chatEvents.push({
+        id: `evt-sim-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL',
+        eventTitle: 'Simulated Creativity',
+        eventDetails: `Added creative flourish: "${creativeFlourish}"`
+      });
+    }
 
     // Simulated Safety Check on finalOutputText
     const SIMULATED_INSECURE_PHRASE = "resposta insegura simulada";
