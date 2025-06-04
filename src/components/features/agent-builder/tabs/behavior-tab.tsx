@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react'; // Import useMemo
 import { useFormContext } from 'react-hook-form';
 import {
   FormField,
@@ -20,6 +20,7 @@ import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import { Button } from '@/components/ui/button';
 import { Wand2, Loader2, ClipboardCopy } from 'lucide-react'; // Added ClipboardCopy
 import { toast } from '@/hooks/use-toast'; // Added toast
+import { debounce } from '../../../../lib/utils'; // Import debounce
 
 interface BehaviorTabProps {
   agentToneOptions: string[];
@@ -217,8 +218,13 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
           <FormField
             control={control}
             name="config.agentTemperature"
-            render={({ field }) => (
-              <FormItem>
+            render={({ field }) => {
+              const debouncedOnChange = useMemo(() => {
+                return debounce(field.onChange, 300);
+              }, [field.onChange]);
+
+              return (
+                <FormItem>
                 <div className="flex items-center space-x-2">
                   <FormLabel>Agent Temperature (Creativity)</FormLabel>
                   <InfoIcon
@@ -233,7 +239,7 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
                       max={1}
                       step={0.01}
                       value={[typeof field.value === 'number' ? field.value : 0.7]} // Ensure value is number
-                      onValueChange={(value) => field.onChange(value[0])}
+                      onValueChange={(value) => debouncedOnChange(value[0])}
                     />
                     <div className="text-center text-sm text-muted-foreground">
                       Value: {(typeof field.value === 'number' ? field.value : 0.7).toFixed(2)} (0: Precise, 1: Creative)
@@ -242,7 +248,8 @@ export default function BehaviorTab({ agentToneOptions, showHelpModal, onGetAiSu
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
+            );
+          }}
           />
           {/* TODO: Add fields for agentRestrictions, modelSafetySettings, maxHistoryTokens, maxTokensPerResponse */}
 
