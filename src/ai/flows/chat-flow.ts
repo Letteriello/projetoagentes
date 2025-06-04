@@ -26,6 +26,7 @@ import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed w
 import { winstonLogger } from '../../lib/winston-logger';
 import { z } from 'zod';
 import { ActionContext } from 'genkit';
+import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/agent-configs-new'; // Adjust path as needed
 
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
 // Stores factory functions for configurable tools and direct tool objects for static ones.
@@ -123,6 +124,9 @@ interface ChatFlowParams {
   maxOutputTokens?: number;
   stopSequences?: string[];
   agentToolsDetails?: ToolDetail[];
+  // Added for RAG
+  ragMemoryConfig?: RagMemoryConfig;
+  knowledgeSources?: KnowledgeSource[];
 }
 
 // Zod validation schemas
@@ -144,7 +148,12 @@ const ChatFlowParamsSchema = z.object({
   topP: z.number().optional(),
   maxOutputTokens: z.number().optional(),
   stopSequences: z.array(z.string()).optional(),
-  agentToolsDetails: z.array(ToolDetailSchema).optional()
+  agentToolsDetails: z.array(ToolDetailSchema).optional(),
+  // Added for RAG - Zod types for these would ideally come from agent-configs-new.ts if they exist
+  // For now, using z.any() as a placeholder if specific Zod schemas are not readily available.
+  // It's better to define these properly if possible.
+  ragMemoryConfig: z.any().optional(), // Placeholder: Replace with RagMemoryConfigSchema if available
+  knowledgeSources: z.array(z.any()).optional() // Placeholder: Replace with KnowledgeSourceSchema if available
 });
 
 /**
@@ -173,6 +182,7 @@ export interface BasicChatOutput {
     toolName?: string;
   }>[];
   generatedArtifact?: GeneratedArtifactInfo; // Added for artifact output
+  retrievedContextForDisplay?: string; // Added for RAG context
 }
 
 // Definir tipo completo para mensagens
@@ -206,13 +216,41 @@ async function basicChatFlowInternal(
     if (input.history) {
       messages.push(...input.history.map(msg => ({
         role: msg.role as ChatMessage['role'],
-        content: Array.isArray(msg.content) ? 
-          msg.content.map(c => typeof c === 'string' ? {text: c} : c) : 
-          [{text: String(msg.content)}],
-        ...('metadata' in msg && {metadata: msg.metadata as Record<string, unknown>})
+        content: Array.isArray(msg.content) ?
+          msg.content.map(c => typeof c === 'string' ? { text: c } : c) :
+          [{ text: String(msg.content) }],
+        ...('metadata' in msg && { metadata: msg.metadata as Record<string, unknown> })
       })));
     }
-    const userMessageContent: Part[] = [{ text: input.userMessage }];
+
+    // RAG Simulation Logic
+    let retrievedContextForLLM = "";
+    let retrievedContextForDisplay: string | undefined = undefined;
+    // The AgentConfig type is used here, assuming input contains the necessary fields.
+    // The caller of basicChatFlowInternal must ensure these are populated.
+    const agentConfigFromInput = input as Partial<AgentConfig & ChatFlowParams>;
+
+    if (agentConfigFromInput.ragMemoryConfig?.enabled && agentConfigFromInput.knowledgeSources && agentConfigFromInput.knowledgeSources.length > 0) {
+      const simulatedRAGContextParts: string[] = [];
+      agentConfigFromInput.knowledgeSources.forEach(ks => {
+        if (ks.enabled) {
+          simulatedRAGContextParts.push(`Source: ${ks.name}${ks.description ? ' - ' + ks.description : ''}`);
+        }
+      });
+
+      if (simulatedRAGContextParts.length > 0) {
+        retrievedContextForDisplay = "Simulated RAG Context:\n" + simulatedRAGContextParts.join("\n");
+        retrievedContextForLLM = `\n\n[Retrieved Context from Knowledge Sources]:\n${retrievedContextForDisplay}\n\n`;
+        winstonLogger.info(`Chat Flow: RAG enabled. Simulated context: ${retrievedContextForDisplay}`, { agentId });
+      } else {
+        winstonLogger.info("Chat Flow: RAG enabled, but no enabled knowledge sources found or they produced no context.", { agentId });
+        retrievedContextForDisplay = "RAG enabled, but no relevant context found from knowledge sources.";
+      }
+    }
+
+    const userMessageText = retrievedContextForLLM ? `${retrievedContextForLLM}${input.userMessage}` : input.userMessage;
+    const userMessageContent: Part[] = [{ text: userMessageText }];
+
     if (input.fileDataUri) {
       userMessageContent.push({
         media: {
@@ -539,10 +577,11 @@ async function basicChatFlowInternal(
 
     return {
       outputMessage: finalOutputText,
-      toolRequests: executedToolRequests, 
-      toolResults: executedToolResults, 
+      toolRequests: executedToolRequests,
+      toolResults: executedToolResults,
       chatEvents: chatEvents, // Add chatEvents to output
       generatedArtifact: foundArtifact, // Add generated artifact to output
+      retrievedContextForDisplay: retrievedContextForDisplay, // Add RAG context
     };
   } catch (e: any) {
     winstonLogger.error(`Error in ${flowName} (Agent: ${agentId})`, {
@@ -552,7 +591,7 @@ async function basicChatFlowInternal(
     });
     // enhancedLogger.logError is good here if createLoggableFlow doesn't capture enough detail or if error is caught before re-throwing
     // For now, createLoggableFlow will handle the primary error logging.
-    return { error: e.message || 'An unexpected error occurred', chatEvents }; // Also return chatEvents in case of early error
+    return { error: e.message || 'An unexpected error occurred', chatEvents, retrievedContextForDisplay }; // Also return chatEvents and context in case of early error
   }
 }
 

@@ -80,12 +80,23 @@ export interface StatePersistenceConfig {
   config?: Record<string, any>;
 }
 
+export type KnowledgeSourceType =
+  | "document"
+  | "website"
+  | "api"
+  | "database"
+  | "custom";
+
 export interface KnowledgeSource {
   id: string;
-  type: string;
   name: string;
+  type: KnowledgeSourceType;
   description?: string;
-  config: Record<string, any>;
+  location: string; // URI, URL, ou caminho de arquivo
+  credentials?: string; // Opcional, para fontes que requerem autenticação
+  format?: string; // Formato do conteúdo (PDF, HTML, JSON, etc.)
+  updateFrequency?: "static" | "daily" | "weekly" | "monthly" | "custom"; // Frequência de atualização
+  enabled: boolean;
 }
 
 export interface RagMemoryConfig {

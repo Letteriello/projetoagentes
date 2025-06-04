@@ -25,6 +25,12 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from 'rehype-raw';
 import { CodeBlock } from "./CodeBlock"; // Componente para realce de sintaxe em blocos de código.
 import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensagens de chat.
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"; // Added import for Accordion
 
 // Interface para as props do componente ChatMessageDisplay.
 // Define a estrutura esperada para uma mensagem de chat.
@@ -291,6 +297,27 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
                 <Download className="h-4 w-4" /> {/* Ícone de download. */}
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Retrieved Context Display */}
+        {message.role === 'assistant' && message.retrievedContext && isVerboseMode && (
+          <div className="mt-2 pt-2 border-t border-border/50">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1">
+                <AccordionTrigger className="text-xs hover:no-underline py-2">
+                  <div className="flex items-center text-muted-foreground">
+                    <Info size={14} className="mr-2" />
+                    Retrieved Context (Verbose Mode)
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-xs bg-muted/30 p-3 rounded-md">
+                  <pre className="whitespace-pre-wrap break-all">
+                    {message.retrievedContext}
+                  </pre>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         )}
       </div>
