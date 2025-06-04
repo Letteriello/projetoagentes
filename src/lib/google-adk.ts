@@ -1,7 +1,7 @@
 // src/lib/google-adk.ts
 import { v4 as uuidv4 } from 'uuid';
 // Import the specific DB function needed
-import { getAgentByIdDB } from '@/lib/agentIndexedDB';
+import { getAgentById as getAgentByIdFromDB } from '@/services/indexed-db-agent-service';
 import { ADKAgentConfig, ADKChatMessage, ADKContentPart, ADKChatCompletionOptions, ADKChatCompletionResponse, ADKTool } from '@/types/adk-types'; // Assuming types are here
 
 // Mock da API do Google ADK - Substituir pela implementação real quando disponível
@@ -133,7 +133,7 @@ export async function sendMessageToAgent(
   history: ADKChatMessage[] = []
 ): Promise<ADKChatMessage> {
   // Retrieve agent configuration from IndexedDB
-  const agentConfig = await getAgentByIdDB(agentId); // Changed from localStorage
+  const agentConfig = await getAgentByIdFromDB(agentId); // Changed from localStorage
   
   if (!agentConfig) {
     // Try to provide a more specific error if agent is not found by ID

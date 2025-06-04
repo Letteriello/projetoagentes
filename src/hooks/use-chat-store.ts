@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useOptimistic } from 'react';
 import { Conversation, ChatMessageUI, Message, MessageFeedback, ToolCallData, ToolResponseData, ErrorDetails } from '@/types/chat';
-import { User } from 'firebase/auth';
+// import { User } from 'firebase/auth'; // No longer directly needed for User type here
 import { v4 as uuidv4 } from 'uuid';
 import {
   getAllConversations,
@@ -10,12 +10,13 @@ import {
   renameConversationInStorage,
   addMessageToConversation,
   updateMessageFeedback,
-  deleteMessageFromConversation, // Added for regenerate
-} from '@/lib/firestoreConversationStorage';
+  deleteMessageFromConversation,
+  // finalizeMessageInConversation, // Not used in this hook, but available from service
+} from '@/services/indexed-db-conversation-service'; // UPDATED IMPORT
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Timestamp } from 'firebase/firestore';
+// import { Timestamp } from 'firebase/firestore'; // No longer needed
 
 // Define ExtendedChatMessageUI and OptimisticUpdateAction
 export interface ExtendedChatMessageUI extends ChatMessageUI {
@@ -173,9 +174,9 @@ export function useChatStore(): ChatStore {
       const conversation = await getConversationById(conversationId);
       const uiMessages: ExtendedChatMessageUI[] = (conversation?.messages || []).map((dbMessage: Message) => ({
         id: dbMessage.id || uuidv4(),
-        text: dbMessage.content || "",
+        text: dbMessage.content || "", // Assuming content is string, adjust if structured
         sender: dbMessage.isUser ? "user" : "agent",
-        timestamp: dbMessage.timestamp ? (dbMessage.timestamp instanceof Date ? dbMessage.timestamp : (dbMessage.timestamp as any).toDate()) : new Date(),
+        timestamp: dbMessage.timestamp, // Already a Date object from the service
         status: 'completed',
         feedback: dbMessage.feedback,
         isStreaming: false,
@@ -299,15 +300,18 @@ export function useChatStore(): ChatStore {
     try {
       const userMessageToPersist: Message = {
         id: userMessageId, isUser: true, content: messageInputValue,
-        timestamp: Timestamp.fromDate(userMessageTimestamp),
+        timestamp: userMessageTimestamp, // Use Date object directly
         imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
         conversationId: currentConvId,
+        // Ensure other fields like 'text' are aligned if Message type expects it
+        // For IndexedDB service, content is the primary text field.
+        text: messageInputValue,
       };
       await addMessageToConversation(currentConvId, userMessageToPersist);
       // Update true `messages` state
       setMessages(prev => [...prev, { ...userMessagePayload, status: 'completed' }]);
       addOptimisticMessage({ type: 'update_message_status', messageId: userMessageId, newStatus: 'completed' });
-      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: messageInputValue.substring(0,50) }) : c));
+      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: messageInputValue.substring(0,50) }) : c));
     } catch (error) { /* error handling, revert optimistic, set pending false */
         console.error("Error persisting user message:", error);
         toast({ title: "Error", description: "Failed to send your message.", variant: "destructive" });
@@ -331,16 +335,19 @@ export function useChatStore(): ChatStore {
       .filter(m => m.status === 'completed') // only completed from true state
       .map(uiMsg => ({
         id: uiMsg.id, isUser: uiMsg.sender === 'user', content: uiMsg.text,
-        timestamp: Timestamp.fromDate(uiMsg.timestamp), feedback: uiMsg.feedback,
+        timestamp: uiMsg.timestamp, // Use Date object directly
+        feedback: uiMsg.feedback,
         imageUrl: uiMsg.imageUrl, fileName: uiMsg.fileName,
         conversationId: uiMsg.conversationId,
+        text: uiMsg.text, // Ensure text field if Message type expects it
       }));
     // Add the current user message to history as it's now completed
     historyForBackend.push({
         id: userMessageId, isUser: true, content: currentInputForAgent,
-        timestamp: Timestamp.fromDate(userMessageTimestamp),
+        timestamp: userMessageTimestamp, // Use Date object directly
         imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
         conversationId: currentConvId,
+        text: currentInputForAgent, // Ensure text field
     });
 
 
@@ -439,11 +446,11 @@ export function useChatStore(): ChatStore {
             id: msg.id,
             isUser: msg.sender === 'user',
             content: msg.text,
-            timestamp: Timestamp.fromDate(msg.timestamp),
+            timestamp: msg.timestamp, // Use Date object directly
             conversationId: currentConvId,
-            // Map toolCall/toolResponse to Firestore fields if necessary
+            text: msg.text, // Ensure text field
+            // Map toolCall/toolResponse if needed
             // For now, assuming content/text is sufficient for display.
-            // Detailed tool data might be stored in a separate field or within metadata.
           };
           if (msg.sender !== 'user') { // User message already persisted
              await addMessageToConversation(currentConvId, messageToPersist);
@@ -469,8 +476,9 @@ export function useChatStore(): ChatStore {
 
         const agentMessageToPersist: Message = {
             id: agentMessageId, isUser: false, content: finalAgentText,
-            timestamp: Timestamp.fromDate(agentMessageTimestamp),
+            timestamp: agentMessageTimestamp, // Use Date object directly
             conversationId: currentConvId,
+            text: finalAgentText, // Ensure text field
         };
         await addMessageToConversation(currentConvId, agentMessageToPersist);
         setMessages(prev => [...prev, finalAgentPayload]);
@@ -478,7 +486,7 @@ export function useChatStore(): ChatStore {
 
       // Common post-processing for both JSON and stream paths
       if (currentConvId && finalAgentText) { // Ensure there's an agent text to update preview
-         setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: finalAgentText.substring(0,50) }) : c));
+         setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: finalAgentText.substring(0,50) }) : c));
       }
 
     } catch (error: any) {
@@ -500,18 +508,17 @@ export function useChatStore(): ChatStore {
           };
           setMessages(prev => [...prev, agentErrorMessageObject]);
 
-          const agentErrorFirestoreObject: Message = {
+          const agentErrorPersistObject: Message = { // Renamed for clarity
             id: agentMessageId,
             content: errorMsg,
             isUser: false,
-            timestamp: Timestamp.fromDate(agentMessageTimestamp), // Ensure this is available
+            timestamp: agentMessageTimestamp, // Use Date object directly. Ensure this is available
             conversationId: currentConvId,
-            // Firestore Message type might not have isError or status,
-            // error state is represented by the content and potentially how UI treats it.
+            text: errorMsg, // Ensure text field
           };
-          addMessageToConversation(currentConvId, agentErrorFirestoreObject)
+          addMessageToConversation(currentConvId, agentErrorPersistObject)
             .catch(err => {
-              console.error("Failed to persist agent error message to Firestore:", err);
+              console.error("Failed to persist agent error message to IndexedDB:", err);
               // Optionally, toast another error or handle this failure
             });
         }
@@ -597,9 +604,11 @@ export function useChatStore(): ChatStore {
       .filter(m => m.status === 'completed')
       .map(uiMsg => ({
         id: uiMsg.id, isUser: uiMsg.sender === 'user', content: uiMsg.text,
-        timestamp: Timestamp.fromDate(uiMsg.timestamp), feedback: uiMsg.feedback,
+        timestamp: uiMsg.timestamp, // Use Date object directly
+        feedback: uiMsg.feedback,
         imageUrl: uiMsg.imageUrl, fileName: uiMsg.fileName,
         conversationId: uiMsg.conversationId,
+        text: uiMsg.text, // Ensure text field
       }));
 
     // The userPromptMessage.text is the input for this new agent turn.
@@ -645,12 +654,13 @@ export function useChatStore(): ChatStore {
 
       const agentMessageToPersist: Message = {
           id: newAgentMessageId, isUser: false, content: accumulatedAgentResponse,
-          timestamp: Timestamp.fromDate(newAgentTimestamp),
+          timestamp: newAgentTimestamp, // Use Date object directly
           conversationId: activeConversationId,
+          text: accumulatedAgentResponse, // Ensure text field
       };
       await addMessageToConversation(activeConversationId, agentMessageToPersist);
       setMessages(prev => [...prev, finalAgentPayload]); // Update true state
-      setConversations(prev => prev.map(c => c.id === activeConversationId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
+      setConversations(prev => prev.map(c => c.id === activeConversationId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
 
     } catch (error: any) {
         console.error("Error during agent response regeneration:", error);
