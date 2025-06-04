@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { lazy, Suspense } from 'react';
-import { useForm, FormProvider, useFormContext, Controller, SubmitHandler } from 'react-hook-form';
+import { useForm, FormProvider, useFormContext, Controller, SubmitHandler, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -20,6 +20,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
+import JsonEditorField from '@/components/ui/JsonEditorField'; // Added JsonEditorField
 // Label replaced by FormLabel where appropriate
 import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
 import { toast } from '@/hooks/use-toast';
@@ -96,11 +98,74 @@ import type {
   A2AConfig as AgentA2AConfig, // Keep alias
   AvailableTool, // Now from agent-types
   AgentType, // Added as per subtask example
-  AgentFramework // Added as per subtask example
+  AgentFramework, // Added as per subtask example
+  // WorkflowStep // Removed from here if it was, will be specifically imported
   // Add any other specific config types that were imported from agent-configs-fixed if they were missed
   // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
   // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
 } from '@/types/agent-types';
+// Import WorkflowStep directly from agent-configs-new
+import { WorkflowStep } from '@/types/agent-configs-new';
+
+// Helper function to construct system prompt
+const constructSystemPrompt = (
+  config: AgentConfigUnion | null | undefined,
+  availableAgents: Array<{ id: string; agentName: string }>
+): string => {
+  if (!config) return "No configuration provided.";
+
+  let promptParts: string[] = [];
+
+  if (config.type === 'llm') {
+    const llmConfig = config as LLMAgentConfig;
+    promptParts.push(`You are an AI agent${llmConfig.agentPersonality ? ` with the personality of a ${llmConfig.agentPersonality}` : ''}.`);
+    if (llmConfig.agentGoal) {
+      promptParts.push(`Your primary goal is: ${llmConfig.agentGoal}.`);
+    }
+    if (llmConfig.agentTasks && llmConfig.agentTasks.length > 0) {
+      promptParts.push("To achieve this goal, you must perform the following tasks:");
+      promptParts.push(...llmConfig.agentTasks.map(task => `- ${task}`));
+    }
+    if (llmConfig.agentRestrictions && llmConfig.agentRestrictions.length > 0) {
+      promptParts.push("\nYou must adhere to the following restrictions:");
+      promptParts.push(...llmConfig.agentRestrictions.map(restriction => `- ${restriction}`));
+    }
+    return promptParts.join('\n');
+  } else if (config.type === 'workflow') {
+    const wfConfig = config as WorkflowAgentConfig;
+    promptParts.push("You are a workflow orchestrator agent.");
+    if (wfConfig.agentGoal) {
+      promptParts.push(`Your primary goal is: ${wfConfig.agentGoal}.`);
+    }
+    if (wfConfig.workflowType) {
+      promptParts.push(`This is a '${wfConfig.workflowType}' workflow, executing the following steps:`);
+    }
+    if (wfConfig.workflowSteps && wfConfig.workflowSteps.length > 0) {
+      const stepDescriptions = wfConfig.workflowSteps.map((step, index) => {
+        const agentName = availableAgents.find(a => a.id === step.agentId)?.agentName || step.agentId || "Unknown Agent";
+        let inputMappingStr = typeof step.inputMapping === 'string' ? step.inputMapping : JSON.stringify(step.inputMapping);
+        try {
+          // Attempt to parse and re-stringify for consistent formatting if it's a JSON string
+          inputMappingStr = JSON.stringify(JSON.parse(inputMappingStr), null, 2);
+        } catch (e) {
+          // If it's not a valid JSON string, use it as is
+        }
+
+        return `\nStep ${index + 1}: ${step.name || 'Unnamed Step'}
+  Description: ${step.description || 'N/A'}
+  Agent: ${agentName}
+  Input Mapping: ${inputMappingStr}
+  Output Key: ${step.outputKey || 'N/A'}`;
+      });
+      promptParts.push(...stepDescriptions);
+    } else {
+      promptParts.push("No workflow steps defined.");
+    }
+    return promptParts.join('\n');
+  }
+
+  return "System prompt generation for this agent type is not yet configured.";
+};
 
 // Fallback component for lazy loading
 const LoadingFallback = () => <div>Loading tab...</div>;
@@ -227,13 +292,23 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   // Helper function to prepare default values ensuring artifacts config is present
   const prepareFormDefaultValues = (agent?: SavedAgentConfiguration | null): SavedAgentConfiguration => {
     const baseConfig = agent || createDefaultSavedAgentConfiguration();
-    return {
+  const preparedConfig = {
       ...baseConfig,
       config: {
         ...baseConfig.config,
         artifacts: baseConfig.config?.artifacts || { ...DEFAULT_ARTIFACTS_CONFIG },
       },
     };
+
+  // Ensure workflowSteps is initialized for workflow agents
+  if (preparedConfig.config.type === 'workflow') {
+    const workflowConfig = preparedConfig.config as WorkflowAgentConfig;
+    if (workflowConfig.workflowSteps === undefined) {
+      workflowConfig.workflowSteps = [];
+    }
+  }
+
+  return preparedConfig;
   };
 
   const methods = useForm<SavedAgentConfiguration>({
@@ -244,6 +319,46 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   React.useEffect(() => {
     methods.reset(prepareFormDefaultValues(editingAgent));
   }, [editingAgent, methods]); // methods should be in dependency array if it could change, but typically it doesn't for useForm.
+
+  const { control, watch, setValue, getValues } = methods; // Get control, watch, setValue, getValues from methods
+  const agentType = watch("config.type");
+  const agentGoal = watch("config.agentGoal");
+  const agentTasks = watch("config.agentTasks");
+  const agentPersonality = watch("config.agentPersonality");
+  const agentRestrictions = watch("config.agentRestrictions");
+  const workflowType = watch("config.workflowType");
+  const workflowSteps = watch("config.workflowSteps");
+
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "config.workflowSteps",
+  });
+
+  // Effect to update systemPromptGenerated
+  React.useEffect(() => {
+    const currentFullConfig = getValues(); // Get all form values
+    const currentAgentConfig = currentFullConfig.config; // Get the agent-specific config part
+
+    if (currentAgentConfig) {
+      const newPromptString = constructSystemPrompt(currentAgentConfig, availableAgentsForSubSelector);
+      setValue('config.systemPromptGenerated', newPromptString, {
+        shouldDirty: false, // Avoid marking form as dirty due to auto-update
+        shouldValidate: false, // Avoid re-validating on this change
+      });
+    }
+  }, [
+    agentType,
+    agentGoal,
+    agentTasks,
+    agentPersonality,
+    agentRestrictions,
+    workflowType,
+    workflowSteps,
+    availableAgentsForSubSelector,
+    setValue, // setValue and getValues from RHF are stable, but good practice to include if used directly
+    getValues
+  ]);
 
   const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (data) => {
     const { id: saveToastId, update: updateSaveToast, dismiss: dismissSaveToast } = toast({
@@ -484,6 +599,119 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     SparklesIcon={Wand2}
                     showHelpModal={showHelpModal}
                   />
+
+                  {/* Workflow Steps UI - Rendered conditionally within General Tab Content */}
+                  {agentType === 'workflow' && (
+                    <Card className="mt-6">
+                      <CardHeader>
+                        <CardTitle>Passos do Workflow</CardTitle>
+                        <CardDescription>Defina os passos sequenciais para este agente workflow.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {fields.map((item, index) => (
+                          <Card key={item.id} className="p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <h4 className="font-semibold">Passo {index + 1}</h4>
+                              <Button variant="ghost" size="sm" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={control}
+                                name={`config.workflowSteps.${index}.name`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Nome do Passo (Opcional)</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="Ex: Validar Pedido" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={control}
+                                name={`config.workflowSteps.${index}.agentId`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Agente ID</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Selecione um agente" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {availableAgentsForSubSelector.map(agent => (
+                                          <SelectItem key={agent.id} value={agent.id}>
+                                            {agent.agentName}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormField
+                              control={control}
+                              name={`config.workflowSteps.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem className="mt-4">
+                                  <FormLabel>Descrição do Passo (Opcional)</FormLabel>
+                                  <FormControl>
+                                    <Textarea {...field} placeholder="Ex: Este passo verifica os detalhes do pedido..." />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={control}
+                              name={`config.workflowSteps.${index}.inputMapping`}
+                              render={({ field }) => (
+                                <FormItem className="mt-4">
+                                  <FormLabel>Mapeamento de Input (JSON)</FormLabel>
+                                  <FormControl>
+                                    <JsonEditorField
+                                      value={field.value as string | Record<string, any>} // Expects string or object
+                                      onChange={(value) => field.onChange(typeof value === 'object' ? JSON.stringify(value) : value)}
+                                      height="150px"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={control}
+                              name={`config.workflowSteps.${index}.outputKey`}
+                              render={({ field }) => (
+                                <FormItem className="mt-4">
+                                  <FormLabel>Chave de Saída</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="Ex: resultadoValidacao" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </Card>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => append({ agentId: '', inputMapping: '{}', outputKey: '', name: '', description: '' } as WorkflowStep)}
+                          className="mt-4"
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Adicionar Passo
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
 
                 {/* Tools Tab */}
