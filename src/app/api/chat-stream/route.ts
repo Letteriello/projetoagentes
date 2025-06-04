@@ -95,6 +95,16 @@ async function fetchAgentConfiguration(agentId: string): Promise<SavedAgentConfi
 
 export async function POST(req: NextRequest) {
   try {
+    // API Key Authentication
+    const authHeader = req.headers.get('Authorization');
+    const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const serverApiKey = process.env.CHAT_API_KEY;
+
+    if (!apiKey || apiKey !== serverApiKey) {
+      winstonLogger.warn('Unauthorized access attempt to /api/chat-stream', { api: 'chat-stream', remoteAddress: req.ip });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const chatInput: ChatInput = await req.json();
 
     if (!chatInput.agentId) {
