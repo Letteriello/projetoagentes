@@ -41,8 +41,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs-fixed';
-import type { AvailableTool } from '@/types/agent-types';
+import type { 
+  SavedAgentConfiguration, 
+  AgentConfig,
+  AvailableTool 
+} from '@/types'; // Importando do arquivo index.ts que criamos
 
 import {
   availableTools as defaultAvailableTools,
