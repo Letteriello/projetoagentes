@@ -1,5 +1,9 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
+import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock } from "lucide-react"; // Added Clock
+import { dateTimeTool } from "../../ai/tools/date-time-tool"; // Import dateTimeTool
+import { petStoreTool } from "../../ai/tools/openapi-tool"; // Import petStoreTool
+import { fileIoTool } from "../../ai/tools/file-io-tool"; // Import fileIoTool
 import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Video } from "lucide-react"; // Added Video
 import {
   TOOL_ID_WEB_SEARCH,
@@ -297,6 +301,37 @@ export const standardTools: AvailableTool[] = [
     ]
   },
   {
+    id: "dateTimeTool",
+    name: "Date & Time Operations",
+    icon: Clock, // Using Clock icon
+    description: "Provides functions for getting current date/time, adding days, and formatting dates.",
+    hasConfig: false, // Assuming no external configuration needed for this tool itself
+    // genkitToolName: "dateTimeTool", // This refers to the tool itself, not a specific action name if the tool has multiple actions.
+                                      // The flow will use the tool name and specify actions like 'dateTimeTool.getCurrentDateTime'
+    category: "Utilities", // Or any other relevant category
+    value: dateTimeTool, // The actual tool instance
+    genkitTool: dateTimeTool // Storing the actual tool for direct use if needed by the framework
+  },
+  {
+    id: "petStoreTool",
+    name: "Pet Store API (Mocked)",
+    icon: Network, // Using Network icon as it's an API tool
+    description: "Provides mocked functions for interacting with a Pet Store API (e.g., getPetById, addPet).",
+    hasConfig: false, // No external configuration for this mocked tool
+    category: "API Integration",
+    value: petStoreTool, // The actual tool instance
+    genkitTool: petStoreTool // Storing the actual tool for direct use
+  },
+  {
+    id: "fileIoTool",
+    name: "File I/O (Simulated)",
+    icon: FileText, // Using FileText icon
+    description: "Provides simulated functions for reading and writing files.",
+    hasConfig: false, // No external configuration for this simulated tool
+    category: "Utilities",
+    value: fileIoTool, // The actual tool instance
+    genkitTool: fileIoTool // Storing the actual tool for direct use
+  }
     id: TOOL_ID_VIDEO_STREAM_MONITOR,
     name: "Monitor de Stream de Vídeo (Simulado)",
     icon: Video, // Using Video icon

@@ -53,6 +53,20 @@ export const WebSearchOutputSchema = z.object({
  * @param config - Configuration for the web search tool.
  * @returns A Genkit tool definition for web search.
  */
+export const performWebSearchTool: Tool = {
+  name: "perform_web_search",
+  description: "Performs a web search to find up-to-date information on various topics, events, or facts. Useful when the model's internal knowledge might be outdated. Returns a list of search results including titles, URLs, and snippets. (Simulated if API key is not set).",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "The search query string (e.g., 'latest AI advancements').",
+      },
+      num_results: {
+        type: "number",
+        description: "The desired number of search results to return (integer, max 10, defaults to 5).",
+      }
 export function createPerformWebSearchTool(
   config: WebSearchToolConfig
 ): ToolDefinition<typeof WebSearchInputSchema, typeof WebSearchOutputSchema> {

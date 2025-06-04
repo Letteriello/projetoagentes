@@ -7,6 +7,10 @@
  */
 
 import { ai } from '@/ai/genkit'; 
+import { performWebSearchTool } from '@/ai/tools/web-search-tool';
+import { dateTimeTool } from '../tools/date-time-tool'; // Import dateTimeTool
+import { petStoreTool } from '../tools/openapi-tool'; // Import petStoreTool
+import { fileIoTool } from '../tools/file-io-tool'; // Import fileIoTool
 // Import factory functions for refactored tools
 import { createPerformWebSearchTool } from '@/ai/tools/web-search-tool';
 import { createKnowledgeBaseTool } from '@/ai/tools/knowledge-base-tool';
@@ -42,6 +46,11 @@ const llmCache = new LRUCache<string, GenerateResponse>({
 const SENSITIVE_KEYWORDS = ["conteúdo sensível", "excluir dados", "informação confidencial", "apagar tudo", "dados pessoais", "senha", "segredo"];
 
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
+const allAvailableTools = {
+  performWebSearch: performWebSearchTool,
+  dateTimeTool: dateTimeTool,
+  petStoreTool: petStoreTool,
+  fileIoTool: fileIoTool, // Add fileIoTool
 // Stores factory functions for configurable tools and direct tool objects for static ones.
 interface AppTool extends Tool {
   func: (input: any) => Promise<any>;
