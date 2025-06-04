@@ -65,9 +65,9 @@ export interface AvailableTool {
 
   // Campos específicos para MCP Tools
   isMCPTool?: boolean; 
-  mcpServerId?: string;
-  mcpServerName?: string;
-  mcpToolName?: string;
+  // mcpServerId?: string; // Removed - This will be part of ToolConfigData
+  // mcpServerName?: string; // Removed - This was likely for display and not persisted on the tool definition
+  mcpToolName?: string; // This might be the specific name/ID the MCP server expects for this tool
   parameters?: ToolParameter[];
 
   // Campos para configuração da UI

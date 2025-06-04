@@ -7,24 +7,27 @@ import { TabsContent } from "@/components/ui/tabs"; // Needed for the root eleme
 import ToolCard from "./ToolCard";
 import type { AvailableTool } from "@/types/agent-types";
 import type { ToolConfigData } from '@/types/agent-configs-fixed';
+import type { MCPServerConfig } from '@/types/mcp-types'; // Import MCPServerConfig
 
 // Props para o componente ToolsTab.
 interface ToolsTabProps {
   availableTools: AvailableTool[];
+  mcpServers?: MCPServerConfig[]; // Add mcpServers prop
   selectedTools: string[];
-  setSelectedTools: React.Dispatch<React.SetStateAction<string[]>>; // Allows direct update of selected tools
-  toolConfigurations: Record<string, ToolConfigData>;
-  handleToolConfigure: (tool: AvailableTool) => void; // Function to open configuration modal
+  setSelectedTools: React.Dispatch<React.SetStateAction<string[]>>;
+  toolConfigurations: Record<string, ToolConfigData>; // This should now potentially include selectedMcpServerId
+  handleToolConfigure: (tool: AvailableTool) => void;
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
-  Wand2Icon: React.FC<React.SVGProps<SVGSVGElement>>; // Actual Wand2 component
-  SettingsIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Actual Settings component
-  CheckIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Actual Check component
-  AlertIcon: React.FC<React.SVGProps<SVGSVGElement>>; // Icon for the Alert (e.g., Wand2)
-  isSequentialWorkflow?: boolean; // MODIFIED: Added prop
+  Wand2Icon: React.FC<React.SVGProps<SVGSVGElement>>;
+  SettingsIcon: React.FC<React.SVGProps<SVGSVGElement>>;
+  CheckIcon: React.FC<React.SVGProps<SVGSVGElement>>;
+  AlertIcon: React.FC<React.SVGProps<SVGSVGElement>>;
+  isSequentialWorkflow?: boolean;
 }
 
 const ToolsTab: React.FC<ToolsTabProps> = ({
   availableTools,
+  mcpServers, // Destructure mcpServers
   selectedTools,
   setSelectedTools,
   toolConfigurations,

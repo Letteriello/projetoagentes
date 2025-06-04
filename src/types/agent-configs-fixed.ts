@@ -45,6 +45,7 @@ export interface ToolConfigField {
 export interface ToolConfigData {
   [toolId: string]: {
     [fieldId: string]: string | number | boolean;
+    selectedMcpServerId?: string;
   };
 }
 

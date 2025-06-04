@@ -18,49 +18,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { AvailableTool } from '@/types/tool-types'; // Corrected import path
+import type { AvailableTool, MCPServerConfig } from '@/types/tool-types'; // Corrected import path, MCPServerConfig added
 import { cn } from "@/lib/utils";
-
-// Define ToolConfigData based on the state managed by the modal
-export interface ToolConfigData {
-  googleApiKeyId?: string; // From vault
-  googleCseId?: string;
-  openapiSpecUrl?: string;
-  openapiApiKeyId?: string; // From vault
-  dbType?: string;
-  dbHost?: string;
-  dbPort?: string;
-  dbName?: string;
-  dbUser?: string;
-  dbPasswordId?: string; // From vault
-  dbQuery?: string;
-  scriptPath?: string;
-  scriptArgs?: string[];
-  scriptInputType?: 'stdin' | 'args' | 'file' | 'env';
-  scriptOutputType?: 'stdout' | 'file' | 'json_stdout';
-  scriptTimeout?: number;
-  customToolName?: string;
-  customToolDescription?: string;
-  customToolInputSchema?: string; // JSON string
-  customToolOutputSchema?: string; // JSON string
-  customToolAuthType?: 'none' | 'apiKey' | 'oauth2';
-  customToolApiKeyId?: string; // From vault
-  customToolAuthUrl?: string;
-  customToolTokenUrl?: string;
-  customToolScopes?: string[];
-  advancedConfig?: string; // JSON string for tool-specific advanced settings
-  allowedPatterns?: string;
-  deniedPatterns?: string;
-  customRules?: string;
-
-  // Added based on IDE errors
-  selectedApiKeyId?: string;
-  dbConnectionString?: string;
-  dbDescription?: string;
-  knowledgeBaseId?: string;
-  calendarApiEndpoint?: string;
-  // Add any other relevant fields that are part of the tool's configuration
-}
+import type { ToolConfigData } from '@/types/agent-configs-fixed'; // Import from central types
 
 import { ApiKeyEntry } from '../../../services/api-key-service';
 import { useToast } from "@/hooks/use-toast"; // For showing errors
@@ -72,26 +32,31 @@ interface ToolConfigModalProps {
   configuringTool: AvailableTool | null;
   onSave: (toolId: string, configData: ToolConfigData) => void;
 
-  // Receive current selection and callback to update it in parent state
+  // API Key selection
   currentSelectedApiKeyId?: string;
   onApiKeyIdChange: (toolId: string, apiKeyId?: string) => void;
-  availableApiKeys: ApiKeyEntry[]; // New prop
+  availableApiKeys: ApiKeyEntry[];
+
+  // MCP Server selection
+  mcpServers?: MCPServerConfig[];
+  currentSelectedMcpServerId?: string;
+  onMcpServerIdChange: (toolId: string, mcpServerId?: string) => void;
 
   // Existing state for direct input fields (some might become obsolete or conditional)
   // modalGoogleApiKey: string; setModalGoogleApiKey: (value: string) => void; // Replaced by vault
   modalGoogleCseId: string; setModalGoogleCseId: (value: string) => void;
   modalOpenapiSpecUrl: string; setModalOpenapiSpecUrl: (value: string) => void;
   // modalOpenapiApiKey: string; setModalOpenapiApiKey: (value: string) => void; // Replaced by vault
-  modalDbType: string; setModalDbType: (value: string) => void;
-  modalDbHost: string; setModalDbHost: (value: string) => void;
-  modalDbPort: number; setModalDbPort: (value: number) => void;
-  modalDbName: string; setModalDbName: (value: string) => void;
-  modalDbUser: string; setModalDbUser: (value: string) => void;
+  modalDbType: string; setModalDbType: (value: string) => void; // This might need to be part of ToolConfigData directly
+  modalDbHost: string; setModalDbHost: (value: string) => void; // This might need to be part of ToolConfigData directly
+  modalDbPort: number; setModalDbPort: (value: number) => void; // This might need to be part of ToolConfigData directly
+  modalDbName: string; setModalDbName: (value: string) => void; // This might need to be part of ToolConfigData directly
+  modalDbUser: string; setModalDbUser: (value: string) => void; // This might need to be part of ToolConfigData directly
   // modalDbPassword: string; setModalDbPassword: (value: string) => void; // Replaced by vault
-  modalDbConnectionString: string; setModalDbConnectionString: (value: string) => void;
-  modalDbDescription: string; setModalDbDescription: (value: string) => void;
-  modalKnowledgeBaseId: string; setModalKnowledgeBaseId: (value: string) => void;
-  modalCalendarApiEndpoint: string; setModalCalendarApiEndpoint: (value: string) => void;
+  modalDbConnectionString: string; setModalDbConnectionString: (value: string) => void; // This might need to be part of ToolConfigData directly
+  modalDbDescription: string; setModalDbDescription: (value: string) => void; // This might need to be part of ToolConfigData directly
+  modalKnowledgeBaseId: string; setModalKnowledgeBaseId: (value: string) => void; // This might need to be part of ToolConfigData directly
+  modalCalendarApiEndpoint: string; setModalCalendarApiEndpoint: (value: string) => void; // This might need to be part of ToolConfigData directly
 
   modalAllowedPatterns: string; setModalAllowedPatterns: (value: string) => void;
   modalDeniedPatterns: string; setModalDeniedPatterns: (value: string) => void;
@@ -99,28 +64,27 @@ interface ToolConfigModalProps {
   InfoIcon: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
-// No longer needed as config is built dynamically based on availableTool.configFields
-// const toolConfigKeys: Record<string, (keyof ToolConfigData)[]> = { ... };
-
 const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   isOpen,
   onOpenChange,
   configuringTool,
   onSave,
+  // API Key props
   currentSelectedApiKeyId,
   onApiKeyIdChange,
-  availableApiKeys, // New prop
-  // Keep other state setters for non-auth fields or direct input fallback (though direct input is removed for auth fields)
-  // modalGoogleApiKey, setModalGoogleApiKey, // Removed
+  availableApiKeys,
+  // MCP Server props
+  mcpServers = [], // Default to empty array
+  currentSelectedMcpServerId,
+  onMcpServerIdChange,
+  // Direct state setters (consider refactoring these to be part of a single config object)
   modalGoogleCseId, setModalGoogleCseId,
   modalOpenapiSpecUrl, setModalOpenapiSpecUrl,
-  // modalOpenapiApiKey, setModalOpenapiApiKey, // Removed
   modalDbType, setModalDbType,
   modalDbHost, setModalDbHost,
   modalDbPort, setModalDbPort,
   modalDbName, setModalDbName,
   modalDbUser, setModalDbUser,
-  // modalDbPassword, setModalDbPassword, // Removed
   modalDbConnectionString, setModalDbConnectionString,
   modalDbDescription, setModalDbDescription,
   modalKnowledgeBaseId, setModalKnowledgeBaseId,
@@ -131,55 +95,23 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   InfoIcon,
 }) => {
   const { toast } = useToast();
-  // const [apiKeyVaultEntries, setApiKeyVaultEntries] = React.useState<ApiKeyVaultEntry[]>([]); // Removed
-  // const [isLoadingVaultKeys, setIsLoadingVaultKeys] = React.useState(false); // Removed
-
-  // React.useEffect(() => { // Removed
-  //   if (isOpen && configuringTool?.requiresAuth) {
-  //     setIsLoadingVaultKeys(true);
-  //     fetch("/api/apikeys")
-  //       .then((res) => {
-  //         if (!res.ok) {
-  //           throw new Error(`Failed to fetch API keys: ${res.statusText}`);
-  //         }
-  //         return res.json();
-  //       })
-  //       .then((data: ApiKeyVaultEntry[]) => {
-  //         setApiKeyVaultEntries(Array.isArray(data) ? data : []);
-  //       })
-  //       .catch((error) => {
-  //         console.error("Error fetching API keys from vault:", error);
-  //         toast({
-  //           title: "Erro ao Carregar Chaves API",
-  //           description: error.message || "Não foi possível buscar as chaves do cofre.",
-  //           variant: "destructive",
-  //         });
-  //         setApiKeyVaultEntries([]); // Ensure it's an empty array on error
-  //       })
-  //       .finally(() => {
-  //         setIsLoadingVaultKeys(false);
-  //       });
-  //   } else if (!isOpen) {
-  //     // Reset when modal closes
-  //     setApiKeyVaultEntries([]);
-  //   }
-  // }, [isOpen, configuringTool, toast]);
-
 
   const handleSave = () => {
     if (!configuringTool) return;
 
-    const toolId = configuringTool.id; // e.g., 'google-search', 'openapi-custom'
-    const configData: ToolConfigData = {}; // Removido o Partial para garantir que todos os campos obrigatórios estejam presentes
+    const toolId = configuringTool.id;
+    const configData: ToolConfigData = { [toolId]: {} }; // Initialize for the specific tool
 
-    // Common fields that might exist regardless of specific tool type
+    // Common fields
     if (configuringTool.requiresAuth) {
-      configData.selectedApiKeyId = currentSelectedApiKeyId;
+      configData[toolId].selectedApiKeyId = currentSelectedApiKeyId;
     }
 
-    // Specific fields based on tool ID - only set what's relevant and managed by this modal's state
-    // This switch now primarily handles non-auth fields or fields specific to a tool's nature
-    // Auth fields like `googleApiKey`, `openapiApiKey`, `dbPassword` are now implicitly handled by `selectedApiKeyId`
+    if (configuringTool.isMCPTool) {
+      configData[toolId].selectedMcpServerId = currentSelectedMcpServerId;
+    }
+
+    // Specific fields based on tool ID
     switch (toolId) {
       case "google-search": // Matches ID in available-tools.ts
         configData.googleCseId = modalGoogleCseId;
@@ -217,12 +149,32 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
     // Add guardrail data for relevant tools
     // Assuming guardrail fields are generic and not part of the direct state setters for each tool type
     if (configuringTool && ["database-connector", "openapi-custom", "codeExecutor"].includes(configuringTool.id)) {
-      configData.allowedPatterns = modalAllowedPatterns;
-      configData.deniedPatterns = modalDeniedPatterns;
-      configData.customRules = modalCustomRules;
+      configData[toolId].allowedPatterns = modalAllowedPatterns;
+      configData[toolId].deniedPatterns = modalDeniedPatterns;
+      configData[toolId].customRules = modalCustomRules;
     }
 
-    onSave(toolId, configData as ToolConfigData);
+    // Ensure the configData object for the toolId is correctly structured
+    let finalConfigData: Record<string, any> = { // Use a more general type for intermediate object
+        ...configData[toolId], // existing specific fields
+    };
+
+    if (configuringTool.requiresAuth) {
+        finalConfigData.selectedApiKeyId = currentSelectedApiKeyId;
+    }
+    if (configuringTool.isMCPTool) {
+        finalConfigData.selectedMcpServerId = currentSelectedMcpServerId;
+        finalConfigData.isMCPTool = true; // Persist the isMCPTool flag
+    }
+
+    // Guardrail data if applicable
+    if (["database-connector", "openapi-custom", "codeExecutor"].includes(configuringTool.id)) {
+        finalConfigData.allowedPatterns = modalAllowedPatterns;
+        finalConfigData.deniedPatterns = modalDeniedPatterns;
+        finalConfigData.customRules = modalCustomRules;
+    }
+
+    onSave(toolId, { [toolId]: finalConfigData } as ToolConfigData);
   };
 
   if (!configuringTool) {

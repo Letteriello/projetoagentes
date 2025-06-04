@@ -52,8 +52,10 @@ import type {
   AgentType,
   ToolConfigData,
   KnowledgeSource,
-  KnowledgeSourceType
+  KnowledgeSourceType,
+  // MCPServerConfig will be imported from tool-types
 } from '@/types/agent-configs-fixed';
+import type { MCPServerConfig } from '@/types/tool-types'; // Import MCPServerConfig
 
 // Importando os tipos necessários e funções de conversão
 import type { AgentFormData } from '@/types/agent-types-unified';
@@ -69,7 +71,9 @@ type AdaptedSavedAgentConfiguration = SavedAgentConfiguration;
 // Importando corretamente do arquivo agentBuilderConfig
 import { 
   builderAvailableTools as defaultAvailableTools,
-  iconComponents 
+  iconComponents,
+  // Assuming mcpServers might come from a config file or be defined here
+  // For now, defining mock data directly in the page component.
 } from "@/data/agentBuilderConfig";
 
 // Definindo tipos locais para os componentes dinâmicos
@@ -111,6 +115,13 @@ export const agentToneOptions = [
 const AgentBuilderDialog = React.lazy(() => 
   import('@/components/features/agent-builder/agent-builder-dialog').then(module => ({
     default: module.default || module.AgentBuilderDialog
+  }))
+);
+
+// ToolConfigModal
+const ToolConfigModal = React.lazy(() =>
+  import('@/components/features/agent-builder/ToolConfigModal').then(module => ({ // Assuming ToolConfigModal.tsx exists
+    default: module.default || module.ToolConfigModal
   }))
 );
 
@@ -189,6 +200,12 @@ interface AgentBuilderPageProps {
   };
 }
 
+// Mock MCP Servers data - to be owned by AgentBuilderPage
+const mockMcpServers: MCPServerConfig[] = [
+  { id: 'mcp-server-page-1', name: 'MCP Server Alpha (from Page)', url: 'https://mcp.page.com/alpha', description: 'Primary MCP processing server from Page context.' },
+  { id: 'mcp-server-page-2', name: 'MCP Server Beta (from Page)', url: 'https://mcp.page.com/beta', description: 'Experimental MCP server from Page context.' },
+];
+
 export default function AgentBuilderPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -231,6 +248,15 @@ export default function AgentBuilderPage() {
 
   // Estado para o monitoramento de agentes
   const [selectedAgentForMonitoring, setSelectedAgentForMonitoring] = React.useState<SavedAgentConfiguration | null>(null);
+
+  // State for ToolConfigModal
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = React.useState(false);
+  const [configuringTool, setConfiguringTool] = React.useState<AvailableTool | null>(null);
+  // API Key related states for ToolConfigModal (assuming these are managed here or passed down)
+  // These might need to be lifted from AgentBuilderDialog or managed via context if not already here.
+  // For now, let's assume they are available or will be added.
+  const [currentSelectedApiKeyId, setCurrentSelectedApiKeyId] = React.useState<string | undefined>(undefined);
+  const [availableApiKeys, setAvailableApiKeys] = React.useState<ApiKeyEntry[]>([]); // Define ApiKeyEntry if not already available
 
   const handleCreateNewAgent = React.useCallback(() => {
     // Function to handle creating a new agent - opens the builder modal with empty form
@@ -365,7 +391,7 @@ export default function AgentBuilderPage() {
 
       // Close the modal and reset form
       setIsBuilderModalOpen(false);
-      setEditingAgent(null);
+        setEditingAgent(null); // This is AgentFormData
     } catch (error) {
       console.error("Erro ao processar o formulário:", error);
       toast({
@@ -439,6 +465,76 @@ export default function AgentBuilderPage() {
   const closeTutorialModal = () => setIsTutorialModalOpen(false);
   const handleTutorialNext = () => setCurrentTutorialStep(prev => Math.min(prev + 1, activeTutorial.steps.length - 1));
   const handleTutorialPrev = () => setCurrentTutorialStep(prev => Math.max(prev - 1, 0));
+
+  // Handler to open ToolConfigModal
+  const handleConfigureTool = (tool: AvailableTool) => {
+    setConfiguringTool(tool);
+    // Assuming toolConfigsApplied is part of editingAgent (which is AgentFormData)
+    // And editingAgent is correctly typed to include toolConfigsApplied: Record<string, ToolConfigData>
+    const currentToolConfig = editingAgent?.toolConfigsApplied?.[tool.id];
+    setCurrentSelectedApiKeyId(currentToolConfig?.selectedApiKeyId);
+    // setCurrentSelectedMcpServerId(currentToolConfig?.selectedMcpServerId); // This will be handled by ToolConfigModal directly via editingAgent
+    setIsToolConfigModalOpen(true);
+  };
+
+  // Handler for saving tool configuration from ToolConfigModal
+  const handleSaveToolConfig = (toolId: string, configData: ToolConfigData) => {
+    setEditingAgent((prevAgent: any) => {
+      if (!prevAgent) return null;
+      const updatedToolConfigsApplied = {
+        ...(prevAgent.toolConfigsApplied || {}),
+        [toolId]: {
+          ...(prevAgent.toolConfigsApplied?.[toolId] || {}),
+          ...configData[toolId], // Merge new config for the specific toolId
+        }
+      };
+      return {
+        ...prevAgent,
+        toolConfigsApplied: updatedToolConfigsApplied,
+      };
+    });
+    setIsToolConfigModalOpen(false);
+    setConfiguringTool(null);
+    toast({ title: "Configuração da Ferramenta Salva", description: `Configuração para ${toolId} atualizada.`});
+  };
+
+  // Handler for MCP Server ID change in ToolConfigModal
+  const handleMcpServerIdChange = (toolId: string, mcpServerId?: string) => {
+    setEditingAgent((prevAgent: any) => {
+      if (!prevAgent) return null;
+      const updatedToolConfigsApplied = {
+        ...(prevAgent.toolConfigsApplied || {}),
+        [toolId]: {
+          ...(prevAgent.toolConfigsApplied?.[toolId] || {}),
+          selectedMcpServerId: mcpServerId,
+        }
+      };
+      return {
+        ...prevAgent,
+        toolConfigsApplied: updatedToolConfigsApplied,
+      };
+    });
+  };
+
+  // Handler for API Key ID change in ToolConfigModal
+  const handleApiKeyIdChange = (toolId: string, apiKeyId?: string) => {
+     setEditingAgent((prevAgent: any) => {
+      if (!prevAgent) return null;
+      const updatedToolConfigsApplied = {
+        ...(prevAgent.toolConfigsApplied || {}),
+        [toolId]: {
+          ...(prevAgent.toolConfigsApplied?.[toolId] || {}),
+          selectedApiKeyId: apiKeyId,
+        }
+      };
+      return {
+        ...prevAgent,
+        toolConfigsApplied: updatedToolConfigsApplied,
+      };
+    });
+    // setCurrentSelectedApiKeyId(apiKeyId); // This local state might not be needed if form drives it
+  };
+
 
   const totalAgents = agents.length;
   const agentsWithTools = agents.filter(agent => agent.tools && agent.tools.length > 0).length;
@@ -631,11 +727,13 @@ export default function AgentBuilderPage() {
                 router.push('/agent-builder'); // Clear URL parameters
               }}
               onSave={handleFormSubmit}
-              agent={editingAgent as any}
+              agent={editingAgent as any} // This is AdaptedAgentFormData / AgentFormData
               availableTools={builderAvailableTools}
               agentToneOptions={agentToneOptions.map(option => option.id)}
               agentTypeOptions={agentTypeOptions.map(option => option.id)}
               iconComponents={iconComponents}
+              mcpServers={mockMcpServers}
+              onConfigureToolInDialog={handleConfigureTool} // Pass the handler to AgentBuilderDialog
             />
           ) : (
             <AgentCreatorChatUI
@@ -647,8 +745,60 @@ export default function AgentBuilderPage() {
               }}
               onSave={handleFormSubmit}
               agent={editingAgent as any}
-            />  
+            />
           )
+        )}
+
+        {isToolConfigModalOpen && configuringTool && editingAgent && (
+          <ToolConfigModal
+            isOpen={isToolConfigModalOpen}
+            onOpenChange={setIsToolConfigModalOpen}
+            configuringTool={configuringTool}
+            onSave={handleSaveToolConfig}
+            // API Key Props
+            currentSelectedApiKeyId={editingAgent.toolConfigsApplied?.[configuringTool.id]?.selectedApiKeyId}
+            onApiKeyIdChange={handleApiKeyIdChange}
+            availableApiKeys={availableApiKeys} // Ensure availableApiKeys is populated
+            // MCP Server Props
+            mcpServers={mockMcpServers}
+            currentSelectedMcpServerId={editingAgent.toolConfigsApplied?.[configuringTool.id]?.selectedMcpServerId}
+            onMcpServerIdChange={handleMcpServerIdChange}
+            // Other direct input modal state setters - these should be part of the form state within ToolConfigModal if possible
+            // For now, assuming ToolConfigModal handles its own internal state for these based on props or context
+            modalGoogleCseId={editingAgent.toolConfigsApplied?.[configuringTool.id]?.googleCseId || ""}
+            setModalGoogleCseId={(value) => { /* update editingAgent.toolConfigsApplied[configuringTool.id].googleCseId */ }}
+            modalOpenapiSpecUrl={editingAgent.toolConfigsApplied?.[configuringTool.id]?.openapiSpecUrl || ""}
+            setModalOpenapiSpecUrl={(value) => { /* update editingAgent.toolConfigsApplied[configuringTool.id].openapiSpecUrl */ }}
+            // ... and so on for other direct fields in ToolConfigModalProps
+            // This part highlights that ToolConfigModal might need refactoring to manage its fields more centrally
+            // or AgentBuilderPage needs to manage all these individual field states.
+            // For the scope of this task, focusing on MCP server props.
+            modalDbType={editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbType || ""}
+            setModalDbType={(value) => {}}
+            modalDbHost={editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbHost || ""}
+            setModalDbHost={(value) => {}}
+            modalDbPort={parseInt(editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbPort || "0")}
+            setModalDbPort={(value) => {}}
+            modalDbName={editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbName || ""}
+            setModalDbName={(value) => {}}
+            modalDbUser={editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbUser || ""}
+            setModalDbUser={(value) => {}}
+            modalDbConnectionString={editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbConnectionString || ""}
+            setModalDbConnectionString={(value) => {}}
+            modalDbDescription={editingAgent.toolConfigsApplied?.[configuringTool.id]?.dbDescription || ""}
+            setModalDbDescription={(value) => {}}
+            modalKnowledgeBaseId={editingAgent.toolConfigsApplied?.[configuringTool.id]?.knowledgeBaseId || ""}
+            setModalKnowledgeBaseId={(value) => {}}
+            modalCalendarApiEndpoint={editingAgent.toolConfigsApplied?.[configuringTool.id]?.calendarApiEndpoint || ""}
+            setModalCalendarApiEndpoint={(value) => {}}
+            modalAllowedPatterns={editingAgent.toolConfigsApplied?.[configuringTool.id]?.allowedPatterns || ""}
+            setModalAllowedPatterns={(value) => {}}
+            modalDeniedPatterns={editingAgent.toolConfigsApplied?.[configuringTool.id]?.deniedPatterns || ""}
+            setModalDeniedPatterns={(value) => {}}
+            modalCustomRules={editingAgent.toolConfigsApplied?.[configuringTool.id]?.customRules || ""}
+            setModalCustomRules={(value) => {}}
+            InfoIcon={Info} // Pass a valid InfoIcon component
+          />
         )}
 
         {isSaveAsTemplateModalOpen && (
