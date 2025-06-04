@@ -6,10 +6,12 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-  FormControl, // Ensure FormControl is imported
+  // FormControl is used within the render prop of FormFieldWithLabel
 } from '@/components/ui/form';
+import FormFieldWithLabel from '@/components/ui/extended/FormFieldWithLabel'; // Import new component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+// Tooltip components are now used by FormFieldWithLabel
+// import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -86,64 +88,37 @@ export default function BehaviorTab({
   return (
     <div className="space-y-6">
       {/* Common Fields: agentGoal and agentTasks */}
-      <FormField
-        control={control}
+      <FormFieldWithLabel
         name="config.agentGoal"
+        label="Agent Goal"
+        control={control}
+        tooltipContent={
+          <p className="max-w-xs">
+            Defina a meta primária que o agente deve alcançar. Isso será usado para formar a declaração de objetivo principal no prompt do sistema. Ex: "Ajudar usuários a encontrar informações sobre produtos."
+          </p>
+        }
         render={({ field }) => (
-          <FormItem>
-            <div className="flex items-center space-x-2">
-              <FormLabel className="flex items-center">
-                Agent Goal
-                <TooltipProvider>
-                  <Tooltip delayDuration={300}>
-                    <TooltipTrigger asChild>
-                      <Info size={14} className="ml-1.5 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p className="max-w-xs">
-                        Defina a meta primária que o agente deve alcançar. Isso será usado para formar a declaração de objetivo principal no prompt do sistema. Ex: "Ajudar usuários a encontrar informações sobre produtos."
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </FormLabel>
-              {/* Modal onClick InfoIcon can be added back if needed, or integrated into the new Info icon's onClick */}
-            </div>
-            <FormControl>
-              <Textarea {...field} placeholder="Define the primary goal for this agent..." />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
+          <FormControl>
+            <Textarea {...field} placeholder="Define the primary goal for this agent..." />
+          </FormControl>
         )}
       />
 
       {/* Agent Tasks - Assuming it's part of LLMAgentConfig and thus rendered when agentType === 'llm' */}
       {/* If it's truly common, it stays outside. If LLM specific, it should be inside the agentType === 'llm' block */}
-      <FormField
-        control={control}
+      <FormFieldWithLabel
         name="config.agentTasks"
+        label="Agent Tasks (one per line)"
+        control={control}
+        tooltipContent={
+          <p className="max-w-xs">
+            Liste as tarefas específicas que o agente deve executar para atingir seu objetivo. Cada tarefa será detalhada no prompt do sistema. Ex: "Coletar requisitos do usuário", "Buscar documentação relevante".
+          </p>
+        }
         render={({ field }) => (
-          <FormItem>
-            <div className="flex items-center space-x-2">
-              <FormLabel className="flex items-center">
-                Agent Tasks (one per line)
-                <TooltipProvider>
-                  <Tooltip delayDuration={300}>
-                    <TooltipTrigger asChild>
-                      <Info size={14} className="ml-1.5 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p className="max-w-xs">
-                        Liste as tarefas específicas que o agente deve executar para atingir seu objetivo. Cada tarefa será detalhada no prompt do sistema. Ex: "Coletar requisitos do usuário", "Buscar documentação relevante".
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </FormLabel>
-            </div>
-            <FormControl>
-              <Textarea
-                {...field}
+          <FormControl>
+            <Textarea
+              {...field}
                 placeholder="List the specific tasks the agent needs to perform, one per line."
                 rows={4}
                 // Convert array to string for display, and string to array on change if needed by schema
@@ -363,41 +338,28 @@ export default function BehaviorTab({
           <FormField
             control={control}
             name="config.agentPersonality"
+            label="Agent Personality/Tone"
+            control={control}
+            tooltipContent={
+              <p className="max-w-xs">
+                Escolha a personalidade que o agente deve adotar. Isso influenciará o tom e o estilo de suas respostas no prompt. Ex: "Um assistente amigável e prestativo".
+              </p>
+            }
             render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center space-x-2">
-                  <FormLabel className="flex items-center">
-                    Agent Personality/Tone
-                    <TooltipProvider>
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <Info size={14} className="ml-1.5 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                          <p className="max-w-xs">
-                            Escolha a personalidade que o agente deve adotar. Isso influenciará o tom e o estilo de suas respostas no prompt. Ex: "Um assistente amigável e prestativo".
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </FormLabel>
-                </div>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select personality" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {agentToneOptions.map(tone => (
-                      <SelectItem key={tone} value={tone.toLowerCase()}>
-                        {tone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select personality" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {agentToneOptions.map(tone => (
+                    <SelectItem key={tone} value={tone.toLowerCase()}>
+                      {tone}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           />
 

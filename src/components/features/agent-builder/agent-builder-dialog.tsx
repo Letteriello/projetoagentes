@@ -83,6 +83,8 @@ const A2AConfig = lazy(() => import('./tabs/a2a-config'));
 const MultiAgentTab = lazy(() => import('./tabs/multi-agent-tab'));
 const ReviewTab = lazy(() => import('./tabs/review-tab'));
 const DeployTab = lazy(() => import('./tabs/DeployTab')); // Import DeployTab
+const CallbacksTab = lazy(() => import('./tabs/CallbacksTab'));
+const AdvancedSettingsTab = lazy(() => import('./tabs/AdvancedSettingsTab'));
 
 import { SubAgentSelector } from './sub-agent-selector';
 import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
@@ -955,21 +957,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                   <Suspense fallback={<LoadingFallback />}>
                     <ToolsTab
                       availableTools={availableTools}
-                      selectedTools={methods.watch("tools") || []} // RHF state
-                    setSelectedTools={(tools) => methods.setValue("tools", tools, {shouldValidate: true, shouldDirty: true})} // RHF action
-                    iconComponents={iconComponents}
-                    InfoIcon={InfoIcon} // Pass the imported InfoIcon
-                    SettingsIcon={Settings}
+                      // selectedTools, setSelectedTools, toolConfigurations, setToolConfiguration are managed by useFormContext in ToolsTab
+                      iconComponents={iconComponents}
+                      InfoIconComponent={InfoIcon} // Pass the imported InfoIcon, ToolsTab expects InfoIconComponent
+                      SettingsIcon={Settings}
                     CheckIcon={Check}
-                    PlusCircleIcon={PlusCircle}
-                    Trash2Icon={Trash2}
+                    PlusCircleIcon={PlusCircle} // Keep passing for now, ToolsTabProps includes it
+                    Trash2Icon={Trash2} // Keep passing for now, ToolsTabProps includes it
                     showHelpModal={showHelpModal}
-                    availableApiKeys={availableApiKeys || []} // Pass the keys from the hook
-                    setToolConfiguration={(toolId, config) => {
-                      const currentConfigs = methods.getValues("toolConfigsApplied") || {};
-                      methods.setValue("toolConfigsApplied", { ...currentConfigs, [toolId]: config }, { shouldValidate: true, shouldDirty: true });
-                    }}
-                    toolConfigurations={methods.watch("toolConfigsApplied") || {}} // Still pass current configs for reading
+                    availableApiKeys={availableApiKeys || []}
                     />
                   </Suspense>
                 </TabsContent>
@@ -1067,7 +1063,12 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                     <CardContent className="space-y-4">
                       {/* The A2AConfigComponent will have its own internal switch for enabling/disabling */}
                       {/* It will use useFormContext to manage config.a2a directly */}
-                        <A2AConfig savedAgents={availableAgentsForSubSelector} showHelpModal={showHelpModal} />
+                      {/* savedAgents prop removed as A2AConfigTab uses useAppContext for agent list */}
+                      <A2AConfig
+                        showHelpModal={showHelpModal}
+                        PlusIcon={Plus} // Added PlusIcon
+                        Trash2Icon={Trash2} // Added Trash2Icon
+                      />
                     </CardContent>
                     </Card>
                   </Suspense>
@@ -1105,27 +1106,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                         Trash2Icon={Trash2}
                         showHelpModal={showHelpModal}
                       />
-                      <div className="space-y-2 pt-4">
-                        <TooltipProvider>
-                          {/* ... Tooltip for global instruction ... */}
-                        </TooltipProvider>
-                        <Controller
-                          name="config.globalInstruction" // This path is correct for SavedAgentConfiguration.config
-                          control={methods.control}
-                          render={({ field }) => (
-                            <Textarea
-                              id="globalSubAgentInstructionRHF"
-                              placeholder="Ex: 'Você é um assistente especialista...'"
-                              value={field.value || ""} // Ensure field.value is not null/undefined before passing to textarea
-                              onChange={field.onChange}
-                              rows={3}
-                            />
-                          )}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Uma diretiva geral que se aplica a todos os sub-agentes orquestrados por este agente.
-                        </p>
-                      </div>
+                      {/* The globalInstruction field is now handled within MultiAgentTab.tsx */}
                     </CardContent>
                     </Card>
                     {/* This section seems to be a placeholder, no RHF fields to change here yet */}
@@ -1145,7 +1126,11 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 {/* Review Tab */}
                 <TabsContent value="review">
                   <Suspense fallback={<LoadingFallback />}>
-                    <ReviewTab setActiveEditTab={setActiveEditTab} showHelpModal={showHelpModal} />
+                    <ReviewTab
+                      setActiveEditTab={setActiveEditTab}
+                      showHelpModal={showHelpModal}
+                      availableTools={availableTools} // Pass availableTools
+                    />
                   </Suspense>
                 </TabsContent>
 
@@ -1158,299 +1143,16 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
                 {/* Callbacks Tab */}
                 <TabsContent value="callbacks" className="space-y-6 mt-4">
-                  <Alert variant="warning" className="mb-6">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Performance Considerations</AlertTitle>
-                    <AlertDescription>
-                      Operações longas dentro de callbacks podem impactar a performance do agente, seguindo a documentação do ADK.
-                    </AlertDescription>
-                  </Alert>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Model Callbacks</CardTitle>
-                      <CardDescription>
-                        Define snippets of logic to be executed before and after model calls.
-                        These will be stored in the new `callbacks` field in the agent configuration.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Before Model Callback Section */}
-                      <div className="space-y-2">
-                        <FormLabel>Before Model Callback</FormLabel>
-                        <FormField
-                          control={control}
-                          name="config.callbacks.beforeModelLogic" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Textarea
-                                  {...field}
-                                  placeholder="Enter logic for Before Model callback (e.g., modify request object)"
-                                  rows={3}
-                                  value={field.value || ""}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={control}
-                          name="config.callbacks.beforeModelEnabled" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Enable Before Model Callback
-                              </FormLabel>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <Separator />
-
-                      {/* After Model Callback Section */}
-                      <div className="space-y-2">
-                        <FormLabel>After Model Callback</FormLabel>
-                        <FormField
-                          control={control}
-                          name="config.callbacks.afterModelLogic" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Textarea
-                                  {...field}
-                                  placeholder="Enter logic for After Model callback (e.g., log response or modify it)"
-                                  rows={3}
-                                  value={field.value || ""}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={control}
-                          name="config.callbacks.afterModelEnabled" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Enable After Model Callback
-                              </FormLabel>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Tool Callbacks Card */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Tool Callbacks</CardTitle>
-                      <CardDescription>
-                        Define snippets of logic to be executed before and after tool calls.
-                        These will also be stored in the `callbacks` field.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Before Tool Callback Section */}
-                      <div className="space-y-2">
-                        <FormLabel>Before Tool Callback</FormLabel>
-                        <FormField
-                          control={control}
-                          name="config.callbacks.beforeToolLogic" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Textarea
-                                  {...field}
-                                  placeholder="Enter logic for Before Tool callback (e.g., validate tool input)"
-                                  rows={3}
-                                  value={field.value || ""}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={control}
-                          name="config.callbacks.beforeToolEnabled" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Enable Before Tool Callback
-                              </FormLabel>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <Separator />
-
-                      {/* After Tool Callback Section */}
-                      <div className="space-y-2">
-                        <FormLabel>After Tool Callback</FormLabel>
-                        <FormField
-                          control={control}
-                          name="config.callbacks.afterToolLogic" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Textarea
-                                  {...field}
-                                  placeholder="Enter logic for After Tool callback (e.g., process tool output)"
-                                  rows={3}
-                                  value={field.value || ""}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={control}
-                          name="config.callbacks.afterToolEnabled" // Assuming this path
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Enable After Tool Callback
-                              </FormLabel>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <CallbacksTab />
+                  </Suspense>
                 </TabsContent>
 
                 {/* Advanced Tab (ADK Callbacks) */}
                 <TabsContent value="advanced" className="space-y-6 mt-4">
-                  <Alert variant="warning">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Considerações de Segurança para RunConfig</AlertTitle>
-                    <AlertDescription>
-                      Parâmetros de RunConfig (como 'max_tokens' para limitar a geração de conteúdo, 'temperature' para controlar a aleatoriedade, ou configurações de 'compositional_function_calling' para controlar a complexidade e execução de múltiplas funções) podem impactar a segurança, o custo e o comportamento do agente. Revise estas configurações cuidadosamente, especialmente em ambientes de produção.
-                    </AlertDescription>
-                  </Alert>
-                  <Alert>
-                    {/* Note: This tab does not seem to use a lazy-loaded component directly at its root.
-                        If specific components *within* this tab were to be lazy-loaded, they would need
-                        their own Suspense boundaries. For now, assuming the content is static or
-                        already handled if it were a separate component. The prompt asked for specific
-                        components like ToolsTab, BehaviorTab etc. to be lazy loaded.
-                        If 'Advanced' itself was a component like 'AdvancedTab', it would be lazy loaded.
-                        Since it's direct JSX, no Suspense is added here unless a sub-component needs it.
-                    */}
-                    <Settings2 className="h-4 w-4" />
-                    <AlertTitle>Configurações Avançadas</AlertTitle>
-                    <AlertDescription>
-                      Configure callbacks do ciclo de vida do agente ADK e outras opções avançadas.
-                    </AlertDescription>
-                  </Alert>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Callbacks do Ciclo de Vida ADK</CardTitle>
-                      <CardDescription>
-                        Especifique nomes de fluxos Genkit ou referências de funções para serem invocadas em pontos chave do ciclo de vida do agente.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {[
-                        { name: "beforeAgent", label: "Callback Before Agent", description: "Invocado antes do agente principal processar a requisição. Útil para configuração, validação inicial ou **verificação de conformidade de segurança da requisição de entrada**." },
-                        { name: "afterAgent", label: "Callback After Agent", description: "Invocado após o agente principal concluir. Útil para formatação final, limpeza ou **registro de auditoria seguro da transação completa**." },
-                        { name: "beforeModel", label: "Callback Before Model", description: "Invocado antes de uma chamada ao LLM. Permite modificar o prompt ou configurações do modelo, **adicionar contexto de segurança ou verificar o prompt contra políticas de uso aceitável**." },
-                        { name: "afterModel", label: "Callback After Model", description: "Invocado após o LLM retornar uma resposta. Permite modificar ou validar a saída do LLM, **verificar conformidade com políticas de conteúdo ou remover informações sensíveis antes de serem usadas por uma ferramenta ou retornadas ao usuário**." },
-                        { name: "beforeTool", label: "Callback Before Tool", description: "Invocado antes da execução de uma ferramenta. Permite inspecionar/modificar argumentos, **validar permissões ou cancelar a execução por razões de segurança (ex: usando um fluxo Genkit de validação)**." },
-                        { name: "afterTool", label: "Callback After Tool", description: "Invocado após uma ferramenta ser executada. Permite inspecionar/modificar o resultado da ferramenta ou **realizar verificações de segurança nos dados retornados pela ferramenta antes de serem usados em etapas subsequentes**." },
-                      ].map(callback => (
-                        <FormField
-                          key={callback.name}
-                          control={methods.control}
-                          name={`config.adkCallbacks.${callback.name}` as const}
-                          render={({ field }) => (
-                            <FormItem className="space-y-1">
-                              <FormLabel htmlFor={field.name}>{callback.label}</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  id={field.name}
-                                  placeholder="Nome do fluxo Genkit ou ref da função"
-                                  value={field.value || ""}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                              <p className="text-xs text-muted-foreground pt-1">{callback.description}</p>
-                            </FormItem>
-                          )}
-                        />
-                      ))}
-                    </CardContent>
-                  </Card>
-
-                  {/* Additional Security Settings Card */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Configurações de Segurança Adicionais</CardTitle>
-                      <CardDescription>
-                        Ajustes finos para segurança na execução de código e outras operações sensíveis.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <FormField
-                        control={methods.control}
-                        name="config.sandboxedCodeExecution"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                Habilitar Execução de Código em Sandbox
-                              </FormLabel>
-                              <p className="text-xs text-muted-foreground pt-1">
-                                Quando habilitado, o código executado pela ferramenta codeExecutor será invocado em um ambiente sandbox simulado para maior segurança.
-                              </p>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </CardContent>
-                  </Card>
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AdvancedSettingsTab />
+                  </Suspense>
                 </TabsContent>
 
               </Tabs>

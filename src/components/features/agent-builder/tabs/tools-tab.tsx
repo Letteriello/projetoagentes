@@ -30,6 +30,7 @@ import {
 import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import type { AvailableTool } from '@/types/tool-types';
 // import CustomToolDialog, { CustomToolData } from '../custom-tool-dialog'; // Lazy loaded
+import { cn } from "@/lib/utils"; // Ensure cn is imported
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import {
   Card,
@@ -50,27 +51,18 @@ import { ApiKeyEntry } from '../../../../services/api-key-service';
 
 interface ToolsTabProps {
   availableTools: AvailableTool[];
-  availableApiKeys: ApiKeyEntry[]; // NEW
-  // Props for icons and help modal, passed from AgentBuilderDialog
+  availableApiKeys: ApiKeyEntry[];
   iconComponents: Record<string, React.ComponentType<{ className?: string }>>;
-  InfoIconComponent: React.ElementType; // Renamed to avoid conflict with local InfoIcon
+  InfoIconComponent: React.ElementType;
   SettingsIcon: React.ElementType;
   CheckIcon: React.ElementType;
-  PlusCircleIcon: React.ElementType;
-  Trash2Icon: React.ElementType;
+  PlusCircleIcon: React.ElementType; // This can be removed if not used directly, but kept for now
+  Trash2Icon: React.ElementType; // This can be removed if not used directly, but kept for now
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
-  // onToolConfigure: (toolId: string) => void; // REMOVED: Function to open configuration modal for a tool
 }
 
 // Definindo o tipo para o contexto do formulário
 // Using SavedAgentConfiguration directly with useFormContext as it's the root form type
-// type FormContextType = {
-//   tools?: string[];
-//   toolConfigsApplied?: Record<string, ToolConfigData>; // Changed 'any' to 'ToolConfigData'
-//   chatHistory?: Array<{role: string; content: string}>;
-//   userInput?: string;
-//   [key: string]: any;
-// };
 
 const CustomToolDialog = lazy(() => import('../custom-tool-dialog'));
 const ToolConfigModal = lazy(() => import('../ToolConfigModal'));
@@ -89,10 +81,11 @@ export default function ToolsTab({
   InfoIconComponent,
   SettingsIcon,
   CheckIcon,
+  // PlusCircleIcon, // Not directly used in the component body, icons are aliased or passed to other components
+  // Trash2Icon, // Not directly used in the component body
   showHelpModal,
-  // onToolConfigure, // REMOVED
 }: ToolsTabProps) {
-  const { control, watch, setValue, getValues } = useFormContext<SavedAgentConfiguration>(); // Changed FormContextType to SavedAgentConfiguration
+  const { control, watch, setValue, getValues } = useFormContext<SavedAgentConfiguration>();
   const { toast } = useToast();
   const currentSelectedTools = watch('tools') || [];
   const agentModelId = watch('config.agentModel'); // Watch the agentModel ID
@@ -519,7 +512,7 @@ export default function ToolsTab({
                             className="h-8 w-8" // Adjusted size for icon button
                             title={tool.type === 'custom' ? "Editar Ferramenta Customizada" : "Configurar Ferramenta"}
                           >
-                            {tool.type === 'custom' ? <Edit3 className="h-4 w-4" /> : <SettingsIcon className={`h-4 w-4 ${isConfigured ? 'text-green-500' : 'text-orange-500'}`} />}
+                            {tool.type === 'custom' ? <Edit3 className="h-4 w-4" /> : <SettingsIcon className={cn("h-4 w-4", isConfigured ? "text-green-500" : "text-orange-500")} />}
                             {/* Display configuration status for non-custom tools */}
                             {tool.type !== 'custom' && isConfigured && <CheckIcon className="absolute top-0 right-0 h-3 w-3 text-green-500 transform translate-x-1/2 -translate-y-1/2" />}
                             {tool.type !== 'custom' && !isConfigured && <AlertTriangle className="absolute top-0 right-0 h-3 w-3 text-orange-500 transform translate-x-1/2 -translate-y-1/2" />}
