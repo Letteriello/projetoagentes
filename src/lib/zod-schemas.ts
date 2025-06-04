@@ -9,7 +9,7 @@ import type {
   ArtifactStorageType as ArtifactStorageTypeType,
   StateScope as StateScopeType,
   CommunicationChannel as CommunicationChannelType // For A2A
-} from '@/types/agent-configs-new';
+} from '@/types/agent-configs-new'; // Assuming agent-configs-new.ts is the correct new path
 
 // Maximum length for system prompts
 export const MAX_SYSTEM_PROMPT_LENGTH = 10000;
@@ -145,10 +145,16 @@ export const a2aSettingsSchema = z.object({
   path: ["apiKeyHeaderName"],
 });
 
+export const evaluationGuardrailsSchema = z.object({
+  prohibitedKeywords: z.array(z.string()).optional().describe("Lista de palavras-chave que não devem aparecer nas respostas."),
+  maxResponseLength: z.number().int().positive().optional().describe("Comprimento máximo permitido para uma resposta do agente."),
+  checkForToxicity: z.boolean().optional().describe("Habilita uma verificação simulada de toxicidade na resposta."),
+}).optional();
+
 export const agentConfigBaseSharedSchema = z.object({
   framework: AgentFrameworkEnum,
   agentGoal: z.string().min(1, "Agent goal is required."),
-  agentTasks: z.string().min(1, "Agent tasks are required."),
+  agentTasks: z.string().min(1, "Agent tasks are required."), // Assuming this was meant to be string array based on types, but schema had string. For now, string.
   terminationConditions: z.array(agentTerminationConditionSchema).optional(),
   statePersistence: statePersistenceConfigSchema.optional(),
   ragMemoryConfig: ragMemoryConfigSchema.optional(),
@@ -171,6 +177,7 @@ export const agentConfigBaseSharedSchema = z.object({
     prompt: z.string(),
     timestamp: z.string().datetime(),
   })).optional(),
+  evaluationGuardrails: evaluationGuardrailsSchema, // Added for Task 9.4
 });
 
 export const llmAgentConfigSchema = agentConfigBaseSharedSchema.extend({
@@ -202,6 +209,7 @@ export const customAgentConfigSchema = agentConfigBaseSharedSchema.extend({
 
 export const a2aAgentSpecialistConfigSchema = agentConfigBaseSharedSchema.extend({
   type: z.literal(AgentTypeEnum.Values.a2a),
+  // Add A2A specific fields here from its type if not covered by agentConfigBaseSharedSchema's a2a field
 });
 
 export const agentConfigSchema = z.discriminatedUnion("type", [

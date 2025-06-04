@@ -1,14 +1,16 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
-// Merged lucide-react imports and added Video, Clock, Smile, ThumbsUp
-import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock, Video, Smile, ThumbsUp } from "lucide-react";
+// Merged lucide-react imports and added Video, Clock, Smile, ThumbsUp, TestTubeDiagonal
+import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock, Video, Smile, ThumbsUp, TestTubeDiagonal } from "lucide-react";
 import { dateTimeTool } from "../../ai/tools/date-time-tool";
 import { petStoreTool } from "../../ai/tools/openapi-tool";
 import { fileIoTool } from "../../ai/tools/file-io-tool";
-import { imageClassifierTool } from '../../ai/tools/image-classifier-tool'; // Import for Image Classifier
-import { textSummarizerTool } from '../../ai/tools/text-summarizer-tool'; // Import for Text Summarizer
-import { sentimentAnalyzerTool } from '../../ai/tools/sentiment-analyzer-tool'; // Import for Sentiment Analyzer
-import { aiFeedbackTool } from '../../ai/tools/ai-feedback-tool'; // Import for AI Feedback Tool
+import { imageClassifierTool } from '../../ai/tools/image-classifier-tool';
+import { textSummarizerTool } from '../../ai/tools/text-summarizer-tool';
+import { sentimentAnalyzerTool } from '../../ai/tools/sentiment-analyzer-tool';
+import { aiFeedbackTool } from '../../ai/tools/ai-feedback-tool';
+import { stringReverserTool } from '@/ai/tools/example-tdd-tool'; // Task 9.7
+
 import {
   TOOL_ID_WEB_SEARCH,
   TOOL_ID_CALCULATOR,
@@ -17,7 +19,7 @@ import {
   TOOL_ID_CUSTOM_API_INTEGRATION,
   TOOL_ID_DATABASE_ACCESS,
   TOOL_ID_CODE_EXECUTOR,
-  TOOL_ID_VIDEO_STREAM_MONITOR, // Added TOOL_ID_VIDEO_STREAM_MONITOR
+  TOOL_ID_VIDEO_STREAM_MONITOR,
   GENKIT_TOOL_NAME_WEB_SEARCH,
   GENKIT_TOOL_NAME_CALCULATOR,
   GENKIT_TOOL_NAME_KNOWLEDGE_BASE_RETRIEVE,
@@ -25,7 +27,7 @@ import {
   GENKIT_TOOL_NAME_CUSTOM_API_CALL,
   GENKIT_TOOL_NAME_DATABASE_QUERY,
   GENKIT_TOOL_NAME_CODE_EXECUTE,
-  GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR, // Added GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR
+  GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR,
   CONFIG_FIELD_GOOGLE_API_KEY,
   CONFIG_FIELD_GOOGLE_CSE_ID,
   CONFIG_FIELD_ALLOWED_DOMAINS,
@@ -44,17 +46,6 @@ import {
   CONFIG_FIELD_DB_DESCRIPTION,
   CONFIG_FIELD_ALLOWED_SQL_OPERATIONS,
   CONFIG_FIELD_SANDBOX_ENDPOINT,
-  // CONFIG_FIELD_AUTHENTICATION_TYPE, // Not used in this file yet
-  // CONFIG_FIELD_API_KEY, // Not used in this file yet
-  // CONFIG_FIELD_OAUTH_CLIENT_ID, // Not used in this file yet
-  // CONFIG_FIELD_OAUTH_CLIENT_SECRET, // Not used in this file yet
-  // CONFIG_FIELD_OAUTH_TOKEN_URL, // Not used in this file yet
-  // CONFIG_FIELD_DATABASE_TYPE, // Not used in this file yet
-  // CONFIG_FIELD_CONNECTION_STRING, // Not used in this file yet
-  // CONFIG_FIELD_QUERY, // Not used in this file yet
-  // CONFIG_FIELD_CODE_LANGUAGE, // Not used in this file yet
-  // CONFIG_FIELD_CODE_TO_EXECUTE, // Not used in this file yet
-  // CONFIG_FIELD_MAX_OUTPUT_CHARACTERS, // Not used in this file yet
 } from "@/lib/constants";
 
 function getIconComponent(name?: string): LucideIcon {
@@ -70,10 +61,10 @@ function getIconComponent(name?: string): LucideIcon {
     cpu: Cpu,
     brain: Brain,
     globe: Globe,
-    video: Video, // Added Video icon
-    smile: Smile, // Added Smile icon
-    thumbsup: ThumbsUp, // Added ThumbsUp icon
-    // Adicione outros ícones conforme necessário
+    video: Video,
+    smile: Smile,
+    thumbsup: ThumbsUp,
+    testtubediagonal: TestTubeDiagonal, // Added for TDD tool
   };
   if (!name) return HelpCircle;
   return iconMap[name.toLowerCase()] || HelpCircle;
@@ -309,52 +300,49 @@ export const standardTools: AvailableTool[] = [
   {
     id: "dateTimeTool",
     name: "Date & Time Operations",
-    icon: Clock, // Using Clock icon
+    icon: Clock,
     description: "Provides functions for getting current date/time, adding days, and formatting dates.",
-    hasConfig: false, // Assuming no external configuration needed for this tool itself
-    // genkitToolName: "dateTimeTool", // This refers to the tool itself, not a specific action name if the tool has multiple actions.
-                                      // The flow will use the tool name and specify actions like 'dateTimeTool.getCurrentDateTime'
-    category: "Utilities", // Or any other relevant category
-    value: dateTimeTool, // The actual tool instance
-    genkitTool: dateTimeTool // Storing the actual tool for direct use if needed by the framework
+    hasConfig: false,
+    category: "Utilities",
+    value: dateTimeTool,
+    genkitTool: dateTimeTool
   },
   {
     id: "petStoreTool",
     name: "Pet Store API (Mocked)",
-    icon: Network, // Using Network icon as it's an API tool
+    icon: Network,
     description: "Provides mocked functions for interacting with a Pet Store API (e.g., getPetById, addPet).",
-    hasConfig: false, // No external configuration for this mocked tool
+    hasConfig: false,
     category: "API Integration",
-    value: petStoreTool, // The actual tool instance
-    genkitTool: petStoreTool // Storing the actual tool for direct use
+    value: petStoreTool,
+    genkitTool: petStoreTool
   },
   {
     id: "fileIoTool",
     name: "File I/O (Simulated)",
-    icon: FileText, // Using FileText icon
+    icon: FileText,
     description: "Provides simulated functions for reading and writing files.",
-    hasConfig: false, // No external configuration for this simulated tool
+    hasConfig: false,
     category: "Utilities",
-    value: fileIoTool, // The actual tool instance
-    genkitTool: fileIoTool // Storing the actual tool for direct use
+    value: fileIoTool,
+    genkitTool: fileIoTool
   },
-  // Removed duplicate dateTimeTool, petStoreTool, fileIoTool which were above this
   {
     id: TOOL_ID_VIDEO_STREAM_MONITOR,
     name: "Monitor de Stream de Vídeo (Simulado)",
-    icon: Video, // Using Video icon
+    icon: Video,
     description: "Inicia o monitoramento simulado de um fluxo de vídeo para detectar eventos.",
-    hasConfig: false, // No config fields for the initial mock
+    hasConfig: false,
     genkitToolName: GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR,
-    configFields: [] // No configuration fields initially
+    configFields: []
   },
   {
     id: 'imageClassifierTool',
     name: 'Image Classifier (Simulated)',
-    icon: Video, // Using Video icon as Camera is not available and Video seems appropriate
+    icon: Video,
     description: 'Simulates image classification, returning a label and confidence.',
     hasConfig: false,
-    genkitToolName: 'imageClassifier',
+    genkitToolName: 'imageClassifier', // Assuming the tool's name property is 'imageClassifier'
     value: imageClassifierTool,
     genkitTool: imageClassifierTool,
   },
@@ -364,7 +352,7 @@ export const standardTools: AvailableTool[] = [
     icon: Brain,
     description: 'Summarizes long text using a Genkit LLM.',
     hasConfig: false,
-    genkitToolName: 'textSummarizer',
+    genkitToolName: textSummarizerTool.name, // Using .name from the tool definition
     value: textSummarizerTool,
     genkitTool: textSummarizerTool,
   },
@@ -374,7 +362,7 @@ export const standardTools: AvailableTool[] = [
     icon: Smile,
     description: 'Simulates sentiment analysis of text, returning positive, negative, or neutral.',
     hasConfig: false,
-    genkitToolName: 'sentimentAnalyzer',
+    genkitToolName: sentimentAnalyzerTool.name,
     value: sentimentAnalyzerTool,
     genkitTool: sentimentAnalyzerTool,
   },
@@ -384,9 +372,26 @@ export const standardTools: AvailableTool[] = [
     icon: ThumbsUp,
     description: 'Simulates an AI feedback loop, allowing users to rate agent responses.',
     hasConfig: false,
-    genkitToolName: 'aiFeedback',
+    genkitToolName: aiFeedbackTool.name,
     value: aiFeedbackTool,
     genkitTool: aiFeedbackTool,
+  },
+  { // Task 9.7: Adding stringReverserTool
+    id: 'stringReverser', // Matches the name property in stringReverserTool
+    name: 'String Reverser (TDD Example)',
+    description: stringReverserTool.description,
+    icon: TestTubeDiagonal, // Uses the getIconComponent mapping
+    type: 'utility', // Or 'example', consistent with how other types might be used for filtering/display
+    // inputSchema and outputSchema are typically not stored directly as Zod objects here.
+    // The Agent Builder UI might rely on fetching schema details from an API or from the tool's definition at runtime.
+    // For now, leaving them as undefined or empty objects if not used by UI directly from this array.
+    // inputSchema: stringReverserTool.inputSchema, // This would store the Zod object
+    // outputSchema: stringReverserTool.outputSchema,
+    hasConfig: false,
+    genkitToolName: stringReverserTool.name, // Important for linking to the Genkit tool
+    value: stringReverserTool, // The actual tool instance, if needed by parts of the UI
+    genkitTool: stringReverserTool, // Storing the tool for consistency
+    category: "Examples", // Added category
   }
 ];
 
@@ -395,7 +400,7 @@ export const standardTools: AvailableTool[] = [
  */
 const mcpToolsWithIcons: AvailableTool[] = mcpTools.map(tool => ({
   ...tool,
-  icon: getIconComponent(tool.iconName) // Removed 'as any' and 'as string', tool.iconName is string | undefined
+  icon: getIconComponent(tool.iconName)
 }));
 
 /**
