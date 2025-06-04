@@ -182,6 +182,7 @@ export const llmAgentConfigSchema = agentConfigBaseSharedSchema.extend({
   modelSafetySettings: z.array(modelSafetySettingItemSchema).optional(),
   maxHistoryTokens: z.number().int().positive().optional(),
   maxTokensPerResponse: z.number().int().positive().optional(),
+  enableCompositionalFunctionCalling: z.boolean().optional(), // Added for CFC
 });
 
 export const workflowAgentConfigSchema = agentConfigBaseSharedSchema.extend({

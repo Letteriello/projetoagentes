@@ -104,7 +104,7 @@ import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
 // import { Message } from "@/types/chat"; // Message type is used by useChatStore
-import { Conversation, ChatMessageUI, TestRunConfig } from "@/types/chat"; // Added TestRunConfig
+import { Conversation, ChatMessageUI, TestRunConfig, ChatRunConfig } from "@/types/chat"; // Added ChatRunConfig
 import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Added TestRunConfigPanel
 import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -208,6 +208,25 @@ export function ChatUI() {
     streamingEnabled: true,
   });
   const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
+
+  // User-facing chat configuration state
+  const [userChatConfig, setUserChatConfig] = useState<ChatRunConfig>({
+    streamingEnabled: true,
+    simulatedVoiceConfig: {
+      voice: 'alloy',
+      speed: 1.0,
+    },
+  });
+
+  const handleUserChatConfigChange = (newConfig: Partial<ChatRunConfig>) => {
+    setUserChatConfig(prev => ({
+      ...prev,
+      ...newConfig,
+      simulatedVoiceConfig: newConfig.simulatedVoiceConfig
+        ? { ...prev.simulatedVoiceConfig, ...newConfig.simulatedVoiceConfig }
+        : prev.simulatedVoiceConfig,
+    }));
+  };
 
   // Message and Conversation State - MOVED TO useChatStore
   // const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]);
@@ -314,8 +333,13 @@ export function ChatUI() {
   // removeSelectedFile is now INTERNAL to MessageInputArea.tsx
 
   // handleFormSubmit is now largely store.submitMessage
-  // It now needs to accept the file from MessageInputArea
-  const handleFormSubmitWrapper = async (event: React.FormEvent<HTMLFormElement>, file?: File | null) => {
+  // It now needs to accept the file and audio data from MessageInputArea
+  const handleFormSubmitWrapper = async (
+    event: React.FormEvent<HTMLFormElement>,
+    file?: File | null,
+    audioDataUri?: string | null,
+    attachmentType?: 'file' | 'audio'
+  ) => {
     event.preventDefault();
     if (pendingAgentConfig && store.isPending) { // Check store.isPending
       toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
@@ -330,8 +354,16 @@ export function ChatUI() {
     });
 
     try {
-      // Pass the file to submitMessage. The store will need to handle it.
-      await store.submitMessage(store.inputValue, activeChatTarget, testRunConfig, file);
+      // Pass the file, audioDataUri, userChatConfig, and testRunConfig to submitMessage.
+      await store.submitMessage(
+        store.inputValue,
+        activeChatTarget,
+        // testRunConfig, // testRunConfig is now passed as the fourth argument
+        attachmentType === 'audio' ? undefined : file,
+        attachmentType === 'audio' ? audioDataUri : undefined,
+        userChatConfig, // Pass the current userChatConfig
+        testRunConfig // Pass the current testRunConfig
+      );
       updateMsgToast({
         title: "Message Sent!",
         // description: "Your message has been sent.", // Optional description
@@ -592,6 +624,9 @@ export function ChatUI() {
             onExportChatLog={handleExportChatLog}
             isVerboseMode={isVerboseMode} // Pass verbose mode state
             onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)} // Pass toggle function
+            // User Chat Config props
+            userChatConfig={userChatConfig}
+            onUserChatConfigChange={handleUserChatConfigChange}
           >
             {/* Test settings button can remain or be moved if header gets too cluttered */}
             <Button variant="outline" size="icon" onClick={() => setIsTestConfigPanelOpen(true)} title="Test Settings" className="ml-2">

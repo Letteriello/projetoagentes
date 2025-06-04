@@ -57,6 +57,8 @@ export interface ChatMessageUI {
   toolCall?: ToolCallData;
   toolResponse?: ToolResponseData; // This will now use the updated ToolResponseData
   feedback?: 'liked' | 'disliked' | null; // Added for message feedback
+  appliedUserChatConfig?: ChatRunConfig; // Added for displaying applied config
+  appliedTestRunConfig?: any; // Added for displaying applied config (type TestRunConfig from chat-ui.tsx not imported here)
 }
 
 export interface ChatEvent {
@@ -82,4 +84,13 @@ export interface ChatState {
   conversations: Conversation[];
   activeConversationId: string | null;
   // other global chat settings
+}
+
+export interface ChatRunConfig {
+  streamingEnabled: boolean;
+  simulatedVoiceConfig?: {
+    voice: string;
+    speed: number;
+  };
+  // Add other chat-specific run configurations here
 }

@@ -349,6 +349,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         agentTemperature: 0.7,
         systemPromptGenerated: '', // Will be generated based on fields
         safetySettings: [],
+        enableCompositionalFunctionCalling: false, // Initialize CFC to false
         // Initialize other optional base fields with default 'disabled' states
         statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
         rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: {enabled: false} },
@@ -377,11 +378,18 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   // Helper function to prepare default values ensuring artifacts config is present
   const prepareFormDefaultValues = (agent?: SavedAgentConfiguration | null): SavedAgentConfiguration => {
     const baseConfig = agent || createDefaultSavedAgentConfiguration();
+  // Ensure LLM-specific fields like enableCompositionalFunctionCalling are preserved or defaulted
+  // if the baseConfig.config is already an LLMAgentConfig.
+  // If baseConfig.config is not an LLMAgentConfig (e.g., workflow), these fields wouldn't apply.
+  const isLLM = baseConfig.config?.type === 'llm';
+
   const preparedConfig = {
       ...baseConfig,
       config: {
         ...baseConfig.config,
         artifacts: baseConfig.config?.artifacts || { ...DEFAULT_ARTIFACTS_CONFIG },
+        // Explicitly ensure CFC field for LLM agents
+        ...(isLLM && { enableCompositionalFunctionCalling: (baseConfig.config as LLMAgentConfig).enableCompositionalFunctionCalling || false }),
       },
     };
 

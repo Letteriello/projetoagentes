@@ -1,6 +1,6 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
-import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe } from "lucide-react";
+import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Video } from "lucide-react"; // Added Video
 import {
   TOOL_ID_WEB_SEARCH,
   TOOL_ID_CALCULATOR,
@@ -9,6 +9,7 @@ import {
   TOOL_ID_CUSTOM_API_INTEGRATION,
   TOOL_ID_DATABASE_ACCESS,
   TOOL_ID_CODE_EXECUTOR,
+  TOOL_ID_VIDEO_STREAM_MONITOR, // Added TOOL_ID_VIDEO_STREAM_MONITOR
   GENKIT_TOOL_NAME_WEB_SEARCH,
   GENKIT_TOOL_NAME_CALCULATOR,
   GENKIT_TOOL_NAME_KNOWLEDGE_BASE_RETRIEVE,
@@ -16,6 +17,7 @@ import {
   GENKIT_TOOL_NAME_CUSTOM_API_CALL,
   GENKIT_TOOL_NAME_DATABASE_QUERY,
   GENKIT_TOOL_NAME_CODE_EXECUTE,
+  GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR, // Added GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR
   CONFIG_FIELD_GOOGLE_API_KEY,
   CONFIG_FIELD_GOOGLE_CSE_ID,
   CONFIG_FIELD_ALLOWED_DOMAINS,
@@ -60,6 +62,7 @@ function getIconComponent(name?: string): LucideIcon {
     cpu: Cpu,
     brain: Brain,
     globe: Globe,
+    video: Video, // Added Video icon
     // Adicione outros ícones conforme necessário
   };
   if (!name) return HelpCircle;
@@ -292,6 +295,15 @@ export const standardTools: AvailableTool[] = [
         description: "URL para o serviço de execução de código"
       }
     ]
+  },
+  {
+    id: TOOL_ID_VIDEO_STREAM_MONITOR,
+    name: "Monitor de Stream de Vídeo (Simulado)",
+    icon: Video, // Using Video icon
+    description: "Inicia o monitoramento simulado de um fluxo de vídeo para detectar eventos.",
+    hasConfig: false, // No config fields for the initial mock
+    genkitToolName: GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR,
+    configFields: [] // No configuration fields initially
   },
 ];
 

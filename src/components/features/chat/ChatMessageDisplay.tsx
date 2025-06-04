@@ -31,13 +31,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"; // Added import for Accordion
+import { ChatRunConfig } from "@/types/chat"; // Import ChatRunConfig for type usage
 
 // Interface para as props do componente ChatMessageDisplay.
 // Define a estrutura esperada para uma mensagem de chat.
 interface ChatMessageDisplayProps {
-  message: ChatMessageUI; // Objeto da mensagem, incluindo se está sendo transmitida (isStreaming).
+  message: ChatMessageUI; // Objeto da mensagem, que inclui appliedUserChatConfig and appliedTestRunConfig.
   onRegenerate?: (messageId: string) => void; // Função para tentar novamente o envio da mensagem.
   isVerboseMode?: boolean; // Added isVerboseMode prop
+  // appliedUserChatConfig and appliedTestRunConfig are now part of message prop
 }
 
 // Componente para exibir um cursor piscante, usado para indicar que o agente está digitando.
@@ -320,13 +322,35 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
             </Accordion>
           </div>
         )}
+
+        {/* Display Applied Run Configurations in Verbose Mode */}
+        {isVerboseMode && (message.appliedUserChatConfig || message.appliedTestRunConfig) && (
+          <details className="mt-2 text-xs" open>
+            <summary className="cursor-pointer italic text-gray-500">Applied Run Configuration</summary>
+            {message.appliedUserChatConfig && (
+              <>
+                <h4 className="font-semibold mt-1 text-muted-foreground">User Chat Config:</h4>
+                <pre className="bg-muted p-2 mt-1 rounded-md overflow-x-auto whitespace-pre-wrap break-all text-foreground">
+                  {JSON.stringify(message.appliedUserChatConfig, null, 2)}
+                </pre>
+              </>
+            )}
+            {message.appliedTestRunConfig && (
+              <>
+                <h4 className="font-semibold mt-1 text-muted-foreground">Test Run Config:</h4>
+                <pre className="bg-muted p-2 mt-1 rounded-md overflow-x-auto whitespace-pre-wrap break-all text-foreground">
+                  {JSON.stringify(message.appliedTestRunConfig, null, 2)}
+                </pre>
+              </>
+            )}
+          </details>
+        )}
       </div>
       {/* Ícone do usuário, exibido à direita se a mensagem for do usuário. */}
       {isUser && (
         <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
           <User className="h-5 w-5 text-foreground" />
         </div>
-      )}
       )}
       {/* Error display and retry button */}
       {message.status === "error" && !isUser && onRegenerate && (

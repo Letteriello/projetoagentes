@@ -22,7 +22,7 @@ This design specification is broken down into the following detailed documents:
 2.  **[Agent Creation Process](./agent_creation_process.md)**
     *   *Description:* Details the step-by-step process for creating agents in both "Beginner Mode" (conversational AI builder) and "Advanced Mode" (detailed configuration interface).
 3.  **[Tool Integration Mechanism](./tool_integration_mechanism.md)**
-    *   *Description:* Specifies how users add, configure, and manage tools (both standard and custom/MCP), and how agents invoke these tools, including security considerations.
+    *   *Description:* Specifies how users add, configure, and manage tools (both standard and custom/MCP), and how agents invoke these tools, including security considerations. This also covers the platform's support for (simulated) streaming tools that can return continuous data.
 4.  **[AI-Assisted Input](./ai_assisted_input.md)**
     *   *Description:* Outlines the feature that helps users formulate effective prompts and configurations via AI-generated suggestions within various input fields across the platform.
 5.  **[Task Management Interface](./task_management_interface.md)**
@@ -46,10 +46,11 @@ Conceptually, the platform can be envisioned as a layered architecture:
     *   Task Storage & Agent Assignment.
     *   A2A Communication Bus & Discovery Registry.
     *   Orchestration Engine (managing triggers, schedules, and workflows).
+    *   Support for advanced agent capabilities, including (simulated) custom audio input streaming and video event stream monitoring.
 *   **User Interface Layer:** The web-based UI, guided by the UI/UX principles, provides users access to all platform features, including AI-assisted input generation.
 *   **AI Assistance Layer:** A dedicated AI model (or models) that power the "AI-Assisted Input" feature and the "Builder Bot" in Beginner Mode, interacting with various platform services to provide contextual help.
 
-These components work in concert to allow users to define agents (their prompts, tools, and desired autonomy), assign them work or set them to respond to events, and observe their activity, all within a user-friendly environment.
+These components work in concert to allow users to define agents (their prompts, tools, and desired autonomy), assign them work or set them to respond to events, and observe their activity, all within a user-friendly environment. The platform's architecture is designed to be extensible, demonstrated by its (simulated) support for streaming tools like the `video-stream-tool.ts` (which uses `AsyncGenerator` to yield continuous data) and custom media inputs like mock audio Data URIs. This showcases readiness for more complex, real-time interactions.
 
 ## Next Steps (Conceptual)
 

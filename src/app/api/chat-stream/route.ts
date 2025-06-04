@@ -29,6 +29,7 @@ interface ChatInput {
   userMessage: string;
   history?: Array<{role: string; content: any}>;
   fileDataUri?: string;
+  audioDataUri?: string; // Added audioDataUri
   modelName?: string;
   temperature?: number;
   // agentToolsDetails from the chatInput will be overridden by the fetched agent's tools configuration
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
       userMessage: chatInput.userMessage,
       history: chatInput.history,
       fileDataUri: chatInput.fileDataUri,
+      audioDataUri: chatInput.audioDataUri, // Pass audioDataUri
       modelName: chatInput.modelName, // User can still override model per request if desired
       temperature: chatInput.temperature, // User can still override temp per request
       systemPrompt: systemPrompt, // Generated system prompt

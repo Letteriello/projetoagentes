@@ -77,9 +77,22 @@ export interface ChatStore {
   handleDeleteConversation: (conversationId: string) => Promise<void>;
   handleRenameConversation: (conversationId: string, newTitle: string) => Promise<void>;
 
-  submitMessage: (messageInputValue: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => Promise<void>;
+  submitMessage: (
+    messageInputValue: string,
+    activeChatTarget?: ActiveChatTarget | null,
+    // testRunConfig?: TestRunConfig, // This was the old position, now further down
+    file?: File | null,
+    audioDataUri?: string | null,
+    userChatConfig?: ChatRunConfig, // Added userChatConfig
+    testRunConfig?: TestRunConfig // Added testRunConfig (actual position)
+  ) => Promise<void>;
   handleFeedback: (messageId: string, feedback: MessageFeedback | null) => Promise<void>; // Corrected type
-  handleRegenerate: (messageIdToRegenerate: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => Promise<void>;
+  handleRegenerate: (
+    messageIdToRegenerate: string,
+    activeChatTarget?: ActiveChatTarget | null,
+    testRunConfig?: TestRunConfig, // Assuming regenerate might also use testRunConfig
+    userChatConfig?: ChatRunConfig // Assuming regenerate might also use userChatConfig for consistency
+  ) => Promise<void>;
   clearSelectedFile: () => void;
 }
 
@@ -267,9 +280,18 @@ export function useChatStore(): ChatStore {
 
   const clearSelectedFile = useCallback(() => {
     setSelectedFile(null); setSelectedFileName(null); setSelectedFileDataUri(null);
+    // Also clear attachmentType if it were part of the store, but it's in MessageInputArea's local state.
   }, []);
 
-  const submitMessage = async ( messageInputValue: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => {
+  const submitMessage = async (
+    messageInputValue: string,
+    activeChatTarget?: ActiveChatTarget | null,
+    // testRunConfig is now further down, this was its old spot
+    file?: File | null,
+    audioDataUri?: string | null,
+    userChatConfig?: ChatRunConfig, // Added userChatConfig
+    testRunConfig?: TestRunConfig // Added testRunConfig
+  ) => {
     // --- Feedback Capture Mode ---
     // Check if the store is currently waiting for feedback on a specific message.
     // If so, the current input is treated as the feedback reason.
@@ -325,7 +347,11 @@ export function useChatStore(): ChatStore {
       toast({ title: "Error", description: "User not logged in.", variant: "destructive" });
       return;
     }
-    if (!messageInputValue.trim() && !selectedFile) { /* ... */ return; }
+    // Use the passed file and audioDataUri for the check, not selectedFile from store state directly for this submission
+    if (!messageInputValue.trim() && !file && !audioDataUri) {
+      toast({ title: "Input Required", description: "Please type a message or attach a file/audio.", variant: "default" });
+      return;
+    }
 
     setIsPending(true);
     const userMessageId = uuidv4();
@@ -333,8 +359,12 @@ export function useChatStore(): ChatStore {
     const userMessagePayload: ExtendedChatMessageUI = {
       id: userMessageId, text: messageInputValue, sender: "user", status: "pending",
       timestamp: userMessageTimestamp,
-      imageUrl: selectedFile?.type.startsWith("image/") ? selectedFileDataUri : undefined,
-      fileName: selectedFileName || undefined,
+      // Use the passed file/audioDataUri for this message
+      imageUrl: file?.type.startsWith("image/") ? selectedFileDataUri : undefined, // Assuming selectedFileDataUri was set if file exists
+      fileName: file?.name || (audioDataUri ? "mock_audio.mp3" : undefined),
+      // audioDataUri is not directly part of ChatMessageUI, it's passed to API
+      appliedUserChatConfig: userChatConfig, // Store the applied UserChatConfig
+      appliedTestRunConfig: testRunConfig,   // Store the applied TestRunConfig
     };
     addOptimisticMessage({ type: "add_message", message: userMessagePayload });
 
@@ -358,10 +388,10 @@ export function useChatStore(): ChatStore {
       const userMessageToPersist: Message = {
         id: userMessageId, isUser: true, content: messageInputValue,
         timestamp: userMessageTimestamp, // Use Date object directly
-        imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
+        imageUrl: userMessagePayload.imageUrl,
+        fileName: userMessagePayload.fileName,
+        // audioDataUri is not part of Message type for DB, it's for API call
         conversationId: currentConvId,
-        // Ensure other fields like 'text' are aligned if Message type expects it
-        // For IndexedDB service, content is the primary text field.
         text: messageInputValue,
       };
       await addMessageToConversation(currentConvId, userMessageToPersist);
@@ -377,14 +407,25 @@ export function useChatStore(): ChatStore {
     }
 
     const currentInputForAgent = messageInputValue;
-    const currentFileDataUriForAgent = selectedFileDataUri;
-    setInputValue(""); clearSelectedFile();
+    // Use the passed file/audio for the API call, not the store's selectedFile
+    const currentFileDataUriForAgent = file?.type.startsWith("image/") ? selectedFileDataUri : undefined; // Assuming selectedFileDataUri was set for image
+    const currentAudioDataUriForAgent = audioDataUri;
+
+    setInputValue("");
+    // Clear selected file from the store if it was the one submitted.
+    // This is a bit indirect as MessageInputArea now manages its own state.
+    // However, ChatUI passes the file to submitMessage, so the store's selectedFile is likely stale.
+    // It's safer to clear it.
+    clearSelectedFile();
+
 
     const agentMessageId = uuidv4();
     const agentMessageTimestamp = new Date();
     const agentOptimisticPayload: ExtendedChatMessageUI = {
       id: agentMessageId, text: "", sender: "agent", status: "pending",
       isStreaming: true, timestamp: agentMessageTimestamp, conversationId: currentConvId,
+      appliedUserChatConfig: userChatConfig, // Agent message also gets the configs
+      appliedTestRunConfig: testRunConfig,   // Agent message also gets the configs
     };
     addOptimisticMessage({ type: "add_message", message: agentOptimisticPayload });
 
@@ -410,9 +451,14 @@ export function useChatStore(): ChatStore {
 
     let apiEndpoint = activeChatTarget?.type === 'adk-agent' ? '/api/agent-creator-stream' : '/api/chat-stream';
     const requestBody = {
-      userMessage: currentInputForAgent, history: historyForBackend, userId: currentUserId, stream: true, // stream: true might be problematic if we expect a JSON object with tool data
-      fileDataUri: currentFileDataUriForAgent, conversationId: currentConvId,
-      agentConfig: activeChatTarget?.config, testRunConfig: testRunConfig,
+      userMessage: currentInputForAgent, history: historyForBackend, userId: currentUserId, stream: true, // Stream behavior might be overridden by userChatConfig.streamingEnabled
+      fileDataUri: currentFileDataUriForAgent, // For image/file
+      audioDataUri: currentAudioDataUriForAgent, // For audio
+      conversationId: currentConvId,
+      agentConfig: activeChatTarget?.config,
+      // Pass the specific configs to the backend
+      userChatConfig: userChatConfig,
+      testRunConfig: testRunConfig,
     };
 
     try {
@@ -479,11 +525,12 @@ export function useChatStore(): ChatStore {
         if (data.outputMessage) {
           finalAgentText = data.outputMessage;
           const agentResponseMessage: ExtendedChatMessageUI = {
-            ...agentOptimisticPayload, // Use the ID of the pending message
+            ...agentOptimisticPayload, // Use the ID & configs from the pending message
             id: agentMessageId,
             text: finalAgentText,
             status: 'completed',
             isStreaming: false,
+            // appliedUserChatConfig and appliedTestRunConfig are already in agentOptimisticPayload
           };
           newMessagesToAdd.push(agentResponseMessage);
         }
@@ -555,7 +602,12 @@ export function useChatStore(): ChatStore {
           }
         }
         finalAgentText = accumulatedAgentResponse;
-        const finalAgentPayload: ExtendedChatMessageUI = { ...agentOptimisticPayload, text: finalAgentText, status: 'completed', isStreaming: false};
+        const finalAgentPayload: ExtendedChatMessageUI = {
+             ...agentOptimisticPayload, // Ensure configs are carried over
+             text: finalAgentText,
+             status: 'completed',
+             isStreaming: false
+        };
         addOptimisticMessage({ type: "update_message_status", messageId: agentMessageId, status: "completed", isStreaming: false, newContent: finalAgentText });
 
         const agentMessageToPersist: Message = {
@@ -589,6 +641,7 @@ export function useChatStore(): ChatStore {
             isError: true,
             timestamp: agentMessageTimestamp, // Ensure this is available in scope
             conversationId: currentConvId,
+            // appliedUserChatConfig and appliedTestRunConfig are not part of the DB Message type
           };
           setMessages(prev => [...prev, agentErrorMessageObject]);
 
@@ -697,7 +750,12 @@ export function useChatStore(): ChatStore {
     }
   };
 
-  const handleRegenerate = async (messageIdToRegenerate: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => {
+  const handleRegenerate = async (
+    messageIdToRegenerate: string,
+    activeChatTarget?: ActiveChatTarget | null,
+    testRunConfig?: TestRunConfig, // From original call
+    userChatConfig?: ChatRunConfig // Added userChatConfig for consistency
+  ) => {
     if (!currentUserId || !activeConversationId) {
       toast({ title: "Error", description: "User or conversation not identified.", variant: "destructive" });
       return;
@@ -765,6 +823,9 @@ export function useChatStore(): ChatStore {
     const newAgentOptimisticPayload: ExtendedChatMessageUI = {
       id: newAgentMessageId, text: "", sender: "agent", status: "pending",
       isStreaming: true, timestamp: newAgentTimestamp, conversationId: activeConversationId,
+      // Carry over the configs from the original user message that led to this regeneration chain
+      appliedUserChatConfig: userPromptMessage.appliedUserChatConfig || userChatConfig, // Prefer original, fallback to current
+      appliedTestRunConfig: userPromptMessage.appliedTestRunConfig || testRunConfig,   // Prefer original, fallback to current
     };
     addOptimisticMessage({ type: "add_message", message: newAgentOptimisticPayload });
 
@@ -775,7 +836,10 @@ export function useChatStore(): ChatStore {
       userId: currentUserId, stream: true,
       fileDataUri: currentFileDataUriForAgent, // Use original file if any
       conversationId: activeConversationId,
-      agentConfig: activeChatTarget?.config, testRunConfig: testRunConfig,
+      agentConfig: activeChatTarget?.config,
+      // Pass the configs used for the original message or current if not available
+      userChatConfig: userPromptMessage.appliedUserChatConfig || userChatConfig,
+      testRunConfig: userPromptMessage.appliedTestRunConfig || testRunConfig,
     };
 
     try {
@@ -793,7 +857,12 @@ export function useChatStore(): ChatStore {
         }
       }
 
-      const finalAgentPayload: ExtendedChatMessageUI = { ...newAgentOptimisticPayload, text: accumulatedAgentResponse, status: 'completed', isStreaming: false};
+      const finalAgentPayload: ExtendedChatMessageUI = {
+        ...newAgentOptimisticPayload, // Ensure configs are carried over
+        text: accumulatedAgentResponse,
+        status: 'completed',
+        isStreaming: false
+      };
       addOptimisticMessage({ type: "update_message_status", messageId: newAgentMessageId, status: "completed", isStreaming: false, newContent: accumulatedAgentResponse });
 
       const agentMessageToPersist: Message = {
