@@ -1138,8 +1138,8 @@ export function ArtifactManagementTab({
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>
-                                  O usuário final interagindo com o agente.
+                                  <p className="max-w-xs">
+                                    Permite que o usuário final (humano interagindo com o agente) leia ou escreva este tipo de artefato, dependendo das operações permitidas pelo agente.
                                 </p>
                               </TooltipContent>
                             </Tooltip>
@@ -1166,7 +1166,9 @@ export function ArtifactManagementTab({
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>O próprio agente.</p>
+                                  <p className="max-w-xs">
+                                    Permite que o próprio agente principal leia ou escreva este tipo de artefato.
+                                  </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -1195,8 +1197,8 @@ export function ArtifactManagementTab({
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>
-                                  Outros agentes que são subordinados a este.
+                                  <p className="max-w-xs">
+                                    Permite que sub-agentes (agentes orquestrados por este agente principal) leiam ou escrevam este tipo de artefato.
                                 </p>
                               </TooltipContent>
                             </Tooltip>

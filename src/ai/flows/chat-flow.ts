@@ -28,6 +28,9 @@ import { z } from 'zod';
 import { ActionContext } from 'genkit';
 import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/agent-configs-new'; // Adjust path as needed
 
+// Define sensitive keywords for guardrails
+const SENSITIVE_KEYWORDS = ["conteúdo sensível", "excluir dados", "informação confidencial", "apagar tudo", "dados pessoais", "senha", "segredo"];
+
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
 // Stores factory functions for configurable tools and direct tool objects for static ones.
 interface AppTool extends Tool {
@@ -299,6 +302,32 @@ async function basicChatFlowInternal(
     let currentMessages = [...messages]; // Start with the initial set of messages
 
     const MAX_TOOL_ITERATIONS = 5; // Prevent infinite loops
+
+    // Guardrail: Before Model Callback Simulation
+    let fullPromptTextForGuardrail = "";
+    currentMessages.forEach(msg => {
+      msg.content.forEach(part => {
+        if (part.text) {
+          fullPromptTextForGuardrail += part.text.toLowerCase() + " ";
+        }
+      });
+    });
+
+    for (const keyword of SENSITIVE_KEYWORDS) {
+      if (fullPromptTextForGuardrail.includes(keyword.toLowerCase())) {
+        const errorMessage = `Guardrail ativado: Prompt bloqueado devido a conteúdo potencialmente sensível (palavra-chave: "${keyword}").`;
+        winstonLogger.warn(`Guardrail (Model Prompt) triggered for Agent ${agentId}: ${errorMessage}`);
+        chatEvents.push({
+          id: `evt-${Date.now()}-guardrail-prompt`,
+          timestamp: new Date(),
+          eventType: 'AGENT_CONTROL',
+          eventTitle: 'Guardrail: Prompt Bloqueado',
+          eventDetails: errorMessage,
+        });
+        return { error: errorMessage, chatEvents };
+      }
+    }
+
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const llmResponse = await ai.generate({
         ...request,
@@ -448,6 +477,40 @@ async function basicChatFlowInternal(
             continue;
           }
 
+          // Guardrail: Before Tool Callback Simulation
+          const stringifiedToolInput = JSON.stringify(toolRequest.input).toLowerCase();
+          let toolBlockedByGuardrail = false;
+          for (const keyword of SENSITIVE_KEYWORDS) {
+            if (stringifiedToolInput.includes(keyword.toLowerCase())) {
+              toolExecutionFailed = true;
+              errorMessage = `Guardrail ativado: Execução de ferramenta '${toolRequest.name}' bloqueada devido a parâmetros potencialmente sensíveis (palavra-chave: "${keyword}").`;
+              winstonLogger.warn(`Guardrail (Tool Input) triggered for Agent ${agentId}, Tool ${toolRequest.name}: ${errorMessage}`);
+              resultOutput = { error: errorMessage, code: 'GUARDRAIL_TOOL_BLOCKED' };
+              executedToolResults.push({
+                name: toolRequest.name,
+                input: toolRequest.input as Record<string, unknown>,
+                errorDetails: { message: errorMessage, code: 'GUARDRAIL_TOOL_BLOCKED' },
+                status: 'error',
+                ref: toolRequest.ref,
+              });
+              chatEvents.push({
+                id: `evt-${Date.now()}-guardrail-tool-${toolRequest.name}`,
+                timestamp: new Date(),
+                eventType: 'TOOL_ERROR', // Or a new specific eventType like 'TOOL_GUARDRAIL_BLOCKED'
+                toolName: toolRequest.name,
+                eventTitle: `Guardrail: Ferramenta ${toolRequest.name} Bloqueada`,
+                eventDetails: errorMessage,
+              });
+              toolResponseParts.push({ toolRequest, output: resultOutput });
+              toolBlockedByGuardrail = true;
+              break; // Keyword found, no need to check others
+            }
+          }
+
+          if (toolBlockedByGuardrail) {
+            continue; // Skip to the next tool request
+          }
+
           // Execute the tool function
           const toolRawOutput = await toolToRun.func(validatedInput);
 
@@ -550,6 +613,20 @@ async function basicChatFlowInternal(
 
     // const stream = llmResponse.stream ? llmResponse.stream() : null; // Stream handling would need rework with this loop
     // if (stream) { return { stream }; }
+
+    // Simulated Safety Check on finalOutputText
+    const SIMULATED_INSECURE_PHRASE = "resposta insegura simulada";
+    if (finalOutputText.toLowerCase().includes(SIMULATED_INSECURE_PHRASE.toLowerCase())) {
+      winstonLogger.warn(`Simulated Safety Alert triggered for Agent ${agentId}. Original response: "${finalOutputText}"`);
+      finalOutputText = "Não posso responder a isso.";
+      chatEvents.push({
+        id: `evt-${Date.now()}-safety-alert`,
+        timestamp: new Date(),
+        eventType: 'AGENT_CONTROL',
+        eventTitle: 'Alerta de Segurança Simulado',
+        eventDetails: 'A resposta original foi substituída por uma mensagem padrão devido a preocupações de segurança simuladas.',
+      });
+    }
 
     let foundArtifact: GeneratedArtifactInfo | undefined = undefined;
     if (executedToolResults) { // Check if executedToolResults is not undefined

@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
+import { Switch } from "@/components/ui/switch"; // Added Switch
 import JsonEditorField from '@/components/ui/JsonEditorField'; // Added JsonEditorField
 // Label replaced by FormLabel where appropriate
 import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
@@ -57,6 +58,7 @@ import {
   Loader2,
   ClipboardCopy,
   Undo2, // Import Undo2
+  AlertTriangle, // Import AlertTriangle
   // Wand2 // Already imported
 } from 'lucide-react';
 
@@ -1013,6 +1015,13 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
                 {/* Advanced Tab (ADK Callbacks) */}
                 <TabsContent value="advanced" className="space-y-6 mt-4">
+                  <Alert variant="warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Considerações de Segurança para RunConfig</AlertTitle>
+                    <AlertDescription>
+                      Parâmetros de RunConfig (como 'max_tokens' para limitar a geração de conteúdo, 'temperature' para controlar a aleatoriedade, ou configurações de 'compositional_function_calling' para controlar a complexidade e execução de múltiplas funções) podem impactar a segurança, o custo e o comportamento do agente. Revise estas configurações cuidadosamente, especialmente em ambientes de produção.
+                    </AlertDescription>
+                  </Alert>
                   <Alert>
                     {/* Note: This tab does not seem to use a lazy-loaded component directly at its root.
                         If specific components *within* this tab were to be lazy-loaded, they would need
@@ -1065,6 +1074,41 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                           )}
                         />
                       ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Additional Security Settings Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Configurações de Segurança Adicionais</CardTitle>
+                      <CardDescription>
+                        Ajustes finos para segurança na execução de código e outras operações sensíveis.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <FormField
+                        control={methods.control}
+                        name="config.sandboxedCodeExecution"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Habilitar Execução de Código em Sandbox
+                              </FormLabel>
+                              <p className="text-xs text-muted-foreground pt-1">
+                                Quando habilitado, o código executado pela ferramenta codeExecutor será invocado em um ambiente sandbox simulado para maior segurança.
+                              </p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </CardContent>
                   </Card>
                 </TabsContent>
