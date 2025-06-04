@@ -6,9 +6,11 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
+  FormControl, // Ensure FormControl is imported
 } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -500,6 +502,30 @@ export default function BehaviorTab({
                 Certifique-se de que o "Agent Goal" e "Agent Tasks" estejam preenchidos para melhores sugestões.
               </p>
             </div>
+          )}
+
+          {/* Compositional Function Calling Checkbox */}
+          {agentType === 'llm' && (
+            <FormField
+              control={control}
+              name="config.enableCompositionalFunctionCalling"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-4 bg-background">
+                  <div className="space-y-0.5">
+                    <FormLabel>Habilitar Compositional Function Calling (CFC)</FormLabel>
+                    <FormDescription>
+                      Sinaliza que o LLM pode orquestrar múltiplas chamadas de ferramentas em um único turno.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
           )}
 
           {/* Copy System Prompt Button */}

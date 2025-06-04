@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image"; // Import next/image
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -20,13 +21,17 @@ import {
   LogIn,
   LogOut,
   DownloadCloud, // Added DownloadCloud
+  Settings, // Added Settings icon for ChatRunConfig
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Keep if still used for some parts
 import { llmModels } from '../../../data/llm-models'; // Import llmModels
 import { Badge } from "@/components/ui/badge"; // Import Badge
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Added Popover
+import { Slider } from "@/components/ui/slider"; // Added Slider
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ActiveChatTarget } from "@/hooks/use-chat-store"; // Import ActiveChatTarget
+import { ChatRunConfig } from "@/types/chat"; // Import ChatRunConfig
 
 interface Gem {
   id: string;
@@ -58,6 +63,8 @@ interface ChatHeaderProps {
   handleLogout: () => void;
   isVerboseMode: boolean; // Added isVerboseMode prop
   onToggleVerboseMode: () => void; // Added onToggleVerboseMode prop
+  userChatConfig: ChatRunConfig;
+  onUserChatConfigChange: (newConfig: Partial<ChatRunConfig>) => void;
 }
 
 export default function ChatHeader({
@@ -79,9 +86,14 @@ export default function ChatHeader({
   handleLogout,
   isVerboseMode, // Added isVerboseMode
   onToggleVerboseMode, // Added onToggleVerboseMode
+  userChatConfig,
+  onUserChatConfigChange,
 }: ChatHeaderProps) {
   const { currentUser, loading: authLoading } = useAuth();
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
+
+  const simulatedVoiceOptions = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
   const handleGemSelect = (id: string) => {
     setSelectedGemId(id);
@@ -277,7 +289,70 @@ export default function ChatHeader({
 
         {/* Alternador de tema */}
         <ThemeToggle className="text-muted-foreground hover:text-foreground" />
-        
+
+        {/* Chat Settings Popover */}
+        <Popover open={isChatSettingsOpen} onOpenChange={setIsChatSettingsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground"
+              title="Configurações de Chat"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <h4 className="font-medium leading-none">Configurações de Chat</h4>
+                <p className="text-sm text-muted-foreground">
+                  Ajuste o comportamento do chat.
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="streaming-enabled">Habilitar Streaming</Label>
+                  <Switch
+                    id="streaming-enabled"
+                    checked={userChatConfig.streamingEnabled}
+                    onCheckedChange={(checked) => onUserChatConfigChange({ streamingEnabled: checked })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="voice-select">Voz Simulada</Label>
+                  <Select
+                    value={userChatConfig.simulatedVoiceConfig?.voice || 'alloy'}
+                    onValueChange={(value) => onUserChatConfigChange({ simulatedVoiceConfig: { voice: value, speed: userChatConfig.simulatedVoiceConfig?.speed || 1.0 } })}
+                  >
+                    <SelectTrigger id="voice-select">
+                      <SelectValue placeholder="Selecione uma voz" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {simulatedVoiceOptions.map(voice => (
+                        <SelectItem key={voice} value={voice}>
+                          {voice.charAt(0).toUpperCase() + voice.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="voice-speed">Velocidade da Voz ({userChatConfig.simulatedVoiceConfig?.speed || 1.0}x)</Label>
+                  <Slider
+                    id="voice-speed"
+                    min={0.5}
+                    max={2}
+                    step={0.1}
+                    value={[userChatConfig.simulatedVoiceConfig?.speed || 1.0]}
+                    onValueChange={(value) => onUserChatConfigChange({ simulatedVoiceConfig: { voice: userChatConfig.simulatedVoiceConfig?.voice || 'alloy', speed: value[0] } })}
+                  />
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         {/* Autenticação */}
         {authLoading ? (
           <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
@@ -291,7 +366,7 @@ export default function ChatHeader({
               title={currentUser.displayName || currentUser.email || "Perfil do usuário"}
             >
               {currentUser.photoURL ? (
-                <img src={currentUser.photoURL} alt="Avatar" className="h-full w-full object-cover" />
+                <Image src={currentUser.photoURL} alt="Avatar" width={32} height={32} className="h-full w-full object-cover" />
               ) : (
                 <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary">
                   {(currentUser.displayName?.[0] || currentUser.email?.[0] || "U").toUpperCase()}

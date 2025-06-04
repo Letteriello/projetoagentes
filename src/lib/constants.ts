@@ -14,6 +14,7 @@ export const TOOL_ID_CALENDAR_ACCESS = "calendarAccess";
 export const TOOL_ID_CUSTOM_API_INTEGRATION = "customApiIntegration";
 export const TOOL_ID_DATABASE_ACCESS = "databaseAccess";
 export const TOOL_ID_CODE_EXECUTOR = "codeExecutor";
+export const TOOL_ID_VIDEO_STREAM_MONITOR = "videoStreamMonitor";
 
 // Genkit Tool Names
 export const GENKIT_TOOL_NAME_WEB_SEARCH = "performWebSearch";
@@ -23,6 +24,7 @@ export const GENKIT_TOOL_NAME_CALENDAR_GET_EVENTS = "calendarGetEvents";
 export const GENKIT_TOOL_NAME_CUSTOM_API_CALL = "customApiCall"; // Example, might vary
 export const GENKIT_TOOL_NAME_DATABASE_QUERY = "databaseQuery"; // Example, might vary
 export const GENKIT_TOOL_NAME_CODE_EXECUTE = "codeExecute"; // Example, might vary
+export const GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR = "videoStreamMonitorTool";
 
 // Config Field IDs
 export const CONFIG_FIELD_GOOGLE_API_KEY = "googleApiKey";

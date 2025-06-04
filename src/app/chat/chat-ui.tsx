@@ -18,6 +18,8 @@ import {
   useCallback,
   // useOptimistic, // Removed
   useMemo,
+  Suspense,
+  lazy,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "@/hooks/use-toast";
@@ -104,9 +106,9 @@ import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
 // import { Message } from "@/types/chat"; // Message type is used by useChatStore
-import { Conversation, ChatMessageUI, TestRunConfig } from "@/types/chat"; // Added TestRunConfig
-import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Added TestRunConfigPanel
-import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
+import { Conversation, ChatMessageUI, TestRunConfig, ChatRunConfig } from "@/types/chat"; // Added ChatRunConfig
+// import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
+// import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -142,6 +144,9 @@ export function ChatUI() {
   // const currentUserId = currentUser?.uid; // Now from store.currentUserId
 
   const store = useChatStore(); // USE THE STORE
+
+  const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
+  const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
 
   // State for current agent and conversation context
   // Definindo uma interface estendida de SavedAgentConfigType que inclui todas as propriedades necessárias
@@ -208,6 +213,25 @@ export function ChatUI() {
     streamingEnabled: true,
   });
   const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
+
+  // User-facing chat configuration state
+  const [userChatConfig, setUserChatConfig] = useState<ChatRunConfig>({
+    streamingEnabled: true,
+    simulatedVoiceConfig: {
+      voice: 'alloy',
+      speed: 1.0,
+    },
+  });
+
+  const handleUserChatConfigChange = (newConfig: Partial<ChatRunConfig>) => {
+    setUserChatConfig(prev => ({
+      ...prev,
+      ...newConfig,
+      simulatedVoiceConfig: newConfig.simulatedVoiceConfig
+        ? { ...prev.simulatedVoiceConfig, ...newConfig.simulatedVoiceConfig }
+        : prev.simulatedVoiceConfig,
+    }));
+  };
 
   // Message and Conversation State - MOVED TO useChatStore
   // const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]);
@@ -314,8 +338,13 @@ export function ChatUI() {
   // removeSelectedFile is now INTERNAL to MessageInputArea.tsx
 
   // handleFormSubmit is now largely store.submitMessage
-  // It now needs to accept the file from MessageInputArea
-  const handleFormSubmitWrapper = async (event: React.FormEvent<HTMLFormElement>, file?: File | null) => {
+  // It now needs to accept the file and audio data from MessageInputArea
+  const handleFormSubmitWrapper = async (
+    event: React.FormEvent<HTMLFormElement>,
+    file?: File | null,
+    audioDataUri?: string | null,
+    attachmentType?: 'file' | 'audio'
+  ) => {
     event.preventDefault();
     if (pendingAgentConfig && store.isPending) { // Check store.isPending
       toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
@@ -330,8 +359,16 @@ export function ChatUI() {
     });
 
     try {
-      // Pass the file to submitMessage. The store will need to handle it.
-      await store.submitMessage(store.inputValue, activeChatTarget, testRunConfig, file);
+      // Pass the file, audioDataUri, userChatConfig, and testRunConfig to submitMessage.
+      await store.submitMessage(
+        store.inputValue,
+        activeChatTarget,
+        // testRunConfig, // testRunConfig is now passed as the fourth argument
+        attachmentType === 'audio' ? undefined : file,
+        attachmentType === 'audio' ? audioDataUri : undefined,
+        userChatConfig, // Pass the current userChatConfig
+        testRunConfig // Pass the current testRunConfig
+      );
       updateMsgToast({
         title: "Message Sent!",
         // description: "Your message has been sent.", // Optional description
@@ -534,42 +571,48 @@ export function ChatUI() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      {isTestConfigPanelOpen && (
-        <TestRunConfigPanel
-          isOpen={isTestConfigPanelOpen}
-          onClose={() => setIsTestConfigPanelOpen(false)}
-          config={testRunConfig}
-          onConfigChange={handleTestConfigChange}
-          onApply={handleApplyTestConfig}
-        />
-      )}
-      <div 
-        className={cn(
-          "fixed md:relative inset-y-0 left-0 z-20 w-72 h-full transition-transform duration-300 ease-in-out bg-gray-800",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      <Suspense fallback={<div>Carregando painel de configuração...</div>}>
+        {isTestConfigPanelOpen && (
+          <TestRunConfigPanel
+            isOpen={isTestConfigPanelOpen}
+            onClose={() => setIsTestConfigPanelOpen(false)}
+            config={testRunConfig}
+            onConfigChange={handleTestConfigChange}
+            onApply={handleApplyTestConfig}
+          />
         )}
-      >
-        <ConversationSidebar
-          isOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen(false)}
-          conversations={store.conversations}
-          activeConversationId={store.activeConversationId}
-          onSelectConversation={store.handleSelectConversation}
-          onNewConversation={() => store.handleNewConversation()}
-          onDeleteConversation={(conversation) => store.handleDeleteConversation(conversation.id)}
-          onRenameConversation={store.handleRenameConversation}
-          isLoading={store.isLoadingConversations}
-          currentUserId={store.currentUserId}
-          gems={initialGems} // Keep UI specific props
-          savedAgents={savedAgents} // Keep UI specific props
-          adkAgents={adkAgents} // Keep UI specific props
-          onSelectAgent={(agent) => { // Keep UI specific logic
-            if ('displayName' in agent) setSelectedADKAgentId(agent.id);
-            else if ('prompt' in agent) setSelectedGemId(agent.id);
-            else if ('agentName' in agent || 'id' in agent) setSelectedAgentId(agent.id);
-          }}
-        />
-      </div>
+      </Suspense>
+      <Suspense fallback={<div className="fixed md:relative inset-y-0 left-0 z-20 w-72 h-full bg-gray-800 text-gray-200 p-4">Carregando sidebar...</div>}>
+        {isClient && isSidebarOpen && ( // Ensure isClient and isSidebarOpen are true for Suspense
+          <div
+            className={cn(
+              "fixed md:relative inset-y-0 left-0 z-20 w-72 h-full transition-transform duration-300 ease-in-out bg-gray-800",
+              isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+            )}
+          >
+            <ConversationSidebar
+              isOpen={isSidebarOpen}
+              onToggleSidebar={() => setIsSidebarOpen(false)}
+              conversations={store.conversations}
+              activeConversationId={store.activeConversationId}
+              onSelectConversation={store.handleSelectConversation}
+              onNewConversation={() => store.handleNewConversation()}
+              onDeleteConversation={(conversation) => store.handleDeleteConversation(conversation.id)}
+              onRenameConversation={store.handleRenameConversation}
+              isLoading={store.isLoadingConversations}
+              currentUserId={store.currentUserId}
+              gems={initialGems} // Keep UI specific props
+              savedAgents={savedAgents} // Keep UI specific props
+              adkAgents={adkAgents} // Keep UI specific props
+              onSelectAgent={(agent) => { // Keep UI specific logic
+                if ('displayName' in agent) setSelectedADKAgentId(agent.id);
+                else if ('prompt' in agent) setSelectedGemId(agent.id);
+                else if ('agentName' in agent || 'id' in agent) setSelectedAgentId(agent.id);
+              }}
+            />
+          </div>
+        )}
+      </Suspense>
 
       <div className="flex flex-col flex-1 w-full md:w-auto overflow-hidden">
         <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -592,6 +635,9 @@ export function ChatUI() {
             onExportChatLog={handleExportChatLog}
             isVerboseMode={isVerboseMode} // Pass verbose mode state
             onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)} // Pass toggle function
+            // User Chat Config props
+            userChatConfig={userChatConfig}
+            onUserChatConfigChange={handleUserChatConfigChange}
           >
             {/* Test settings button can remain or be moved if header gets too cluttered */}
             <Button variant="outline" size="icon" onClick={() => setIsTestConfigPanelOpen(true)} title="Test Settings" className="ml-2">

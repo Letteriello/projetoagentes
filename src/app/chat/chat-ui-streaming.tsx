@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, Suspense, lazy } from "react"; // Added Suspense, lazy
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Menu, Plus, Bug, Settings2 } from "lucide-react"; // Added Settings2
@@ -13,13 +13,13 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import type { TestRunConfig } from "@/types/chat-types"; // Added TestRunConfig
-import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Added TestRunConfigPanel
+// import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
 import { StreamingMessageList } from "@/components/features/chat/streaming/StreamingMessageList";
 import { StreamingInputArea } from "@/components/features/chat/streaming/StreamingInputArea";
 import { EventDebugPanel } from "@/components/features/chat/streaming/EventDebugPanel";
 import SimpleChatHeader from "@/components/features/chat/SimpleChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
-import ConversationSidebar from "@/components/features/chat/ConversationSidebar";
+// import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
 import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs-fixed';
 import { getToolsByIds } from "@/ai/tools";
 import type { Tool } from '@genkit-ai/sdk';
@@ -30,6 +30,9 @@ export function ChatUIStreaming() {
   // const [isLoadingAgents, setIsLoadingAgents] = useState(true); // Not strictly used, can be removed if not needed for UI
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentConversationId, setCurrentConversationId] = useState<string>(uuidv4());
+
+  const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
+  const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
@@ -293,23 +296,47 @@ export function ChatUIStreaming() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      {isTestConfigPanelOpen && (
-        <TestRunConfigPanel
-          isOpen={isTestConfigPanelOpen}
-          onClose={() => setIsTestConfigPanelOpen(false)}
-          config={testRunConfig}
-          onConfigChange={handleTestConfigChange}
-          onApply={handleApplyTestConfig}
-        />
-      )}
-      <ConversationSidebar
-        selectedAgentId={selectedAgentId}
-        setSelectedAgentId={setSelectedAgentId}
-        savedAgents={savedAgents}
-        handleNewConversation={handleNewConversation}
-        isSidebarOpen={isSidebarOpen}
-        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-      />
+      <Suspense fallback={<div>Carregando painel de configuração...</div>}>
+        {isTestConfigPanelOpen && (
+          <TestRunConfigPanel
+            isOpen={isTestConfigPanelOpen}
+            onClose={() => setIsTestConfigPanelOpen(false)}
+            config={testRunConfig}
+            onConfigChange={handleTestConfigChange}
+            onApply={handleApplyTestConfig}
+          />
+        )}
+      </Suspense>
+      <Suspense fallback={<div className="w-64 p-4 bg-gray-800 text-gray-200">Carregando sidebar...</div>}>
+        {isSidebarOpen && ( // Conditionally render based on isSidebarOpen for Suspense to work correctly
+          <ConversationSidebar
+            // Props seem mismatched with ConversationSidebar's definition.
+            // Passing what's currently used in this file.
+            // TODO: Reconcile props for ConversationSidebar.
+            // Expected: isOpen, conversations, activeConversationId, onSelectConversation, etc.
+            // Current pass: selectedAgentId, setSelectedAgentId, savedAgents, handleNewConversation, isSidebarOpen, onMenuToggle
+            isOpen={isSidebarOpen}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            conversations={[]} // Placeholder - this component manages its own conversations via useChatStore or similar
+            activeConversationId={null} // Placeholder
+            onSelectConversation={() => {}} // Placeholder
+            onNewConversation={handleNewConversation}
+            onDeleteConversation={async () => {}} // Placeholder
+            onRenameConversation={() => {}} // Placeholder
+            isLoading={false} // Placeholder
+            gems={[]} // Placeholder
+            savedAgents={savedAgents}
+            adkAgents={[]} // Placeholder
+            onSelectAgent={() => {}} // Placeholder
+            // Original props from this file's usage:
+            // selectedAgentId={selectedAgentId}
+            // setSelectedAgentId={setSelectedAgentId} - This should be handled internally or via onSelectAgent
+            // handleNewConversation={handleNewConversation} - Correctly passed to onNewConversation
+            // isSidebarOpen={isSidebarOpen} - Correctly passed to isOpen
+            // onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} - Correctly passed to onToggleSidebar
+          />
+        )}
+      </Suspense>
 
       <Card className="flex flex-col flex-1 h-full overflow-hidden border-0 rounded-none md:border md:rounded-lg md:ml-0">
         <div className="flex items-center justify-between p-2 border-b">

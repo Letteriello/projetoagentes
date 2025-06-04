@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Paperclip, SendHorizontal, Loader2 as Loader, Search, Sparkles, Code, Database, Globe, Bot } from "lucide-react";
+import { Paperclip, SendHorizontal, Loader2 as Loader, Search, Sparkles, Code, Database, Globe, Bot, Mic } from "lucide-react"; // Added Mic
 import AttachmentPopoverContent from "./AttachmentPopoverContent";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast"; // Import toast
@@ -37,11 +37,15 @@ interface MessageInputAreaProps {
   formRef: React.RefObject<HTMLFormElement>;
   inputRef: React.RefObject<HTMLTextAreaElement>;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>, file?: File | null) => void; // Modified onSubmit
+  onSubmit: (
+    event: React.FormEvent<HTMLFormElement>,
+    file?: File | null,
+    audioDataUri?: string | null, // Added for audio data
+    attachmentType?: 'file' | 'audio' // Added for attachment type
+  ) => void;
   isPending: boolean;
-  // selectedFile, selectedFileName, selectedFileDataUri, onRemoveAttachment, handleFileChange are now internal
   inputValue: string;
-  onInputChange: (event: React.ChangeEvent<HTMLTextAreaElement> | string) => void; // Modified onInputChange
+  onInputChange: (event: React.ChangeEvent<HTMLTextAreaElement> | string) => void;
 }
 
 // Lista de ferramentas disponíveis
@@ -107,8 +111,10 @@ export default function MessageInputArea({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
+  const [attachmentType, setAttachmentType] = useState<'file' | 'audio' | null>(null);
 
   const handleFileChangeInternal = (event: ChangeEvent<HTMLInputElement>) => {
+    setAttachmentType('file'); // Set type to file when file input changes
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -145,6 +151,7 @@ export default function MessageInputArea({
     // If validations pass
     setSelectedFile(file);
     setSelectedFileName(file.name);
+    setAttachmentType('file'); // Ensure type is file
     const reader = new FileReader();
     reader.onloadend = () => {
       setSelectedFileDataUri(reader.result as string);
@@ -165,22 +172,38 @@ export default function MessageInputArea({
     setSelectedFile(null);
     setSelectedFileName("");
     setSelectedFileDataUri(null);
+    setAttachmentType(null); // Reset attachment type
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // Reset file input
     }
   };
 
+  const handleVoiceClickInternal = () => {
+    // Simulate selecting an audio file
+    const mockAudioDataUri = "data:audio/mp3;base64,SUQzBAAAAAAAI हत्याकांडimagine a world where you can type anything and have it appear on your screen in any font style you desire. This is the power of modern text editors, and it's a power that we often take for granted. But what if you could take that power one step further? What if you could not only type text, but also record audio and have it transcribed in real time? This is the future of text editing, and it's a future that's closer than you think.";
+    setSelectedFileDataUri(mockAudioDataUri);
+    setSelectedFileName("mock_audio.mp3");
+    setSelectedFile(null); // No actual file object for mock audio
+    setAttachmentType('audio');
+    setIsPopoverOpen(true); // Open popover to show attachment
+    // No need to interact with fileInputRef here as it's a mock
+  };
+
   useEffect(() => {
-    if (selectedFile) {
+    if (selectedFile || (attachmentType === 'audio' && selectedFileDataUri)) {
       setIsPopoverOpen(true);
     } else {
       setIsPopoverOpen(false);
     }
-  }, [selectedFile]);
+  }, [selectedFile, selectedFileDataUri, attachmentType]);
 
   const handleFormSubmitInternal = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSubmit(event, selectedFile);
+    if (attachmentType === 'audio') {
+      onSubmit(event, null, selectedFileDataUri, 'audio');
+    } else {
+      onSubmit(event, selectedFile, null, 'file');
+    }
   };
 
   const handleTextareaKeyDown = (
@@ -301,45 +324,73 @@ export default function MessageInputArea({
       </Popover>
 
       {/* Anexo de arquivos */}
+      {/* Anexo de arquivos */}
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
+          {/* This button can act as a generic trigger, or you can have separate triggers */}
           <Button
             type="button"
             variant="outline"
             size="icon"
             className="flex-shrink-0 relative group hover:border-primary/70 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
+            // onClick={() => setIsPopoverOpen(!isPopoverOpen)} // Toggle popover for choice
             disabled={isPending}
-            title="Anexar arquivo"
+            title="Anexar"
           >
             <Paperclip className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-            {selectedFile && (
+            {(selectedFile || (attachmentType === 'audio' && selectedFileDataUri)) && (
               <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full border-2 border-background" />
             )}
           </Button>
         </PopoverTrigger>
-        {selectedFile && (
-          <PopoverContent
-            side="top"
-            align="start"
-            className="w-auto p-0 border-none shadow-none bg-transparent mb-1"
-          >
+        <PopoverContent
+          side="top"
+          align="start"
+          className={cn(
+            "w-auto p-0 border-none shadow-none bg-transparent mb-1",
+            !(selectedFile || (attachmentType === 'audio' && selectedFileDataUri)) && "p-1 border bg-background shadow-md" // Style for choice menu
+          )}
+        >
+          {selectedFile || (attachmentType === 'audio' && selectedFileDataUri) ? (
             <AttachmentPopoverContent
               fileName={selectedFileName}
               fileDataUri={selectedFileDataUri}
-              fileType={selectedFile?.type || ""}
+              fileType={attachmentType === 'audio' ? 'audio/mp3' : selectedFile?.type || ""}
               onRemoveAttachment={onRemoveAttachmentInternal}
+              isAudio={attachmentType === 'audio'}
             />
-          </PopoverContent>
-        )}
+          ) : (
+            // Show choice buttons if nothing is selected yet
+            <div className="flex flex-col gap-1 p-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="justify-start"
+              >
+                <Paperclip className="h-4 w-4 mr-2" />
+                Anexar Arquivo
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleVoiceClickInternal}
+                className="justify-start"
+              >
+                <Mic className="h-4 w-4 mr-2" />
+                Gravar Voz (Simulado)
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
       </Popover>
 
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChangeInternal} // Use internal file change handler
+        onChange={handleFileChangeInternal}
         className="hidden"
-        accept={ALLOWED_FILE_TYPES.join(",")} // Update accept attribute
+        accept={ALLOWED_FILE_TYPES.join(",")}
         disabled={isPending}
       />
 
@@ -361,7 +412,7 @@ export default function MessageInputArea({
       <Button
         type="submit"
         size="icon"
-        disabled={isPending || (!inputValue.trim() && !selectedFile)}
+        disabled={isPending || (!inputValue.trim() && !selectedFile && !(attachmentType === 'audio' && selectedFileDataUri))}
         className="flex-shrink-0 group transition-all duration-300 ease-out transform active:scale-95"
       >
         {isPending ? (
