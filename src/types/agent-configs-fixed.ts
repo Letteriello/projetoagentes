@@ -63,6 +63,7 @@ export interface SavedAgentConfiguration {
   config: AgentConfig;
   tools: string[];
   toolConfigsApplied?: Record<string, any>;
+  callbacks?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   isTemplate?: boolean;
