@@ -1,3 +1,5 @@
+"use client";
+
 // ToolConfigModal: Modal para configurar os parâmetros de uma ferramenta específica.
 // Este componente encapsula o formulário de configuração que aparece ao clicar em "Configurar" em uma ferramenta.
 
@@ -10,13 +12,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { AvailableTool, ToolConfigData } from '@/types/agent-configs-fixed'; // Updated import path
+import type { AvailableTool } from '@/types/tool-types'; // Corrected import path
+
+// Define ToolConfigData based on the state managed by the modal
+export interface ToolConfigData {
+  googleApiKeyId?: string; // From vault
+  googleCseId?: string;
+  openapiSpecUrl?: string;
+  openapiApiKeyId?: string; // From vault
+  dbType?: string;
+  dbHost?: string;
+  dbPort?: string;
+  dbName?: string;
+  dbUser?: string;
+  dbPasswordId?: string; // From vault
+  dbQuery?: string;
+  scriptPath?: string;
+  scriptArgs?: string[];
+  scriptInputType?: 'stdin' | 'args' | 'file' | 'env';
+  scriptOutputType?: 'stdout' | 'file' | 'json_stdout';
+  scriptTimeout?: number;
+  customToolName?: string;
+  customToolDescription?: string;
+  customToolInputSchema?: string; // JSON string
+  customToolOutputSchema?: string; // JSON string
+  customToolAuthType?: 'none' | 'apiKey' | 'oauth2';
+  customToolApiKeyId?: string; // From vault
+  customToolAuthUrl?: string;
+  customToolTokenUrl?: string;
+  customToolScopes?: string[];
+  advancedConfig?: string; // JSON string for tool-specific advanced settings
+  allowedPatterns?: string;
+  deniedPatterns?: string;
+  customRules?: string;
+
+  // Added based on IDE errors
+  selectedApiKeyId?: string;
+  dbConnectionString?: string;
+  dbDescription?: string;
+  knowledgeBaseId?: string;
+  calendarApiEndpoint?: string;
+  // Add any other relevant fields that are part of the tool's configuration
+}
+
 import { ApiKeyEntry } from '../../../services/api-key-service';
 import { useToast } from "@/hooks/use-toast"; // For showing errors
 
@@ -147,7 +191,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
       case "database-connector": // Matches ID in available-tools.ts
         configData.dbType = modalDbType as ToolConfigData['dbType'];
         configData.dbHost = modalDbHost;
-        configData.dbPort = modalDbPort;
+        configData.dbPort = modalDbPort?.toString(); // Ensure string type for configData
         configData.dbName = modalDbName;
         configData.dbUser = modalDbUser;
         // dbPassword is now from vault via selectedApiKeyId
@@ -188,7 +232,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Configurar Ferramenta: {configuringTool.label}</DialogTitle> {/* Use label for display */}
+          <DialogTitle>Configurar Ferramenta: {configuringTool.name}</DialogTitle> {/* Use name for display (corrected from label)*/}
           <DialogDescription>{configuringTool.description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
@@ -321,7 +365,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
               </div>
               <div className="space-y-2 mt-2">
                 <Label htmlFor="modalCustomRules">Regras Adicionais (Texto/JSON)</Label>
-                <Textarea id="modalCustomRules" value={modalCustomRules} onChange={(e) => setModalCustomRules(e.target.value)} placeholder="Ex: { "max_rows": 100 } ou 'PROHIBIT_FILE_WRITE'" rows={2}/>
+                <Textarea id="modalCustomRules" value={modalCustomRules} onChange={(e) => setModalCustomRules(e.target.value)} placeholder={"Ex: { \"max_rows\": 100 } ou 'PROHIBIT_FILE_WRITE'"} rows={2}/>
                 <p className="text-xs text-muted-foreground">Opcional. Regras específicas em texto ou JSON, dependendo da capacidade da ferramenta.</p>
               </div>
             </div>

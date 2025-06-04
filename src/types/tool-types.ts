@@ -84,4 +84,6 @@ export interface AvailableTool {
   // Primarily for tools where type === 'custom'
   inputSchema?: string;
   outputSchema?: string;
+
+  serviceTypeRequired?: string; // Added to address usage in ToolConfigModal
 }

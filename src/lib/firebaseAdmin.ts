@@ -9,6 +9,15 @@ import * as admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK if it hasn't been initialized yet
 if (!admin.apps.length) {
+  console.log('Attempting to initialize Firebase Admin SDK...');
+  console.log('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID ? 'Set' : 'NOT SET');
+  console.log('FIREBASE_CLIENT_EMAIL:', process.env.FIREBASE_CLIENT_EMAIL ? 'Set' : 'NOT SET');
+  console.log('FIREBASE_PRIVATE_KEY:', process.env.FIREBASE_PRIVATE_KEY ? 'Set (partially hidden)' : 'NOT SET');
+  // For security, only log a portion of the private key or its presence
+  if (process.env.FIREBASE_PRIVATE_KEY) {
+    console.log('FIREBASE_PRIVATE_KEY (first 10 chars):', process.env.FIREBASE_PRIVATE_KEY.substring(0, 10));
+  }
+
   try {
     admin.initializeApp({
       credential: admin.credential.cert({
