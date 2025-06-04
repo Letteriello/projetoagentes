@@ -66,10 +66,10 @@ import type {
   AgentConfig,
   LLMAgentConfig,
   WorkflowAgentConfig,
-  // CustomAgentConfig,  // Marked as unused in provided code, will keep for now
+  CustomAgentConfig, // Assuming this will now come from agent-configs-new
   AvailableTool,
-} from '@/types/agent-configs-fixed';
-import { cn } from "@/lib/utils";
+} from '@/types/agent-configs-new'; // UPDATED IMPORT PATH
+import { cn, capitalize } from "@/lib/utils"; // Added capitalize
 
 
 const getToolIconComponent = (
@@ -81,12 +81,8 @@ const getToolIconComponent = (
   return HelpCircle;
 };
 
-// Define CustomAgentConfig locally if not used elsewhere to avoid import errors if it's truly unused globally
-interface CustomAgentConfig extends AgentConfig {
-  customLogicDescription?: string;
-  // Add other fields specific to CustomAgentConfig if any
-}
-
+// Removed local CustomAgentConfig definition, assuming it's imported or not strictly needed if not used.
+// If CustomAgentConfig from agent-configs-new is different and causes issues, it would need adjustment.
 
 interface AgentCardProps {
   agent: SavedAgentConfiguration;
@@ -272,6 +268,12 @@ export function AgentCard({
                       )}
                    </div>
                     <Badge variant="secondary" className="text-xs h-5 px-1.5 ml-2 flex-shrink-0">{safeToReactNode(agentTypeLabel)}</Badge>
+                    {/* Display workflowType badge for workflow agents in list view */}
+                    {isListView && agent.config.type === 'workflow' && (agent.config as WorkflowAgentConfig).workflowType && (
+                      <Badge variant="outline" className="text-xs h-5 px-1.5 ml-1 flex-shrink-0">
+                        {capitalize((agent.config as WorkflowAgentConfig).workflowType || '')}
+                      </Badge>
+                    )}
                 </div>
                 <CardDescription className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                   {safeToReactNode(agent.agentDescription, "Sem descrição.")}
