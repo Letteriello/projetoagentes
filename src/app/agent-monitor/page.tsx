@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2
+  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2
 } from "lucide-react"; // Added icons
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 import { cn } from "@/lib/utils";
@@ -42,6 +43,8 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { type MonitorEvent, ToolCallEvent, ErrorEvent, InfoEvent, TaskCompletionEvent, AgentStateEvent, PerformanceMetricsEvent } from '@/types/monitor-events';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   type AgentStatus,
   type ExecutionHistory,
@@ -196,6 +199,42 @@ export default function AgentMonitorPage() {
   const [traceLoading, setTraceLoading] = useState<boolean>(false);
   const [traceError, setTraceError] = useState<string | null>(null);
   const [currentTraceId, setCurrentTraceId] = useState<string>('');
+
+  interface DisplayAgent {
+    id: string;
+    name?: string; // Optional: if we can get names
+    currentStatus: AgentStateEvent['status'] | 'unknown'; // 'unknown' for agents not yet seen in SSE
+    lastSeen: string; // Timestamp of last status event
+  }
+  const [displayAgents, setDisplayAgents] = useState<Record<string, DisplayAgent>>({});
+
+  const [liveEvents, setLiveEvents] = useState<MonitorEvent[]>([]);
+  const [isSseConnected, setIsSseConnected] = useState<boolean>(false);
+  const [sseError, setSseError] = useState<string | null>(null);
+  const MAX_LIVE_EVENTS = 100;
+
+  const [feedSearchQuery, setFeedSearchQuery] = useState<string>('');
+  const [feedFilterAgentId, setFeedFilterAgentId] = useState<string>('');
+  const [feedFilterEventType, setFeedFilterEventType] = useState<string>('all');
+  const [feedFilterStatus, setFeedFilterStatus] = useState<string>('all');
+  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+
+  const [verboseMode, setVerboseMode] = useState<boolean>(false);
+  const [selectedTraceIdForTrajectory, setSelectedTraceIdForTrajectory] = useState<string | null>(null);
+  const [expandedTrajectoryNodes, setExpandedTrajectoryNodes] = useState<Record<string, boolean>>({});
+
+  interface ChartableMetric {
+    id: string;
+    name: string;
+    value: number;
+    [key: string]: any;
+  }
+
+  const [latencyMetrics, setLatencyMetrics] = useState<ChartableMetric[]>([]);
+  const [tokenUsageMetrics, setTokenUsageMetrics] = useState<ChartableMetric[]>([]);
+  const [costMetrics, setCostMetrics] = useState<ChartableMetric[]>([]);
+
+  const MAX_METRIC_DATAPOINTS_PER_AGENT = 30;
 
 
   const agentUsageChartConfig = {
@@ -470,7 +509,28 @@ export default function AgentMonitorPage() {
       // Generate 5 agent IDs for mock data consistency
       const mockAgentIds = Array.from({ length: 5 }, (_, i) => `agent-${i}`);
 
-      setAgentStatusData(generateAgentStatusData(mockAgentIds.length));
+      const initialAgentStatusData = generateAgentStatusData(mockAgentIds.length);
+      setAgentStatusData(initialAgentStatusData);
+
+      // Initialize displayAgents from agentStatusData and sseAgentIds
+      const initialDisplayAgents: Record<string, DisplayAgent> = {};
+      initialAgentStatusData.forEach(agent => {
+        initialDisplayAgents[agent.id] = {
+          id: agent.id,
+          name: agent.id, // Assuming name is same as ID for mock
+          currentStatus: agent.isActive ? 'online' : 'offline',
+          lastSeen: new Date().toISOString(),
+        };
+      });
+
+      const sseAgentIds = ['agent-001', 'agent-002', 'agent-003', 'agent-004', 'corp-workflow-agent']; // From monitor-stream route
+      sseAgentIds.forEach(id => {
+        if (!initialDisplayAgents[id]) {
+          initialDisplayAgents[id] = { id, name: id, currentStatus: 'unknown', lastSeen: new Date().toISOString() };
+        }
+      });
+      setDisplayAgents(initialDisplayAgents);
+
       // Pass the generated agent IDs to the response time generator
       setAverageResponseTimeData(generateAverageResponseTimeData(mockAgentIds));
     } catch (err) {
@@ -504,6 +564,145 @@ export default function AgentMonitorPage() {
     }
   }, []); // Empty dependency array ensures this runs only once on mount
 
+  useEffect(() => {
+    const eventSource = new EventSource('/api/monitor-stream');
+    console.log("Attempting to connect to SSE stream...");
+    setSseError(null);
+
+    eventSource.onopen = () => {
+      console.log('SSE connection established.');
+      setIsSseConnected(true);
+      setSseError(null);
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const newEvent = JSON.parse(event.data) as MonitorEvent;
+        setLiveEvents((prevEvents) => {
+          const updatedEvents = [newEvent, ...prevEvents];
+          if (updatedEvents.length > MAX_LIVE_EVENTS) {
+            return updatedEvents.slice(0, MAX_LIVE_EVENTS);
+          }
+          return updatedEvents;
+        });
+
+        // Update displayAgents based on the new event
+        if (newEvent.eventType === 'agent_state') {
+          const stateEvent = newEvent as AgentStateEvent;
+          setDisplayAgents(prevAgents => ({
+            ...prevAgents,
+            [stateEvent.agentId]: {
+              id: stateEvent.agentId,
+              name: prevAgents[stateEvent.agentId]?.name || stateEvent.agentId,
+              currentStatus: stateEvent.status,
+              lastSeen: stateEvent.timestamp,
+            }
+          }));
+        } else {
+          setDisplayAgents(prevAgents => {
+            if (prevAgents[newEvent.agentId] && (prevAgents[newEvent.agentId].currentStatus === 'offline' || prevAgents[newEvent.agentId].currentStatus === 'unknown' || prevAgents[newEvent.agentId].currentStatus === 'idle')) {
+              return {
+                ...prevAgents,
+                [newEvent.agentId]: {
+                  ...prevAgents[newEvent.agentId],
+                  currentStatus: 'busy',
+                  lastSeen: newEvent.timestamp,
+                }
+              };
+            } else if (!prevAgents[newEvent.agentId]) {
+              return {
+                ...prevAgents,
+                [newEvent.agentId]: {
+                  id: newEvent.agentId,
+                  name: newEvent.agentId,
+                  currentStatus: 'busy',
+                  lastSeen: newEvent.timestamp,
+                }
+              };
+            }
+            // If agent is already online/busy and it's not an agent_state event, update lastSeen
+            else if (prevAgents[newEvent.agentId]) {
+               return {
+                 ...prevAgents,
+                 [newEvent.agentId]: {
+                   ...prevAgents[newEvent.agentId],
+                   lastSeen: newEvent.timestamp,
+                 }
+               };
+            }
+            return prevAgents;
+          });
+        } else if (newEvent.eventType === 'performance_metrics') {
+          const perfEvent = newEvent as PerformanceMetricsEvent;
+          const metricItem: ChartableMetric = {
+            id: perfEvent.agentId,
+            name: perfEvent.agentId,
+            value: perfEvent.value,
+            timestamp: perfEvent.timestamp,
+            unit: perfEvent.unit,
+          };
+
+          if (perfEvent.metricName === 'latency') {
+            setLatencyMetrics(prevMetrics => {
+              const agentIndex = prevMetrics.findIndex(m => m.id === perfEvent.agentId);
+              if (agentIndex > -1) {
+                 const newMetrics = [...prevMetrics.filter(m => m.id !== perfEvent.agentId), metricItem];
+                 return newMetrics.sort((a,b) => a.name.localeCompare(b.name));
+              } else {
+                 return [...prevMetrics, metricItem].sort((a,b) => a.name.localeCompare(b.name));
+              }
+            });
+          } else if (perfEvent.metricName === 'token_usage') {
+            if(perfEvent.details?.tokensUsed) metricItem.value = perfEvent.details.tokensUsed;
+            else if(perfEvent.details?.totalTokens) metricItem.value = perfEvent.details.totalTokens;
+
+            setTokenUsageMetrics(prevMetrics => {
+              const agentIndex = prevMetrics.findIndex(m => m.id === perfEvent.agentId);
+              if (agentIndex > -1) {
+                const newMetrics = [...prevMetrics.filter(m => m.id !== perfEvent.agentId), metricItem];
+                return newMetrics.sort((a,b) => a.name.localeCompare(b.name));
+              } else {
+                return [...prevMetrics, metricItem].sort((a,b) => a.name.localeCompare(b.name));
+              }
+            });
+          } else if (perfEvent.metricName === 'cost') {
+             if(perfEvent.details?.simulatedCost) metricItem.value = perfEvent.details.simulatedCost;
+
+            setCostMetrics(prevMetrics => {
+              const agentIndex = prevMetrics.findIndex(m => m.id === perfEvent.agentId);
+               if (agentIndex > -1) {
+                const newMetrics = [...prevMetrics.filter(m => m.id !== perfEvent.agentId), metricItem];
+                return newMetrics.sort((a,b) => a.name.localeCompare(b.name));
+              } else {
+                return [...prevMetrics, metricItem].sort((a,b) => a.name.localeCompare(b.name));
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to parse SSE event data:', error);
+        // setSseError('Failed to parse event data.'); // Optionally update UI
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      setIsSseConnected(false);
+      setSseError('Connection to live feed failed. If this persists, please check the console or try refreshing.');
+      eventSource.close();
+    };
+
+    const eventSourceRef = React.useRef(eventSource);
+
+    return () => {
+      console.log('Closing SSE connection.');
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+      setIsSseConnected(false);
+    };
+  }, []);
+
 
   const logTypeOptions = [
     { value: 'all', label: 'All Types' },
@@ -519,6 +718,215 @@ export default function AgentMonitorPage() {
     { value: 'success', label: 'Success' }, // Assuming 'success' can be determined (e.g. presence of 'end' and no 'error' for a trace)
     { value: 'error', label: 'Error' },   // Directly from 'error' type logs
   ];
+
+  const filteredLiveEvents = React.useMemo(() => {
+    return liveEvents.filter(event => {
+      // Event Type Filter
+      if (feedFilterEventType !== 'all' && event.eventType !== feedFilterEventType) {
+        return false;
+      }
+
+      // Agent ID Filter (exact match for simplicity, could be partial)
+      if (feedFilterAgentId && event.agentId !== feedFilterAgentId) {
+        return false;
+      }
+
+      // Status Filter
+      if (feedFilterStatus !== 'all') {
+        let eventStatus = '';
+        if (event.eventType === 'tool_call') eventStatus = (event as ToolCallEvent).status;
+        else if (event.eventType === 'task_completion') eventStatus = (event as TaskCompletionEvent).status;
+        else if (event.eventType === 'agent_state') eventStatus = (event as AgentStateEvent).status;
+        // Errors have their own eventType, so 'error' status check might be redundant if eventType 'error' is selected
+        // but useful if filtering other event types for an error *within* them (e.g. tool_call error status)
+        else if (event.eventType === 'error') eventStatus = 'error';
+
+
+        if (eventStatus !== feedFilterStatus) {
+          // Specific handling for 'error' status to catch tool_call errors when 'error' status is selected
+          if (!(feedFilterStatus === 'error' && event.eventType === 'tool_call' && (event as ToolCallEvent).status === 'error')) {
+             if (!(feedFilterStatus === 'failure' && event.eventType === 'task_completion' && (event as TaskCompletionEvent).status === 'failure')) {
+              // Allow 'error' eventType to always pass if status filter is 'error'
+              if (!(feedFilterStatus === 'error' && event.eventType === 'error')) {
+                 return false;
+              }
+             }
+          }
+        }
+      }
+
+      // Search Query Filter (case-insensitive)
+      if (feedSearchQuery) {
+        const query = feedSearchQuery.toLowerCase();
+        let searchableContent = `${event.agentId} ${event.eventType} ${event.id} ${event.timestamp}`;
+        if (event.traceId) searchableContent += ` ${event.traceId}`;
+
+        switch (event.eventType) {
+          case 'tool_call':
+            const tcEvent = event as ToolCallEvent;
+            searchableContent += ` ${tcEvent.toolName} ${tcEvent.status}`;
+            if (tcEvent.input) searchableContent += ` ${JSON.stringify(tcEvent.input).toLowerCase()}`;
+            if (tcEvent.output) searchableContent += ` ${JSON.stringify(tcEvent.output).toLowerCase()}`;
+            if (tcEvent.errorDetails) searchableContent += ` ${tcEvent.errorDetails.message.toLowerCase()}`;
+            break;
+          case 'task_completion':
+            const tcompEvent = event as TaskCompletionEvent;
+            searchableContent += ` ${tcompEvent.status}`;
+            if (tcompEvent.message) searchableContent += ` ${tcompEvent.message.toLowerCase()}`;
+            if (tcompEvent.result) searchableContent += ` ${JSON.stringify(tcompEvent.result).toLowerCase()}`;
+            break;
+          case 'error':
+            const errEvent = event as ErrorEvent;
+            searchableContent += ` ${errEvent.errorMessage.toLowerCase()}`;
+            if (errEvent.stackTrace) searchableContent += ` ${errEvent.stackTrace.toLowerCase()}`;
+            if (errEvent.errorSource) searchableContent += ` ${errEvent.errorSource.toLowerCase()}`;
+            break;
+          case 'info':
+            const infoEvent = event as InfoEvent;
+            searchableContent += ` ${infoEvent.message.toLowerCase()}`;
+            if (infoEvent.data) searchableContent += ` ${JSON.stringify(infoEvent.data).toLowerCase()}`;
+            break;
+          case 'agent_state':
+            const asEvent = event as AgentStateEvent;
+            searchableContent += ` ${asEvent.status}`;
+            if (asEvent.message) searchableContent += ` ${asEvent.message.toLowerCase()}`;
+            break;
+          case 'performance_metrics':
+            const pmEvent = event as PerformanceMetricsEvent;
+            searchableContent += ` ${pmEvent.metricName} ${pmEvent.value}`;
+            if(pmEvent.unit) searchableContent += ` ${pmEvent.unit}`;
+            if(pmEvent.details) searchableContent += ` ${JSON.stringify(pmEvent.details).toLowerCase()}`;
+            break;
+        }
+        if (!searchableContent.toLowerCase().includes(query)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [liveEvents, feedSearchQuery, feedFilterAgentId, feedFilterEventType, feedFilterStatus]);
+
+  const feedEventTypeOptions = [
+    { value: 'all', label: 'All Event Types' },
+    { value: 'tool_call', label: 'Tool Call' },
+    { value: 'task_completion', label: 'Task Completion' },
+    { value: 'error', label: 'Error' },
+    { value: 'info', label: 'Info' },
+    { value: 'agent_state', label: 'Agent State' },
+    { value: 'performance_metrics', label: 'Performance Metrics' },
+  ];
+
+  const feedStatusOptions = [
+    { value: 'all', label: 'All Statuses' },
+    // For ToolCallEvent
+    { value: 'started', label: 'Started (Tool)' },
+    { value: 'completed', label: 'Completed (Tool)' },
+    // For TaskCompletionEvent
+    { value: 'success', label: 'Success (Task)' },
+    { value: 'failure', label: 'Failure (Task)' },
+    // For ErrorEvent (implicit status)
+    { value: 'error', label: 'Error (Event/Tool)' }, // Catches ErrorEvent type and tool_call with error status
+    // For AgentStateEvent
+    { value: 'online', label: 'Online (Agent)' },
+    { value: 'offline', label: 'Offline (Agent)' },
+    { value: 'busy', label: 'Busy (Agent)' },
+    { value: 'idle', label: 'Idle (Agent)' },
+  ];
+
+  const getStatusIndicatorClass = (status: DisplayAgent['currentStatus']): string => {
+    switch (status) {
+      case 'online':
+        return 'bg-green-500';
+      case 'offline':
+        return 'bg-slate-400 dark:bg-slate-600';
+      case 'busy':
+        return 'bg-yellow-500 animate-pulse';
+      case 'idle':
+        return 'bg-sky-500';
+      case 'unknown':
+      default:
+        return 'bg-gray-300 dark:bg-gray-700';
+    }
+  };
+
+  const latencyChartConfig = {
+    value: { label: "Latency (ms)", color: "hsl(var(--chart-1))" },
+    name: { label: "Agent ID" },
+  } satisfies ChartConfig;
+
+  const tokenUsageChartConfig = {
+    value: { label: "Tokens Used", color: "hsl(var(--chart-2))" },
+    name: { label: "Agent ID" },
+  } satisfies ChartConfig;
+
+  const costChartConfig = {
+    value: { label: "Simulated Cost (USD)", color: "hsl(var(--chart-3))" },
+    name: { label: "Agent ID" },
+  } satisfies ChartConfig;
+
+  const getTrajectoryEvents = (traceId: string | null): MonitorEvent[] => {
+    if (!traceId) return [];
+    return liveEvents
+      .filter(event => event.traceId === traceId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  };
+
+  const renderEventDetails = (event: MonitorEvent) => {
+    let details = `Agent: ${event.agentId}`;
+    let content = '';
+    let styleClass = 'text-sm'; // Base style
+
+    switch (event.eventType) {
+      case 'tool_call':
+        const tcEvent = event as ToolCallEvent;
+        content = `Tool: ${tcEvent.toolName} (${tcEvent.status})`;
+        if (tcEvent.status === 'error' && tcEvent.errorDetails) {
+          content += ` - Error: ${tcEvent.errorDetails.message}`;
+          styleClass += ' text-orange-500 dark:text-orange-400';
+        } else if (tcEvent.status === 'completed') {
+           styleClass += ' text-green-500 dark:text-green-400';
+        } else if (tcEvent.status === 'started') {
+          styleClass += ' text-sky-500 dark:text-sky-400';
+        }
+        break;
+      case 'task_completion':
+        const tcompEvent = event as TaskCompletionEvent;
+        content = `${tcompEvent.message || 'Task completed'} (Status: ${tcompEvent.status})`;
+        if (tcompEvent.status === 'failure') {
+          styleClass += ' text-red-500 dark:text-red-400 font-medium';
+        } else {
+          styleClass += ' text-blue-500 dark:text-blue-400';
+        }
+        break;
+      case 'error':
+        const errEvent = event as ErrorEvent;
+        content = `Error: ${errEvent.errorMessage}`;
+        styleClass += ' text-red-500 dark:text-red-400 font-semibold';
+        break;
+      case 'info':
+        content = `Info: ${(event as InfoEvent).message}`;
+        styleClass += ' text-gray-500 dark:text-gray-300';
+        break;
+      case 'agent_state':
+        const asEvent = event as AgentStateEvent;
+        content = `Agent Status: ${asEvent.status}. ${asEvent.message || ''}`;
+        if (asEvent.status === 'online') styleClass += ' text-emerald-500 dark:text-emerald-400';
+        else if (asEvent.status === 'offline') styleClass += ' text-slate-500 dark:text-slate-400';
+        else if (asEvent.status === 'busy') styleClass += ' text-yellow-500 dark:text-yellow-400';
+        else styleClass += ' text-gray-500 dark:text-gray-300';
+        break;
+      case 'performance_metrics':
+        const pmEvent = event as PerformanceMetricsEvent;
+        content = `Perf: ${pmEvent.metricName}: ${typeof pmEvent.value === 'number' ? pmEvent.value.toFixed(2) : pmEvent.value}${pmEvent.unit ? ' ' + pmEvent.unit : ''}`;
+        styleClass += ' text-purple-500 dark:text-purple-400';
+        break;
+      default:
+        const unknownEvent = event as any;
+        content = `Unknown event type: ${unknownEvent.eventType}`;
+        styleClass += ' text-gray-400 dark:text-gray-500';
+    }
+    return <span className={styleClass}><strong className="font-medium">{details}</strong> - {content}</span>;
+  };
 
 
   return (
@@ -594,13 +1002,336 @@ export default function AgentMonitorPage() {
             <DatePicker date={filters.endTime} setDate={(date) => handleDateChange('endTime', date)} placeholder="Select end date" />
           </div>
         </div>
-        <div className="flex justify-end space-x-4 mt-6">
+        <div className="flex justify-end items-center space-x-4 mt-6">
+          <div className="flex items-center space-x-2 mr-auto"> {/* Pushes toggle to the left */}
+            <Switch
+              id="verbose-mode"
+              checked={verboseMode}
+              onCheckedChange={setVerboseMode}
+            />
+            <Label htmlFor="verbose-mode" className="text-sm">Verbose Mode (Show Trajectories)</Label>
+          </div>
           <Button variant="outline" onClick={handleClearFilters}>Clear Filters</Button>
           <Button onClick={handleApplyFilters}>Apply Filters</Button>
         </div>
       </div>
       {/* END OF FILTERS SECTION */}
 
+      {/* START OF LIVE ACTIVITY FEED SECTION */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Live Activity Feed</h2>
+          <div className="flex items-center space-x-2">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isSseConnected ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' : 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100'}`}>
+              {isSseConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 mb-6 pb-4 border-b border-border">
+          <div>
+            <Label htmlFor="feedSearchQuery" className="text-xs text-muted-foreground">Search Feed</Label>
+            <Input
+              id="feedSearchQuery"
+              name="feedSearchQuery"
+              placeholder="Keywords, IDs, messages..."
+              value={feedSearchQuery}
+              onChange={(e) => setFeedSearchQuery(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label htmlFor="feedFilterAgentId" className="text-xs text-muted-foreground">Agent ID</Label>
+            <Input
+              id="feedFilterAgentId"
+              name="feedFilterAgentId"
+              placeholder="Filter by Agent ID"
+              value={feedFilterAgentId}
+              onChange={(e) => setFeedFilterAgentId(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label htmlFor="feedFilterEventType" className="text-xs text-muted-foreground">Event Type</Label>
+            <Select value={feedFilterEventType} onValueChange={setFeedFilterEventType}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select Event Type" />
+              </SelectTrigger>
+              <SelectContent>
+                {feedEventTypeOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value} className="text-sm">{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="feedFilterStatus" className="text-xs text-muted-foreground">Status</Label>
+            <Select value={feedFilterStatus} onValueChange={setFeedFilterStatus}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Select Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {feedStatusOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value} className="text-sm">{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ScrollArea className="h-[400px] w-full border rounded-md p-0 bg-muted/20 dark:bg-muted/10">
+          <div className="p-4"> {/* Inner div for padding */}
+            {filteredLiveEvents.length === 0 ? (
+              <EmptyStateDisplay
+                icon={isSseConnected ? Inbox : WifiOff}
+                title={
+                  !isSseConnected ? "Connecting to event stream..." :
+                  liveEvents.length === 0 ? "Waiting for events..." :
+                  "No events match filters"
+                }
+                message={
+                  sseError ? sseError :
+                  !isSseConnected ? "Attempting to connect to the live feed. If this persists, check the console." :
+                  liveEvents.length === 0 ? "No new agent activities detected yet." :
+                  "Try adjusting your search or filter criteria."
+                }
+              />
+            ) : (
+              <ul className="space-y-2.5">
+                {filteredLiveEvents.map((event) => (
+                  <li key={event.id} className="text-xs p-2.5 rounded-lg bg-background dark:bg-black/20 shadow-sm border border-border/50 hover:border-primary/30 transition-all">
+                    <div className="flex justify-between items-start mb-0.5">
+                      <span className="font-mono text-muted-foreground text-[11px]">{format(new Date(event.timestamp), "HH:mm:ss.SSS")}</span>
+                      <div className="flex items-center space-x-2">
+                        {event.traceId && <span className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors">Trace: {event.traceId}</span>}
+                        {event.eventType === 'error' && (event as ErrorEvent).stackTrace && (
+                          <Button
+                            variant="link"
+                            size="xs" // Assuming you have or can create a small size for buttons, or use text styling
+                            className="text-xs h-auto p-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            onClick={() => setExpandedErrorId(expandedErrorId === event.id ? null : event.id)}
+                          >
+                            {expandedErrorId === event.id ? 'Hide Details' : 'Show Details'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-0.5">{renderEventDetails(event)}</div>
+                    {event.eventType === 'error' && expandedErrorId === event.id && (event as ErrorEvent).stackTrace && (
+                      <div className="mt-2 pt-2 border-t border-dashed border-border/70">
+                        <h4 className="text-xs font-semibold mb-1 text-muted-foreground">Stack Trace:</h4>
+                        <pre className="text-[10px] p-2 bg-muted/50 dark:bg-muted/20 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                          {(event as ErrorEvent).stackTrace}
+                        </pre>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+      {/* END OF LIVE ACTIVITY FEED SECTION */}
+
+      {/* START OF AGENT STATUS INDICATORS SECTION */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Agent Live Status</h2>
+        {Object.keys(displayAgents).length === 0 ? (
+          <EmptyStateDisplay
+            icon={Activity} // Or UsersIcon if you import it
+            title="No Agents Detected"
+            message="Agent statuses will appear here as they become active or send events."
+          />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Object.values(displayAgents)
+              .sort((a, b) => a.id.localeCompare(b.id)) // Sort for consistent order
+              .map((agent) => (
+              <div key={agent.id} className="flex items-center p-3 rounded-md border bg-background dark:bg-black/20 shadow-sm hover:shadow-md transition-shadow">
+                <span className={`w-3 h-3 rounded-full mr-3 flex-shrink-0 ${getStatusIndicatorClass(agent.currentStatus)}`}></span>
+                <div className="flex-grow">
+                  <p className="text-sm font-medium text-foreground truncate" title={agent.name || agent.id}>{agent.name || agent.id}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{agent.currentStatus}</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground/80 ml-2 whitespace-nowrap">
+                  {format(new Date(agent.lastSeen), "HH:mm:ss")}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* END OF AGENT STATUS INDICATORS SECTION */}
+
+      {/* START OF VISUAL TRAJECTORY SECTION */}
+      {verboseMode && (
+        <div className="bg-card p-6 rounded-lg shadow mb-8">
+          <h2 className="text-xl font-semibold mb-4">Agent Execution Trajectory</h2>
+          <div className="flex items-end gap-4 mb-6 pb-4 border-b border-border">
+            <div className="flex-grow">
+              <Label htmlFor="trajectoryTraceIdInput" className="text-xs text-muted-foreground">Enter Trace ID to View Trajectory</Label>
+              <Input
+                id="trajectoryTraceIdInput"
+                placeholder="Enter Trace ID..."
+                value={selectedTraceIdForTrajectory || ''}
+                onChange={(e) => setSelectedTraceIdForTrajectory(e.target.value)}
+                className="h-9 text-sm mt-1"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                if (selectedTraceIdForTrajectory) {
+                  setExpandedTrajectoryNodes({});
+                }
+              }}
+              disabled={!selectedTraceIdForTrajectory}
+              className="h-9"
+              variant="secondary"
+            >
+              View Trajectory
+            </Button>
+          </div>
+
+          {selectedTraceIdForTrajectory ? (
+            getTrajectoryEvents(selectedTraceIdForTrajectory).length > 0 ? (
+              <ScrollArea className="h-[500px] w-full rounded-md p-0">
+                <div className="p-1">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Showing trajectory for Trace ID: <span className="font-mono text-primary">{selectedTraceIdForTrajectory}</span>
+                  </p>
+                  <ul className="space-y-1">
+                    {getTrajectoryEvents(selectedTraceIdForTrajectory).map((event, index, array) => {
+                      return (
+                        <li key={event.id} className={`p-2.5 rounded-md border border-border/70 bg-background dark:bg-black/20`}>
+                          <div className="flex justify-between items-start">
+                            <span className="font-mono text-[10px] text-muted-foreground">{format(new Date(event.timestamp), "HH:mm:ss.SSS")}</span>
+                          </div>
+                          <div className="mt-1 text-xs">
+                            {renderEventDetails(event)}
+                          </div>
+                           {(event.eventType === 'tool_call' && ((event as ToolCallEvent).input || (event as ToolCallEvent).output)) && (
+                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-border/50 text-[10px]">
+                              { (event as ToolCallEvent).input && (
+                                <div className="mb-1">
+                                  <strong className="text-muted-foreground">Input:</strong>
+                                  <pre className="p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).input, null, 2)}</pre>
+                                </div>
+                              )}
+                              { (event as ToolCallEvent).output && (
+                                <div>
+                                  <strong className="text-muted-foreground">Output:</strong>
+                                  <pre className="p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).output, null, 2)}</pre>
+                                </div>
+                              )}
+                               {(event as ToolCallEvent).status === 'error' && (event as ToolCallEvent).errorDetails && (
+                                <div className="mt-1">
+                                  <strong className="text-red-500 dark:text-red-400">Tool Error:</strong>
+                                  <pre className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded whitespace-pre-wrap break-all">{JSON.stringify((event as ToolCallEvent).errorDetails, null, 2)}</pre>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                           {event.eventType === 'error' && (event as ErrorEvent).stackTrace && (
+                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-border/50 text-[10px]">
+                                <strong className="text-red-500 dark:text-red-400">Stack Trace:</strong>
+                                <pre className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded  whitespace-pre-wrap break-all">{(event as ErrorEvent).stackTrace}</pre>
+                            </div>
+                           )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </ScrollArea>
+            ) : (
+              <EmptyStateDisplay
+                icon={SearchX}
+                title="No Events for Trace ID"
+                message={`No events found for Trace ID: ${selectedTraceIdForTrajectory}. Ensure the ID is correct and events have been processed.`}
+              />
+            )
+          ) : (
+            <EmptyStateDisplay
+              icon={Settings2}
+              title="Select a Trace ID"
+              message="Enter a Trace ID in the input above to view its execution trajectory. Verbose mode must be enabled."
+            />
+          )}
+        </div>
+      )}
+      {/* END OF VISUAL TRAJECTORY SECTION */}
+
+      {/* START OF PERFORMANCE METRICS CHARTS SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Latency Chart */}
+        <div className="bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Average Latency per Agent</h2>
+          {latencyMetrics.length > 0 ? (
+            <ChartContainer config={latencyChartConfig} className="min-h-[250px] w-full">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={latencyMetrics} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={10} />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} fontSize={10} unit="ms" />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dashed" valueFormatter={(value) => `${value} ms`} />}
+                  />
+                  <Bar dataKey="value" fill="var(--color-value)" radius={4} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay icon={LineChart} title="No Latency Data" message="Latency metrics will appear here." />
+          )}
+        </div>
+
+        {/* Token Usage Chart */}
+        <div className="bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Token Usage per Agent</h2>
+          {tokenUsageMetrics.length > 0 ? (
+            <ChartContainer config={tokenUsageChartConfig} className="min-h-[250px] w-full">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={tokenUsageMetrics} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={10} />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} fontSize={10} unit=" tokens" />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dashed" valueFormatter={(value) => `${value} tokens`} />}
+                  />
+                  <Bar dataKey="value" fill="var(--color-value)" radius={4} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay icon={PieChart} title="No Token Usage Data" message="Token usage metrics will appear here." />
+          )}
+        </div>
+
+        {/* Cost Chart */}
+        <div className="bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Simulated Cost per Agent</h2>
+          {costMetrics.length > 0 ? (
+            <ChartContainer config={costChartConfig} className="min-h-[250px] w-full">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={costMetrics} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={10} />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} fontSize={10} unit="$" tickFormatter={(value) => value.toFixed(4)} />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dashed" valueFormatter={(value) => `$${Number(value).toFixed(4)}`} />}
+                  />
+                  <Bar dataKey="value" fill="var(--color-value)" radius={4} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay icon={BarChartBig} title="No Cost Data" message="Simulated cost metrics will appear here." />
+          )}
+        </div>
+      </div>
+      {/* END OF PERFORMANCE METRICS CHARTS SECTION */}
 
       {/* Agent Status Summary */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
