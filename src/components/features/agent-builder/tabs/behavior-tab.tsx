@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'; // Import useMemo
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, Controller } from 'react-hook-form'; // Import Controller
 import {
   FormField,
   FormItem,
@@ -12,8 +12,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { SavedAgentConfiguration } from '@/types/agent-types'; // Changed import
-import { aiModels, AIModel } from '@/data/ai-models'; // Import AI Models
+import type { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-types'; // Changed import
+// Remove aiModels and AIModel, will be replaced by llmModels
+// import { aiModels, AIModel } from '@/data/ai-models';
+import { llmModels } from '@/data/llm-models'; // Import the new llmModels
+import type { LLMModelDetails } from '@/types/agent-configs-new'; // Import LLMModelDetails for type safety
 import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for now, verify if needed
 import { InfoIcon } from '@/components/ui/InfoIcon'; // Keep for other uses if any
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
@@ -22,7 +25,6 @@ import { Wand2, Loader2, ClipboardCopy, Info, History } from 'lucide-react'; // 
 import { toast } from '@/hooks/use-toast'; // Added toast
 import { debounce } from '../../../../lib/utils'; // Import debounce
 import { MAX_SYSTEM_PROMPT_LENGTH } from '@/lib/zod-schemas'; // Import MAX_SYSTEM_PROMPT_LENGTH
-import { Controller } from 'react-hook-form'; // Import Controller
 import { CodeBlock } from '@/components/features/chat/CodeBlock'; // Import CodeBlock
 
 interface BehaviorTabProps {
@@ -185,13 +187,14 @@ export default function BehaviorTab({
                   </FormControl>
                   <SelectContent className="max-h-[400px] overflow-y-auto"> {/* Added max-height and scroll */}
                     {Object.entries(
-                      aiModels.reduce((acc, model) => {
-                        if (!acc[model.provider]) {
-                          acc[model.provider] = [];
+                      llmModels.reduce((acc, model) => {
+                        const providerKey = model.provider || 'Unknown Provider';
+                        if (!acc[providerKey]) {
+                          acc[providerKey] = [];
                         }
-                        acc[model.provider].push(model);
+                        acc[providerKey].push(model);
                         return acc;
-                      }, {} as Record<string, AIModel[]>)
+                      }, {} as Record<string, LLMModelDetails[]>)
                     ).map(([provider, models]) => (
                       <SelectGroup key={provider}>
                         <SelectLabel>{provider}</SelectLabel>
@@ -207,10 +210,21 @@ export default function BehaviorTab({
                                 <div className="font-bold text-lg mb-2">{model.name}</div>
                                 <div className="text-sm space-y-1">
                                   <p><span className="font-semibold">Provider:</span> {model.provider}</p>
-                                  <p><span className="font-semibold">Price:</span> {model.price}</p>
-                                  <p><span className="font-semibold">Use Cases:</span> {model.useCases}</p>
-                                  {model.strengths && <p><span className="font-semibold">Strengths:</span> {model.strengths}</p>}
-                                  {model.limitations && <p><span className="font-semibold">Limitations:</span> {model.limitations}</p>}
+                                  {model.estimatedCost && (
+                                    <p><span className="font-semibold">Est. Cost:</span>
+                                      {model.estimatedCost.input ? ` $${model.estimatedCost.input.toFixed(5)}/in` : ''}
+                                      {model.estimatedCost.output ? ` $${model.estimatedCost.output.toFixed(5)}/out` : ''}
+                                      {` per ${model.estimatedCost.unit?.includes('TOKEN') ? '1K tokens' : (model.estimatedCost.unit?.includes('CHAR') ? '1K chars' : model.estimatedCost.unit )}`}
+                                    </p>
+                                  )}
+                                  <p><span className="font-semibold">Max Output Tokens:</span> {model.maxOutputTokens || 'N/A'}</p>
+                                  <p><span className="font-semibold">Capabilities:</span>
+                                    {model.capabilities?.streaming ? " Streaming" : ""}
+                                    {model.capabilities?.tools ? ", Tools" : ""}
+                                    {(model.capabilities as any)?.vision ? ", Vision" : ""}
+                                    {/* Filter out initial comma if no streaming */}
+                                    {(model.capabilities?.tools || (model.capabilities as any)?.vision) && model.capabilities?.streaming === undefined ? "" : ""}
+                                  </p>
                                 </div>
                               </TooltipContent>
                             </Tooltip>
@@ -220,6 +234,125 @@ export default function BehaviorTab({
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+            )}
+          />
+
+          {/* Top K Field */}
+          <FormField
+            control={control}
+            name="config.topK" // Path for LLMAgentConfig
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center space-x-2">
+                  <FormLabel>Top K</FormLabel>
+                  <InfoIcon
+                    tooltipText="Controla a aleatoriedade. Reduz o conjunto de tokens considerados para amostragem para os K mais prováveis. Ajuda a prevenir tokens de baixa probabilidade. Deixe vazio para usar o padrão do modelo."
+                  />
+                </div>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    placeholder="Ex: 40 (padrão do modelo se vazio)"
+                    value={field.value ?? ''} // Handle undefined/null case for input display
+                    onChange={e => {
+                      const value = e.target.value;
+                      field.onChange(value === '' ? undefined : parseInt(value, 10));
+                    }}
+                    step="1" // Integers
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Max Output Tokens Field */}
+          <FormField
+            control={control}
+            name="config.maxOutputTokens" // Path for LLMAgentConfig
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center space-x-2">
+                  <FormLabel>Token Limit / Max Output Tokens</FormLabel>
+                  <InfoIcon
+                    tooltipText="Define o número máximo de tokens que o modelo pode gerar em uma única resposta. Se não definido, usará o padrão do modelo selecionado ou um padrão global da aplicação."
+                    // onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'maxOutputTokens' })} // Add to help content if needed
+                  />
+                </div>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    placeholder="Ex: 2048 (padrão do modelo se vazio)"
+                    value={field.value ?? ''} // Handle undefined/null case for input display
+                    onChange={e => {
+                      const value = e.target.value;
+                      // Allow clearing the input (sets to undefined), or parse to int
+                      field.onChange(value === '' ? undefined : parseInt(value, 10));
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+            )}
+          />
+
+          {/* Top P Field */}
+          <FormField
+            control={control}
+            name="config.topP" // Path for LLMAgentConfig
+            render={({ field }) => ( // field provided by render is for the specific RHF field registration
+              <FormItem>
+                <div className="flex items-center space-x-2">
+                  <FormLabel>Top P</FormLabel>
+                  <InfoIcon
+                    tooltipText="Controla a diversidade via amostragem de núcleo. Ex: 0.1 significa que apenas tokens compreendendo os 10% de massa de probabilidade superior são considerados. Ajuda a prevenir tokens de baixa probabilidade. Deixe vazio/1 para usar o padrão do modelo ou desabilitar."
+                  />
+                </div>
+                <FormControl>
+                  <div className="flex flex-col space-y-2 pt-2">
+                    <Controller
+                      name="config.topP" // Controller also needs the name
+                      control={control}
+                      // defaultValue={undefined} // Let it be undefined initially to signify "model default"
+                      render={({ field: controllerField }) => { // field from Controller's render prop
+                        const val = typeof controllerField.value === 'number' ? controllerField.value : undefined;
+                        const debouncedSliderChange = useMemo(() => {
+                            return debounce((sliderValue: number[]) => {
+                              // If slider is at max (1), treat as 'undefined' to use model default
+                              controllerField.onChange(sliderValue[0] === 1 ? undefined : sliderValue[0]);
+                            }, 300);
+                        }, [controllerField.onChange]);
+
+                        return (
+                          <>
+                            <Slider
+                              min={0.01}
+                              max={1} // Slider max is 1. When value is 1, it implies "use default" or "disabled"
+                              step={0.01}
+                              value={val !== undefined ? [val] : [1]} // Display 1 if undefined
+                              onValueChange={debouncedSliderChange}
+                            />
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Value: {val !== undefined ? val.toFixed(2) : "Default (1.0)"}</span>
+                              <Button variant="link" size="sm" className="p-0 h-auto"
+                                onClick={() => controllerField.onChange(val === undefined ? 0.9 : undefined)}>
+                                {val === undefined ? "Set (e.g. 0.9)" : "Use Default"}
+                              </Button>
+                            </div>
+                          </>
+                        );
+                      }}
+                    />
+                  </div>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

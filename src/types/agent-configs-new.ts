@@ -4,6 +4,26 @@ import { ReactNode } from 'react';
 // Tipos básicos
 export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
 export type AgentType = "llm" | "workflow" | "custom" | "a2a";
+
+// Detailed Model Information
+export interface LLMModelDetails {
+  id: string;
+  name: string;
+  provider?: string;
+  capabilities?: {
+    streaming?: boolean;
+    tools?: boolean;
+    // other capabilities like vision, etc.
+  };
+  estimatedCost?: {
+    input?: number; // e.g., cost per 1K tokens
+    output?: number; // e.g., cost per 1K tokens
+    unit?: string; // e.g., "USD_PER_1K_TOKENS"
+  };
+  maxOutputTokens?: number; // Default max tokens for this model
+  customProperties?: Record<string, any>; // For model-specific simulation flags or other properties
+}
+
 export type WorkflowDetailedType = "sequential" | "parallel" | "loop" | "graph" | "stateMachine";
 export type TerminationConditionType = "tool_success" | "state_change" | "max_iterations" | "none";
 export type StatePersistenceType = "session" | "memory" | "database";
@@ -131,13 +151,17 @@ export interface ModelSafetySettingItem {
 
 export interface LLMAgentConfig extends AgentConfigBase {
   type: "llm";
-  agentModel: string;
+  agentModel: string; // This will be an ID referencing an LLMModelDetails entry
   agentTemperature: number;
   agentPersonality?: string;
   agentRestrictions?: string[];
   modelSafetySettings?: ModelSafetySettingItem[];
   maxHistoryTokens?: number;
-  maxTokensPerResponse?: number;
+  // New fields for LLMAgentConfig
+  maxOutputTokens?: number; // Overrides model's default maxOutputTokens and replaces maxTokensPerResponse
+  topP?: number;
+  topK?: number;
+  forceToolUsage?: boolean;
 }
 
 export interface WorkflowAgentConfig extends AgentConfigBase {
