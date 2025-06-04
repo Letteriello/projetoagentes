@@ -18,6 +18,7 @@ import {
   Home, // Icon for Navegação Principal
   SlidersHorizontal, // Icon for Ferramentas
   Cog, // Icon for Configurações group
+  Languages, // Icon for Language Selector
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
@@ -357,6 +365,58 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+
+          {/* Language Selector */}
+          <div className={cn("mt-auto pt-2", !isSidebarIconOnly ? "px-3" : "")}>
+            <SidebarMenuItem className={cn(isSidebarIconOnly ? "p-0" : "")}>
+              <Select
+                defaultValue="pt-BR"
+                onValueChange={(value) => {
+                  toast({
+                    title: "Idioma Selecionado",
+                    description: `Idioma alterado para: ${
+                      value === "pt-BR" ? "Português" : "Inglês"
+                    }`,
+                  });
+                }}
+              >
+                <SidebarMenuButton
+                  asChild
+                  className={cn(
+                    "w-full",
+                    isSidebarIconOnly ? "justify-center" : "justify-start",
+                  )}
+                  tooltip={{
+                    children: "Selecionar Idioma",
+                    side: "right",
+                    className: "bg-popover text-popover-foreground",
+                  }}
+                  aria-label="Selecionar Idioma"
+                >
+                  {/* Using a div as child for SelectTrigger to control layout */}
+                  <div>
+                    <Languages
+                      className={cn(
+                        "flex-shrink-0 size-5",
+                        isSidebarIconOnly ? "" : "mr-2",
+                      )}
+                    />
+                    {!isSidebarIconOnly && (
+                      <SelectValue placeholder="Idioma" />
+                    )}
+                  </div>
+                </SidebarMenuButton>
+                <SelectContent
+                  side={isSidebarIconOnly ? "right" : "top"}
+                  align={isSidebarIconOnly ? "start" : "center"}
+                  className="bg-popover text-popover-foreground"
+                >
+                  <SelectItem value="pt-BR">Português</SelectItem>
+                  <SelectItem value="en-US">Inglês</SelectItem>
+                </SelectContent>
+              </Select>
+            </SidebarMenuItem>
+          </div>
         </SidebarFooter>
       </Sidebar>
       <MainLayout>{children}</MainLayout>

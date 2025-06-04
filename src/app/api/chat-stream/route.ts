@@ -37,7 +37,7 @@ interface ChatInput {
 // Mock function to simulate fetching agent configuration
 // In a real application, this would query a database or configuration service.
 async function fetchAgentConfiguration(agentId: string): Promise<SavedAgentConfiguration | null> {
-  console.log(`Fetching configuration for agentId: ${agentId}`);
+  winstonLogger.debug(`Fetching configuration for agentId: ${agentId}`, { agentId, api: 'chat-stream' });
   // Simulate fetching for a specific agentId
   if (agentId === 'agent_123_llm_tool_user') {
     return {
@@ -121,12 +121,14 @@ export async function POST(req: NextRequest) {
       toolConfigsApplied: agentConfig.toolConfigsApplied, // Tool configurations from fetched agent config
     };
 
-    console.log("Prepared BasicChatInput for flow:", {
-        userMessage: actualBasicChatInput.userMessage,
-        modelName: actualBasicChatInput.modelName,
-        systemPromptLength: actualBasicChatInput.systemPrompt?.length,
-        numAgentTools: actualBasicChatInput.agentToolsDetails?.length,
-        toolConfigsKeys: Object.keys(actualBasicChatInput.toolConfigsApplied || {}),
+    winstonLogger.debug("Prepared BasicChatInput for flow", {
+      api: 'chat-stream',
+      agentId: chatInput.agentId,
+      userMessageLength: actualBasicChatInput.userMessage.length,
+      modelName: actualBasicChatInput.modelName,
+      systemPromptLength: actualBasicChatInput.systemPrompt?.length,
+      numAgentTools: actualBasicChatInput.agentToolsDetails?.length,
+      toolConfigsKeys: Object.keys(actualBasicChatInput.toolConfigsApplied || {}),
     });
 
 
@@ -164,8 +166,12 @@ export async function POST(req: NextRequest) {
     }));
 
   } catch (error: any) {
-    console.error('[Chat API Error]', error);
-    winstonLogger.error('Error in chat-stream API:', { error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error) });
+    // console.error('[Chat API Error]', error); // Removed redundant console.error
+    winstonLogger.error('Error in chat-stream API', {
+      api: 'chat-stream',
+      agentId: (error as any)?.config?.agentId || 'unknown', // Attempt to get agentId if available in error context
+      error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error)
+    });
     return NextResponse.json(
       { error: error.message || 'An unexpected error occurred in chat API.' },
       { status: 500 }

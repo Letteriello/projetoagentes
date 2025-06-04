@@ -20,11 +20,18 @@ import {
   MessageSquareText,
   Edit3,
   Ghost, // Added Ghost icon
+  Users, // For Total Agents
+  Wrench, // For Agents with Tools (alternative: PuzzlePiece)
+  Route, // For Root Agents (alternative: Network, GitFork)
+  List, // Icon for List view
+  LayoutGrid, // Icon for Grid view
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
+import { useAgentStorage } from "@/hooks/use-agent-storage"; // Import useAgentStorage
 import { cn } from "@/lib/utils";
+import { FixedSizeList } from 'react-window'; // Import FixedSizeList
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
 import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
 import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog";
@@ -54,10 +61,19 @@ import { guidedTutorials, GuidedTutorial, TutorialStep } from '@/data/agent-buil
 import { FeedbackButton } from "@/components/features/agent-builder/feedback-button";
 import { FeedbackModal } from "@/components/features/agent-builder/feedback-modal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal"; // Import ConfirmationModal
+
+// Moved ViewMode type definition here to be accessible by AgentRow
+type ViewMode = 'grid' | 'list';
 
 export default function AgentBuilderPage() {
   const { toast } = useToast();
   const { savedAgents, addAgent: addAgentViaContext, updateAgent: updateAgentViaContext, deleteAgent: deleteAgentViaContext, isLoadingAgents } = useAgents();
+
+  // Calculate statistics
+  const totalAgents = savedAgents.length;
+  const agentsWithTools = savedAgents.filter(agent => agent.tools && agent.tools.length > 0).length;
+  const rootAgents = savedAgents.filter(agent => agent.config && agent.config.isRootAgent).length;
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgent, setEditingAgent] =
@@ -74,6 +90,33 @@ export default function AgentBuilderPage() {
   const [currentTutorialStep, setCurrentTutorialStep] = React.useState(0);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = React.useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = React.useState(false);
+
+  // State for delete confirmation modal
+  const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = React.useState(false);
+  const [agentToDelete, setAgentToDelete] = React.useState<SavedAgentConfiguration | null>(null);
+
+  // State for agent order and drag-and-drop
+  const [agentOrder, setAgentOrder] = React.useState<string[]>([]);
+  const [draggedAgentId, setDraggedAgentId] = React.useState<string | null>(null);
+
+  const { saveAgentOrder } = useAgentStorage(); // Get saveAgentOrder directly
+
+  // View Mode state and persistence
+  // type ViewMode = 'grid' | 'list'; // Moved to top-level
+  const VIEW_MODE_STORAGE_KEY = 'agentViewMode_v1';
+  const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
+  const listRef = React.useRef<FixedSizeList>(null); // Ref for FixedSizeList
+
+  React.useEffect(() => {
+    const savedViewMode = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as ViewMode | null;
+    if (savedViewMode) {
+      setViewMode(savedViewMode);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -145,6 +188,73 @@ export default function AgentBuilderPage() {
     setIsMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    // Initialize agentOrder when savedAgents changes and agentOrder is empty
+    // This handles initial load and cases where savedAgents are updated externally.
+    if (savedAgents.length > 0 && agentOrder.length === 0) {
+      setAgentOrder(savedAgents.map(agent => agent.id));
+    } else if (savedAgents.length === 0 && agentOrder.length > 0) {
+      // Clear agentOrder if all agents are deleted
+      setAgentOrder([]);
+    }
+    // A more sophisticated sync might be needed if useAgentStorage provides persisted order later
+  }, [savedAgents, agentOrder]);
+
+
+  const orderedAgents = React.useMemo(() => {
+    if (agentOrder.length > 0 && savedAgents.length > 0) {
+      return agentOrder
+        .map(id => savedAgents.find(agent => agent.id === id))
+        .filter(Boolean) as SavedAgentConfiguration[];
+    }
+    return savedAgents; // Fallback to savedAgents if order is not yet established or empty
+  }, [agentOrder, savedAgents]);
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, agentId: string) => {
+    setDraggedAgentId(agentId);
+    // Optional: Add styles for dragging element
+    // e.dataTransfer.effectAllowed = "move";
+    // e.dataTransfer.setData("text/plain", agentId); // Not strictly necessary with React state
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necessary to allow dropping
+    // Optional: Add styles for drop target
+    // e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetAgentId: string) => {
+    e.preventDefault();
+    if (!draggedAgentId || draggedAgentId === targetAgentId) {
+      setDraggedAgentId(null);
+      return;
+    }
+
+    const newOrder = [...agentOrder];
+    const draggedIndex = newOrder.indexOf(draggedAgentId);
+    const targetIndex = newOrder.indexOf(targetAgentId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedAgentId(null);
+      return; // Should not happen if IDs are correct
+    }
+
+    // Remove the dragged agent and insert it before the target agent
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedAgentId);
+
+    setAgentOrder(newOrder);
+    setDraggedAgentId(null);
+    // Persist the new order
+    saveAgentOrder(newOrder);
+    console.log("Nova ordem persistida:", newOrder);
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    // Optional: Clean up any drag state or styles
+    setDraggedAgentId(null);
+  };
+
   const handleOpenCreateAgentModal = () => {
     setEditingAgent(null);
     setBuildMode("form"); // Ensure form mode when creating new
@@ -199,19 +309,33 @@ export default function AgentBuilderPage() {
     }
   };
 
-  const handleDeleteAgent = async (agentIdToDelete: string) => {
-    if (selectedAgentForMonitoring?.id === agentIdToDelete) {
-      setSelectedAgentForMonitoring(null);
-    }
-    if (currentAgentForTemplating?.id === agentIdToDelete) {
-      setCurrentAgentForTemplating(null);
-      setIsSaveAsTemplateDialogOpen(false);
-    }
-    const success = await deleteAgentViaContext(agentIdToDelete);
-    if (success) {
-      toast({ title: "Agente Excluído" });
+  const handleDeleteAgent = (agentIdToDelete: string) => {
+    const agentObject = savedAgents.find(agent => agent.id === agentIdToDelete);
+    if (agentObject) {
+      setAgentToDelete(agentObject);
+      setIsConfirmDeleteAgentOpen(true);
     } else {
-      toast({ title: "Erro ao Excluir", variant: "destructive" });
+      toast({ title: "Erro", description: "Agente não encontrado para exclusão.", variant: "destructive" });
+    }
+  };
+
+  const onConfirmDeleteAgent = async () => {
+    if (agentToDelete) {
+      if (selectedAgentForMonitoring?.id === agentToDelete.id) {
+        setSelectedAgentForMonitoring(null);
+      }
+      if (currentAgentForTemplating?.id === agentToDelete.id) {
+        setCurrentAgentForTemplating(null);
+        setIsSaveAsTemplateDialogOpen(false);
+      }
+      const success = await deleteAgentViaContext(agentToDelete.id);
+      if (success) {
+        toast({ title: "Agente Excluído", description: `O agente "${agentToDelete.agentName}" foi excluído.` });
+      } else {
+        toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o agente "${agentToDelete.agentName}".`, variant: "destructive" });
+      }
+      setIsConfirmDeleteAgentOpen(false);
+      setAgentToDelete(null);
     }
   };
 
@@ -299,8 +423,84 @@ export default function AgentBuilderPage() {
             <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
           </Button>
           <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} />
+
+          {/* View Mode Toggle Buttons */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setViewMode('grid')}
+                  className="shadow-sm"
+                  aria-label="Visualização em Grade"
+                >
+                  <LayoutGrid className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Grade</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setViewMode('list')}
+                  className="shadow-sm"
+                  aria-label="Visualização em Lista"
+                >
+                  <List className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Lista</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </header>
+
+      {/* Dashboard Section */}
+      {!isLoadingAgents && savedAgents && savedAgents.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Agentes</CardTitle>
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalAgents}</div>
+              {/* <p className="text-xs text-muted-foreground">+20.1% from last month</p> */}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Agentes com Ferramentas</CardTitle>
+              <Wrench className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{agentsWithTools}</div>
+              {/* <p className="text-xs text-muted-foreground">+180.1% from last month</p> */}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Agentes Raiz</CardTitle>
+              <Route className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{rootAgents}</div>
+              {/* <p className="text-xs text-muted-foreground">+19% from last month</p> */}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {/* End Dashboard Section */}
+
 
       {buildMode === 'chat' ? (
         <AgentCreatorChatUI
@@ -316,8 +516,24 @@ export default function AgentBuilderPage() {
           </div>
           {isLoadingAgents && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {Array.from({ length: 3 }).map((_, index) => ( // Skeleton for Dashboard cards if needed, or for agent cards
+                <Card key={`skeleton-card-${index}`}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <Skeleton className="h-4 w-[150px]" />
+                    <Skeleton className="h-5 w-5" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-1/4 mb-1" />
+                    {/* <Skeleton className="h-3 w-1/2" /> */}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          {isLoadingAgents && ( // Keep skeleton for agent list separate
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="p-4 rounded-lg border border-border bg-card space-y-4 h-[210px] flex flex-col justify-between">
+                <div key={`skeleton-agent-${index}`} className="p-4 rounded-lg border border-border bg-card space-y-4 h-[210px] flex flex-col justify-between">
                   <div>
                     <div className="flex items-center space-x-3 mb-3">
                       <Skeleton className="h-10 w-10 rounded-md" />
@@ -331,25 +547,67 @@ export default function AgentBuilderPage() {
               ))}
             </div>
           )}
-          {!isLoadingAgents && savedAgents.length > 0 ? (
+          {!isLoadingAgents && orderedAgents && orderedAgents.length > 0 ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {savedAgents.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    onEdit={() => handleEditAgent(agent)} // Already ensures form mode
-                    onSaveAsTemplate={handleSaveAsTemplate}
-                    onViewMonitoring={() => handleViewAgentMonitoring(agent)} // Already ensures form mode
-                    onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
-                    onDelete={() => handleDeleteAgent(agent.id)}
-                    availableTools={defaultAvailableTools}
-                    agentTypeOptions={agentTypeOptions}
-                    isFavorite={agent.isFavorite}
-                    onToggleFavorite={handleToggleFavorite}
-                  />
-                ))}
-              </div>
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {orderedAgents.map((agent) => (
+                    <AgentCard
+                      key={agent.id}
+                      agent={agent}
+                      agentId={agent.id}
+                      viewMode={viewMode}
+                      onEdit={() => handleEditAgent(agent)}
+                      onSaveAsTemplate={handleSaveAsTemplate}
+                      onViewMonitoring={() => handleViewAgentMonitoring(agent)}
+                      onTest={() => toast({ title: "Em breve!", description: "Funcionalidade de teste no chat." })}
+                      onDelete={() => handleDeleteAgent(agent.id)}
+                      availableTools={defaultAvailableTools}
+                      agentTypeOptions={agentTypeOptions}
+                      isFavorite={agent.isFavorite}
+                      onToggleFavorite={handleToggleFavorite}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, agent.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, agent.id)}
+                      onDragEnd={handleDragEnd}
+                    />
+                  ))}
+                </div>
+              ) : (
+                // List View using FixedSizeList
+                // TODO: The height of FixedSizeList (e.g., 700px) should be dynamic.
+                // Consider using a library like 'react-virtualized-auto-sizer'
+                // or calculate based on parent dimensions.
+                // AGENT_CARD_LIST_ITEM_SIZE and AgentRow will be defined outside this component.
+                <div style={{ height: '700px', width: '100%' }} className="flex flex-col"> {/* Removed gap-4 from here, apply spacing in AgentRow if needed */}
+                  <FixedSizeList
+                    ref={listRef}
+                    height={700} // Example fixed height
+                    itemCount={orderedAgents.length}
+                    itemSize={AGENT_CARD_LIST_ITEM_SIZE}
+                    width="100%"
+                    itemData={{
+                      agents: orderedAgents,
+                      viewMode, // Should be 'list'
+                      handleEditAgent,
+                      handleSaveAsTemplate,
+                      handleViewAgentMonitoring,
+                      toast,
+                      handleDeleteAgent,
+                      defaultAvailableTools,
+                      agentTypeOptions,
+                      handleToggleFavorite,
+                      handleDragStart,
+                      handleDragOver,
+                      handleDrop,
+                      handleDragEnd,
+                    }}
+                  >
+                    {AgentRow}
+                  </FixedSizeList>
+                </div>
+              )}
             </div>
           ) : (
             !isLoadingAgents && (
@@ -469,6 +727,27 @@ export default function AgentBuilderPage() {
         isOpen={isFeedbackModalOpen}
         onOpenChange={setIsFeedbackModalOpen}
       />
+
+      {agentToDelete && (
+        <ConfirmationModal
+          isOpen={isConfirmDeleteAgentOpen}
+          onOpenChange={(isOpen) => {
+            setIsConfirmDeleteAgentOpen(isOpen);
+            if (!isOpen) {
+              setAgentToDelete(null);
+            }
+          }}
+          title="Confirmar Exclusão de Agente"
+          description={`Tem certeza que deseja excluir o agente "${agentToDelete?.agentName}"? Esta ação não pode ser desfeita.`}
+          onConfirm={onConfirmDeleteAgent}
+          confirmButtonVariant="destructive"
+          confirmText="Excluir Agente"
+        />
+      )}
     </div>
   );
 }
+
+// AgentRow and AGENT_CARD_LIST_ITEM_SIZE will be appended here by the next operation.
+// Placeholder comment to ensure this line is unique for the next replace/append.
+[end of src/app/agent-builder/page.tsx]

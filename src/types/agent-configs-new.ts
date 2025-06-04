@@ -107,6 +107,7 @@ export interface AgentConfigBase {
   knowledgeSources?: KnowledgeSource[];
   ragMemoryConfig?: RagMemoryConfig;
   artifacts?: ArtifactsConfig;
+  systemPromptGenerated?: string; // Added field for auto-generated system prompt
 }
 
 export interface ModelSafetySettingItem {
@@ -130,6 +131,16 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   workflowType: WorkflowDetailedType;
   subAgents?: string[];
   workflowConfig?: Record<string, any>;
+  workflowSteps?: WorkflowStep[];
+}
+
+export interface WorkflowStep {
+  agentId: string;
+  inputMapping: Record<string, any>;
+  outputKey: string;
+  // Optional: Add a name and description for better readability in UI
+  name?: string;
+  description?: string;
 }
 
 export interface CustomAgentConfig extends AgentConfigBase {
