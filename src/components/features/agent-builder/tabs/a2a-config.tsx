@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFormContext, Controller, useFieldArray } from 'react-hook-form';
+import { useFormContext, Controller, useFieldArray, useWatch } from 'react-hook-form';
 import { Switch } from '@/components/ui/switch';
 // Label will be replaced by FormLabel
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,8 @@ import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import {
   SavedAgentConfiguration,
   CommunicationChannel as CommunicationChannelNew, // Assuming type from agent-configs-new
-  A2ASettings // Import if A2ASettings is a distinct type, or use parts of SavedAgentConfiguration['config']['a2a']
+  A2ASettings, // Import if A2ASettings is a distinct type, or use parts of SavedAgentConfiguration['config']['a2a']
+  Agent, // Assuming Agent type is available for all agents
 } from '@/types/agent-configs-new'; // Updated import
 import {
   FormField,
@@ -22,6 +23,9 @@ import {
   FormControl,
   FormMessage,
 } from '@/components/ui/form';
+import A2AGraphVisualizer from '../a2a-graph-visualizer';
+import A2ATestChannelDialog from '../a2a-test-channel-dialog'; // Import the new dialog
+import { useAppContext } from '@/contexts/app-context';
 
 interface A2AConfigTabProps {
   showHelpModal: (contentKey: { tab: keyof typeof agentBuilderHelpContent; field: string }) => void;
@@ -57,8 +61,14 @@ const securityPolicyOptions: Array<{value: string, label: string}> = [
 
 
 export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2AConfigTabProps) {
-  const { control, watch, formState: { errors } } = useFormContext<FormContextType>(); // Removed register
+  const { control, watch, getValues, formState: { errors } } = useFormContext<FormContextType>();
+  const { allAgents } = useAppContext(); // Get all saved agents
+
+  const [isTestDialogOpen, setIsTestDialogOpen] = React.useState(false);
+  const [selectedChannelForTest, setSelectedChannelForTest] = React.useState<CommunicationChannelNew | null>(null);
+
   const a2aEnabled = watch('config.a2a.enabled');
+  const communicationChannels = watch('config.a2a.communicationChannels');
   const securityPolicy = watch('config.a2a.securityPolicy');
 
   const { fields: channelFields, append: appendChannel, remove: removeChannel } = useFieldArray({
@@ -66,8 +76,56 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
     name: "config.a2a.communicationChannels",
   });
 
+  const currentAgentFormValues = getValues(); // This is SavedAgentConfiguration
+
+  // Data for Graph Visualizer
+  const currentAgentForGraph: Agent = { // This Agent type might be different from SavedAgentConfiguration
+    id: currentAgentFormValues.id || 'current_agent',
+    name: currentAgentFormValues.name || 'Current Agent',
+  };
+  const subAgentsForGraph: Agent[] = []; // Placeholder
+  const a2aChannelsForGraph = (communicationChannels || []).map(channel => ({
+    ...channel,
+    sourceAgentId: channel.direction === 'inbound' ? channel.targetAgentId || 'unknown_source' : currentAgentForGraph.id,
+    targetAgentId: channel.direction === 'outbound' ? channel.targetAgentId || 'unknown_target' : currentAgentForGraph.id,
+  })).filter(c => c.sourceAgentId && c.targetAgentId);
+
+  const isRootAgent = !allAgents.some(agent => agent.config?.subAgents?.includes(currentAgentFormValues.id || ''));
+  const shouldShowVisualizer = a2aEnabled && (isRootAgent || (communicationChannels && communicationChannels.length > 0));
+
+  // Data for Test Dialog
+  const currentAgentForTestDialog: Pick<SavedAgentConfiguration, 'id' | 'name'> = {
+    id: currentAgentFormValues.id,
+    name: currentAgentFormValues.name,
+  };
+
+  const handleOpenTestDialog = (channelData: CommunicationChannelNew) => {
+    setSelectedChannelForTest(channelData);
+    setIsTestDialogOpen(true);
+  };
+
+  const targetAgentForTestDialog = selectedChannelForTest?.targetAgentId
+    ? allAgents.find(agent => agent.id === selectedChannelForTest.targetAgentId) || null
+    : null;
+
   return (
     <div className="space-y-6">
+      {shouldShowVisualizer && (
+        <A2AGraphVisualizer
+          currentAgent={currentAgentForGraph}
+          subAgents={subAgentsForGraph}
+          a2aChannels={a2aChannelsForGraph}
+        />
+      )}
+       {selectedChannelForTest && (
+        <A2ATestChannelDialog
+          isOpen={isTestDialogOpen}
+          onOpenChange={setIsTestDialogOpen}
+          channel={selectedChannelForTest}
+          currentAgent={currentAgentForTestDialog}
+          targetAgent={targetAgentForTestDialog}
+        />
+      )}
       <FormItem className="flex flex-row items-center space-x-2">
         <FormControl>
           <Controller
@@ -202,13 +260,39 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
                         </FormItem>
                       )}
                     />
-                    <Button type="button" variant="destructive" size="sm" onClick={() => removeChannel(index)} className="mt-2">
-                      <Trash2Icon className="mr-2 h-4 w-4" />Remove Channel
-                    </Button>
+                    <div className="flex justify-end space-x-2 mt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenTestDialog(item as any as CommunicationChannelNew)} // item is a FieldArrayWithId
+                      >
+                        Testar Canal
+                      </Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => removeChannel(index)}>
+                        <Trash2Icon className="mr-2 h-4 w-4" />Remove Channel
+                      </Button>
+                    </div>
                   </Card>
                 ))}
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => appendChannel({ id: `chan_${Date.now()}`, name: '', direction: 'outbound', messageFormat: 'json', syncMode: 'async' } as any)} className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendChannel({
+                  id: `chan_${Date.now()}`,
+                  name: '',
+                  direction: 'outbound',
+                  messageFormat: 'json',
+                  syncMode: 'async',
+                  // Ensure all required fields by CommunicationChannelNew are present
+                  targetAgentId: '',
+                  schema: '',
+                  timeout: 5000, // Default timeout
+                } as CommunicationChannelNew)}
+                className="mt-3"
+              >
                 <PlusIcon className="mr-2 h-4 w-4" />Add Channel
               </Button>
             </div>
@@ -259,7 +343,7 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
             {securityPolicy === 'api_key' && (
               <FormField
                 control={control}
-                name="config.a2a.apiKeyHeaderName"
+                name="config.a2a.apiKeyHeaderName" // Corrected: This was outside CardContent, moved for layout consistency
                 render={({field}) => (
                   <FormItem>
                     <FormLabel className="flex items-center">API Key Header Name <InfoIconComponent tooltipText={agentBuilderHelpContent.a2aTab.apiKeyHeaderName.tooltip} onClick={() => showHelpModal({ tab: 'a2aTab', field: 'apiKeyHeaderName' })} className="ml-2" /></FormLabel>
@@ -269,6 +353,7 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
                 )}
               />
             )}
+             {/* Moved from outside CardContent to inside for proper structure */}
             <FormItem className="flex flex-row items-center space-x-2 pt-2">
               <FormControl>
                 <Controller name="config.a2a.loggingEnabled" control={control} render={({field}) => <Switch id="a2a-logging-enabled" checked={field.value || false} onCheckedChange={field.onChange} />} />

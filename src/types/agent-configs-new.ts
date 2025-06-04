@@ -168,8 +168,16 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   type: "workflow";
   workflowType: WorkflowDetailedType;
   subAgents?: string[];
-  workflowConfig?: Record<string, any>;
+  workflowConfig?: Record<string, any>; // General config placeholder
   workflowSteps?: WorkflowStep[];
+
+  // Loop-specific termination conditions (complementary to general terminationConditions)
+  // These are applied specifically when workflowType is 'loop'.
+  loopExitToolName?: string;      // Name of a tool whose successful execution (or specific output) terminates the loop.
+  loopExitStateKey?: string;      // A key in the loop's accumulated state.
+  loopExitStateValue?: string;    // The value to check for at loopExitStateKey. Loop terminates if state[key] === value.
+                                  // Consider if this should be `any` or a more specific union type if state values are diverse.
+                                  // For now, string is simpler for direct comparison.
 }
 
 export interface WorkflowStep {

@@ -76,72 +76,136 @@ const workflowAgentConfigSchema: z.ZodType<WorkflowAgentConfig> = z.object({
   subAgents: z.array(z.string()).optional(),
   workflowConfig: z.record(z.any()).optional(),
   workflowSteps: z.array(workflowStepSchema).optional(),
+  // Add new optional fields for loop termination to the Zod schema
+  loopExitToolName: z.string().optional(),
+  loopExitStateKey: z.string().optional(),
+  loopExitStateValue: z.string().optional(), // Assuming string for now, adjust if complex types needed
 }) as z.ZodType<WorkflowAgentConfig>; // Cast to ensure it matches the TS type for defineFlow
 
-export const workflowAgentRunnerFlow: Flow<WorkflowAgentConfig, { status: string; message: string; simulatedOutputs?: any }> = defineFlow(
+export const workflowAgentRunnerFlow: Flow<WorkflowAgentConfig, { status: string; message: string; simulatedOutputs?: any, iterations?: number }> = defineFlow(
   {
     name: 'workflowAgentRunnerFlow',
     inputSchema: workflowAgentConfigSchema,
     outputSchema: z.object({
       status: z.string(),
       message: z.string(),
-      simulatedOutputs: z.any().optional(), // To store simulated outputs from steps
+      simulatedOutputs: z.any().optional(),
+      iterations: z.number().optional(), // For loop workflows
     }),
-    middleware: [], // Add auth or other middleware if needed
+    middleware: [],
   },
   async (config: WorkflowAgentConfig) => {
-    console.log(`[Workflow Flow] Starting workflow execution for agent with goal: "${config.agentGoal}"`);
-    console.log(`[Workflow Flow] Workflow Type: ${config.workflowType}`);
-
-    const simulatedOutputs: Record<string, any> = {};
+    console.log(`[Workflow Flow] Starting workflow: "${config.agentGoal}", Type: ${config.workflowType}`);
 
     if (!config.workflowSteps || config.workflowSteps.length === 0) {
-      console.log("[Workflow Flow] No steps found in the workflow configuration.");
+      console.log("[Workflow Flow] No steps defined.");
+      return { status: "COMPLETED_NO_STEPS", message: "Workflow completed: No steps." };
+    }
+
+    const globalSimulatedOutputs: Record<string, any> = {}; // Stores outputs across all iterations for loops
+
+    if (config.workflowType === 'loop') {
+      let currentIteration = 0;
+      const maxIterationsFromConfig = config.terminationConditions?.find(c => c.type === 'max_iterations')?.value as number | undefined;
+      const maxIterations = maxIterationsFromConfig ?? 10; // Default to 10 if not specified
+
+      console.log(`[Workflow Flow] Starting LOOP. Max iterations: ${maxIterations}`);
+      if(config.loopExitToolName) console.log(`  Exit on tool: ${config.loopExitToolName}`);
+      if(config.loopExitStateKey) console.log(`  Exit on state: ${config.loopExitStateKey} = ${config.loopExitStateValue}`);
+
+
+      while (currentIteration < maxIterations) {
+        currentIteration++;
+        console.log(`\n[Workflow Flow] LOOP Iteration: ${currentIteration}`);
+        const iterationOutputs: Record<string, any> = { ...globalSimulatedOutputs }; // Each iteration starts with global state, can overwrite
+
+        for (let i = 0; i < config.workflowSteps.length; i++) {
+          const step = config.workflowSteps[i];
+          const stepIdentifier = step.name || step.agentId || `Step ${i + 1}`;
+          console.log(`  [Iter ${currentIteration}] Executing Step: ${stepIdentifier}`);
+
+          const actualInput = resolveInputMapping(step.inputMapping, iterationOutputs);
+          console.log(`    [Iter ${currentIteration}] Actual Input: ${JSON.stringify(actualInput)}`);
+
+          // Simulate step execution
+          const simulatedStepOutput = {
+            result: `Simulated output for ${step.agentId} (Iter ${currentIteration}, Step ${stepIdentifier})`,
+            toolNameUsed: step.agentId, // Assuming agentId can be used as a tool name for simulation
+            received_input: actualInput,
+            timestamp: new Date().toISOString(),
+          };
+
+          if (step.outputKey) {
+            iterationOutputs[step.outputKey] = simulatedStepOutput;
+            globalSimulatedOutputs[step.outputKey] = simulatedStepOutput; // Persist in global for next iterations
+            console.log(`    [Iter ${currentIteration}] Output stored to key "${step.outputKey}"`);
+          }
+        }
+
+        // Check termination conditions
+        let terminated = false;
+        // 1. loopExitToolName
+        if (config.loopExitToolName) {
+          for (const key in iterationOutputs) {
+            // Check if any output in the current iteration matches the tool name criteria
+            // This is a simplified check; real tool call identification might be more complex
+            if (iterationOutputs[key]?.toolNameUsed === config.loopExitToolName) {
+              console.log(`[Workflow Flow] Terminating loop: Tool "${config.loopExitToolName}" executed.`);
+              terminated = true;
+              break;
+            }
+          }
+        }
+        if (terminated) break;
+
+        // 2. loopExitStateKey / loopExitStateValue
+        if (config.loopExitStateKey && config.loopExitStateValue !== undefined) {
+          const stateValue = resolveValuePath(`$${config.loopExitStateKey}`, iterationOutputs); // Resolve from current iteration's state
+          console.log(`  [Iter ${currentIteration}] Checking state termination: Key '${config.loopExitStateKey}', Value: '${stateValue}', Expected: '${config.loopExitStateValue}'`);
+          if (stateValue !== undefined && String(stateValue) === String(config.loopExitStateValue)) {
+            console.log(`[Workflow Flow] Terminating loop: State condition met (${config.loopExitStateKey} = ${config.loopExitStateValue}).`);
+            terminated = true;
+          }
+        }
+        if (terminated) break;
+
+        // 3. Max iterations (checked by while loop condition, but good to log if it's the reason)
+        if (currentIteration >= maxIterations && maxIterationsFromConfig) {
+             console.log(`[Workflow Flow] Terminating loop: Max iterations (${maxIterations}) reached.`);
+             // No 'terminated = true' needed as the while loop condition will handle it.
+        }
+      } // End of while loop
+
       return {
-        status: "COMPLETED_NO_STEPS",
-        message: "Workflow completed, but no steps were defined.",
-        simulatedOutputs,
-      };
-    }
-
-    for (let i = 0; i < config.workflowSteps.length; i++) {
-      const step = config.workflowSteps[i];
-      const stepIdentifier = step.name || step.agentId || `Unnamed Step ${i + 1}`;
-
-      console.log(`\n[Workflow Flow] Executing Step ${i + 1}: ${stepIdentifier}`);
-      console.log(`  Agent ID: ${step.agentId}`);
-      console.log(`  Input Mapping (original): ${JSON.stringify(step.inputMapping, null, 2)}`);
-      console.log(`  Output Key: ${step.outputKey}`);
-
-      // Resolve input mappings using the new logic
-      const actualInput = resolveInputMapping(step.inputMapping, simulatedOutputs);
-
-      console.log(`  Actual Input (after resolution): ${JSON.stringify(actualInput, null, 2)}`);
-
-      console.log(`  Simulating execution of agent ${step.agentId}...`);
-      // In a real scenario, you would call another flow or service here:
-      // e.g., const stepOutput = await runFlow(someOtherAgentFlow, actualInput);
-      // For simulation, we create a generic output structure.
-      const simulatedStepOutput = {
-        result: `Simulated output for agent ${step.agentId} (step: ${stepIdentifier})`,
-        received_input: actualInput, // Include the actual input that was resolved
-        timestamp: new Date().toISOString(),
+        status: "SUCCESS_LOOP_COMPLETED",
+        message: `Loop workflow completed after ${currentIteration} iterations.`,
+        simulatedOutputs: globalSimulatedOutputs,
+        iterations: currentIteration,
       };
 
-      if (!step.outputKey) {
-        console.warn(`[Workflow Flow] Warning: Step "${stepIdentifier}" does not have an outputKey. Its output will not be available to subsequent steps.`);
-      } else {
-        simulatedOutputs[step.outputKey] = simulatedStepOutput;
-        console.log(`  Simulated output for step ${i + 1} (${stepIdentifier}) stored with key "${step.outputKey}": ${JSON.stringify(simulatedStepOutput, null, 2)}`);
+    } else { // Sequential, Parallel, Graph, StateMachine (currently treated as sequential)
+      for (let i = 0; i < config.workflowSteps.length; i++) {
+        const step = config.workflowSteps[i];
+        const stepIdentifier = step.name || step.agentId || `Step ${i + 1}`;
+        console.log(`\n[Workflow Flow] Executing Step ${i + 1}: ${stepIdentifier}`);
+
+        const actualInput = resolveInputMapping(step.inputMapping, globalSimulatedOutputs);
+        console.log(`  Actual Input: ${JSON.stringify(actualInput)}`);
+
+        const simulatedStepOutput = {
+          result: `Simulated output for ${step.agentId} (step: ${stepIdentifier})`,
+          received_input: actualInput,
+          timestamp: new Date().toISOString(),
+        };
+
+        if (step.outputKey) {
+          globalSimulatedOutputs[step.outputKey] = simulatedStepOutput;
+          console.log(`  Output stored to key "${step.outputKey}"`);
+        }
       }
+      console.log("\n[Workflow Flow] Workflow execution simulated successfully.");
+      return { status: "SUCCESS", message: "Workflow execution simulated successfully.", simulatedOutputs: globalSimulatedOutputs };
     }
-
-    console.log("\n[Workflow Flow] Workflow execution simulation completed.");
-    return {
-      status: "SUCCESS",
-      message: "Workflow execution simulated successfully.",
-      simulatedOutputs,
-    };
   }
 );
 

@@ -52,10 +52,25 @@ export interface PerformanceMetricsEvent extends BaseEvent {
   details?: any; // e.g., { tokensUsed: 1500, simulatedCost: 0.02 } for a combined metric
 }
 
+// New event type for A2A Messages
+export interface A2AMessageEvent extends BaseEvent {
+  eventType: 'a2a_message';
+  fromAgentId: string;
+  toAgentId: string;
+  messageContent: string | any; // Allowing complex objects, will need serialization for display
+  status: 'sent' | 'received' | 'simulated_success' | 'simulated_failed' | 'error';
+  channelId?: string; // Optional, to link to a specific communication channel
+  errorDetails?: { // Optional error details if status is 'error' or 'simulated_failed'
+    message: string;
+    stack?: string;
+  };
+}
+
 
 export type MonitorEvent =
   | ToolCallEvent
   | TaskCompletionEvent
+  | A2AMessageEvent // Added A2AMessageEvent
   | ErrorEvent
   | InfoEvent
   | AgentStateEvent
