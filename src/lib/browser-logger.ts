@@ -1,33 +1,11 @@
-import { createLogger, format, transports } from 'winston';
+// Logging para browser: substitua Winston por console.log
+export const logger = {
+  info: (...args: any[]) => console.info('[INFO]', ...args),
+  warn: (...args: any[]) => console.warn('[WARN]', ...args),
+  error: (...args: any[]) => console.error('[ERROR]', ...args),
+  debug: (...args: any[]) => console.debug('[DEBUG]', ...args),
+};
 
-// Verifica se estamos no navegador
-const isBrowser = typeof window !== 'undefined';
-
-// Configuração básica do logger
-const logger = createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: format.combine(
-    format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    format.errors({ stack: true }),
-    format.splat(),
-    format.json()
-  ),
-  defaultMeta: { service: 'agentverse-client' },
-  transports: [
-    // No navegador, usamos apenas o console
-    new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.printf(
-          ({ level, message, timestamp, ...meta }) => {
-            return `${timestamp} [${level}]: ${message} ${
-              Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
-            }`;
-          }
-        )
-      )
-    })
-  ]
 });
 
 // Se não estivermos no navegador, adicionamos transporte para arquivo

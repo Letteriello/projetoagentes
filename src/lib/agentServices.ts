@@ -49,11 +49,11 @@ export async function saveAgentConfiguration(agentConfig: SavedAgentConfiguratio
         } else {
           // Document doesn't exist, though an ID was provided. Treat as new for ownership.
           // This case should ideally not happen if IDs are managed correctly.
-          enhancedLogger.logWarning({
+          enhancedLogger.logError(JSON.stringify({
             message: "Agent ID provided but document not found in Firestore. Treating as new for ownership.",
             details: { agentId: agentConfig.id, userId },
             flowName: "agentServices",
-          });
+          }));
           firestoreData.ownerId = userId;
           firestoreData.sharedWith = []; // Initialize sharedWith for this edge case
         }
@@ -90,11 +90,11 @@ export async function saveAgentConfiguration(agentConfig: SavedAgentConfiguratio
     } else {
       // Handle case where userId is not provided
       console.warn("Attempted to save agent configuration without a userId. ownerId and sharedWith will not be set/modified.");
-      enhancedLogger.logWarning({
+      enhancedLogger.logError(JSON.stringify({
         message: "Attempted to save agent configuration without a userId. ownerId and sharedWith will not be set/modified.",
         details: { agentName: agentConfig.agentName, agentId: agentConfig.id },
         flowName: "agentServices",
-      });
+      }));
       // Fallback to original logic if no userId, though this is not ideal for new requirements.
       // This will save the agent without ownerId or sharedWith being explicitly managed here.
       // If agentConfig already contains ownerId/sharedWith (e.g. loaded and re-saved), they will persist.
@@ -111,13 +111,13 @@ export async function saveAgentConfiguration(agentConfig: SavedAgentConfiguratio
     }
   } catch (error: any) {
     console.error("Erro ao salvar a configuração do agente:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error saving agent configuration to Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: { agentName: agentConfig.agentName, agentId: agentConfig.id, userId },
         flowName: "agentServices", // Generic flow/context name
         agentId: userId || "unknown_user_as_agent", // Use userId if available
-    });
+    }));
     throw error; // Propaga o erro para ser tratado pelo chamador
   }
 }
@@ -140,13 +140,13 @@ export async function getAgentConfiguration(agentId: string): Promise<SavedAgent
     return null;
   } catch (error: any) {
     console.error("Erro ao recuperar a configuração do agente:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error retrieving agent configuration from Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: { agentIdQuery: agentId },
         flowName: "agentServices",
         agentId: "system_operation", // Or pass userId if this operation is user-specific
-    });
+    }));
     throw error;
   }
 }
@@ -184,13 +184,13 @@ export async function saveAgentTemplate(templateConfig: SavedAgentConfiguration,
     }
   } catch (error: any) {
     console.error("Erro ao salvar o template do agente:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error saving agent template to Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: { templateName: templateConfig.agentName, templateId: templateConfig.id, userId },
         flowName: "agentServices",
         agentId: userId || "unknown_user_as_agent",
-    });
+    }));
     throw error;
   }
 }
@@ -208,13 +208,13 @@ export async function getAgentTemplate(templateId: string): Promise<SavedAgentCo
     return null;
   } catch (error: any) {
     console.error("Erro ao recuperar o template do agente:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error retrieving agent template from Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: { templateIdQuery: templateId },
         flowName: "agentServices",
-        agentId: "system_operation",
-    });
+        agentId: "system_operation"
+    }));
     throw error;
   }
 }
@@ -234,13 +234,13 @@ export async function getUserAgentTemplates(userId: string): Promise<SavedAgentC
     } as SavedAgentConfiguration));
   } catch (error: any) {
     console.error("Erro ao recuperar os templates de agente do usuário:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error retrieving user's agent templates from Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: { userIdQuery: userId },
         flowName: "agentServices",
-        agentId: userId, // userId is the agentId in this context
-    });
+        agentId: userId
+    }));
     throw error;
   }
 }
@@ -257,13 +257,13 @@ export async function getCommunityAgentTemplates(): Promise<SavedAgentConfigurat
     } as SavedAgentConfiguration));
   } catch (error: any) {
     console.error("Erro ao recuperar os templates de agente da comunidade:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error retrieving community agent templates from Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: {},
         flowName: "agentServices",
-        agentId: "system_operation",
-    });
+        agentId: "system_operation"
+    }));
     throw error;
   }
 }
@@ -285,13 +285,13 @@ export async function getUserAgentConfigurations(userId: string): Promise<SavedA
     } as SavedAgentConfiguration));
   } catch (error: any) {
     console.error("Erro ao recuperar as configurações de agente do usuário:", error);
-    enhancedLogger.logError({
+    enhancedLogger.logError(JSON.stringify({
         message: "Error retrieving user's agent configurations from Firestore",
-        error: error,
+        error: error instanceof Error ? error.message : String(error),
         details: { userIdQuery: userId },
         flowName: "agentServices",
-        agentId: userId, // userId is the agentId in this context
-    });
+        agentId: userId
+    }));
     throw error;
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch, type FieldValues, type UseFormWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 // Esquema de validação com Zod
 const feedbackSchema = z.object({
@@ -24,17 +24,14 @@ type FeedbackFormData = z.infer<typeof feedbackSchema>;
 interface FeedbackModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  watch?: UseFormWatch<FeedbackFormData>;
 }
 
-export function FeedbackModal({ isOpen, onOpenChange }: FeedbackModalProps) {
+const FeedbackModal = ({ isOpen, onOpenChange, watch }: FeedbackModalProps) => {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { toast } = useToast();
   
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FeedbackFormData>({
+  const form = useForm<FeedbackFormData>({
     resolver: zodResolver(feedbackSchema),
     defaultValues: {
       name: '',
@@ -44,28 +41,39 @@ export function FeedbackModal({ isOpen, onOpenChange }: FeedbackModalProps) {
     },
   });
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    formState: { errors },
+    setValue,
+    getValues,
+  } = form;
+
   const onSubmit = async (data: FeedbackFormData) => {
     try {
       setIsSubmitting(true);
-      // Aqui você pode adicionar a lógica para enviar o feedback
-      // Por exemplo, uma chamada para uma API
-      console.log('Feedback enviado:', data);
       
       // Simulando uma requisição assíncrona
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: 'Obrigado pelo seu feedback!',
-        description: 'Sua opinião é muito importante para nós.',
+      await new Promise<void>((resolve) => {
+        console.log('Enviando feedback:', data);
+        setTimeout(resolve, 1000);
       });
       
-      // Fecha o modal e reseta o formulário
+      // Mostrar mensagem de sucesso
+      toast({
+        title: 'Feedback enviado!',
+        description: 'Obrigado pelo seu feedback.',
+      });
+      
+      // Fechar o modal e resetar o formulário
       onOpenChange(false);
       reset();
     } catch (error) {
       console.error('Erro ao enviar feedback:', error);
       toast({
-        title: 'Erro',
+        title: 'Erro ao enviar feedback',
         description: 'Ocorreu um erro ao enviar seu feedback. Por favor, tente novamente.',
         variant: 'destructive',
       });
@@ -76,21 +84,21 @@ export function FeedbackModal({ isOpen, onOpenChange }: FeedbackModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Enviar Feedback</DialogTitle>
           <DialogDescription>
-            Sua opinião é muito importante para melhorarmos nossa plataforma.
+            Sua opinião é muito importante para nós. Conte-nos o que achou!
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome (opcional)</Label>
-            <Input 
-              id="name" 
-              placeholder="Seu nome" 
-              {...register('name')} 
+            <Input
+              id="name"
+              placeholder="Seu nome"
+              {...register('name')}
               disabled={isSubmitting}
             />
             {errors.name && (
@@ -100,10 +108,10 @@ export function FeedbackModal({ isOpen, onOpenChange }: FeedbackModalProps) {
           
           <div className="space-y-2">
             <Label htmlFor="email">E-mail (opcional)</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="seu@email.com" 
+            <Input
+              id="email"
+              type="email"
+              placeholder="seu@email.com"
               {...register('email')}
               disabled={isSubmitting}
             />
@@ -113,43 +121,42 @@ export function FeedbackModal({ isOpen, onOpenChange }: FeedbackModalProps) {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="rating">Avaliação</Label>
-            <div className="flex items-center space-x-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <React.Fragment key={star}>
-                  <input
-                    type="radio"
-                    id={`star${star}`}
-                    value={star}
-                    className="sr-only"
-                    {...register('rating', { valueAsNumber: true })}
-                  />
-                  <label
-                    htmlFor={`star${star}`}
-                    className="text-2xl cursor-pointer"
-                    title={`${star} estrela${star > 1 ? 's' : ''}`}
-                  >
-                    {star <= (watch ? watch('rating') : 5) ? '★' : '☆'}
-                  </label>
-                </React.Fragment>
-              ))}
-            </div>
-            {errors.rating && (
-              <p className="text-sm text-red-500">{errors.rating.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
             <Label htmlFor="message">Mensagem *</Label>
             <Textarea
               id="message"
               placeholder="Conte-nos o que você achou..."
-              className="min-h-[120px]"
+              className="min-h-[100px]"
               {...register('message')}
               disabled={isSubmitting}
             />
             {errors.message && (
               <p className="text-sm text-red-500">{errors.message.message}</p>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Avaliação *</Label>
+            <div className="flex items-center space-x-1">
+              {[1, 2, 3, 4, 5].map((star) => {
+                const isSelected = getValues('rating') >= star;
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    className={`text-2xl transition-colors ${isSelected ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-300'}`}
+                    onClick={() => setValue('rating', star, { shouldValidate: true })}
+                    disabled={isSubmitting}
+                    aria-label={`Avaliar com ${star} ${star === 1 ? 'estrela' : 'estrelas'}`}
+                    aria-pressed={isSelected}
+                  >
+                    <span className="sr-only">{star} {star === 1 ? 'estrela' : 'estrelas'}</span>
+                    <span aria-hidden="true">★</span>
+                  </button>
+                );
+              })}
+            </div>
+            {errors.rating && (
+              <p className="text-sm text-red-500">{errors.rating.message}</p>
             )}
           </div>
           
@@ -170,32 +177,14 @@ export function FeedbackModal({ isOpen, onOpenChange }: FeedbackModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+};
 
-// Adiciona o hook watch para acompanhar as mudanças no formulário
-function useWatchForm<T>(form: any, fieldName: string) {
-  const [value, setValue] = React.useState<T>();
-  
-  React.useEffect(() => {
-    const subscription = form.watch((value: any) => {
-      setValue(value[fieldName]);
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [form, fieldName]);
-  
-  return value;
-}
-
-// Componente auxiliar para usar o hook useWatch
-function WatchForm({ form, fieldName, children }: { form: any; fieldName: string; children: (value: any) => React.ReactNode }) {
-  const value = useWatchForm(form, fieldName);
-  return <>{children(value)}</>;
-}
-
-// Adiciona o hook watch ao componente
 FeedbackModal.displayName = 'FeedbackModal';
-const FeedbackModalWithWatch = (props: FeedbackModalProps) => {
+
+const FeedbackModalWithWatch: React.FC<Omit<FeedbackModalProps, 'watch'>> = ({
+  isOpen,
+  onOpenChange,
+}) => {
   const form = useForm<FeedbackFormData>({
     resolver: zodResolver(feedbackSchema),
     defaultValues: {
@@ -205,15 +194,13 @@ const FeedbackModalWithWatch = (props: FeedbackModalProps) => {
       rating: 5,
     },
   });
-  
-  const watch = form.watch;
-  
+
   return (
-    <WatchForm form={form} fieldName="rating">
-      {(rating) => (
-        <FeedbackModal {...props} watch={() => rating} />
-      )}
-    </WatchForm>
+    <FeedbackModal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      watch={form.watch}
+    />
   );
 };
 

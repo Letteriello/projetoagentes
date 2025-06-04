@@ -41,23 +41,36 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type {
-  SavedAgentConfiguration,
-  AvailableTool
-} from '@/types/agent-types';
+import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs-fixed';
+import type { AvailableTool } from '@/types/agent-types';
 
 import {
-  availableTools as defaultAvailableTools,
-  agentToneOptions,
-  agentTypeOptions,
+  builderAvailableTools as defaultAvailableTools,
   iconComponents
 } from "@/data/agentBuilderConfig";
+
+// Definindo agentTypeOptions localmente
+const agentTypeOptions = [
+  { id: 'llm', label: 'LLM Agent', description: 'Agente baseado em modelo de linguagem' },
+  { id: 'workflow', label: 'Workflow Agent', description: 'Agente baseado em fluxo de trabalho' },
+  { id: 'custom', label: 'Custom Agent', description: 'Agente personalizado' },
+  { id: 'a2a', label: 'A2A Agent', description: 'Agente de aplicativo para aplicativo' }
+];
+
+// Definindo agentToneOptions localmente já que não está mais disponível no agentBuilderConfig
+export const agentToneOptions = [
+  { id: 'professional', label: 'Profissional' },
+  { id: 'friendly', label: 'Amigável' },
+  { id: 'casual', label: 'Casual' },
+  { id: 'formal', label: 'Formal' },
+  { id: 'technical', label: 'Técnico' },
+];
 import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui";
 import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
 import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
 import { v4 as uuidv4 } from 'uuid';
 import { HelpModal } from '@/components/ui/HelpModal';
-import { FeedbackModal } from '@/components/features/agent-builder/FeedbackModal';
+import FeedbackModal from '@/components/features/agent-builder/FeedbackModal';
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'; 
 
 // Define tutorials (example structure)
@@ -78,12 +91,21 @@ const tutorials = {
 
 const AGENT_CARD_LIST_ITEM_SIZE = 210; // Approximate height of an agent card + padding
 
-export default function AgentBuilderPage() {
-  const { agents, addAgent, updateAgent, deleteAgent, isLoading, error } = useAgents();
-  const { saveAgentConfig, loadAgentConfigs, deleteAgentConfig } = useAgentStorage();
+interface AgentBuilderPageProps {
+  searchParams: {
+    agentId?: string; // Usado genericamente, pode ser substituído por edit/monitor
+    tab?: string;
+    create?: string; // 'true' para abrir o modal de criação
+    edit?: string;   // ID do agente para editar
+    monitor?: string; // ID do agente para monitorar
+  };
+}
+
+export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPageProps) {
+  const { savedAgents: agents, addAgent, updateAgent, deleteAgent, isLoadingAgents: isLoading, fetchAgents } = useAgents();
+  const { saveAgent: saveAgentConfig, loadAgents: loadAgentConfigs, deleteAgent: deleteAgentConfig } = useAgentStorage();
   const { toast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
   const [editingAgent, setEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
@@ -106,11 +128,11 @@ export default function AgentBuilderPage() {
   const [agentToDelete, setAgentToDelete] = React.useState<SavedAgentConfiguration | null>(null);
 
   React.useEffect(() => {
-    const agentIdToEdit = searchParams.get('edit');
-    const agentToMonitorId = searchParams.get('monitor');
-    const openBuilder = searchParams.get('create') === 'true';
+    const { create, edit: agentIdToEdit, monitor: agentIdToMonitor, tab } = searchParams || {};
+    const currentTab = tab || 'overview';
+    // const isChatMode = currentTab === 'chat'; // Ver se é necessário
 
-    if (openBuilder) {
+    if (create === 'true') {
       handleCreateNewAgent();
     }
 
@@ -118,16 +140,18 @@ export default function AgentBuilderPage() {
       const agentFound = agents.find(agent => agent.id === agentIdToEdit);
       if (agentFound) {
         setEditingAgent(agentFound);
+        setBuildMode('form'); // Ou determinar o modo com base em outra prop?
         setIsBuilderModalOpen(true);
       }
     }
-    if (agentToMonitorId) {
-      const agentFound = agents.find(agent => agent.id === agentToMonitorId);
+
+    if (agentIdToMonitor) {
+      const agentFound = agents.find(agent => agent.id === agentIdToMonitor);
       if (agentFound) {
         setSelectedAgentForMonitoring(agentFound);
       }
     }
-  }, [searchParams, agents]);
+  }, [searchParams, agents, handleCreateNewAgent]);
 
   const handleCreateNewAgent = () => {
     setEditingAgent(null);
@@ -135,7 +159,7 @@ export default function AgentBuilderPage() {
     setIsBuilderModalOpen(true);
   };
 
-  const handleEditAgent = (agent: SavedAgentConfiguration) => {
+  const handleUpdateAgent = async (agent: Partial<Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>> & { id: string }) => {
     setEditingAgent(agent);
     setBuildMode('form'); // Default to form mode for editing
     setIsBuilderModalOpen(true);
@@ -152,27 +176,35 @@ export default function AgentBuilderPage() {
   const onConfirmDeleteAgent = async () => {
     if (agentToDelete) {
       try {
-        await deleteAgent(agentToDelete.id);
-        await deleteAgentConfig(agentToDelete.id); // Also delete from local storage
-        toast({
-          title: "Agente Excluído",
-          description: `O agente "${agentToDelete.agentName}" foi excluído com sucesso.`,
-          variant: "destructive",
-        });
+        const success = await deleteAgent(agentToDelete.id);
+        if (success) {
+          await deleteAgentConfig(agentToDelete.id); // Also delete from local storage
+          toast({
+            title: "Agente Excluído",
+            description: `O agente "${agentToDelete.agentName}" foi excluído com sucesso.`,
+          });
+          setAgentToDelete(null);
+          setIsConfirmDeleteAgentOpen(false);
+          // fetchAgents(); // Refresh the list - already handled by context
+        } else {
+          toast({
+            title: "Erro ao Excluir Agente",
+            description: "Não foi possível excluir o agente. Tente novamente.",
+            variant: "destructive",
+          });
+        }
       } catch (error) {
-        console.error("Erro ao excluir agente:", error);
+        console.error("Error deleting agent:", error);
         toast({
-          title: "Erro ao Excluir",
-          description: "Não foi possível excluir o agente. Tente novamente.",
+          title: "Erro ao Excluir Agente",
+          description: error.message || "Ocorreu um erro desconhecido.",
           variant: "destructive",
         });
       }
-      setAgentToDelete(null);
-      setIsConfirmDeleteAgentOpen(false);
     }
   };
 
-  const handleSaveAgent = async (agentConfig: SavedAgentConfiguration) => {
+  const handleSaveAgent = async (agentConfig: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'> & { agentName: string; agentDescription: string; agentVersion: string; config: AgentConfig; tools: string[]; }) => {
     try {
       if (editingAgent) {
         await updateAgent(agentConfig.id, agentConfig);
@@ -195,7 +227,7 @@ export default function AgentBuilderPage() {
       console.error("Erro ao salvar agente:", error);
       toast({
         title: "Erro ao Salvar",
-        description: "Não foi possível salvar o agente. Tente novamente.",
+        description: error.message || "Ocorreu um erro desconhecido ao salvar o agente.",
         variant: "destructive",
       });
     }
@@ -215,10 +247,10 @@ export default function AgentBuilderPage() {
           description: `O agente "${agentToSaveAsTemplate.agentName}" foi salvo como template "${templateName}".`,
         });
       } catch (error) {
-        console.error("Erro ao salvar template:", error);
+        console.error("Error saving agent as template:", error);
         toast({
           title: "Erro ao Salvar Template",
-          description: "Não foi possível salvar o template. Tente novamente.",
+          description: error.message || "Ocorreu um erro desconhecido ao salvar o template.",
           variant: "destructive",
         });
       }
@@ -245,7 +277,6 @@ export default function AgentBuilderPage() {
 
   const totalAgents = agents.length;
   const agentsWithTools = agents.filter(agent => agent.tools && agent.tools.length > 0).length;
-  const rootAgents = agents.filter(agent => agent.isRootAgent).length; // Assuming isRootAgent property exists
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
@@ -262,7 +293,7 @@ export default function AgentBuilderPage() {
       <div style={style} className="px-1 py-2">
         <AgentCard
           agent={agent}
-          onEdit={handleEditAgent}
+          onEdit={() => handleUpdateAgent(agent)}
           onDelete={handleDeleteAgent} // Pass handleDeleteAgent directly
           onSaveAsTemplate={handleSaveAsTemplate}
           onSelectForMonitoring={handleSelectAgentForMonitoring}
@@ -323,18 +354,6 @@ export default function AgentBuilderPage() {
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Agentes Raiz</CardTitle>
-              <Route className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rootAgents}</div>
-              <p className="text-xs text-muted-foreground">
-                {/* +19% from last month (example) */}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="flex justify-end items-center mb-4">
@@ -379,7 +398,7 @@ export default function AgentBuilderPage() {
             <Button onClick={() => setSelectedAgentForMonitoring(null)} variant="outline" className="mb-4">
               Voltar para Lista de Agentes
             </Button>
-            <AgentMetricsView agent={selectedAgentForMonitoring} />
+            {selectedAgentForMonitoring && <AgentMetricsView agentId={selectedAgentForMonitoring.id} />}
           </div>
           <AgentLogView agentId={selectedAgentForMonitoring.id} />
         </div>
@@ -402,7 +421,7 @@ export default function AgentBuilderPage() {
                 <AgentCard
                   key={agent.id}
                   agent={agent}
-                  onEdit={handleEditAgent}
+                  onEdit={() => handleUpdateAgent(agent)}
                   onDelete={handleDeleteAgent} // Pass handleDeleteAgent directly
                   onSaveAsTemplate={handleSaveAsTemplate}
                   onSelectForMonitoring={handleSelectAgentForMonitoring}
@@ -436,9 +455,9 @@ export default function AgentBuilderPage() {
             }}
             onSave={handleSaveAgent}
             agent={editingAgent}
-            availableTools={defaultAvailableTools} // Pass default tools or fetch dynamically
-            agentToneOptions={agentToneOptions}
-            agentTypeOptions={agentTypeOptions}
+            availableTools={defaultAvailableTools.map(tool => tool.id)} // Pass default tools or fetch dynamically
+            agentToneOptions={agentToneOptions.map(option => option.id)}
+            agentTypeOptions={agentTypeOptions.map(option => option.id)}
             iconComponents={iconComponents}
           />
         ) : (
@@ -450,6 +469,10 @@ export default function AgentBuilderPage() {
             }}
             onSave={handleSaveAgent} // Or a different save handler for chat-created agents
             initialAgentConfig={editingAgent} // Pass existing config if editing, or null/default for new
+            availableTools={defaultAvailableTools.map(tool => tool.id)}
+            agentToneOptions={agentToneOptions.map(option => option.id)}
+            agentTypeOptions={agentTypeOptions.map(option => option.id)} // Corrigir mapeamento
+            iconComponents={iconComponents}
             // onEditInFormMode={handleEditAgentWithMode} // Function to switch to form mode
           />
         )
@@ -507,10 +530,4 @@ export default function AgentBuilderPage() {
 // AgentRow and AGENT_CARD_LIST_ITEM_SIZE will be appended here by the next operation.
 // Placeholder comment to ensure this line is unique for the next replace/append.
 // Note: The handleEditAgentWithMode function mentioned in comments for AgentCreatorChatUI
-// was not present in the original code, so it's not added here. If needed, it would be:
-// const handleEditAgentWithMode = (agentToEdit: SavedAgentConfiguration, mode: "form" | "chat") => {
-//   setEditingAgent(agentToEdit);
-//   setBuildMode(mode);
-//   if (mode === "form") setIsBuilderModalOpen(true);
-//   else setSelectedAgentForMonitoring(null); // Or other logic for chat build mode
-// };
+// was not present in the original code, so it's not added here.

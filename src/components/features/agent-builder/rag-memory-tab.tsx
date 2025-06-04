@@ -57,7 +57,7 @@ import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { KnowledgeSource, KnowledgeSourceType } from "../../../types/agent-configs-new";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 // Tipos de serviços de memória/RAG suportados
 export type MemoryServiceType =

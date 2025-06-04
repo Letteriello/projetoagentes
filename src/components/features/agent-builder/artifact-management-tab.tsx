@@ -60,7 +60,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUploader } from "@/components/ui/file-uploader"; // Added
-import { useToast } from "@/components/ui/use-toast"; // Added
+import { useToast } from "@/hooks/use-toast"; // Added
 
 // Tipos de artefatos suportados pelo Google ADK
 export type ArtifactType =
