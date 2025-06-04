@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image"; // Import next/image
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -365,7 +366,7 @@ export default function ChatHeader({
               title={currentUser.displayName || currentUser.email || "Perfil do usuário"}
             >
               {currentUser.photoURL ? (
-                <img src={currentUser.photoURL} alt="Avatar" className="h-full w-full object-cover" />
+                <Image src={currentUser.photoURL} alt="Avatar" width={32} height={32} className="h-full w-full object-cover" />
               ) : (
                 <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary">
                   {(currentUser.displayName?.[0] || currentUser.email?.[0] || "U").toUpperCase()}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react'; // Added Suspense and lazy
 import { useFormContext, Controller, useFieldArray, useWatch } from 'react-hook-form';
 import { Switch } from '@/components/ui/switch';
 // Label will be replaced by FormLabel
@@ -24,7 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import A2AGraphVisualizer from '../a2a-graph-visualizer';
-import A2ATestChannelDialog from '../a2a-test-channel-dialog'; // Import the new dialog
+// import A2ATestChannelDialog from '../a2a-test-channel-dialog'; // Lazy loaded
 import { useAppContext } from '@/contexts/app-context';
 
 interface A2AConfigTabProps {
@@ -66,6 +66,8 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
 
   const [isTestDialogOpen, setIsTestDialogOpen] = React.useState(false);
   const [selectedChannelForTest, setSelectedChannelForTest] = React.useState<CommunicationChannelNew | null>(null);
+
+  const A2ATestChannelDialog = lazy(() => import('../a2a-test-channel-dialog'));
 
   const a2aEnabled = watch('config.a2a.enabled');
   const communicationChannels = watch('config.a2a.communicationChannels');
@@ -117,15 +119,17 @@ export default function A2AConfigTab({ showHelpModal, PlusIcon, Trash2Icon }: A2
           a2aChannels={a2aChannelsForGraph}
         />
       )}
-       {selectedChannelForTest && (
-        <A2ATestChannelDialog
-          isOpen={isTestDialogOpen}
-          onOpenChange={setIsTestDialogOpen}
-          channel={selectedChannelForTest}
-          currentAgent={currentAgentForTestDialog}
-          targetAgent={targetAgentForTestDialog}
-        />
-      )}
+      <Suspense fallback={<div>Carregando diálogo de teste...</div>}>
+        {isTestDialogOpen && selectedChannelForTest && (
+          <A2ATestChannelDialog
+            isOpen={isTestDialogOpen}
+            onOpenChange={setIsTestDialogOpen}
+            channel={selectedChannelForTest}
+            currentAgent={currentAgentForTestDialog}
+            targetAgent={targetAgentForTestDialog}
+          />
+        )}
+      </Suspense>
       <FormItem className="flex flex-row items-center space-x-2">
         <FormControl>
           <Controller
