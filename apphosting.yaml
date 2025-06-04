@@ -4,4 +4,28 @@
 runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
-  maxInstances: 1
+  maxInstances: 5
+
+env:
+  - variable: OPENAI_API_KEY
+    # Value will be set in the Cloud Run environment / Secret Manager
+  - variable: OLLAMA_API_HOST
+    # Value will be set in the Cloud Run environment
+  - variable: GOOGLE_API_KEY
+    # Value will be set in the Cloud Run environment
+  - variable: SEARCH_API_KEY
+    # Value will be set in the Cloud Run environment
+  - variable: KB_ENDPOINT
+    # Value will be set in the Cloud Run environment
+  - variable: CALENDAR_TOKEN
+    # Value will be set in the Cloud Run environment
+  - variable: DB_CONNECTION
+    # Value will be set in the Cloud Run environment
+  - variable: GCP_PROJECT_ID
+    # Value will be set in the Cloud Run environment / Secret Manager
+  - variable: GCP_LOCATION
+    # Value will be set in the Cloud Run environment
+  - variable: RAG_CORPUS_NAME
+    # Value will be set in the Cloud Run environment
+  - variable: CHAT_API_KEY
+    # Value will be set in the Cloud Run environment / Secret Manager
