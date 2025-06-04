@@ -44,22 +44,55 @@ const BlinkingCursor = () => (
 
 // Helper function to get the appropriate attachment icon
 const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
+  // Check by fileType first
   if (fileType) {
+    // PDF
     if (fileType === "application/pdf") return FileText;
-    if (fileType === "text/csv" || fileType === "application/vnd.ms-excel" || fileType.includes("spreadsheet")) return FileBadge; // Using FileBadge
+    // DOC/DOCX
+    if (fileType === "application/msword" || fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return FileText;
+    // JSON
     if (fileType === "application/json") return FileJson;
+    // Code files
+    if (
+      fileType === "text/javascript" ||
+      fileType === "text/x-python" ||
+      fileType === "application/xml" ||
+      fileType === "text/css" ||
+      fileType === "text/html" ||
+      fileType === "text/markdown"
+    ) return FileCode2;
+    // CSV/Spreadsheet
+    if (fileType === "text/csv" || fileType === "application/vnd.ms-excel" || fileType.includes("spreadsheet")) return FileBadge;
+    // Plain text
     if (fileType === "text/plain") return FileText;
-    if (fileType === "text/markdown") return FileCode2;
+    // Generic text/code catch-all
     if (fileType.startsWith("text/") || fileType.includes("script") || fileType.includes("code")) return FileCode2;
   }
-  // Fallback based on extension if fileType is generic or missing
+
+  // Fallback based on extension if fileType is generic, missing, or not specific enough
   if (fileName) {
-    if (fileName.endsWith(".pdf")) return FileText;
-    if (fileName.endsWith(".csv")) return FileBadge; // Using FileBadge
-    if (fileName.endsWith(".json")) return FileJson;
-    if (fileName.endsWith(".txt")) return FileText;
-    if (fileName.endsWith(".md")) return FileCode2;
+    const lowerFileName = fileName.toLowerCase();
+    // PDF
+    if (lowerFileName.endsWith(".pdf")) return FileText;
+    // DOC/DOCX
+    if (lowerFileName.endsWith(".doc") || lowerFileName.endsWith(".docx")) return FileText;
+    // JSON
+    if (lowerFileName.endsWith(".json")) return FileJson;
+    // Code files
+    if (
+      lowerFileName.endsWith(".js") ||
+      lowerFileName.endsWith(".py") ||
+      lowerFileName.endsWith(".xml") ||
+      lowerFileName.endsWith(".css") ||
+      lowerFileName.endsWith(".html") ||
+      lowerFileName.endsWith(".md")
+    ) return FileCode2;
+    // CSV
+    if (lowerFileName.endsWith(".csv")) return FileBadge;
+    // Plain text
+    if (lowerFileName.endsWith(".txt")) return FileText;
   }
+
   return FileIcon; // Default icon
 };
 
