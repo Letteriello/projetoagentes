@@ -7,6 +7,10 @@
  */
 
 import { ai } from '@/ai/genkit'; 
+import { performWebSearchTool } from '@/ai/tools/web-search-tool';
+import { dateTimeTool } from '../tools/date-time-tool'; // Import dateTimeTool
+import { petStoreTool } from '../tools/openapi-tool'; // Import petStoreTool
+import { fileIoTool } from '../tools/file-io-tool'; // Import fileIoTool
 // Import factory functions for refactored tools
 import { createPerformWebSearchTool } from '@/ai/tools/web-search-tool';
 import { createKnowledgeBaseTool } from '@/ai/tools/knowledge-base-tool';
@@ -27,13 +31,26 @@ import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed w
 import { winstonLogger } from '../../lib/winston-logger';
 import { z } from 'zod';
 import { ActionContext } from 'genkit';
+import { LRUCache } from 'lru-cache';
+import { GenerateResponse } from '@genkit-ai/ai';
 import { AgentConfig, KnowledgeSource, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
 import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
+
+// Initialize LRU Cache for LLM responses
+const llmCache = new LRUCache<string, GenerateResponse>({
+  max: 500, // Max 500 items
+  ttl: 1000 * 60 * 5, // 5 minutes TTL
+});
 
 // Define sensitive keywords for guardrails
 const SENSITIVE_KEYWORDS = ["conteúdo sensível", "excluir dados", "informação confidencial", "apagar tudo", "dados pessoais", "senha", "segredo"];
 
 // Mapa de todas as ferramentas Genkit disponíveis na aplicação
+const allAvailableTools = {
+  performWebSearch: performWebSearchTool,
+  dateTimeTool: dateTimeTool,
+  petStoreTool: petStoreTool,
+  fileIoTool: fileIoTool, // Add fileIoTool
 // Stores factory functions for configurable tools and direct tool objects for static ones.
 interface AppTool extends Tool {
   func: (input: any) => Promise<any>;
@@ -486,10 +503,35 @@ async function basicChatFlowInternal(
         messagesForThisIteration = [...currentMessages]; // currentMessages would have been updated with tool responses
       }
 
-      const llmResponse = await ai.generate({
-        ...request,
+      // Cache logic for ai.generate()
+      let llmResponse: GenerateResponse;
+      const currentRequestCacheKeyPayload = {
         messages: messagesForThisIteration,
-      });
+        modelName: input.modelName,
+        tools: request.tools, // Tools definition for the current ai.generate() call
+        temperature: request.config?.temperature,
+        // Consider adding other relevant parts of 'request.config' like topP, topK, maxOutputTokens, stopSequences
+        topP: request.config?.topP,
+        topK: request.config?.topK,
+        maxOutputTokens: request.config?.maxOutputTokens,
+        stopSequences: request.config?.stopSequences,
+      };
+      const currentRequestCacheKey = JSON.stringify(currentRequestCacheKeyPayload);
+
+      if (llmCache.has(currentRequestCacheKey)) {
+        winstonLogger.info(`[Chat Flow Cache] HIT for iteration key: ${currentRequestCacheKey.substring(0, 50)}...`, { agentId, flowName });
+        llmResponse = llmCache.get(currentRequestCacheKey)!; // Non-null assertion as we checked with .has()
+      } else {
+        winstonLogger.info(`[Chat Flow Cache] MISS for iteration key: ${currentRequestCacheKey.substring(0, 50)}...`, { agentId, flowName });
+        llmResponse = await ai.generate({
+          ...request, // Contains original config like temp, stopSequences
+          messages: messagesForThisIteration, // Crucially, the messages for *this* iteration
+          // Tools are already in 'request.tools'
+        });
+        if (llmResponse && llmResponse.candidates && llmResponse.candidates.length > 0) { // Cache only successful-looking responses
+          llmCache.set(currentRequestCacheKey, llmResponse);
+        }
+      }
 
       const choice = llmResponse.candidates[0];
       if (!choice || !choice.message || !choice.message.content) {
