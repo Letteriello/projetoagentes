@@ -12,41 +12,35 @@ function ErrorFallback({
 }) {
   // Handle chunk loading errors specifically
   if (typeof window !== "undefined" && error.name === "ChunkLoadError") {
-    console.warn("Chunk load error detected. Attempting to recover...");
+    winstonLogger.warn("Chunk load error detected. Attempting to recover...");
     // Force reload the page
     window.location.reload();
     return null;
   }
 
+
+  // Log the error
+  React.useEffect(() => {
+    winstonLogger.error('Error boundary caught an error', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+  }, [error]);
+
   return (
-    <div style={{ padding: "20px", textAlign: "center" }}>
-      <h2>Something went wrong</h2>
-      <p>An error occurred while loading the page.</p>
+    <div className="p-5 text-center">
+      <h2 className="text-xl font-bold mb-2">Algo deu errado</h2>
+      <p className="mb-4">Ocorreu um erro ao carregar a página.</p>
       <button
         onClick={resetErrorBoundary}
-        style={{
-          padding: "8px 16px",
-          fontSize: "16px",
-          cursor: "pointer",
-          backgroundColor: "#0070f3",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-        }}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
       >
-        Try again
+        Tentar novamente
       </button>
-      <details style={{ marginTop: "20px", textAlign: "left" }}>
-        <summary>Error details</summary>
-        <pre
-          style={{
-            background: "#f5f5f5",
-            padding: "10px",
-            borderRadius: "4px",
-            overflowX: "auto",
-            marginTop: "10px",
-          }}
-        >
+      <details className="mt-5 text-left">
+        <summary className="cursor-pointer text-sm text-gray-600">Detalhes do erro</summary>
+        <pre className="bg-gray-100 p-3 rounded mt-2 text-xs overflow-x-auto">
           {error.toString()}
         </pre>
       </details>
@@ -64,17 +58,11 @@ export function ErrorBoundaryClient({
     <ReactErrorBoundary
       FallbackComponent={ErrorFallback}
       onError={(error, info) => {
-        console.error("Error caught by error boundary:", error, info);
-        winstonLogger.error('Error caught by ErrorBoundaryClient:', {
-          error: error.toString(),
+        winstonLogger.error('Error boundary caught an error', {
+          error: error.message,
+          stack: error.stack,
           componentStack: info.componentStack,
         });
-
-        // Handle chunk loading errors globally
-        if (typeof window !== "undefined" && error.name === "ChunkLoadError") {
-          console.warn("Chunk load error detected. Reloading page...");
-          window.location.reload();
-        }
       }}
     >
       {children}

@@ -56,7 +56,7 @@ import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-cr
 import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
 import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
 import { v4 as uuidv4 } from 'uuid';
-import { HelpModal } from '@/components/ui/help-modal';
+import { HelpModal } from '@/components/ui/HelpModal';
 import { FeedbackModal } from '@/components/features/agent-builder/FeedbackModal';
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'; 
 
