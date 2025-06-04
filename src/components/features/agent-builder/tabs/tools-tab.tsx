@@ -1,7 +1,9 @@
 import * as React from 'react';
-import { useFormContext, Controller } from 'react-hook-form';
+import { useFormContext, Controller, FormField } from 'react-hook-form'; // Added FormField
 import { z } from 'zod';
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
+import { llmModels } from '@/data/llm-models'; // Import llmModels
+import type { LLMModelDetails } from '@/types/agent-configs-new'; // Import LLMModelDetails for type safety
 // Importação de tipos removida para evitar duplicação
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -35,8 +37,9 @@ import {
   CardDescription,
   CardContent
 } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // Keep for direct use if any
 import { Switch } from '@/components/ui/switch';
+import { FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // Import Form components for forceToolUsage
 
 // Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
 // For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
@@ -88,6 +91,7 @@ export default function ToolsTab({
   const { control, watch, setValue, getValues } = useFormContext<SavedAgentConfiguration>(); // Changed FormContextType to SavedAgentConfiguration
   const { toast } = useToast();
   const currentSelectedTools = watch('tools') || [];
+  const agentModelId = watch('config.agentModel'); // Watch the agentModel ID
   const toolConfigsApplied = watch('toolConfigsApplied') || {} as Record<string, ToolConfigData>; // Ensure type
 
   const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false);
@@ -249,6 +253,26 @@ export default function ToolsTab({
 
   return (
     <div className="space-y-6">
+      {/* Alert for models that don't support tools */}
+      {(() => {
+        if (agentModelId) {
+          const selectedModel = llmModels.find(model => model.id === agentModelId);
+          if (selectedModel && selectedModel.capabilities?.tools === false) {
+            return (
+              <Alert variant="warning">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Model Tool Capability</AlertTitle>
+                <AlertDescription>
+                  The selected model ({selectedModel.name}) may not fully support tools or function calling.
+                  Tool configurations might not have the intended effect or work as expected.
+                </AlertDescription>
+              </Alert>
+            );
+          }
+        }
+        return null;
+      })()}
+
       {configuringTool && (
         <ToolConfigModal
           isOpen={isToolConfigModalOpen}
@@ -383,7 +407,31 @@ export default function ToolsTab({
           </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px] pr-4"> {/* Added ScrollArea */}
+          {/* Force Tool Usage Field */}
+          <Controller
+            name="config.forceToolUsage"
+            control={control}
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base">
+                    Force Tool Usage
+                  </FormLabel>
+                  <FormDescription>
+                    If enabled, the agent will be forced to use a tool in its response if possible.
+                    This may not be supported by all models or may lead to unexpected behavior if no suitable tool is found.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          <ScrollArea className="h-[350px] pr-4"> {/* Adjusted height due to new field */}
             <div className="space-y-4">
               {availableTools.map((tool, index) => {
                 const isSelected = currentSelectedTools.includes(tool.id);

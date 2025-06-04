@@ -62,10 +62,15 @@ export interface ChatMessageUI {
 export interface ChatEvent {
   id: string;
   timestamp: Date;
-  eventType: 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL' | 'TOOL_CALL_PENDING';
+  eventType: 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL' | 'TOOL_CALL_PENDING' | 'CALLBACK_SIMULATION';
   eventTitle: string;
   eventDetails?: string;
-  toolName?: string;
+  toolName?: string; // Could be used for beforeTool/afterTool callbacks
+  // Fields for CALLBACK_SIMULATION type events
+  callbackType?: 'beforeModel' | 'afterModel' | 'beforeTool' | 'afterTool';
+  callbackAction?: string; // e.g., 'BLOCKED', 'MODIFIED', 'LOGGED', 'PASSED_CHECK', 'UNRECOGNIZED_LOGIC'
+  originalData?: string;   // Store data before modification (e.g., original prompt snippet)
+  modifiedData?: string;   // Store data after modification (e.g., modified prompt snippet)
 }
 
 export type MessageListItem =

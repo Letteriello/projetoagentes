@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
 import { Switch } from "@/components/ui/switch"; // Added Switch
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
 import JsonEditorField from '@/components/ui/JsonEditorField'; // Added JsonEditorField
 // Label replaced by FormLabel where appropriate
 import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
@@ -59,10 +60,12 @@ import {
   ClipboardCopy,
   Undo2, // Import Undo2
   AlertTriangle, // Import AlertTriangle
+  Download, // Import Download icon
   // Wand2 // Already imported
 } from 'lucide-react';
 
 import { HelpModal } from '@/components/ui/HelpModal';
+import { generateAgentCardJson, generateAgentCardYaml } from '../../../lib/agent-utils'; // Added import
 import { aiConfigurationAssistantFlow, AiConfigurationAssistantOutput } from '@/ai/flows/aiConfigurationAssistantFlow';
 import AISuggestionDisplay from './AISuggestionDisplay';
 import { runFlow } from 'genkit';
@@ -293,7 +296,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [activeEditTab, setActiveEditTab] = React.useState('general');
   const [currentStep, setCurrentStep] = React.useState(0);
-  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'deploy', 'review'];
+  const tabOrder = ['general', 'behavior', 'tools', 'memory_knowledge', 'artifacts', 'a2a', 'multi_agent_advanced', 'advanced', 'deploy', 'callbacks', 'review'];
 
   const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
   const [helpModalContent, setHelpModalContent] = React.useState<{ title: string; body: React.ReactNode } | null>(null);
@@ -687,6 +690,34 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     // Handle export logic
   };
 
+  const triggerDownload = (content: string, fileName: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateAgentCard = (format: 'json' | 'yaml') => {
+    const agentData = methods.getValues();
+    const agentName = agentData.name || 'agent'; // Use agent name for the file
+    if (format === 'json') {
+      const jsonString = generateAgentCardJson(agentData);
+      triggerDownload(jsonString, `${agentName}-agent-card.json`, 'application/json');
+    } else {
+      const yamlString = generateAgentCardYaml(agentData);
+      triggerDownload(yamlString, `${agentName}-agent-card.yaml`, 'application/x-yaml');
+    }
+    toast({
+      title: "Agent Card Gerado",
+      description: `O Agent Card (${format.toUpperCase()}) foi baixado.`,
+    });
+  };
+
   // const handleToolConfigure = (toolId: string) => { // REMOVED
   //   // Handle tool configuration
   // };
@@ -750,7 +781,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 }}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-10 mb-6"> {/* Adjusted for 10 tabs */}
+                <TabsList className="grid w-full grid-cols-11 mb-6"> {/* Adjusted for 11 tabs */}
                   {/* Updated TabsTrigger props */}
                   {tabOrder.map((tab, index) => (
                     <TabsTrigger
@@ -1117,6 +1148,203 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                   </Suspense>
                 </TabsContent>
 
+                {/* Callbacks Tab */}
+                <TabsContent value="callbacks" className="space-y-6 mt-4">
+                  <Alert variant="warning" className="mb-6">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Performance Considerations</AlertTitle>
+                    <AlertDescription>
+                      Operações longas dentro de callbacks podem impactar a performance do agente, seguindo a documentação do ADK.
+                    </AlertDescription>
+                  </Alert>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Model Callbacks</CardTitle>
+                      <CardDescription>
+                        Define snippets of logic to be executed before and after model calls.
+                        These will be stored in the new `callbacks` field in the agent configuration.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Before Model Callback Section */}
+                      <div className="space-y-2">
+                        <FormLabel>Before Model Callback</FormLabel>
+                        <FormField
+                          control={control}
+                          name="config.callbacks.beforeModelLogic" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Enter logic for Before Model callback (e.g., modify request object)"
+                                  rows={3}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name="config.callbacks.beforeModelEnabled" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Enable Before Model Callback
+                              </FormLabel>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <Separator />
+
+                      {/* After Model Callback Section */}
+                      <div className="space-y-2">
+                        <FormLabel>After Model Callback</FormLabel>
+                        <FormField
+                          control={control}
+                          name="config.callbacks.afterModelLogic" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Enter logic for After Model callback (e.g., log response or modify it)"
+                                  rows={3}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name="config.callbacks.afterModelEnabled" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Enable After Model Callback
+                              </FormLabel>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Tool Callbacks Card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Tool Callbacks</CardTitle>
+                      <CardDescription>
+                        Define snippets of logic to be executed before and after tool calls.
+                        These will also be stored in the `callbacks` field.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Before Tool Callback Section */}
+                      <div className="space-y-2">
+                        <FormLabel>Before Tool Callback</FormLabel>
+                        <FormField
+                          control={control}
+                          name="config.callbacks.beforeToolLogic" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Enter logic for Before Tool callback (e.g., validate tool input)"
+                                  rows={3}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name="config.callbacks.beforeToolEnabled" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Enable Before Tool Callback
+                              </FormLabel>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <Separator />
+
+                      {/* After Tool Callback Section */}
+                      <div className="space-y-2">
+                        <FormLabel>After Tool Callback</FormLabel>
+                        <FormField
+                          control={control}
+                          name="config.callbacks.afterToolLogic" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Enter logic for After Tool callback (e.g., process tool output)"
+                                  rows={3}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name="config.callbacks.afterToolEnabled" // Assuming this path
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2 mt-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Enable After Tool Callback
+                              </FormLabel>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
                 {/* Advanced Tab (ADK Callbacks) */}
                 <TabsContent value="advanced" className="space-y-6 mt-4">
                   <Alert variant="warning">
@@ -1266,10 +1494,20 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
               ) : (
                 // Editing existing agent
                 <>
-                  <Button variant="outline" type="button" onClick={handleExport} className="mr-auto"> {/* Added mr-auto to push to left */}
-                    <Share2 className="mr-2 h-4 w-4" /> {/* Or DownloadCloud icon */}
-                    Exportar Configuração
-                  </Button>
+                  <div className="mr-auto flex gap-2"> {/* Container for left-aligned buttons */}
+                    <Button variant="outline" type="button" onClick={handleExport}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Exportar Config.
+                    </Button>
+                    <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('json')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Gerar Agent Card (JSON)
+                    </Button>
+                    {/* <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('yaml')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Gerar Agent Card (YAML)
+                    </Button> */}
+                  </div>
                   <DialogClose asChild>
                     <Button variant="outline" type="button">Cancelar</Button>
                   </DialogClose>

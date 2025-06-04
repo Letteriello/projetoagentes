@@ -206,12 +206,17 @@ export interface SavedAgentConfiguration {
   agentVersion: string;
   config: AgentConfig;
   tools: string[];
+<<<<<<< HEAD
   toolsDetails?: ToolDetail[];
   toolConfigsApplied: ToolConfigData;
   a2aConfig?: Record<string, any>;
   communicationChannels?: CommunicationChannel[];
   deploymentConfig?: DeploymentConfig;
   debugModeEnabled?: boolean;
+=======
+  toolConfigsApplied?: Record<string, any>;
+  callbacks?: Record<string, string>;
+>>>>>>> bda22c13ea204b57a3e15d02ce95339da8b0ab06
   createdAt: string;
   updatedAt: string;
   isTemplate: boolean;

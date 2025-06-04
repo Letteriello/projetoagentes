@@ -21,7 +21,9 @@ import {
   LogOut,
   DownloadCloud, // Added DownloadCloud
 } from "lucide-react"; // Added LogIn, LogOut
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Keep if still used for some parts
+import { llmModels } from '../../../data/llm-models'; // Import llmModels
+import { Badge } from "@/components/ui/badge"; // Import Badge
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ActiveChatTarget } from "@/hooks/use-chat-store"; // Import ActiveChatTarget
@@ -97,8 +99,31 @@ export default function ChatHeader({
       const selectedGem = initialGems.find(gem => gem.id === selectedGemId);
       return selectedGem?.name || "Gem";
     }
-    return "Assistente IA";
+    // If an agent from SavedAgentConfiguration is active
+    if (activeChatTargetDetails?.type === 'agent' && activeChatTargetDetails.details?.config) {
+      return activeChatTargetDetails.name; // This is the agent's name
+    }
+    return "Assistente IA"; // Default fallback
   };
+
+  const agentDisplayName = getSelectedModelName();
+
+  let llmModelName: string | undefined = undefined;
+  if (activeChatTargetDetails?.type === 'agent' && activeChatTargetDetails.details?.config?.type === 'llm') {
+    const agentConfig = activeChatTargetDetails.details.config;
+    if (agentConfig.agentModel) {
+      const modelDetails = llmModels.find(m => m.id === agentConfig.agentModel);
+      llmModelName = modelDetails?.name;
+    }
+  } else if (activeChatTargetDetails?.type === 'gem') {
+    // For Gems, if they are configured to use a specific LLM model ID stored somewhere (e.g. in gem.llmModelId)
+    // This part is speculative as Gem type doesn't explicitly have llmModelId
+    // For now, we assume Gems don't show a sub-LLM model name unless their structure changes.
+    // If a Gem IS an LLM model itself (e.g. selectedGemId is an LLM model ID)
+    // then llmModelName could be derived from llmModels using selectedGemId.
+    // However, getSelectedModelName() already returns the Gem's name.
+  }
+
 
   // Determine display name based on activeChatTargetDetails
   let displayName = "Nova Conversa";
@@ -145,8 +170,13 @@ export default function ChatHeader({
           ) : (
             <span className="h-4 w-4 rounded-full bg-gradient-to-br from-blue-400 to-purple-500" />
           )}
-          <span className="text-sm font-medium">{getSelectedModelName()}</span>
-          <span className="text-xs text-muted-foreground">▼</span>
+          <span className="text-sm font-medium">{agentDisplayName}</span>
+          {llmModelName && (
+            <Badge variant="outline" className="ml-2 text-xs">
+              {llmModelName}
+            </Badge>
+          )}
+          <span className="text-xs text-muted-foreground ml-1">▼</span>
         </Button>
         
         {isModelDropdownOpen && (

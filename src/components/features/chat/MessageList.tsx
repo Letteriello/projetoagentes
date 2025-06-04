@@ -35,6 +35,7 @@ const Row = React.memo(({ index, style, data }: { index: number; style: React.CS
           eventDetails={item.eventDetails}
           eventType={item.eventType}
           isVerboseMode={data.isVerboseMode} // Pass isVerboseMode
+          rawEventData={item} // Pass the whole item as rawEventData
         />
       </div>
     );

@@ -26,7 +26,8 @@ import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed w
 import { winstonLogger } from '../../lib/winston-logger';
 import { z } from 'zod';
 import { ActionContext } from 'genkit';
-import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/agent-configs-new'; // Adjust path as needed
+import { AgentConfig, KnowledgeSource, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
+import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
 
 // Define sensitive keywords for guardrails
 const SENSITIVE_KEYWORDS = ["conteúdo sensível", "excluir dados", "informação confidencial", "apagar tudo", "dados pessoais", "senha", "segredo"];
@@ -122,14 +123,17 @@ interface ChatFlowParams {
   modelName: 'geminiPro' | 'gemini15Pro' | string;
   systemPrompt?: string;
   temperature?: number;
-  topK?: number;
-  topP?: number;
-  maxOutputTokens?: number;
+  // topK, topP, maxOutputTokens will be added here by subtask
   stopSequences?: string[];
   agentToolsDetails?: ToolDetail[];
   // Added for RAG
   ragMemoryConfig?: RagMemoryConfig;
   knowledgeSources?: KnowledgeSource[];
+  // New fields from subtask
+  topP?: number;
+  topK?: number;
+  maxOutputTokens?: number;
+  forceToolUsage?: boolean;
 }
 
 // Zod validation schemas
@@ -147,12 +151,15 @@ const ChatFlowParamsSchema = z.object({
   modelName: z.string(),
   systemPrompt: z.string().optional(),
   temperature: z.number().optional(),
-  topK: z.number().optional(),
-  topP: z.number().optional(),
-  maxOutputTokens: z.number().optional(),
+  // topK, topP, maxOutputTokens will be added here by subtask for Zod
   stopSequences: z.array(z.string()).optional(),
   agentToolsDetails: z.array(ToolDetailSchema).optional(),
   // Added for RAG - Zod types for these would ideally come from agent-configs-new.ts if they exist
+  // New fields for Zod schema
+  topP: z.number().min(0).max(1).optional(),
+  topK: z.number().int().min(1).optional(),
+  maxOutputTokens: z.number().int().min(1).optional(),
+  forceToolUsage: z.boolean().optional(),
   // For now, using z.any() as a placeholder if specific Zod schemas are not readily available.
   // It's better to define these properly if possible.
   ragMemoryConfig: z.any().optional(), // Placeholder: Replace with RagMemoryConfigSchema if available
@@ -165,6 +172,10 @@ const ChatFlowParamsSchema = z.object({
 export interface BasicChatInput extends ChatFlowParams {
   agentId?: string; // Optional agentId for logging/context
   userMessage: string;
+  callbacks?: Record<string, string>; // Added for callback configuration
+  // New fields should be implicitly part of BasicChatInput if it extends ChatFlowParams
+  // If BasicChatInput is a distinct type definition that duplicates fields, it would need them too.
+  // Assuming BasicChatInput directly uses/extends ChatFlowParams, so no explicit additions here.
 }
 
 /**
@@ -202,13 +213,35 @@ async function basicChatFlowInternal(
 ): Promise<BasicChatOutput> {
   const flowName = 'basicChatFlowInternal'; // For logging context
   const agentId = input.agentId || 'unknown_agent'; // For logging context
+  const callbacks = input.callbacks || {}; // Extract callbacks
+
+  const selectedModelDetails = llmModels.find(m => m.id === input.modelName);
+  winstonLogger.info(`Chat Flow: Model selected - Name: ${selectedModelDetails?.name}, ID: ${input.modelName}, Tools Capability: ${selectedModelDetails?.capabilities?.tools}`, { agentId, flowName });
+
+  // Helper function to get callback configuration
+  const getCallbackConfig = (callbackName: 'beforeModel' | 'afterModel' | 'beforeTool' | 'afterTool') => {
+    const logic = callbacks[`${callbackName}Logic`];
+    const enabled = callbacks[`${callbackName}Enabled`] === 'true';
+    if (enabled && logic) {
+      winstonLogger.info(`[CallbackSim] ${callbackName} callback is enabled with logic: "${logic}"`, { agentId, flowName });
+    } else if (enabled && !logic) {
+      winstonLogger.info(`[CallbackSim] ${callbackName} callback is enabled but no logic is defined.`, { agentId, flowName });
+    }
+    return { logic, enabled };
+  };
+
   const chatEvents: Partial<{
     id: string;
     timestamp: Date;
-    eventType: 'TOOL_CALL_PENDING' | 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL';
+    eventType: 'TOOL_CALL_PENDING' | 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL' | 'CALLBACK_SIMULATION'; // Added CALLBACK_SIMULATION
     eventTitle: string;
     eventDetails?: string;
     toolName?: string;
+    // For CALLBACK_SIMULATION, we might add specific fields like:
+    callbackType?: 'beforeModel' | 'afterModel' | 'beforeTool' | 'afterTool';
+    callbackAction?: string; // e.g., 'BLOCKED', 'MODIFIED', 'LOGGED'
+    originalData?: string;
+    modifiedData?: string;
   }>[] = [];
 
   try {
@@ -254,6 +287,83 @@ async function basicChatFlowInternal(
     const userMessageText = retrievedContextForLLM ? `${retrievedContextForLLM}${input.userMessage}` : input.userMessage;
     const userMessageContent: Part[] = [{ text: userMessageText }];
 
+    // Simulate beforeModel callback
+    const { logic: beforeModelLogic, enabled: beforeModelEnabled } = getCallbackConfig('beforeModel');
+    if (beforeModelEnabled && beforeModelLogic) {
+      winstonLogger.info(`[CallbackSim] Processing beforeModel: "${beforeModelLogic}"`, { agentId, flowName });
+      if (beforeModelLogic === "BLOCK_IF_PROMPT_CONTAINS_XYZ") {
+        // Check combined messages for "XYZ"
+        let combinedPromptText = "";
+        messages.forEach(msg => msg.content.forEach(part => { if (part.text) combinedPromptText += part.text + " ";}));
+        combinedPromptText += userMessageText; // Include current user message
+
+        if (combinedPromptText.toUpperCase().includes("XYZ")) {
+          winstonLogger.warn(`[CallbackSim] Executing beforeModel: BLOCK_IF_PROMPT_CONTAINS_XYZ. Blocking request.`, { agentId, flowName });
+          chatEvents.push({
+            id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+            callbackType: 'beforeModel', callbackAction: 'BLOCKED',
+            eventTitle: `BeforeModel: ${beforeModelLogic}`,
+            eventDetails: `Request blocked because prompt contained "XYZ". Original combined prompt (part): "${combinedPromptText.substring(0, 100)}..."`
+          });
+          return {
+            error: 'Blocked by beforeModel XYZ policy. Request not sent to LLM.',
+            chatEvents,
+            retrievedContextForDisplay
+          };
+        }
+        winstonLogger.info(`[CallbackSim] beforeModel: BLOCK_IF_PROMPT_CONTAINS_XYZ did not find "XYZ". Proceeding.`, { agentId, flowName });
+        // Event for just processing, if not blocked (optional, can be verbose)
+        chatEvents.push({
+          id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+          callbackType: 'beforeModel', callbackAction: 'PASSED_CHECK',
+          eventTitle: `BeforeModel: ${beforeModelLogic}`,
+          eventDetails: `Prompt did not contain "XYZ". Proceeding.`
+        });
+      } else if (beforeModelLogic === "ADD_SUFFIX_ABC_TO_PROMPT") {
+        // Modify the last user message part for simplicity, or create a new system message
+        // For this simulation, let's assume we append to the user's message text directly before it's added to messages array.
+        // Since userMessageText is already constructed, we modify it here.
+        // This means the userMessageContent will need to be reconstructed if it was already made.
+        const suffix = " ABC_SUFFIX";
+        const originalUserMessageForEvent = userMessageText; // Capture before modification for event
+        // input.userMessage += suffix; // This was modifying the input object, which might be unexpected side effect for caller
+                                     // Instead, we are modifying userMessageContent which is local to this flow execution.
+
+        let newTextForUserMessageContent = "";
+        let textPartFoundAndModified = false;
+        for (let i = 0; i < userMessageContent.length; i++) {
+          if (userMessageContent[i].text) {
+            newTextForUserMessageContent = (userMessageContent[i].text || "") + suffix;
+            userMessageContent[i].text = newTextForUserMessageContent;
+            textPartFoundAndModified = true;
+            break;
+          }
+        }
+        if (!textPartFoundAndModified) { // If no text part, add one
+            newTextForUserMessageContent = suffix;
+            userMessageContent.push({text: newTextForUserMessageContent});
+        }
+
+        winstonLogger.info(`[CallbackSim] Executing beforeModel: ADD_SUFFIX_ABC_TO_PROMPT. Prompt modified.`, { agentId, flowName });
+        chatEvents.push({
+          id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+          callbackType: 'beforeModel', callbackAction: 'MODIFIED',
+          eventTitle: `BeforeModel: ${beforeModelLogic}`,
+          eventDetails: `Prompt (user message part) modified. Suffix "${suffix}" added.`,
+          originalData: `Original User Message (part for LLM): "${originalUserMessageForEvent.substring(0,100)}..."`,
+          modifiedData: `Modified User Message (part for LLM): "${newTextForUserMessageContent.substring(0,100)}..."`
+        });
+      } else {
+        winstonLogger.info(`[CallbackSim] beforeModel logic "${beforeModelLogic}" is enabled but not a recognized simulation.`, { agentId, flowName });
+        chatEvents.push({
+          id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+          callbackType: 'beforeModel', callbackAction: 'UNRECOGNIZED_LOGIC',
+          eventTitle: `BeforeModel: ${beforeModelLogic}`,
+          eventDetails: `Logic "${beforeModelLogic}" enabled but not a recognized simulation.`
+        });
+      }
+    }
+
     if (input.fileDataUri) {
       userMessageContent.push({
         media: {
@@ -282,9 +392,10 @@ async function basicChatFlowInternal(
       messages: messages,
       config: {
         temperature: input.temperature,
-        topK: input.topK,
-        topP: input.topP,
-        maxOutputTokens: input.maxOutputTokens,
+        // Pass new params if they exist
+        ...(input.topP !== undefined && { topP: input.topP }),
+        ...(input.topK !== undefined && { topK: input.topK }),
+        ...(input.maxOutputTokens !== undefined && { maxOutputTokens: input.maxOutputTokens }),
         stopSequences: input.stopSequences
       },
       tools: genkitTools.length > 0 ? genkitTools.map(tool => ({
@@ -296,27 +407,36 @@ async function basicChatFlowInternal(
       })) : undefined, // Only pass tools if there are any
     };
     // Loop for handling tool requests and responses
-    let finalOutputText = '';
+    let finalOutputText = ''; // Will store accumulated text from LLM
     let executedToolRequests: ChatToolRequest[] = [];
     let executedToolResults: ToolExecutionResult[] = []; // Updated type
     let currentMessages = [...messages]; // Start with the initial set of messages
 
     const MAX_TOOL_ITERATIONS = 5; // Prevent infinite loops
 
-    // Guardrail: Before Model Callback Simulation
-    let fullPromptTextForGuardrail = "";
-    currentMessages.forEach(msg => {
+    // Guardrail: Before Model Callback Simulation (Existing)
+    // This should ideally run on the potentially modified prompt by the simulated callback.
+    // For now, placing the new callback simulation before this guardrail.
+    // The `currentMessages` used by the guardrail will include modifications if any.
+    let fullPromptTextForGuardrailCheck = "";
+    // Rebuild `currentMessages` to include the user message with potential modifications
+    const tempMessagesForGuardrail = [...messages]; // Start with system and history
+    tempMessagesForGuardrail.push({ role: 'user', content: userMessageContent }); // Add potentially modified user message
+
+    tempMessagesForGuardrail.forEach(msg => {
       msg.content.forEach(part => {
         if (part.text) {
-          fullPromptTextForGuardrail += part.text.toLowerCase() + " ";
+          fullPromptTextForGuardrailCheck += part.text.toLowerCase() + " ";
         }
       });
     });
 
     for (const keyword of SENSITIVE_KEYWORDS) {
-      if (fullPromptTextForGuardrail.includes(keyword.toLowerCase())) {
+      if (fullPromptTextForGuardrailCheck.includes(keyword.toLowerCase())) {
         const errorMessage = `Guardrail ativado: Prompt bloqueado devido a conteúdo potencialmente sensível (palavra-chave: "${keyword}").`;
         winstonLogger.warn(`Guardrail (Model Prompt) triggered for Agent ${agentId}: ${errorMessage}`);
+        // Ensure chatEvents is defined here if this is the first push
+        // const chatEventsForGuardrail = chatEvents || [];
         chatEvents.push({
           id: `evt-${Date.now()}-guardrail-prompt`,
           timestamp: new Date(),
@@ -329,64 +449,248 @@ async function basicChatFlowInternal(
     }
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      // Ensure currentMessages for ai.generate() includes the latest user message (potentially modified)
+      // and any tool responses from previous iterations.
+      // If it's the first iteration, currentMessages should be system + history + user.
+      // If it's a subsequent iteration, it's system + history + user + tool_responses...
+      let messagesForThisIteration = [];
+      if (iteration === 0) {
+        messagesForThisIteration = [...messages, { role: 'user', content: userMessageContent }];
+      } else {
+        messagesForThisIteration = [...currentMessages]; // currentMessages would have been updated with tool responses
+      }
+
       const llmResponse = await ai.generate({
         ...request,
-        messages: currentMessages, // Use updated messages in each iteration
+        messages: messagesForThisIteration,
       });
 
       const choice = llmResponse.candidates[0];
       if (!choice || !choice.message || !choice.message.content) {
-        // No response or empty content, break or handle as error
-        finalOutputText = choice?.finishReason === 'stop' ? finalOutputText : 'No response from model.';
+        finalOutputText = (choice?.finishReason === 'stop' && finalOutputText) ? finalOutputText : 'No response or empty content from model.';
         break;
       }
 
+      // Clear finalOutputText at the beginning of processing a new LLM response in the loop,
+      // unless we intend to accumulate text across multiple LLM calls that don't involve tools (which is not typical for this loop structure).
+      // For this loop, each `ai.generate` is either a direct reply or a tool request.
+      // If it's a direct reply (finishReason === 'stop'), finalOutputText will be built here.
+      // If it's a tool request, finalOutputText from this iteration might be partial or empty.
+      // The current accumulation `finalOutputText += part.text` assumes that text and tool requests can be interleaved.
+      // Let's refine: only accumulate if it's the last iteration or no tool requests.
+
       const contentParts = choice.message.content;
-      let hasToolRequest = false;
+      let hasToolRequestInThisResponse = false;
+      let textFromThisResponse = "";
+      let toolRequestsFromCurrentLLMResponse: ToolRequest[] = [];
 
       for (const part of contentParts) {
         if (part.text) {
-          finalOutputText += part.text; // Accumulate text parts
+          textFromThisResponse += part.text;
         }
         if (part.toolRequest) {
-          hasToolRequest = true;
-          executedToolRequests.push(part.toolRequest); // Store for output
-          // The actual tool execution will happen outside this loop based on these requests
-          // For simplicity in this example, we'll assume Genkit's `generate` handles the tool execution
-          // if the tool is defined and its `func` is called by Genkit internally.
-          // If Genkit `generate` doesn't auto-execute and just returns requests,
-          // then explicit tool execution logic would be needed here.
-          // However, standard Genkit flow with tools in `generateOptions` implies Genkit handles this.
+          hasToolRequestInThisResponse = true;
+          toolRequestsFromCurrentLLMResponse.push(part.toolRequest);
+          // executedToolRequests.push(part.toolRequest); // Store all attempts, will be pushed later if not overridden
         }
       }
 
-      if (!hasToolRequest || choice.finishReason === 'stop') {
-        // If no tool requests in this response, or if LLM decided to stop, then we are done.
-        break; 
+      // SIMULATION: Tool Usage Failure
+      if (hasToolRequestInThisResponse && selectedModelDetails?.capabilities?.tools === false) {
+        winstonLogger.warn(`[Simulation] Model ${selectedModelDetails.name} attempted to use tools but is not capable. Simulating tool usage failure.`, { agentId, flowName });
+        const originalToolNames = toolRequestsFromCurrentLLMResponse.map(tr => tr.name).join(', ');
+        finalOutputText = `This model (${selectedModelDetails.name}) attempted to use a tool(s) (${originalToolNames}) but is not configured to do so.`;
+
+        toolRequestsFromCurrentLLMResponse.forEach(tr => {
+          executedToolResults.push({
+            name: tr.name,
+            input: tr.input as Record<string, unknown>,
+            errorDetails: { message: `Simulated: Model ${selectedModelDetails.name} cannot use tools.`, code: 'SIMULATED_TOOL_CAPABILITY_FAILURE' },
+            status: 'error',
+            ref: tr.ref,
+          });
+        });
+
+        chatEvents.push({
+          id: `evt-sim-${Date.now()}`, timestamp: new Date(), eventType: 'TOOL_ERROR', // Or a custom eventType
+          eventTitle: `Simulated Tool Failure: ${selectedModelDetails.name}`,
+          eventDetails: `Model attempted to use tool(s) '${originalToolNames}' but capabilities.tools is false.`,
+          toolName: originalToolNames
+        });
+
+        hasToolRequestInThisResponse = false; // Prevent actual tool execution
+        toolRequestsFromCurrentLLMResponse = []; // Clear requests
+        // choice.finishReason = 'stop'; // Force stop after this simulation
+        // The loop should break naturally now as hasToolRequestInThisResponse is false and no new tool responses will be added
+        // finalOutputText is set, so it will be returned.
+        // We need to ensure that the main loop breaks correctly.
+        // If textFromThisResponse was also part of the LLM's message, it might be lost if we just set finalOutputText.
+        // For this simulation, we are replacing any text output with the error message.
+        if (choice.finishReason !== 'stop') choice.finishReason = 'stop'; // Ensure loop termination
+      }
+
+      // Push successful tool requests to executedToolRequests if not overridden by simulation
+      if (toolRequestsFromCurrentLLMResponse.length > 0) {
+        executedToolRequests.push(...toolRequestsFromCurrentLLMResponse);
+      }
+
+      // SIMULATION: Force Tool Usage
+      if (
+        input.forceToolUsage === true &&
+        selectedModelDetails?.capabilities?.tools === true &&
+        genkitTools.length > 0 &&
+        toolRequestsFromCurrentLLMResponse.length === 0 && // Only if LLM didn't already request a tool
+        choice.finishReason !== 'stop' // And if the LLM doesn't want to stop yet
+      ) {
+        const firstTool = genkitTools[0]; // Pick the first available tool
+        let fabricatedInput: any = {};
+
+        // Try to make a somewhat relevant input based on tool's inputSchema or name
+        if (firstTool.inputSchema && firstTool.inputSchema.isZod) { // Check if Zod schema
+            const schemaShape = (firstTool.inputSchema as z.ZodObject<any,any,any>).shape;
+            if (schemaShape) {
+                Object.keys(schemaShape).forEach(key => {
+                    // A very basic attempt to populate based on common query/text fields
+                    if (key.toLowerCase().includes('query') || key.toLowerCase().includes('text') || key.toLowerCase().includes('message')) {
+                        fabricatedInput[key] = input.userMessage.substring(0, 50); // Use part of user message
+                    } else if (key.toLowerCase().includes('num')) { // For calculator like tools
+                        fabricatedInput[key] = Math.floor(Math.random() * 10) + 1;
+                    } else {
+                         fabricatedInput[key] = "simulated_value"; // Default placeholder
+                    }
+                });
+            } else {
+                 fabricatedInput = { query: input.userMessage.substring(0,50) }; // Fallback input
+            }
+        } else if (firstTool.name.toLowerCase().includes('search') || firstTool.name.toLowerCase().includes('query')) {
+          fabricatedInput = { query: input.userMessage.substring(0,50) };
+        } else {
+          fabricatedInput = { text: "Forced tool execution with default input" };
+        }
+
+        const fabricatedToolRequest: ToolRequest = {
+          name: firstTool.name,
+          input: fabricatedInput,
+          ref: `sim_force_${Date.now()}` // Unique ref for simulated request
+        };
+
+        winstonLogger.info(`[Simulation] Forcing tool usage. Fabricated request for tool: ${firstTool.name} with input: ${JSON.stringify(fabricatedInput)}`, { agentId, flowName });
+        toolRequestsFromCurrentLLMResponse.push(fabricatedToolRequest);
+        executedToolRequests.push(fabricatedToolRequest); // Also add to overall executed requests
+        hasToolRequestInThisResponse = true; // Ensure the tool execution loop runs
+
+        chatEvents.push({
+          id: `evt-sim-force-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL', // Or a custom eventType
+          eventTitle: `Simulated Force Tool Usage`,
+          eventDetails: `Agent forced to use tool: ${firstTool.name} with input ${JSON.stringify(fabricatedInput)}.`,
+          toolName: firstTool.name
+        });
+        // Do not append textFromThisResponse to finalOutputText yet, as we are now processing a tool.
+        // textFromThisResponse might be an LLM refusal that we are overriding.
+        textFromThisResponse = ""; // Clear any text from LLM as we are forcing a tool.
+      }
+
+
+      if (!hasToolRequestInThisResponse || choice.finishReason === 'stop') {
+        // If no tool requests in this response (either originally or due to simulation),
+        // or if LLM decided to stop, then we are done.
+        finalOutputText += textFromThisResponse; // Append any text from this response (could be empty if tool was forced)
+        break;
       }
 
       // If there were tool requests, Genkit's `generate` (when tools are provided)
       // should ideally return tool responses if it executed them.
       // If `generate` only returns requests, we'd need to simulate or call tools here.
-      // For this example, we'll assume `generate` returns responses if tools were called.
-      // Let's check if the response contains tool_response parts (this part is tricky as Genkit might handle it)
+      // For this example, we'll assume `generate` returns responses if tools were called. (This assumption is being worked through)
 
-      // This part needs to align with how Genkit actually processes tools.
-      // If Genkit's `generate` with `tools` parameter automatically handles the execution and
-      // provides `tool_response` parts in a subsequent call or within the same response,
-      // this loop structure might need adjustment.
+      // Logic for handling tool responses and continuing the loop:
+      // Add the LLM's message (that might contain tool_request) to currentMessages
+      currentMessages = [...messagesForThisIteration, choice.message];
 
-      // Let's assume for now that if `toolRequest` was present, we need to construct `tool_response` parts
-      // and send them back to the LLM in the next iteration.
-      // This requires actually calling the tools.
 
-      const toolResponseParts: ToolResponsePart[] = [];
-      // Process only new tool requests from the current LLM response
-      const newToolRequests = choice.message.content.filter((p: Part) => p.toolRequest).map(p => p.toolRequest as ToolRequest);
+      if (!hasToolRequestInThisResponse) {
+        finalOutputText = textFromThisResponse; // This is the final text response from LLM
 
-      for (const toolRequest of newToolRequests) {
+        // Simulate afterModel callback
+        const { logic: afterModelLogic, enabled: afterModelEnabled } = getCallbackConfig('afterModel');
+        if (afterModelEnabled && afterModelLogic && finalOutputText) { // finalOutputText here is the complete model response if no tools were called
+          winstonLogger.info(`[CallbackSim] Processing afterModel: "${afterModelLogic}" on final LLM response.`, { agentId, flowName });
+          const originalResponseForEvent = finalOutputText;
+          let actionDescription = `Logic "${afterModelLogic}" processed.`;
+          let eventAction: string = 'PROCESSED';
+
+          if (afterModelLogic === "REPLACE_BAD_WORD_WITH_GOOD_WORD") {
+            finalOutputText = finalOutputText.replace(/bad/gi, 'good');
+            if (originalResponseForEvent !== finalOutputText) {
+              winstonLogger.info(`[CallbackSim] Executing afterModel: REPLACE_BAD_WORD_WITH_GOOD_WORD. Response modified.`, { agentId, flowName });
+              actionDescription = `Replaced "bad" with "good" in response.`;
+              eventAction = 'MODIFIED';
+            } else {
+              actionDescription = `No "bad" words found to replace.`;
+              eventAction = 'NO_CHANGE';
+            }
+          } else if (afterModelLogic === "LOG_MODEL_RESPONSE") {
+            winstonLogger.info(`[CallbackSim] Executing afterModel: LOG_MODEL_RESPONSE. Final Response: ${finalOutputText}`, { agentId, flowName });
+            actionDescription = `Logged final model response.`;
+            eventAction = 'LOGGED';
+          } else {
+            winstonLogger.info(`[CallbackSim] afterModel logic "${afterModelLogic}" is enabled but not a recognized simulation.`, { agentId, flowName });
+            actionDescription = `Logic "${afterModelLogic}" is enabled but not a recognized simulation.`;
+            eventAction = 'UNRECOGNIZED_LOGIC';
+          }
+          chatEvents.push({
+            id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+            callbackType: 'afterModel', callbackAction: eventAction,
+            eventTitle: `AfterModel: ${afterModelLogic}`, eventDetails: actionDescription,
+            originalData: eventAction === 'MODIFIED' ? `Original: "${originalResponseForEvent.substring(0,100)}..."` : undefined,
+            modifiedData: eventAction === 'MODIFIED' ? `Modified: "${finalOutputText.substring(0,100)}..."` : undefined,
+          });
+        }
+        break; // No tool requests, so we are done with the loop.
+      } else { // Branch where tool requests are present
+        let potentiallyModifiedTextFromThisResponse = textFromThisResponse;
+        const { logic: afterModelLogic, enabled: afterModelEnabled } = getCallbackConfig('afterModel');
+        if (afterModelEnabled && afterModelLogic && potentiallyModifiedTextFromThisResponse) {
+          winstonLogger.info(`[CallbackSim] Processing afterModel: "${afterModelLogic}" on partial LLM response text.`, { agentId, flowName });
+          const originalPartialResponseForEvent = potentiallyModifiedTextFromThisResponse;
+          let actionDescription = `Logic "${afterModelLogic}" processed on partial text.`;
+          let eventAction: string = 'PROCESSED_PARTIAL';
+
+          if (afterModelLogic === "REPLACE_BAD_WORD_WITH_GOOD_WORD") {
+            potentiallyModifiedTextFromThisResponse = potentiallyModifiedTextFromThisResponse.replace(/bad/gi, 'good');
+            if (originalPartialResponseForEvent !== potentiallyModifiedTextFromThisResponse) {
+              winstonLogger.info(`[CallbackSim] Executing afterModel: REPLACE_BAD_WORD_WITH_GOOD_WORD. Partial response text modified.`, { agentId, flowName });
+              actionDescription = `Replaced "bad" with "good" in partial response text.`;
+              eventAction = 'MODIFIED_PARTIAL';
+            } else {
+              actionDescription = `No "bad" words found to replace in partial text.`;
+              eventAction = 'NO_CHANGE_PARTIAL';
+            }
+          } else if (afterModelLogic === "LOG_MODEL_RESPONSE") {
+            winstonLogger.info(`[CallbackSim] Executing afterModel: LOG_MODEL_RESPONSE. Partial Response text: ${potentiallyModifiedTextFromThisResponse}`, { agentId, flowName });
+            actionDescription = `Logged partial model response text.`;
+            eventAction = 'LOGGED_PARTIAL';
+          } else {
+            winstonLogger.info(`[CallbackSim] afterModel logic "${afterModelLogic}" (on partial text) is enabled but not a recognized simulation.`, { agentId, flowName });
+            actionDescription = `Logic "${afterModelLogic}" on partial text is enabled but not a recognized simulation.`;
+            eventAction = 'UNRECOGNIZED_LOGIC_PARTIAL';
+          }
+          chatEvents.push({
+            id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+            callbackType: 'afterModel', callbackAction: eventAction,
+            eventTitle: `AfterModel (Partial): ${afterModelLogic}`, eventDetails: actionDescription,
+            originalData: eventAction === 'MODIFIED_PARTIAL' ? `Original: "${originalPartialResponseForEvent.substring(0,100)}..."` : undefined,
+            modifiedData: eventAction === 'MODIFIED_PARTIAL' ? `Modified: "${potentiallyModifiedTextFromThisResponse.substring(0,100)}..."` : undefined,
+          });
+        }
+        finalOutputText += potentiallyModifiedTextFromThisResponse; // Accumulate (potentially modified) partial text
+      }
+
+      const toolResponsePartsForNextIteration: ToolResponsePart[] = [];
+      // Use toolRequestsFromCurrentLLMResponse which might have been cleared by simulation
+      for (const toolRequest of toolRequestsFromCurrentLLMResponse) {
         let toolExecutionFailed = false;
-        let resultOutput: any; // Can be success output or error information for the LLM
+        let resultOutput: any;
         let errorMessage: string | undefined;
 
         // Create TOOL_CALL_PENDING event
@@ -401,6 +705,69 @@ async function basicChatFlowInternal(
         });
 
         try {
+          // Simulate beforeTool callback
+          const { logic: beforeToolLogic, enabled: beforeToolEnabled } = getCallbackConfig('beforeTool');
+          let modifiedToolInput = toolRequest.input; // Start with original input
+
+          if (beforeToolEnabled && beforeToolLogic) {
+            winstonLogger.info(`[CallbackSim] Processing beforeTool for "${toolRequest.name}": "${beforeToolLogic}"`, { agentId, flowName });
+            if (beforeToolLogic.startsWith("BLOCK_TOOL_") && toolRequest.name.toUpperCase() === beforeToolLogic.substring("BLOCK_TOOL_".length).toUpperCase()) {
+              winstonLogger.warn(`[CallbackSim] Executing beforeTool: ${beforeToolLogic}. Blocking tool ${toolRequest.name}.`, { agentId, flowName });
+              toolExecutionFailed = true;
+              errorMessage = `Execution of tool ${toolRequest.name} blocked by beforeTool callback.`;
+              resultOutput = { error: errorMessage, code: 'CALLBACK_BLOCKED_TOOL_EXECUTION' };
+              chatEvents.push({
+                id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                toolName: toolRequest.name, callbackType: 'beforeTool', callbackAction: 'BLOCKED',
+                eventTitle: `BeforeTool: ${beforeToolLogic} for ${toolRequest.name}`,
+                eventDetails: `Tool execution blocked. Input: ${JSON.stringify(modifiedToolInput).substring(0,100)}...`
+              });
+            } else if (beforeToolLogic === "ADD_TOOL_INPUT_PREFIX") {
+              const originalInputForEvent = JSON.stringify(modifiedToolInput);
+              if (typeof modifiedToolInput === 'object' && modifiedToolInput !== null) {
+                const prefix = "simulatedPrefix_";
+                const newModifiedInput: Record<string, any> = {};
+                Object.keys(modifiedToolInput).forEach(key => { // Iterate only over own properties
+                    newModifiedInput[key] = prefix + (modifiedToolInput as Record<string,any>)[key];
+                });
+                modifiedToolInput = newModifiedInput;
+                winstonLogger.info(`[CallbackSim] Executing beforeTool: ADD_TOOL_INPUT_PREFIX for "${toolRequest.name}". Input modified.`, { agentId, flowName });
+                chatEvents.push({
+                  id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                  toolName: toolRequest.name, callbackType: 'beforeTool', callbackAction: 'MODIFIED',
+                  eventTitle: `BeforeTool: ${beforeToolLogic} for ${toolRequest.name}`,
+                  eventDetails: `Tool input modified with prefix "${prefix}".`,
+                  originalData: `Original input: ${originalInputForEvent.substring(0,100)}...`,
+                  modifiedData: `Modified input: ${JSON.stringify(modifiedToolInput).substring(0,100)}...`
+                });
+              } else {
+                winstonLogger.warn(`[CallbackSim] beforeTool: ADD_TOOL_INPUT_PREFIX for "${toolRequest.name}" - input is not an object, skipping modification.`, { agentId, flowName });
+                 chatEvents.push({
+                  id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                  toolName: toolRequest.name, callbackType: 'beforeTool', callbackAction: 'NO_CHANGE',
+                  eventTitle: `BeforeTool: ${beforeToolLogic} for ${toolRequest.name}`,
+                  eventDetails: `Input was not an object, skipping modification.`
+                });
+              }
+            } else {
+              winstonLogger.info(`[CallbackSim] beforeTool logic "${beforeToolLogic}" for tool "${toolRequest.name}" is enabled but not a recognized simulation.`, { agentId, flowName });
+              chatEvents.push({
+                id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                toolName: toolRequest.name, callbackType: 'beforeTool', callbackAction: 'UNRECOGNIZED_LOGIC',
+                eventTitle: `BeforeTool: ${beforeToolLogic} for ${toolRequest.name}`,
+                eventDetails: `Logic "${beforeToolLogic}" for tool "${toolRequest.name}" is enabled but not a recognized simulation.`
+              });
+            }
+          }
+
+          if (toolExecutionFailed) { // If callback blocked execution
+            executedToolResults.push({ name: toolRequest.name, input: modifiedToolInput as Record<string, unknown>, errorDetails: { message: errorMessage!, code: (resultOutput as any).code }, status: 'error', ref: toolRequest.ref });
+            // The chatEvent for TOOL_ERROR is pushed below, but we could add a specific one here if the structure for TOOL_ERROR is not sufficient
+            // For now, relying on the existing TOOL_ERROR event push for callback-blocked tools.
+            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
+            continue; // Skip to next toolRequest
+          }
+
           const toolToRun = genkitTools.find(t => t.name === toolRequest.name) as AppTool | undefined;
 
           if (!toolToRun) {
@@ -477,8 +844,8 @@ async function basicChatFlowInternal(
             continue;
           }
 
-          // Guardrail: Before Tool Callback Simulation
-          const stringifiedToolInput = JSON.stringify(toolRequest.input).toLowerCase();
+          // Guardrail: Before Tool Callback Simulation (Existing) - runs on potentially modified input
+          const stringifiedToolInput = JSON.stringify(modifiedToolInput).toLowerCase();
           let toolBlockedByGuardrail = false;
           for (const keyword of SENSITIVE_KEYWORDS) {
             if (stringifiedToolInput.includes(keyword.toLowerCase())) {
@@ -486,14 +853,14 @@ async function basicChatFlowInternal(
               errorMessage = `Guardrail ativado: Execução de ferramenta '${toolRequest.name}' bloqueada devido a parâmetros potencialmente sensíveis (palavra-chave: "${keyword}").`;
               winstonLogger.warn(`Guardrail (Tool Input) triggered for Agent ${agentId}, Tool ${toolRequest.name}: ${errorMessage}`);
               resultOutput = { error: errorMessage, code: 'GUARDRAIL_TOOL_BLOCKED' };
-              executedToolResults.push({
+              executedToolResults.push({ // Log the outcome
                 name: toolRequest.name,
-                input: toolRequest.input as Record<string, unknown>,
+                input: modifiedToolInput as Record<string, unknown>, // Log modified input
                 errorDetails: { message: errorMessage, code: 'GUARDRAIL_TOOL_BLOCKED' },
                 status: 'error',
                 ref: toolRequest.ref,
               });
-              chatEvents.push({
+              chatEvents.push({ // Add to chat events
                 id: `evt-${Date.now()}-guardrail-tool-${toolRequest.name}`,
                 timestamp: new Date(),
                 eventType: 'TOOL_ERROR', // Or a new specific eventType like 'TOOL_GUARDRAIL_BLOCKED'
@@ -511,10 +878,52 @@ async function basicChatFlowInternal(
             continue; // Skip to the next tool request
           }
 
-          // Execute the tool function
-          const toolRawOutput = await toolToRun.func(validatedInput);
+          // Execute the tool function with potentially modified input
+          const toolRawOutput = await toolToRun.func(validatedInput); // validatedInput already incorporates modifiedToolInput if schema validation passed
 
-          if (toolRawOutput && typeof toolRawOutput === 'object' && 'errorDetails' in toolRawOutput && toolRawOutput.errorDetails) {
+          // Simulate afterTool callback
+          let finalToolOutput = toolRawOutput;
+          const { logic: afterToolLogic, enabled: afterToolEnabled } = getCallbackConfig('afterTool');
+          if (afterToolEnabled && afterToolLogic && !toolExecutionFailed) { // Check !toolExecutionFailed again, although guardrail should prevent this point
+            winstonLogger.info(`[CallbackSim] Processing afterTool for "${toolRequest.name}": "${afterToolLogic}"`, { agentId, flowName });
+            if (afterToolLogic === "REPLACE_TOOL_OUTPUT_BAD_WITH_GOOD" && typeof finalToolOutput === 'string') {
+              const originalToolOutputForEvent = finalToolOutput;
+              finalToolOutput = finalToolOutput.replace(/bad/gi, 'good');
+              if (originalToolOutputForEvent !== finalToolOutput) {
+                winstonLogger.info(`[CallbackSim] Executing afterTool: REPLACE_TOOL_OUTPUT_BAD_WITH_GOOD for "${toolRequest.name}". Output modified.`, { agentId, flowName });
+                chatEvents.push({
+                  id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                  toolName: toolRequest.name, callbackType: 'afterTool', callbackAction: 'MODIFIED',
+                  eventTitle: `AfterTool: ${afterToolLogic} for ${toolRequest.name}`, eventDetails: `Tool output modified.`,
+                  originalData: `Original: "${originalToolOutputForEvent.substring(0,100)}..."`, modifiedData: `Modified: "${finalToolOutput.substring(0,100)}..."`
+                });
+              } else {
+                 chatEvents.push({
+                  id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                  toolName: toolRequest.name, callbackType: 'afterTool', callbackAction: 'NO_CHANGE',
+                  eventTitle: `AfterTool: ${afterToolLogic} for ${toolRequest.name}`, eventDetails: `No "bad" words found to replace in tool output.`
+                });
+              }
+            } else if (afterToolLogic === "LOG_TOOL_OUTPUT") {
+              winstonLogger.info(`[CallbackSim] Executing afterTool: LOG_TOOL_OUTPUT for "${toolRequest.name}". Output: ${JSON.stringify(finalToolOutput)}`, { agentId, flowName });
+              chatEvents.push({
+                id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                toolName: toolRequest.name, callbackType: 'afterTool', callbackAction: 'LOGGED',
+                eventTitle: `AfterTool: ${afterToolLogic} for ${toolRequest.name}`, eventDetails: `Logged tool output: ${JSON.stringify(finalToolOutput).substring(0,100)}...`
+              });
+            } else {
+              winstonLogger.info(`[CallbackSim] afterTool logic "${afterToolLogic}" for tool "${toolRequest.name}" is enabled but not a recognized simulation.`, { agentId, flowName });
+              chatEvents.push({
+                id: `evt-cb-${Date.now()}`, timestamp: new Date(), eventType: 'CALLBACK_SIMULATION',
+                toolName: toolRequest.name, callbackType: 'afterTool', callbackAction: 'UNRECOGNIZED_LOGIC',
+                eventTitle: `AfterTool: ${afterToolLogic} for ${toolRequest.name}`,
+                eventDetails: `Logic "${afterToolLogic}" for tool "${toolRequest.name}" is enabled but not a recognized simulation.`
+              });
+            }
+          }
+
+          // Process tool output (potentially modified by afterTool callback)
+          if (finalToolOutput && typeof finalToolOutput === 'object' && 'errorDetails' in finalToolOutput && (finalToolOutput as any).errorDetails) {
             toolExecutionFailed = true;
             const toolErrorDetails = toolRawOutput.errorDetails as ErrorDetails;
             errorMessage = toolErrorDetails.message;
@@ -596,23 +1005,59 @@ async function basicChatFlowInternal(
             // If 'part.output' is an error, it should be represented in a way the LLM can understand.
             // For now, we assume JSON.stringify will handle it, but this might need refinement
             // based on how the LLM expects tool error messages.
-            return {
-              text: JSON.stringify({ // This structure might need to align with Genkit's expected ToolResponse format if not using `Part.toolResponse`
-                name: part.toolRequest.name,
-                output: part.output, // This could be a success result or an error message/object
-                ref: part.toolRequest.ref
-              }),
-              // Ideally, Genkit's ToolResponsePart should be used directly if possible,
-              // which might involve structuring 'output' as { error: string } or similar for errors.
-              // Example: content: toolResponseParts (if toolResponseParts are already ToolResponse[])
-            };
-          })
+
+          // This part constructs the message for the *next* LLM iteration.
+          // The actual `tool_response` Part should be structured correctly.
+          // Genkit expects `Part.toolResponse({ name: string, output: any, ref?: string })`
+          // Let's try to use that, assuming `resultOutput` is the raw data for `output`.
+          toolResponsePartsForNextIteration.push({
+            toolRequest: toolRequest, // Keep original request for reference if needed, though Genkit uses 'ref'
+            output: resultOutput, // This is the actual output to be sent back to the LLM
+          });
+        }
+      }
+
+      // Add tool responses to messages for the next iteration
+      if (toolResponsePartsForNextIteration.length > 0) {
+        currentMessages.push({
+          role: 'tool',
+          content: toolResponsePartsForNextIteration.map(tr => ({
+            toolResponse: { // Using Genkit's defined Part.toolResponse structure
+              name: tr.toolRequest.name,
+              ref: tr.toolRequest.ref || '', // Ensure ref is a string
+              output: tr.output,
+            }
+          }))
         });
       }
-    } // End of while loop
+    } // End of for loop (MAX_TOOL_ITERATIONS)
 
-    // const stream = llmResponse.stream ? llmResponse.stream() : null; // Stream handling would need rework with this loop
+  // const stream = llmResponse.stream ? llmResponse.stream() : null; // Stream handling would need rework with this loop, as llmResponse is from the last call
     // if (stream) { return { stream }; }
+
+    // SIMULATIONS for Concise and Creative models (affecting finalOutputText)
+    if (selectedModelDetails?.customProperties?.behavior === 'concise') {
+      const concisenessThreshold = selectedModelDetails.maxOutputTokens || 50; // Use model's maxOutputTokens or default
+      if (finalOutputText.length > concisenessThreshold) {
+        const originalLength = finalOutputText.length;
+        finalOutputText = finalOutputText.substring(0, concisenessThreshold) + "... (simulated conciseness)";
+        winstonLogger.info(`[Simulation] Concise model behavior: Output truncated from ${originalLength} to ${finalOutputText.length} chars.`, { agentId, flowName });
+        chatEvents.push({
+          id: `evt-sim-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL',
+          eventTitle: 'Simulated Conciseness',
+          eventDetails: `Output truncated to meet concise behavior. Original length: ${originalLength}. New length: ${finalOutputText.length}.`
+        });
+      }
+    } else if (selectedModelDetails?.customProperties?.behavior === 'creative') {
+      const creativeFlourish = " And that's the world in a nutshell, with a sprinkle of stardust!";
+      finalOutputText += creativeFlourish;
+      winstonLogger.info(`[Simulation] Creative model behavior: Added flourish.`, { agentId, flowName });
+      chatEvents.push({
+        id: `evt-sim-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL',
+        eventTitle: 'Simulated Creativity',
+        eventDetails: `Added creative flourish: "${creativeFlourish}"`
+      });
+    }
 
     // Simulated Safety Check on finalOutputText
     const SIMULATED_INSECURE_PHRASE = "resposta insegura simulada";
