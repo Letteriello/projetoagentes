@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Check, Settings } from "lucide-react";
+import { Check, Settings, Lock } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,21 @@ export const ToolCard: React.FC<ToolCardProps> = ({
             <Settings size={12} className="mr-1" />
             Configurar
           </Button>
+        )}
+        {tool.requiresAuth && (
+          <div className="mt-2 pt-2 border-t border-dashed flex items-center justify-between">
+            <div className="flex items-center">
+              <Lock size={14} className="mr-1 text-yellow-500" />
+              <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-600">
+                Requer Autenticação
+              </Badge>
+            </div>
+            <Link href="/api-key-vault" passHref>
+              <a className="text-xs text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                Configurar Chaves
+              </a>
+            </Link>
+          </div>
         )}
       </CardContent>
     </Card>

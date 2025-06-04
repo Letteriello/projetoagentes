@@ -26,6 +26,7 @@ export interface MessageData {
   role: string;
   content: string;
   timestamp?: Date;
+  retrievedContext?: string; // Added for RAG context display
 }
 
 // Input type for chat requests
