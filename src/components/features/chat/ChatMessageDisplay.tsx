@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from 'rehype-raw';
 import { CodeBlock } from "./CodeBlock"; // Componente para realce de sintaxe em blocos de código.
 import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensagens de chat.
 
@@ -117,6 +118,7 @@ export default function ChatMessageDisplay({
               <div className="flex-grow min-w-0"> {/* Ensure text content can shrink and wrap */}
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]} // Plugin para suporte a GitHub Flavored Markdown.
+                  rehypePlugins={[rehypeRaw]} // Added rehypeRaw
                   className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2"
                   components={{
                     // Componente customizado para renderizar blocos de código com realce de sintaxe.
