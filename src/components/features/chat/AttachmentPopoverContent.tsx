@@ -87,8 +87,8 @@ export default function AttachmentPopoverContent({
   };
 
   return (
-    <div className="p-3 bg-popover text-popover-foreground rounded-md shadow-xl border border-border w-64">
-      <div className="flex justify-between items-center mb-2">
+    <div className="p-2 bg-popover text-popover-foreground rounded-md shadow-lg border border-border/60 w-64">
+      <div className="flex justify-between items-center mb-1.5">
         <span className="text-sm font-medium truncate" title={fileName}>
           {fileName}
         </span>

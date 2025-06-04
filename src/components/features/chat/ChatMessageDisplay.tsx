@@ -50,6 +50,8 @@ const BlinkingCursor = () => (
 // Componente principal para exibir uma única mensagem de chat.
 // Responsável por renderizar o conteúdo da mensagem, incluindo texto, imagens e anexos de arquivo.
 
+import { Skeleton } from "@/components/ui/skeleton"; // Added import for Skeleton
+
 // Helper function to get the appropriate attachment icon
 const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
   // Check by fileType first
@@ -110,6 +112,7 @@ export default function ChatMessageDisplay({
 }: ChatMessageDisplayProps) {
   const isUser = message.sender === "user"; // Verifica se o remetente é o usuário.
   const isAgent = message.sender === "agent"; // Verifica se o remetente é o agente.
+  const isUploadingAttachment = message.status === 'pending' && (!!message.imageUrl || !!message.fileName);
 
   // Função para lidar com o download de arquivos anexados.
   // Cria um link temporário e simula um clique para iniciar o download.
