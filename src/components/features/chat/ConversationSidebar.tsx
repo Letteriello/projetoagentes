@@ -108,6 +108,7 @@ export function ConversationSidebar({
   onDeleteConversation,
   isOpen,
   onToggleSidebar,
+  isLoading, // Destructure isLoading from props
 }: ConversationSidebarProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -192,9 +193,15 @@ export function ConversationSidebar({
 
             {/* Conversation List */}
             <div className="flex-1 overflow-y-auto custom-scrollbar-dark -mr-2 pr-2 flex flex-col">
-              {" "}
-              {/* Negative margin for scrollbar, and flex for centering empty state */}
-              {conversations.length === 0 ? (
+              {isLoading ? (
+                <ul className="space-y-2 mt-1"> {/* Added mt-1 for spacing */}
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <li key={`skeleton-conv-${index}`} className="flex items-center w-full px-3 py-3 text-sm rounded-md bg-gray-700 animate-pulse">
+                      <div className="h-4 bg-gray-600 rounded w-3/4"></div>
+                    </li>
+                  ))}
+                </ul>
+              ) : conversations.length === 0 ? (
                 <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                   <MessageSquarePlus className="w-12 h-12 text-gray-500 mb-3" />
                   <h3 className="text-md font-semibold text-gray-300 mb-1">
@@ -253,7 +260,7 @@ export function ConversationSidebar({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onDeleteConversation(conv);
-                              }} // Pass the full conversation object
+                              }}
                               className="p-1 rounded-md hover:bg-red-500 text-gray-400 hover:text-red-100"
                               aria-label="Delete chat"
                             >

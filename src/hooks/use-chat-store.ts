@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useOptimistic } from 'react';
 import { Conversation, ChatMessageUI, Message, MessageFeedback, ToolCallData, ToolResponseData, ErrorDetails } from '@/types/chat';
-import { User } from 'firebase/auth';
+// import { User } from 'firebase/auth'; // No longer directly needed for User type here
 import { v4 as uuidv4 } from 'uuid';
 import {
   getAllConversations,
@@ -10,12 +10,13 @@ import {
   renameConversationInStorage,
   addMessageToConversation,
   updateMessageFeedback,
-  deleteMessageFromConversation, // Added for regenerate
-} from '@/lib/firestoreConversationStorage';
+  deleteMessageFromConversation,
+  // finalizeMessageInConversation, // Not used in this hook, but available from service
+} from '@/services/indexed-db-conversation-service'; // UPDATED IMPORT
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Timestamp } from 'firebase/firestore';
+// import { Timestamp } from 'firebase/firestore'; // No longer needed
 
 // Define ExtendedChatMessageUI and OptimisticUpdateAction
 export interface ExtendedChatMessageUI extends ChatMessageUI {
@@ -56,6 +57,7 @@ export interface ChatStore {
   selectedFileDataUri: string | null;
   currentUserId: string | undefined;
   inputValue: string;
+  waitingForFeedbackOnMessageId: string | null; // Added
 
   setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
   setActiveConversationId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -68,6 +70,7 @@ export interface ChatStore {
   setSelectedFileName: React.Dispatch<React.SetStateAction<string | null>>;
   setSelectedFileDataUri: React.Dispatch<React.SetStateAction<string | null>>;
   setInputValue: React.Dispatch<React.SetStateAction<string>>;
+  setWaitingForFeedbackOnMessageId: React.Dispatch<React.SetStateAction<string | null>>; // Added
 
   handleNewConversation: (defaultTitle?: string) => Promise<Conversation | null>; // Added optional param
   handleSelectConversation: (conversationId: string) => void;
@@ -95,6 +98,7 @@ export function useChatStore(): ChatStore {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState<string>("");
+  const [waitingForFeedbackOnMessageId, setWaitingForFeedbackOnMessageId] = useState<string | null>(null); // Added
   const currentUserId = currentUser?.uid;
 
   const [optimisticMessages, addOptimisticMessage] = useOptimistic<ExtendedChatMessageUI[], OptimisticUpdateAction>(
@@ -173,9 +177,9 @@ export function useChatStore(): ChatStore {
       const conversation = await getConversationById(conversationId);
       const uiMessages: ExtendedChatMessageUI[] = (conversation?.messages || []).map((dbMessage: Message) => ({
         id: dbMessage.id || uuidv4(),
-        text: dbMessage.content || "",
+        text: dbMessage.content || "", // Assuming content is string, adjust if structured
         sender: dbMessage.isUser ? "user" : "agent",
-        timestamp: dbMessage.timestamp ? (dbMessage.timestamp instanceof Date ? dbMessage.timestamp : (dbMessage.timestamp as any).toDate()) : new Date(),
+        timestamp: dbMessage.timestamp, // Already a Date object from the service
         status: 'completed',
         feedback: dbMessage.feedback,
         isStreaming: false,
@@ -266,7 +270,61 @@ export function useChatStore(): ChatStore {
   }, []);
 
   const submitMessage = async ( messageInputValue: string, activeChatTarget?: ActiveChatTarget | null, testRunConfig?: TestRunConfig) => {
-    if (!currentUserId) { /* ... */ return; }
+    // --- Feedback Capture Mode ---
+    // Check if the store is currently waiting for feedback on a specific message.
+    // If so, the current input is treated as the feedback reason.
+    if (waitingForFeedbackOnMessageId) {
+      console.log(`User feedback for message ${waitingForFeedbackOnMessageId}: ${messageInputValue}`);
+      toast({ title: "Feedback Recebido", description: `Obrigado: "${messageInputValue}"`});
+
+      // Optionally: Store this feedback more permanently.
+      // This could involve updating the original disliked message object in the DB
+      // or sending the feedback to an analytics service.
+      // For now, we'll add a confirmation message to the chat UI.
+
+      const originalMessageIndex = messages.findIndex(m => m.id === waitingForFeedbackOnMessageId);
+      if (originalMessageIndex !== -1 && activeConversationId) { // Ensure activeConversationId is available
+        const feedbackConfirmationMessage: ExtendedChatMessageUI = {
+          id: uuidv4(),
+          text: `Obrigado pelo seu feedback: "${messageInputValue}"`,
+          sender: 'system', // Or 'assistant'
+          timestamp: new Date(),
+          status: 'delivered',
+          conversationId: activeConversationId, // Assign to current conversation
+        };
+
+        // Add confirmation message optimistically and to true state
+        addOptimisticMessage({ type: 'add_message', message: feedbackConfirmationMessage });
+        setMessages(prev => {
+          const msgs = [...prev];
+          // Attempt to insert the confirmation message after the feedback question.
+          // The feedback question is expected to be at originalMessageIndex + 1.
+          // So, the confirmation message goes to originalMessageIndex + 2.
+          // A more robust approach might involve searching for the question message by ID if it had one.
+          const confirmationIndex = originalMessageIndex + 2;
+          if (confirmationIndex <= msgs.length) {
+            msgs.splice(confirmationIndex, 0, feedbackConfirmationMessage);
+          } else {
+            msgs.push(feedbackConfirmationMessage); // Fallback: append if index is out of bounds
+          }
+          return msgs;
+        });
+        // TODO: Consider persisting the feedbackConfirmationMessage to DB for history consistency.
+        // await addMessageToConversation(activeConversationId, { ...feedbackConfirmationMessage, isUser: false, content: feedbackConfirmationMessage.text });
+      }
+
+      // Reset feedback mode
+      setWaitingForFeedbackOnMessageId(null);
+      setInputValue(""); // Clear the input field as the feedback has been captured
+      setIsPending(false); // Ensure pending state is reset if it was set before entering feedback mode
+      return; // Important: Bypass normal message submission flow
+    }
+
+    // --- Normal Message Submission Flow ---
+    if (!currentUserId) {
+      toast({ title: "Error", description: "User not logged in.", variant: "destructive" });
+      return;
+    }
     if (!messageInputValue.trim() && !selectedFile) { /* ... */ return; }
 
     setIsPending(true);
@@ -299,15 +357,18 @@ export function useChatStore(): ChatStore {
     try {
       const userMessageToPersist: Message = {
         id: userMessageId, isUser: true, content: messageInputValue,
-        timestamp: Timestamp.fromDate(userMessageTimestamp),
+        timestamp: userMessageTimestamp, // Use Date object directly
         imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
         conversationId: currentConvId,
+        // Ensure other fields like 'text' are aligned if Message type expects it
+        // For IndexedDB service, content is the primary text field.
+        text: messageInputValue,
       };
       await addMessageToConversation(currentConvId, userMessageToPersist);
       // Update true `messages` state
       setMessages(prev => [...prev, { ...userMessagePayload, status: 'completed' }]);
       addOptimisticMessage({ type: 'update_message_status', messageId: userMessageId, newStatus: 'completed' });
-      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: messageInputValue.substring(0,50) }) : c));
+      setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: messageInputValue.substring(0,50) }) : c));
     } catch (error) { /* error handling, revert optimistic, set pending false */
         console.error("Error persisting user message:", error);
         toast({ title: "Error", description: "Failed to send your message.", variant: "destructive" });
@@ -331,16 +392,19 @@ export function useChatStore(): ChatStore {
       .filter(m => m.status === 'completed') // only completed from true state
       .map(uiMsg => ({
         id: uiMsg.id, isUser: uiMsg.sender === 'user', content: uiMsg.text,
-        timestamp: Timestamp.fromDate(uiMsg.timestamp), feedback: uiMsg.feedback,
+        timestamp: uiMsg.timestamp, // Use Date object directly
+        feedback: uiMsg.feedback,
         imageUrl: uiMsg.imageUrl, fileName: uiMsg.fileName,
         conversationId: uiMsg.conversationId,
+        text: uiMsg.text, // Ensure text field if Message type expects it
       }));
     // Add the current user message to history as it's now completed
     historyForBackend.push({
         id: userMessageId, isUser: true, content: currentInputForAgent,
-        timestamp: Timestamp.fromDate(userMessageTimestamp),
+        timestamp: userMessageTimestamp, // Use Date object directly
         imageUrl: userMessagePayload.imageUrl, fileName: userMessagePayload.fileName,
         conversationId: currentConvId,
+        text: currentInputForAgent, // Ensure text field
     });
 
 
@@ -439,11 +503,11 @@ export function useChatStore(): ChatStore {
             id: msg.id,
             isUser: msg.sender === 'user',
             content: msg.text,
-            timestamp: Timestamp.fromDate(msg.timestamp),
+            timestamp: msg.timestamp, // Use Date object directly
             conversationId: currentConvId,
-            // Map toolCall/toolResponse to Firestore fields if necessary
+            text: msg.text, // Ensure text field
+            // Map toolCall/toolResponse if needed
             // For now, assuming content/text is sufficient for display.
-            // Detailed tool data might be stored in a separate field or within metadata.
           };
           if (msg.sender !== 'user') { // User message already persisted
              await addMessageToConversation(currentConvId, messageToPersist);
@@ -469,8 +533,9 @@ export function useChatStore(): ChatStore {
 
         const agentMessageToPersist: Message = {
             id: agentMessageId, isUser: false, content: finalAgentText,
-            timestamp: Timestamp.fromDate(agentMessageTimestamp),
+            timestamp: agentMessageTimestamp, // Use Date object directly
             conversationId: currentConvId,
+            text: finalAgentText, // Ensure text field
         };
         await addMessageToConversation(currentConvId, agentMessageToPersist);
         setMessages(prev => [...prev, finalAgentPayload]);
@@ -478,7 +543,7 @@ export function useChatStore(): ChatStore {
 
       // Common post-processing for both JSON and stream paths
       if (currentConvId && finalAgentText) { // Ensure there's an agent text to update preview
-         setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: finalAgentText.substring(0,50) }) : c));
+         setConversations(prev => prev.map(c => c.id === currentConvId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: finalAgentText.substring(0,50) }) : c));
       }
 
     } catch (error: any) {
@@ -500,18 +565,17 @@ export function useChatStore(): ChatStore {
           };
           setMessages(prev => [...prev, agentErrorMessageObject]);
 
-          const agentErrorFirestoreObject: Message = {
+          const agentErrorPersistObject: Message = { // Renamed for clarity
             id: agentMessageId,
             content: errorMsg,
             isUser: false,
-            timestamp: Timestamp.fromDate(agentMessageTimestamp), // Ensure this is available
+            timestamp: agentMessageTimestamp, // Use Date object directly. Ensure this is available
             conversationId: currentConvId,
-            // Firestore Message type might not have isError or status,
-            // error state is represented by the content and potentially how UI treats it.
+            text: errorMsg, // Ensure text field
           };
-          addMessageToConversation(currentConvId, agentErrorFirestoreObject)
+          addMessageToConversation(currentConvId, agentErrorPersistObject)
             .catch(err => {
-              console.error("Failed to persist agent error message to Firestore:", err);
+              console.error("Failed to persist agent error message to IndexedDB:", err);
               // Optionally, toast another error or handle this failure
             });
         }
@@ -528,20 +592,80 @@ export function useChatStore(): ChatStore {
       return;
     }
     const originalMessage = messages.find(msg => msg.id === messageId);
-    const originalFeedback = originalMessage?.feedback || null;
+    const originalFeedback = originalMessage?.feedback || null; // Store original feedback for potential revert
 
+    // Optimistically update the UI
     addOptimisticMessage({ type: "update_message_feedback", messageId, feedback });
 
     try {
+      // Attempt to persist the feedback to the database
       await updateMessageFeedback(activeConversationId, messageId, feedback);
-      // Update the true `messages` state
-      setMessages(prevMessages => prevMessages.map(msg =>
+
+      // If successful, update the true `messages` state to reflect the change
+      const updatedMessagesTrueState = messages.map(msg =>
         msg.id === messageId ? { ...msg, feedback } : msg
-      ));
+      );
+      setMessages(updatedMessagesTrueState);
+
+      // --- Feedback Loop Logic ---
+      const messageToUpdate = updatedMessagesTrueState.find(m => m.id === messageId);
+
+      // If an agent's message is disliked, set the state to wait for feedback reason
+      // and inject a system message asking for clarification.
+      if (feedback === 'disliked' && messageToUpdate && messageToUpdate.sender !== 'user') {
+        setWaitingForFeedbackOnMessageId(messageId); // Set that we are now waiting for feedback for this message
+
+        const feedbackRequestMessage: ExtendedChatMessageUI = {
+          id: uuidv4(), // Generate a unique ID for the system message
+          text: "Por que você recusou esta sugestão?",
+          sender: 'system', // Or 'assistant', depending on desired UI styling
+          timestamp: new Date(),
+          status: 'delivered', // System messages are considered delivered
+          conversationId: activeConversationId, // Associate with the current conversation
+        };
+
+        // Add the feedback request message optimistically and to the true messages state
+        addOptimisticMessage({ type: 'add_message', message: feedbackRequestMessage });
+        setMessages(prev => {
+          const msgs = [...prev];
+          const dislikedMessageIndex = msgs.findIndex(m => m.id === messageId);
+          // Insert the question right after the disliked message
+          if (dislikedMessageIndex !== -1) {
+            msgs.splice(dislikedMessageIndex + 1, 0, feedbackRequestMessage);
+          } else {
+            msgs.push(feedbackRequestMessage); // Fallback: append if original somehow not found
+          }
+          return msgs;
+        });
+
+        // TODO: Consider if this system message ("Por que você recusou...") should be persisted to DB.
+        // If so, call: await addMessageToConversation(activeConversationId, { ...feedbackRequestMessage, isUser: false, content: feedbackRequestMessage.text });
+
+      } else if (waitingForFeedbackOnMessageId === messageId && (feedback === 'liked' || feedback === null)) {
+        // If the user changes their mind (e.g., likes a previously disliked message for which a question was asked, or removes feedback)
+        // and we are currently waiting for feedback on THAT message:
+        // 1. Reset the waiting state.
+        // 2. Remove the "Por que você recusou..." question message.
+        setWaitingForFeedbackOnMessageId(null);
+
+        // Find and remove the feedback question message.
+        // This assumes the question message is identifiable (e.g., immediately follows the original message and has specific text).
+        // A more robust way would be to store the ID of the question message when it's created and use that ID for removal.
+        const dislikedMessageIndex = updatedMessagesTrueState.findIndex(m => m.id === messageId);
+        if (dislikedMessageIndex !== -1 && dislikedMessageIndex + 1 < updatedMessagesTrueState.length) {
+          const potentialQuestionMessage = updatedMessagesTrueState[dislikedMessageIndex + 1];
+          if (potentialQuestionMessage.sender === 'system' && potentialQuestionMessage.text === "Por que você recusou esta sugestão?") {
+            addOptimisticMessage({ type: 'remove_message', messageId: potentialQuestionMessage.id });
+            setMessages(prev => prev.filter(m => m.id !== potentialQuestionMessage.id));
+            // TODO: If the question message was persisted, remove it from DB here.
+            // await deleteMessageFromConversation(activeConversationId, potentialQuestionMessage.id);
+          }
+        }
+      }
     } catch (error) {
       console.error("Error updating feedback:", error);
       toast({ title: "Error", description: "Failed to save feedback.", variant: "destructive" });
-      // Revert optimistic update
+      // Revert optimistic update on error
       addOptimisticMessage({ type: "update_message_feedback", messageId, feedback: originalFeedback });
     }
   };
@@ -597,9 +721,11 @@ export function useChatStore(): ChatStore {
       .filter(m => m.status === 'completed')
       .map(uiMsg => ({
         id: uiMsg.id, isUser: uiMsg.sender === 'user', content: uiMsg.text,
-        timestamp: Timestamp.fromDate(uiMsg.timestamp), feedback: uiMsg.feedback,
+        timestamp: uiMsg.timestamp, // Use Date object directly
+        feedback: uiMsg.feedback,
         imageUrl: uiMsg.imageUrl, fileName: uiMsg.fileName,
         conversationId: uiMsg.conversationId,
+        text: uiMsg.text, // Ensure text field
       }));
 
     // The userPromptMessage.text is the input for this new agent turn.
@@ -645,12 +771,13 @@ export function useChatStore(): ChatStore {
 
       const agentMessageToPersist: Message = {
           id: newAgentMessageId, isUser: false, content: accumulatedAgentResponse,
-          timestamp: Timestamp.fromDate(newAgentTimestamp),
+          timestamp: newAgentTimestamp, // Use Date object directly
           conversationId: activeConversationId,
+          text: accumulatedAgentResponse, // Ensure text field
       };
       await addMessageToConversation(activeConversationId, agentMessageToPersist);
       setMessages(prev => [...prev, finalAgentPayload]); // Update true state
-      setConversations(prev => prev.map(c => c.id === activeConversationId ? ({ ...c, updatedAt: Timestamp.now(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
+      setConversations(prev => prev.map(c => c.id === activeConversationId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
 
     } catch (error: any) {
         console.error("Error during agent response regeneration:", error);
@@ -666,9 +793,12 @@ export function useChatStore(): ChatStore {
   return {
     conversations, activeConversationId, messages, optimisticMessages, isPending, isLoadingMessages,
     isLoadingConversations, inputContinuation, selectedFile, selectedFileName, selectedFileDataUri,
-    currentUserId, inputValue, setConversations, setActiveConversationId, setMessages, setIsPending,
+    currentUserId, inputValue, waitingForFeedbackOnMessageId, // Added
+    setConversations, setActiveConversationId, setMessages, setIsPending,
     setIsLoadingMessages, setIsLoadingConversations, setInputContinuation, setSelectedFile,
-    setSelectedFileName, setSelectedFileDataUri, setInputValue, handleNewConversation,
+    setSelectedFileName, setSelectedFileDataUri, setInputValue,
+    setWaitingForFeedbackOnMessageId, // Added
+    handleNewConversation,
     handleSelectConversation, handleDeleteConversation, handleRenameConversation, submitMessage,
     handleFeedback, handleRegenerate, clearSelectedFile,
   };

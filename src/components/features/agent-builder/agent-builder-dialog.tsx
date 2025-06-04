@@ -2,7 +2,7 @@ import * as React from 'react';
 import { lazy, Suspense } from 'react';
 import { useForm, FormProvider, useFormContext, Controller, SubmitHandler, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+// import { z } from 'zod'; // z is imported via savedAgentConfigurationSchema
 import {
   Dialog,
   DialogContent,
@@ -107,28 +107,59 @@ import type {
 // Import WorkflowStep directly from agent-configs-new
 import { WorkflowStep } from '@/types/agent-configs-new';
 
-// Helper function to construct system prompt
+/**
+ * Constructs a system prompt string based on the agent's configuration.
+ * This prompt is typically used to guide the behavior of an LLM agent.
+ * It incorporates AI suggestions for personality, tasks, and restrictions if available,
+ * otherwise, it falls back to the manually configured values.
+ *
+ * @param config The agent's configuration object (LLMAgentConfig or WorkflowAgentConfig).
+ * @param availableAgents A list of available agents, used for resolving agent IDs in workflow steps.
+ * @param aiSuggestions Optional AI-generated suggestions that can override parts of the manual config.
+ * @returns A string representing the constructed system prompt.
+ */
 const constructSystemPrompt = (
   config: AgentConfigUnion | null | undefined,
-  availableAgents: Array<{ id: string; agentName: string }>
+  availableAgents: Array<{ id: string; agentName: string }>,
+  aiSuggestions?: AiConfigurationAssistantOutput | null
 ): string => {
-  if (!config) return "No configuration provided.";
+  if (!config) return "No configuration provided."; // Should not happen with proper form initialization
 
   let promptParts: string[] = [];
 
   if (config.type === 'llm') {
     const llmConfig = config as LLMAgentConfig;
-    promptParts.push(`You are an AI agent${llmConfig.agentPersonality ? ` with the personality of a ${llmConfig.agentPersonality}` : ''}.`);
+
+    // --- Personality ---
+    // Use AI suggested personality if available, otherwise use the one from the form.
+    const personality = aiSuggestions?.suggestedPersonality || llmConfig.agentPersonality;
+    promptParts.push(`You are an AI agent${personality ? ` with the personality of a ${personality}` : ''}.`);
+
+    // --- Goal ---
+    // The agent's goal is fundamental and primarily driven by manual configuration.
+    // AI suggestions could refine it, but that's not implemented here.
     if (llmConfig.agentGoal) {
       promptParts.push(`Your primary goal is: ${llmConfig.agentGoal}.`);
     }
-    if (llmConfig.agentTasks && llmConfig.agentTasks.length > 0) {
+
+    // --- Tasks ---
+    // Use AI suggested tasks if available and they are not empty, otherwise use form tasks.
+    const tasksToUse = (aiSuggestions?.suggestedTasks && aiSuggestions.suggestedTasks.length > 0)
+      ? aiSuggestions.suggestedTasks
+      : llmConfig.agentTasks;
+    if (tasksToUse && tasksToUse.length > 0) {
       promptParts.push("To achieve this goal, you must perform the following tasks:");
-      promptParts.push(...llmConfig.agentTasks.map(task => `- ${task}`));
+      promptParts.push(...tasksToUse.map(task => `- ${task}`));
     }
-    if (llmConfig.agentRestrictions && llmConfig.agentRestrictions.length > 0) {
+
+    // --- Restrictions ---
+    // Use AI suggested restrictions if available and not empty, otherwise use form restrictions.
+    const restrictionsToUse = (aiSuggestions?.suggestedRestrictions && aiSuggestions.suggestedRestrictions.length > 0)
+      ? aiSuggestions.suggestedRestrictions
+      : llmConfig.agentRestrictions;
+    if (restrictionsToUse && restrictionsToUse.length > 0) {
       promptParts.push("\nYou must adhere to the following restrictions:");
-      promptParts.push(...llmConfig.agentRestrictions.map(restriction => `- ${restriction}`));
+      promptParts.push(...restrictionsToUse.map(restriction => `- ${restriction}`));
     }
     return promptParts.join('\n');
   } else if (config.type === 'workflow') {
@@ -335,29 +366,40 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     name: "config.workflowSteps",
   });
 
-  // Effect to update systemPromptGenerated
+  /**
+   * Effect to automatically update the `systemPromptGenerated` field in the form
+   * whenever relevant configuration fields change or AI suggestions are updated.
+   * This provides a live preview of the system prompt that would be used by the agent.
+   */
   React.useEffect(() => {
-    const currentFullConfig = getValues(); // Get all form values
-    const currentAgentConfig = currentFullConfig.config; // Get the agent-specific config part
+    const currentFullConfig = getValues();
+    const currentAgentConfig = currentFullConfig.config;
 
     if (currentAgentConfig) {
-      const newPromptString = constructSystemPrompt(currentAgentConfig, availableAgentsForSubSelector);
+      const newPromptString = constructSystemPrompt(
+        currentAgentConfig,
+        availableAgentsForSubSelector,
+        aiSuggestions // Pass current AI suggestions to the prompt constructor
+      );
       setValue('config.systemPromptGenerated', newPromptString, {
-        shouldDirty: false, // Avoid marking form as dirty due to auto-update
-        shouldValidate: false, // Avoid re-validating on this change
+        shouldDirty: false,
+        shouldValidate: false,
       });
     }
   }, [
-    agentType,
-    agentGoal,
-    agentTasks,
-    agentPersonality,
-    agentRestrictions,
-    workflowType,
-    workflowSteps,
-    availableAgentsForSubSelector,
-    setValue, // setValue and getValues from RHF are stable, but good practice to include if used directly
-    getValues
+    // Dependencies that trigger system prompt regeneration:
+    agentType,          // Type of agent (LLM, Workflow)
+    agentGoal,          // LLM agent's goal
+    agentTasks,         // LLM agent's tasks
+    agentPersonality,   // LLM agent's personality
+    agentRestrictions,  // LLM agent's restrictions
+    workflowType,       // Workflow agent's type (sequential, parallel, etc.)
+    workflowSteps,      // Steps in a workflow agent
+    availableAgentsForSubSelector, // List of agents for workflow step resolution
+    aiSuggestions,      // AI-generated suggestions which can override manual settings
+    setValue,           // React Hook Form's setValue function (stable)
+    getValues           // React Hook Form's getValues function (stable)
+    // Note: `control` is implicitly a dependency for `watch` and `getValues`, but not directly used in the callback.
   ]);
 
   const onSubmit: SubmitHandler<SavedAgentConfiguration> = async (data) => {
@@ -394,81 +436,133 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
     }
   };
 
+  /**
+   * Fetches AI-generated suggestions for the agent's configuration.
+   * It uses the current agent's goal and tasks as input for the AI flow.
+   * Updates the `aiSuggestions` state with the response or an error message.
+   */
   const handleGetAiSuggestions = async () => {
+    // Start loading state and clear previous errors/suggestions
+    setIsSuggesting(true);
+    setSuggestionError(null);
+    setAiSuggestions(null);
     const { id: suggestionToastId, update: updateSuggestionToast, dismiss: dismissSuggestionToast } = toast({
       title: "Fetching AI Suggestions...",
       description: "Please wait while we generate suggestions.",
-      variant: "default",
     });
-    setIsSuggesting(true);
-    setSuggestionError(null);
-    setAiSuggestions(null); // Clear previous suggestions
 
     try {
-      const currentConfig = methods.getValues().config as LLMAgentConfig; // Assuming LLM type for goal/tasks
-      const agentGoal = currentConfig?.agentGoal;
-      const agentTasks = currentConfig?.agentTasks;
+      // Get current agent goal and tasks from the form (assuming LLM type for these fields)
+      const currentFormValues = methods.getValues();
+      const currentConfig = currentFormValues.config as LLMAgentConfig;
+      const agentGoalValue = currentConfig?.agentGoal;
+      const agentTasksValue = currentConfig?.agentTasks;
+      const currentToolsValue = currentFormValues.toolsDetails?.map(td => ({ // Get currently selected tools with their data
+        id: td.id,
+        name: td.name,
+        description: td.description,
+        configData: currentFormValues.toolConfigsApplied?.[td.id] // Include existing config
+      }));
 
-      if (!agentGoal || !agentTasks || agentTasks.length === 0) {
+
+      // Basic validation: Ensure goal and tasks are defined before calling the AI.
+      if (!agentGoalValue || !agentTasksValue || agentTasksValue.length === 0) {
         setSuggestionError("Por favor, defina o objetivo e as tarefas do agente primeiro para obter sugestões relevantes.");
+        updateSuggestionToast({ title: "Input Required", description: "Goal and tasks must be set.", variant: "destructive" });
         setIsSuggesting(false);
         return;
       }
 
-      // console.log("Requesting AI suggestions with goal:", agentGoal, "and tasks:", agentTasks);
+      // Call the AI configuration assistant flow
+      // console.log("Requesting AI suggestions with goal:", agentGoalValue, "tasks:", agentTasksValue, "currentTools:", currentToolsValue);
       const response = await runFlow(aiConfigurationAssistantFlow, {
-        agentGoal,
-        agentTasks,
-        suggestionContext: 'fullConfig',
+        agentGoal: agentGoalValue,
+        agentTasks: agentTasksValue,
+        suggestionContext: 'fullConfig', // Requesting a comprehensive set of suggestions
+        currentTools: currentToolsValue, // Provide context of already selected/configured tools
+        fullAgentConfig: methods.getValues() // Provide full config for broader context if needed by the flow
       });
+
       // console.log("AI suggestions received:", response);
-      setAiSuggestions(response);
-      updateSuggestionToast({
-        title: "Suggestions Ready",
-        description: "AI suggestions have been loaded.",
-        variant: "default",
-      });
+      setAiSuggestions(response); // Store the suggestions
+      updateSuggestionToast({ title: "Suggestions Ready", description: "AI suggestions have been loaded.", variant: "default" });
+
     } catch (error) {
       console.error("Failed to get AI suggestions:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       setSuggestionError(`Falha ao obter sugestões da IA. ${errorMessage}`);
-      updateSuggestionToast({
-        title: "Error Fetching Suggestions",
-        description: suggestionError || "An unknown error occurred.", // Use state value if set, otherwise generic
-        variant: "destructive",
-      });
+      updateSuggestionToast({ title: "Error Fetching Suggestions", description: errorMessage, variant: "destructive" });
     } finally {
-      setIsSuggesting(false);
-      setTimeout(() => dismissSuggestionToast(), 5000);
+      setIsSuggesting(false); // Reset loading state
+      setTimeout(() => dismissSuggestionToast(), 5000); // Dismiss toast after 5 seconds
     }
   };
 
+  /**
+   * Applies the AI-generated suggestions to the form fields.
+   * Iterates through the `suggestionsToApply` object and updates the form
+   * using `methods.setValue` for each relevant field.
+   * @param suggestionsToApply The AI suggestions object from `aiSuggestions` state.
+   */
   const handleApplySuggestions = (suggestionsToApply: AiConfigurationAssistantOutput) => {
-    // console.log("Applying suggestions:", suggestionsToApply);
-    const configPath = 'config'; // Base path for LLMAgentConfig fields
+    // console.log("Applying AI suggestions to form:", suggestionsToApply);
+    const configPath = 'config'; // Base path for LLMAgentConfig fields within the form
 
+    // Apply suggested personality
     if (suggestionsToApply.suggestedPersonality) {
       methods.setValue(`${configPath}.agentPersonality` as any, suggestionsToApply.suggestedPersonality, { shouldValidate: true, shouldDirty: true });
     }
+    // Apply suggested restrictions
     if (suggestionsToApply.suggestedRestrictions) {
       methods.setValue(`${configPath}.agentRestrictions` as any, suggestionsToApply.suggestedRestrictions, { shouldValidate: true, shouldDirty: true });
     }
+    // Apply suggested AI model
     if (suggestionsToApply.suggestedModel) {
       methods.setValue(`${configPath}.agentModel` as any, suggestionsToApply.suggestedModel, { shouldValidate: true, shouldDirty: true });
     }
+    // Apply suggested temperature
     if (suggestionsToApply.suggestedTemperature !== undefined) {
       methods.setValue(`${configPath}.agentTemperature` as any, suggestionsToApply.suggestedTemperature, { shouldValidate: true, shouldDirty: true });
     }
+
+    // Apply suggested tools and their configurations
     if (suggestionsToApply.suggestedTools && suggestionsToApply.suggestedTools.length > 0) {
+      // Extract IDs of suggested tools
       const toolIds = suggestionsToApply.suggestedTools.map(t => t.id);
       methods.setValue('tools', toolIds, { shouldValidate: true, shouldDirty: true });
-       // Additionally, update toolsDetails if your structure requires it
-      const toolsDetails = suggestionsToApply.suggestedTools.map(t => ({ id: t.id, name: t.name, description: t.description }));
+
+      // Update toolsDetails (name, description - assuming these are part of the suggestion)
+      const toolsDetails = suggestionsToApply.suggestedTools.map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description
+      }));
       methods.setValue('toolsDetails', toolsDetails, { shouldValidate: true, shouldDirty: true });
+
+      // Apply suggested configuration data for each tool
+      const currentToolConfigs = methods.getValues("toolConfigsApplied") || {};
+      let updatedToolConfigs = { ...currentToolConfigs };
+      suggestionsToApply.suggestedTools.forEach(toolSuggestion => {
+        if (toolSuggestion.id && toolSuggestion.suggestedConfigData) {
+          // This will merge suggested config with existing, or add new if toolId wasn't there.
+          // For a more sophisticated merge, you might need a deep merge utility.
+          updatedToolConfigs[toolSuggestion.id] = {
+            ...(updatedToolConfigs[toolSuggestion.id] || {}),
+            ...toolSuggestion.suggestedConfigData
+          };
+        }
+      });
+      methods.setValue("toolConfigsApplied", updatedToolConfigs, { shouldValidate: true, shouldDirty: true });
     }
 
-    setAiSuggestions(null); // Close the suggestion display
-    // Optionally, trigger a toast notification for success
+    // TODO: Apply other suggestions like suggestedName, suggestedDescription, suggestedTasks if the UI/flow supports it directly.
+    // For example, if there's a button to apply suggested tasks:
+    // if (suggestionsToApply.suggestedTasks && suggestionsToApply.suggestedTasks.length > 0) {
+    //   methods.setValue(`${configPath}.agentTasks`, suggestionsToApply.suggestedTasks, { shouldValidate: true, shouldDirty: true });
+    // }
+
+    setAiSuggestions(null); // Clear suggestions after applying them, closing the suggestion display
+    toast({ title: "Suggestions Applied", description: "AI suggestions have been applied to the form.", variant: "default" });
   };
 
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
