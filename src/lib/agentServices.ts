@@ -1,4 +1,4 @@
-// ----------------------------------------------------------------------
+  // ----------------------------------------------------------------------
 // Nome do Arquivo: agentServices.ts
 // Autor: Cascade AI (assistido por Gabriel Letteriello)
 // Data: 2025-06-01
@@ -8,7 +8,7 @@
 
 import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { firestore } from '@/lib/firebaseClient';
-import { collection, doc, setDoc, addDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc, getDoc, getDocs, query, where, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { enhancedLogger } from '@/lib/logger'; // Import the logger
 
 /**
@@ -279,7 +279,7 @@ export async function getUserAgentConfigurations(userId: string): Promise<SavedA
     const agentsQuery = query(collection(firestore, 'agent-configurations'), where("ownerId", "==", userId));
     const agentsSnapshot = await getDocs(agentsQuery);
     
-    return agentsSnapshot.docs.map(doc => ({
+    return agentsSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
       ...doc.data(),
       id: doc.id
     } as SavedAgentConfiguration));

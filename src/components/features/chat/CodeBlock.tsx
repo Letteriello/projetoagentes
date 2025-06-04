@@ -3,26 +3,25 @@ import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { minimalistLight, minimalistDark } from './codeblockThemes';
 import { useTheme } from '../../../contexts/ThemeContext';
 // Import languages using CommonJS syntax
-import clike from 'react-syntax-highlighter/dist/cjs/languages/prism/clike';
-import javascript from 'react-syntax-highlighter/dist/cjs/languages/prism/javascript';
-import python from 'react-syntax-highlighter/dist/cjs/languages/prism/python';
-import css from 'react-syntax-highlighter/dist/cjs/languages/prism/css';
-import jsx from 'react-syntax-highlighter/dist/cjs/languages/prism/jsx';
-import typescript from 'react-syntax-highlighter/dist/cjs/languages/prism/typescript';
-import json from 'react-syntax-highlighter/dist/cjs/languages/prism/json';
-import java from 'react-syntax-highlighter/dist/cjs/languages/prism/java';
-import csharp from 'react-syntax-highlighter/dist/cjs/languages/prism/csharp';
-import cpp from 'react-syntax-highlighter/dist/cjs/languages/prism/cpp';
-import go from 'react-syntax-highlighter/dist/cjs/languages/prism/go';
-import php from 'react-syntax-highlighter/dist/cjs/languages/prism/php';
-import ruby from 'react-syntax-highlighter/dist/cjs/languages/prism/ruby';
-import rust from 'react-syntax-highlighter/dist/cjs/languages/prism/rust';
-import swift from 'react-syntax-highlighter/dist/cjs/languages/prism/swift';
-import kotlin from 'react-syntax-highlighter/dist/cjs/languages/prism/kotlin';
-import bash from 'react-syntax-highlighter/dist/cjs/languages/prism/bash';
-import sql from 'react-syntax-highlighter/dist/cjs/languages/prism/sql';
-import yaml from 'react-syntax-highlighter/dist/cjs/languages/prism/yaml';
-import markup from 'react-syntax-highlighter/dist/cjs/languages/prism/markup'; // For HTML, XML etc.
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import java from 'react-syntax-highlighter/dist/esm/languages/prism/java';
+import csharp from 'react-syntax-highlighter/dist/esm/languages/prism/csharp';
+import cpp from 'react-syntax-highlighter/dist/esm/languages/prism/cpp';
+import go from 'react-syntax-highlighter/dist/esm/languages/prism/go';
+import php from 'react-syntax-highlighter/dist/esm/languages/prism/php';
+import ruby from 'react-syntax-highlighter/dist/esm/languages/prism/ruby';
+import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust';
+import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
+import kotlin from 'react-syntax-highlighter/dist/esm/languages/prism/kotlin';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
+import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup'; // markup geralmente é html/xml
 import { useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 

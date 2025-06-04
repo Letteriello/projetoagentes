@@ -1,5 +1,6 @@
-// src/types/agent-configs-fixed.ts
-import type { ReactNode } from 'react';
+// src/types/agent-configs.ts
+import { ReactNode } from 'react';
+import { ToolConfigField as ToolConfigFieldBase } from './tool-types';
 
 // Tipos básicos
 export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
@@ -10,7 +11,11 @@ export type StatePersistenceType = "session" | "memory" | "database";
 export type ArtifactStorageType = "local" | "cloud" | "memory" | "filesystem";
 export type StateScope = 'GLOBAL' | 'AGENT' | 'TEMPORARY';
 
-// Artifact Interfaces
+// Interfaces principais
+export interface ToolConfigField extends ToolConfigFieldBase {
+  // Herda todos os campos de ToolConfigFieldBase
+}
+
 export interface ArtifactDefinition {
   id: string;
   name: string;
@@ -31,23 +36,6 @@ export interface ArtifactsConfig {
   definitions?: ArtifactDefinition[];
 }
 
-export interface ToolConfigField {
-  id: string;
-  label: string;
-  type: "text" | "password" | "select" | "number" | "textarea" | "boolean";
-  required?: boolean;
-  options?: Array<{ label: string; value: string | number }>;
-  defaultValue?: string | number | boolean;
-  placeholder?: string;
-  description?: string;
-}
-
-export interface ToolConfigData {
-  [toolId: string]: {
-    [fieldId: string]: string | number | boolean;
-  };
-}
-
 export interface CommunicationChannel {
   type: string;
   config: Record<string, any>;
@@ -57,11 +45,6 @@ export interface AgentTerminationCondition {
   type: TerminationConditionType;
   value?: number | string | boolean;
   description?: string;
-}
-
-export interface StatePersistenceConfig {
-  type: StatePersistenceType;
-  config?: Record<string, any>;
 }
 
 export type KnowledgeSourceType =
@@ -83,13 +66,17 @@ export interface KnowledgeSource {
   enabled: boolean;
 }
 
+export interface StatePersistenceConfig {
+  type: StatePersistenceType;
+  config?: Record<string, any>;
+}
+
 export interface RagMemoryConfig {
   enabled: boolean;
-  chunkSize?: number;
-  chunkOverlap?: number;
+  maxDocuments?: number;
+  maxDocumentSize?: number;
   embeddingModel?: string;
-  similarityThreshold?: number;
-  maxRetrievedDocuments?: number;
+  vectorStoreType?: string;
 }
 
 export interface AgentConfigBase {
@@ -115,14 +102,12 @@ export interface ModelSafetySettingItem {
   threshold: string;
 }
 
-export interface LLMAgentConfig extends AgentConfigBase {
+export interface LLMAgentConfig extends Omit<AgentConfigBase, 'type'> {
   type: "llm";
   agentModel: string;
   agentTemperature: number;
   agentPersonality?: string;
   agentRestrictions?: string[];
-  modelSafetySettings?: Array<{ category: string; threshold: string }>;
-  enableCompositionalFunctionCalling?: boolean; // Added for CFC
   modelSafetySettings?: ModelSafetySettingItem[];
   maxHistoryTokens?: number;
   maxTokensPerResponse?: number;
@@ -136,7 +121,7 @@ export interface WorkflowStep {
   description?: string;
 }
 
-export interface WorkflowAgentConfig extends AgentConfigBase {
+export interface WorkflowAgentConfig extends Omit<AgentConfigBase, 'type'> {
   type: "workflow";
   workflowType: WorkflowDetailedType;
   subAgents?: string[];
@@ -144,13 +129,13 @@ export interface WorkflowAgentConfig extends AgentConfigBase {
   workflowSteps?: WorkflowStep[];
 }
 
-export interface CustomAgentConfig extends AgentConfigBase {
+export interface CustomAgentConfig extends Omit<AgentConfigBase, 'type'> {
   type: "custom";
   scriptPath?: string;
   customConfig?: Record<string, any>;
 }
 
-export interface A2AAgentSpecialistConfig extends AgentConfigBase {
+export interface A2AAgentSpecialistConfig extends Omit<AgentConfigBase, 'type'> {
   type: "a2a";
   specialistRole: string;
   specialistSkills: string[];
@@ -159,13 +144,7 @@ export interface A2AAgentSpecialistConfig extends AgentConfigBase {
   specialistExamples?: string[];
 }
 
-// Definindo um tipo de união discriminada para AgentConfig
-export type AgentConfig = 
-  | LLMAgentConfig 
-  | WorkflowAgentConfig 
-  | CustomAgentConfig 
-  | A2AAgentSpecialistConfig
-  | (Record<string, any> & { type: string }); // Permite objetos com propriedades adicionais, mas requer um tipo
+export type AgentConfig = LLMAgentConfig | WorkflowAgentConfig | CustomAgentConfig | A2AAgentSpecialistConfig;
 
 export interface EnvironmentVariable {
   key: string;
@@ -188,39 +167,31 @@ export interface DeploymentConfig {
     maxInstances?: number;
     targetConcurrency?: number;
   };
-  minInstances?: number;
-  maxInstances?: number;
-  targetConcurrency?: number;
-}
-
-export interface ToolDetail {
-  id: string;
-  name: string;
-  description: string;
-  icon?: string;
-  genkitToolName?: string;
 }
 
 export interface SavedAgentConfiguration {
   id: string;
   agentName: string;
-  agentDescription: string;
-  agentVersion: string;
+  agentDescription?: string;
+  agentVersion?: string;
   config: AgentConfig;
   tools: string[];
-  toolsDetails?: ToolDetail[];
-  toolConfigsApplied: ToolConfigData;
+  toolsDetails?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon?: string;
+    genkitToolName?: string;
+  }>;
+  toolConfigsApplied: Record<string, any>;
   a2aConfig?: Record<string, any>;
   communicationChannels?: CommunicationChannel[];
   deploymentConfig?: DeploymentConfig;
   debugModeEnabled?: boolean;
-  toolConfigsApplied?: Record<string, any>;
-  callbacks?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   isTemplate: boolean;
   userId: string;
-  isFavorite?: boolean;
 }
 
 // Exportar todos os tipos

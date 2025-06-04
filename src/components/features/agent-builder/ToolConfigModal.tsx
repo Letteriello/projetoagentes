@@ -166,11 +166,11 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
   // }, [isOpen, configuringTool, toast]);
 
 
-  const handleInternalSave = () => {
+  const handleSave = () => {
     if (!configuringTool) return;
 
-    const configData: Partial<ToolConfigData> = {};
     const toolId = configuringTool.id; // e.g., 'google-search', 'openapi-custom'
+    const configData: ToolConfigData = {}; // Removido o Partial para garantir que todos os campos obrigatórios estejam presentes
 
     // Common fields that might exist regardless of specific tool type
     if (configuringTool.requiresAuth) {
@@ -243,7 +243,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
               <Label htmlFor="apiKeySelect" className="font-semibold">Autenticação via Cofre API</Label>
               <Select
                 value={currentSelectedApiKeyId || ""}
-                onValueChange={(value) => onApiKeyIdChange(configuringTool.id, value)}
+                onValueChange={(value: string) => onApiKeyIdChange(configuringTool.id, value)}
                 // disabled={isLoadingVaultKeys} // isLoadingVaultKeys is removed
               >
                 <SelectTrigger id="apiKeySelect">
@@ -375,7 +375,7 @@ const ToolConfigModal: React.FC<ToolConfigModalProps> = ({
         </div>
         <DialogFooter>
            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-           <Button onClick={handleInternalSave}>Salvar Configuração da Ferramenta</Button>
+           <Button onClick={handleSave}>Salvar Configuração da Ferramenta</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
