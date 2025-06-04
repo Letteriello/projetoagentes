@@ -29,7 +29,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
-import { useAgentStorage } from "@/hooks/use-agent-storage"; // Import useAgentStorage
+import { useAgentStorage } from "@/hooks/use-agent-storage";
+import { toAgentFormData, toSavedAgentConfiguration } from "@/lib/agent-type-utils";
 import { cn } from "@/lib/utils";
 import { FixedSizeList } from 'react-window'; // Import FixedSizeList
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
@@ -42,14 +43,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { 
-  SavedAgentConfiguration, 
+  SavedAgentConfiguration,
   AgentConfig,
-  AvailableTool 
-} from '@/types'; // Importando do arquivo index.ts que criamos
+  AvailableTool,
+  ToolConfigData,
+  AgentType,
+  AgentFormData
+} from '@/types/agent-types-unified';
 
-import {
-  availableTools as defaultAvailableTools,
-  iconComponents
+// Usando o tipo AgentFormData do arquivo unificado
+
+// Importando corretamente do arquivo agentBuilderConfig
+import { 
+  builderAvailableTools as defaultAvailableTools,
+  iconComponents 
 } from "@/data/agentBuilderConfig";
 
 // Definindo agentTypeOptions localmente
@@ -111,7 +118,7 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
   const router = useRouter();
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
-  const [editingAgent, setEditingAgent] = React.useState<SavedAgentConfiguration | null>(null);
+  const [editingAgent, setEditingAgent] = React.useState<AgentFormData | null>(null);
   const [isSaveAsTemplateModalOpen, setIsSaveAsTemplateModalOpen] = React.useState(false);
   const [agentToSaveAsTemplate, setAgentToSaveAsTemplate] = React.useState<SavedAgentConfiguration | null>(null);
   const [buildMode, setBuildMode] = React.useState<'form' | 'chat'>('form');
@@ -130,6 +137,38 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
   const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = React.useState(false);
   const [agentToDelete, setAgentToDelete] = React.useState<SavedAgentConfiguration | null>(null);
 
+  const handleCreateNewAgent = React.useCallback(() => {
+    const newAgent: AgentFormData = {
+      id: undefined,
+      agentName: 'Novo Agente',
+      agentDescription: '',
+      agentVersion: '1.0.0',
+      tools: [],
+      toolsDetails: [],
+      toolConfigsApplied: {},
+      a2aConfig: {},
+      communicationChannels: [],
+      debugModeEnabled: false,
+      isTemplate: false,
+      isFavorite: false,
+      config: {
+        agentGoal: '',
+        agentTasks: [],
+        framework: 'none',
+        type: 'llm',
+        // Campos específicos do tipo LLM
+        agentModel: 'gpt-3.5-turbo',
+        agentTemperature: 0.7,
+        agentPersonality: '',
+        agentRestrictions: []
+      }
+    };
+    
+    setEditingAgent(newAgent);
+    setBuildMode('form');
+    setIsBuilderModalOpen(true);
+  }, []);
+
   React.useEffect(() => {
     const { create, edit: agentIdToEdit, monitor: agentIdToMonitor, tab } = searchParams || {};
     const currentTab = tab || 'overview';
@@ -142,7 +181,7 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
     if (agentIdToEdit) {
       const agentFound = agents.find(agent => agent.id === agentIdToEdit);
       if (agentFound) {
-        setEditingAgent(agentFound);
+        setEditingAgent(toAgentFormData(agentFound));
         setBuildMode('form'); // Ou determinar o modo com base em outra prop?
         setIsBuilderModalOpen(true);
       }
@@ -156,15 +195,11 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
     }
   }, [searchParams, agents, handleCreateNewAgent]);
 
-  const handleCreateNewAgent = () => {
-    setEditingAgent(null);
-    setBuildMode('form'); // Default to form mode for new agents
-    setIsBuilderModalOpen(true);
-  };
-
-  const handleUpdateAgent = async (agent: Partial<Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>> & { id: string }) => {
-    setEditingAgent(agent);
-    setBuildMode('form'); // Default to form mode for editing
+  const handleEditAgent = (agent: SavedAgentConfiguration) => {
+    // Usar a função auxiliar para converter para AgentFormData
+    const agentFormData = toAgentFormData(agent);
+    setEditingAgent(agentFormData);
+    setBuildMode('form');
     setIsBuilderModalOpen(true);
   };
 
@@ -207,23 +242,75 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
     }
   };
 
-  const handleSaveAgent = async (agentConfig: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'> & { agentName: string; agentDescription: string; agentVersion: string; config: AgentConfig; tools: string[]; }) => {
+  const [isSaving, setIsSaving] = React.useState(false);
+  
+  const handleSaveAgent = async (agentData: AgentFormData) => {
     try {
-      if (editingAgent) {
-        await updateAgent(agentConfig.id, agentConfig);
+      setIsSaving(true);
+      
+      // Usar a função auxiliar para converter para SavedAgentConfiguration
+      const agentToSave = toSavedAgentConfiguration(agentData);
+      let updatedAgent: SavedAgentConfiguration;
+      
+      if (agentData.id) {
+        // Atualizar agente existente
+        updatedAgent = await updateAgent(agentToSave.id, agentToSave);
+        setAgents(prevAgents => 
+          prevAgents.map(agent => agent.id === updatedAgent.id ? updatedAgent : agent)
+        );
+      } else {
+        // Criar novo agente
+        updatedAgent = await createAgent(agentToSave);
+        setAgents(prevAgents => [...prevAgents, updatedAgent]);
+      }
+      
+      // Fechar o modal e limpar o agente em edição
+      setIsBuilderModalOpen(false);
+      setEditingAgent(null);
+      
+      // Mostrar notificação de sucesso
+      toast({
+        title: `Agente ${agentData.id ? 'atualizado' : 'criado'} com sucesso!`,
+        description: `O agente "${agentData.agentName}" foi ${agentData.id ? 'atualizado' : 'criado'}.`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      return updatedAgent;
+        };
+        await updateAgent(updatedAgent.id, updatedAgent);
         toast({
           title: "Agente Atualizado",
-          description: `O agente "${agentConfig.agentName}" foi atualizado com sucesso.`,
+          description: `O agente "${agentFormData.agentName}" foi atualizado com sucesso.`,
         });
       } else {
-        const newAgentWithId = { ...agentConfig, id: uuidv4() };
-        await addAgent(newAgentWithId);
+        // Criar novo agente
+        const newAgent: SavedAgentConfiguration = {
+          ...agentFormData,
+          id: uuidv4(),
+          userId: 'current-user-id', // TODO: Substituir pelo ID do usuário real
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isTemplate: agentFormData.isTemplate || false,
+          // Garantir que todos os campos obrigatórios estejam presentes
+          agentDescription: agentFormData.agentDescription || '',
+          agentVersion: agentFormData.agentVersion || '1.0.0',
+          tools: agentFormData.tools || [],
+          toolConfigsApplied: agentFormData.toolConfigsApplied || {},
+          config: agentFormData.config || { type: 'llm', framework: 'genkit' } as AgentConfig,
+          toolsDetails: agentFormData.toolsDetails || [],
+          communicationChannels: agentFormData.communicationChannels || [],
+          debugModeEnabled: agentFormData.debugModeEnabled || false
+        };
+        
+        await addAgent(newAgent);
         toast({
           title: "Agente Criado",
-          description: `O agente "${newAgentWithId.agentName}" foi criado com sucesso.`,
+          description: `O agente "${agentFormData.agentName}" foi criado com sucesso.`,
         });
       }
-      await saveAgentConfig(agentConfig); // Save to local storage
+      await saveAgentConfig(agentFormData); // Save to local storage
       setIsBuilderModalOpen(false);
       setEditingAgent(null);
     } catch (error) {
@@ -464,20 +551,24 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
             iconComponents={iconComponents}
           />
         ) : (
-          <AgentCreatorChatUI
-            isOpen={isBuilderModalOpen} // This might need to be a different state if chat UI is a separate modal
-            onClose={() => {
-              setIsBuilderModalOpen(false);
-              setEditingAgent(null); // Clear editing agent when closing chat UI too
-            }}
-            onSave={handleSaveAgent} // Or a different save handler for chat-created agents
-            initialAgentConfig={editingAgent} // Pass existing config if editing, or null/default for new
-            availableTools={defaultAvailableTools.map(tool => tool.id)}
-            agentToneOptions={agentToneOptions.map(option => option.id)}
-            agentTypeOptions={agentTypeOptions.map(option => option.id)} // Corrigir mapeamento
-            iconComponents={iconComponents}
-            // onEditInFormMode={handleEditAgentWithMode} // Function to switch to form mode
-          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-full max-w-4xl bg-background rounded-lg shadow-lg p-6">
+              <AgentCreatorChatUI
+                initialAgentConfig={editingAgent}
+              />
+              <div className="mt-4 flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsBuilderModalOpen(false);
+                    setEditingAgent(null);
+                  }}
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </div>
         )
       )}
 
