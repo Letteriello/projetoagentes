@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense, lazy } from "react"; // Added lazy and Suspense
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import {
@@ -33,8 +34,8 @@ import { useAgentStorage } from "@/hooks/use-agent-storage"; // Import useAgentS
 import { cn } from "@/lib/utils";
 import { FixedSizeList } from 'react-window'; // Import FixedSizeList
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
-import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
-import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog";
+// import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog"; // Lazy loaded
+// import SaveAsTemplateDialog from "@/components/features/agent-builder/save-as-template-dialog"; // Lazy loaded
 import {
   Tooltip,
   TooltipContent,
@@ -68,13 +69,13 @@ export const agentToneOptions = [
   { id: 'formal', label: 'Formal' },
   { id: 'technical', label: 'Técnico' },
 ];
-import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui";
-import { AgentLogView } from "@/components/features/agent-builder/AgentLogView";
-import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView";
+// import { AgentCreatorChatUI } from "@/components/features/agent-builder/agent-creator-chat-ui"; // Lazy loaded
+// import { AgentLogView } from "@/components/features/agent-builder/AgentLogView"; // Lazy loaded
+// import { AgentMetricsView } from "@/components/features/agent-builder/AgentMetricsView"; // Lazy loaded
 import { v4 as uuidv4 } from 'uuid';
-import { HelpModal } from '@/components/ui/HelpModal';
-import FeedbackModal from '@/components/features/agent-builder/FeedbackModal';
-import { ConfirmationModal } from '@/components/ui/confirmation-modal'; 
+// import { HelpModal } from '@/components/ui/HelpModal'; // Lazy loaded
+// import FeedbackModal from '@/components/features/agent-builder/FeedbackModal'; // Lazy loaded
+// import { ConfirmationModal } from '@/components/ui/confirmation-modal'; // Lazy loaded
 
 // Define tutorials (example structure)
 const tutorials = {
@@ -91,6 +92,15 @@ const tutorials = {
   },
   // Add more tutorials as needed
 };
+
+const AgentBuilderDialog = lazy(() => import('@/components/features/agent-builder/agent-builder-dialog'));
+const SaveAsTemplateDialog = lazy(() => import('@/components/features/agent-builder/save-as-template-dialog'));
+const AgentCreatorChatUI = lazy(() => import('@/components/features/agent-builder/agent-creator-chat-ui'));
+const HelpModal = lazy(() => import('@/components/ui/HelpModal'));
+const FeedbackModal = lazy(() => import('@/components/features/agent-builder/FeedbackModal'));
+const ConfirmationModal = lazy(() => import('@/components/ui/confirmation-modal'));
+const AgentLogView = lazy(() => import('@/components/features/agent-builder/AgentLogView'));
+const AgentMetricsView = lazy(() => import('@/components/features/agent-builder/AgentMetricsView'));
 
 const AGENT_CARD_LIST_ITEM_SIZE = 210; // Approximate height of an agent card + padding
 
@@ -401,9 +411,15 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
             <Button onClick={() => setSelectedAgentForMonitoring(null)} variant="outline" className="mb-4">
               Voltar para Lista de Agentes
             </Button>
-            {selectedAgentForMonitoring && <AgentMetricsView agentId={selectedAgentForMonitoring.id} />}
+            {selectedAgentForMonitoring && (
+              <Suspense fallback={<div>Carregando métricas...</div>}>
+                <AgentMetricsView agentId={selectedAgentForMonitoring.id} />
+              </Suspense>
+            )}
           </div>
-          <AgentLogView agentId={selectedAgentForMonitoring.id} />
+          <Suspense fallback={<div>Carregando logs...</div>}>
+            <AgentLogView agentId={selectedAgentForMonitoring.id} />
+          </Suspense>
         </div>
       ) : (
         agents.length === 0 ? (
@@ -448,84 +464,86 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
         )
       )}
 
-      {isBuilderModalOpen && (
-        buildMode === 'form' ? (
-          <AgentBuilderDialog
-            isOpen={isBuilderModalOpen}
-            onClose={() => {
-              setIsBuilderModalOpen(false);
-              setEditingAgent(null);
-            }}
-            onSave={handleSaveAgent}
-            agent={editingAgent}
-            availableTools={defaultAvailableTools.map(tool => tool.id)} // Pass default tools or fetch dynamically
-            agentToneOptions={agentToneOptions.map(option => option.id)}
-            agentTypeOptions={agentTypeOptions.map(option => option.id)}
-            iconComponents={iconComponents}
+      <Suspense fallback={<div>Carregando...</div>}>
+        {isBuilderModalOpen && (
+          buildMode === 'form' ? (
+            <AgentBuilderDialog
+              isOpen={isBuilderModalOpen}
+              onClose={() => {
+                setIsBuilderModalOpen(false);
+                setEditingAgent(null);
+              }}
+              onSave={handleSaveAgent}
+              agent={editingAgent}
+              availableTools={defaultAvailableTools.map(tool => tool.id)} // Pass default tools or fetch dynamically
+              agentToneOptions={agentToneOptions.map(option => option.id)}
+              agentTypeOptions={agentTypeOptions.map(option => option.id)}
+              iconComponents={iconComponents}
+            />
+          ) : (
+            <AgentCreatorChatUI
+              isOpen={isBuilderModalOpen} // This might need to be a different state if chat UI is a separate modal
+              onClose={() => {
+                setIsBuilderModalOpen(false);
+                setEditingAgent(null); // Clear editing agent when closing chat UI too
+              }}
+              onSave={handleSaveAgent} // Or a different save handler for chat-created agents
+              initialAgentConfig={editingAgent} // Pass existing config if editing, or null/default for new
+              availableTools={defaultAvailableTools.map(tool => tool.id)}
+              agentToneOptions={agentToneOptions.map(option => option.id)}
+              agentTypeOptions={agentTypeOptions.map(option => option.id)} // Corrigir mapeamento
+              iconComponents={iconComponents}
+              // onEditInFormMode={handleEditAgentWithMode} // Function to switch to form mode
+            />
+          )
+        )}
+
+        {isSaveAsTemplateModalOpen && agentToSaveAsTemplate && (
+          <SaveAsTemplateDialog
+            isOpen={isSaveAsTemplateModalOpen}
+            onClose={() => setIsSaveAsTemplateModalOpen(false)}
+            onSave={onConfirmSaveAsTemplate}
+            agentName={agentToSaveAsTemplate.agentName}
           />
-        ) : (
-          <AgentCreatorChatUI
-            isOpen={isBuilderModalOpen} // This might need to be a different state if chat UI is a separate modal
-            onClose={() => {
-              setIsBuilderModalOpen(false);
-              setEditingAgent(null); // Clear editing agent when closing chat UI too
+        )}
+
+        {isTutorialModalOpen && (
+          <HelpModal
+            isOpen={isTutorialModalOpen}
+            onClose={closeTutorialModal}
+            title={activeTutorial.steps[currentTutorialStep].title}
+            isTutorial={true}
+            currentStep={currentTutorialStep}
+            totalSteps={activeTutorial.steps.length}
+            onNextStep={handleTutorialNext}
+            onPrevStep={handleTutorialPrev}
+            size="lg"
+          >
+            <div dangerouslySetInnerHTML={{ __html: activeTutorial.steps[currentTutorialStep].content as string }} />
+          </HelpModal>
+        )}
+        <FeedbackModal
+          isOpen={isFeedbackModalOpen}
+          onOpenChange={setIsFeedbackModalOpen}
+        />
+
+        {agentToDelete && (
+          <ConfirmationModal
+            isOpen={isConfirmDeleteAgentOpen}
+            onOpenChange={(isOpen) => {
+              setIsConfirmDeleteAgentOpen(isOpen);
+              if (!isOpen) {
+                setAgentToDelete(null);
+              }
             }}
-            onSave={handleSaveAgent} // Or a different save handler for chat-created agents
-            initialAgentConfig={editingAgent} // Pass existing config if editing, or null/default for new
-            availableTools={defaultAvailableTools.map(tool => tool.id)}
-            agentToneOptions={agentToneOptions.map(option => option.id)}
-            agentTypeOptions={agentTypeOptions.map(option => option.id)} // Corrigir mapeamento
-            iconComponents={iconComponents}
-            // onEditInFormMode={handleEditAgentWithMode} // Function to switch to form mode
+            title="Confirmar Exclusão de Agente"
+            description={`Tem certeza que deseja excluir o agente "${agentToDelete?.agentName}"? Esta ação não pode ser desfeita.`}
+            onConfirm={onConfirmDeleteAgent}
+            confirmButtonVariant="destructive"
+            confirmText="Excluir Agente"
           />
-        )
-      )}
-
-      {isSaveAsTemplateModalOpen && agentToSaveAsTemplate && (
-        <SaveAsTemplateDialog
-          isOpen={isSaveAsTemplateModalOpen}
-          onClose={() => setIsSaveAsTemplateModalOpen(false)}
-          onSave={onConfirmSaveAsTemplate}
-          agentName={agentToSaveAsTemplate.agentName}
-        />
-      )}
-
-      {isTutorialModalOpen && (
-        <HelpModal 
-          isOpen={isTutorialModalOpen}
-          onClose={closeTutorialModal}
-          title={activeTutorial.steps[currentTutorialStep].title}
-          isTutorial={true}
-          currentStep={currentTutorialStep}
-          totalSteps={activeTutorial.steps.length}
-          onNextStep={handleTutorialNext}
-          onPrevStep={handleTutorialPrev}
-          size="lg"
-        >
-          <div dangerouslySetInnerHTML={{ __html: activeTutorial.steps[currentTutorialStep].content as string }} />
-        </HelpModal>
-      )}
-      <FeedbackModal
-        isOpen={isFeedbackModalOpen}
-        onOpenChange={setIsFeedbackModalOpen}
-      />
-
-      {agentToDelete && (
-        <ConfirmationModal
-          isOpen={isConfirmDeleteAgentOpen}
-          onOpenChange={(isOpen) => {
-            setIsConfirmDeleteAgentOpen(isOpen);
-            if (!isOpen) {
-              setAgentToDelete(null);
-            }
-          }}
-          title="Confirmar Exclusão de Agente"
-          description={`Tem certeza que deseja excluir o agente "${agentToDelete?.agentName}"? Esta ação não pode ser desfeita.`}
-          onConfirm={onConfirmDeleteAgent}
-          confirmButtonVariant="destructive"
-          confirmText="Excluir Agente"
-        />
-      )}
+        )}
+      </Suspense>
     </div>
   );
 }
@@ -534,3 +552,4 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
 // Placeholder comment to ensure this line is unique for the next replace/append.
 // Note: The handleEditAgentWithMode function mentioned in comments for AgentCreatorChatUI
 // was not present in the original code, so it's not added here.
+// Added Suspense around modal groups and specific views

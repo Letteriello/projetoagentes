@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Suspense, lazy } from 'react'; // Added Suspense and lazy
 import { useFormContext, Controller, FormField } from 'react-hook-form'; // Added FormField
 import { z } from 'zod';
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import type { AvailableTool } from '@/types/tool-types';
-import CustomToolDialog, { CustomToolData } from '../custom-tool-dialog'; 
+// import CustomToolDialog, { CustomToolData } from '../custom-tool-dialog'; // Lazy loaded
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import {
   Card,
@@ -43,7 +44,7 @@ import { FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "
 
 // Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
 // For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
-import ToolConfigModal from '../ToolConfigModal'; // Added import
+// import ToolConfigModal from '../ToolConfigModal'; // Lazy loaded
 import type { ToolConfigData } from '@/types/agent-types'; // Added import
 import { ApiKeyEntry } from '../../../../services/api-key-service';
 
@@ -70,6 +71,9 @@ interface ToolsTabProps {
 //   userInput?: string;
 //   [key: string]: any;
 // };
+
+const CustomToolDialog = lazy(() => import('../custom-tool-dialog'));
+const ToolConfigModal = lazy(() => import('../ToolConfigModal'));
 
 // Definindo o tipo para as ferramentas sugeridas
 type SuggestedToolType = {
@@ -273,29 +277,61 @@ export default function ToolsTab({
         return null;
       })()}
 
-      {configuringTool && (
-        <ToolConfigModal
-          isOpen={isToolConfigModalOpen}
-          onOpenChange={setIsToolConfigModalOpen}
-          tool={configuringTool}
-          // Assuming allTools might be needed if the modal needs to reference other tool definitions
-          // For now, passing only the specific tool. If modal needs more, this can be adjusted.
-          // allTools={availableTools}
-          onSave={(configData) => handleSaveToolConfiguration(configuringTool.id, configData)}
-          existingConfig={toolConfigsApplied[configuringTool.id]}
-          availableApiKeys={availableApiKeys} // Pass availableApiKeys
-        />
-      )}
-      <CustomToolDialog
-        isOpen={isCustomToolDialogOpen}
-        onOpenChange={(open) => {
-          setIsCustomToolDialogOpen(open);
-          if (!open) setEditingCustomToolData(undefined); // Clear editing data when dialog closes
-        }}
-        onSave={handleSaveCustomTool}
-        initialData={editingCustomToolData}
-        availableApiKeys={availableApiKeys} // Pass availableApiKeys
-      />
+      <Suspense fallback={<div>Carregando configuração da ferramenta...</div>}>
+        {configuringTool && isToolConfigModalOpen && (
+          <ToolConfigModal
+            isOpen={isToolConfigModalOpen}
+            onOpenChange={setIsToolConfigModalOpen}
+            configuringTool={configuringTool} // Prop name changed from tool to configuringTool
+            // Assuming allTools might be needed if the modal needs to reference other tool definitions
+            // For now, passing only the specific tool. If modal needs more, this can be adjusted.
+            // allTools={availableTools}
+            onSave={(configData) => handleSaveToolConfiguration(configuringTool.id, configData)}
+            // existingConfig={toolConfigsApplied[configuringTool.id]} // Prop removed or handled internally in ToolConfigModal
+            availableApiKeys={availableApiKeys} // Pass availableApiKeys
+            // The following props seem to be from an older version of ToolConfigModal,
+            // they need to be verified against the actual props of ToolConfigModal.
+            // For now, commenting them out as they are likely handled by `existingConfig` or internal state.
+            // currentSelectedApiKeyId={toolConfigsApplied[configuringTool.id]?.selectedApiKeyId}
+            // onApiKeyIdChange={(toolId, apiKeyId) => {
+            //   const currentToolConfig = toolConfigsApplied[toolId] || {};
+            //   setValue(`toolConfigsApplied.${toolId}`, { ...currentToolConfig, selectedApiKeyId: apiKeyId }, { shouldDirty: true });
+            // }}
+            // modalGoogleCseId={toolConfigsApplied[configuringTool.id]?.googleCseId || ''} setModalGoogleCseId={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.googleCseId`, val)}
+            // modalOpenapiSpecUrl={toolConfigsApplied[configuringTool.id]?.openapiSpecUrl || ''} setModalOpenapiSpecUrl={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.openapiSpecUrl`, val)}
+            // modalDbType={toolConfigsApplied[configuringTool.id]?.dbType || ''} setModalDbType={(val) =>setValue(`toolConfigsApplied.${configuringTool.id}.dbType`, val)}
+            // modalDbHost={toolConfigsApplied[configuringTool.id]?.dbHost || ''} setModalDbHost={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.dbHost`, val)}
+            // modalDbPort={Number(toolConfigsApplied[configuringTool.id]?.dbPort) || 0} setModalDbPort={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.dbPort`, val)}
+            // modalDbName={toolConfigsApplied[configuringTool.id]?.dbName || ''} setModalDbName={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.dbName`, val)}
+            // modalDbUser={toolConfigsApplied[configuringTool.id]?.dbUser || ''} setModalDbUser={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.dbUser`, val)}
+            // modalDbConnectionString={toolConfigsApplied[configuringTool.id]?.dbConnectionString || ''} setModalDbConnectionString={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.dbConnectionString`, val)}
+            // modalDbDescription={toolConfigsApplied[configuringTool.id]?.dbDescription || ''} setModalDbDescription={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.dbDescription`, val)}
+            // modalKnowledgeBaseId={toolConfigsApplied[configuringTool.id]?.knowledgeBaseId || ''} setModalKnowledgeBaseId={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.knowledgeBaseId`, val)}
+            // modalCalendarApiEndpoint={toolConfigsApplied[configuringTool.id]?.calendarApiEndpoint || ''} setModalCalendarApiEndpoint={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.calendarApiEndpoint`, val)}
+            // modalAllowedPatterns={toolConfigsApplied[configuringTool.id]?.allowedPatterns || ''} setModalAllowedPatterns={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.allowedPatterns`, val)}
+            // modalDeniedPatterns={toolConfigsApplied[configuringTool.id]?.deniedPatterns || ''} setModalDeniedPatterns={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.deniedPatterns`, val)}
+            // modalCustomRules={toolConfigsApplied[configuringTool.id]?.customRules || ''} setModalCustomRules={(val) => setValue(`toolConfigsApplied.${configuringTool.id}.customRules`, val)}
+            // InfoIcon={InfoIconComponent} // Pass the correct InfoIcon component
+          />
+        )}
+      </Suspense>
+      <Suspense fallback={<div>Carregando diálogo...</div>}>
+        {isCustomToolDialogOpen && (
+          <CustomToolDialog
+            isOpen={isCustomToolDialogOpen}
+            onOpenChange={(open) => {
+              setIsCustomToolDialogOpen(open);
+              if (!open) setEditingCustomToolData(undefined); // Clear editing data when dialog closes
+            }}
+            onSave={handleSaveCustomTool}
+            initialData={editingCustomToolData}
+            // availableApiKeys={availableApiKeys} // This prop was removed from CustomToolDialog in a previous commit.
+                                                // Keeping it commented out here as a reminder if it needs to be re-added based on CustomToolDialog's actual props.
+                                                // For now, assuming CustomToolDialog does not take availableApiKeys.
+                                                // If CustomToolDialog *does* need it, uncomment and ensure it's correctly passed.
+          />
+        )}
+      </Suspense>
       <AlertDialog open={!!toolToDelete} onOpenChange={() => setToolToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -31,7 +31,8 @@ import { useToast } from '@/hooks/use-toast';
 // Initialize Inter font
 export const inter = Inter({ 
   subsets: ['latin'], 
-  variable: '--font-inter' 
+  variable: '--font-inter',
+  display: 'swap'
 });
 
 // Script to polyfill Node.js modules early in the page lifecycle
