@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge"; // Added import for Badge
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -30,6 +31,7 @@ import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensage
 interface ChatMessageDisplayProps {
   message: ChatMessageUI; // Objeto da mensagem, incluindo se está sendo transmitida (isStreaming).
   onRegenerate?: (messageId: string) => void; // Função para tentar novamente o envio da mensagem.
+  isVerboseMode?: boolean; // Added isVerboseMode prop
 }
 
 // Componente para exibir um cursor piscante, usado para indicar que o agente está digitando.
@@ -63,6 +65,7 @@ const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React
 
 export default function ChatMessageDisplay({
   message,
+  isVerboseMode, // Destructure isVerboseMode
 }: ChatMessageDisplayProps) {
   const isUser = message.sender === "user"; // Verifica se o remetente é o usuário.
   const isAgent = message.sender === "agent"; // Verifica se o remetente é o agente.
@@ -157,9 +160,14 @@ export default function ChatMessageDisplay({
 
           {/* Details for Tool Call Input */}
           {message.toolCall && message.toolCall.input && (
-            <details className="mt-2 text-xs">
-              <summary className="cursor-pointer">Detalhes da Entrada</summary>
-              <pre className="bg-muted p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+            <details className="mt-2 text-xs" open={isVerboseMode}>
+              <summary className="cursor-pointer flex items-center gap-1">
+                Input:
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                  {message.toolCall.name || 'Tool'}
+                </Badge>
+              </summary>
+              <pre className="bg-muted p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-all mt-1">
                 {JSON.stringify(message.toolCall.input, null, 2)}
               </pre>
             </details>
@@ -167,9 +175,14 @@ export default function ChatMessageDisplay({
 
           {/* Details for Tool Response Output (Success) */}
           {message.toolResponse && message.toolResponse.status === 'success' && message.toolResponse.output && (
-            <details className="mt-2 text-xs">
-              <summary className="cursor-pointer">Detalhes da Saída</summary>
-              <pre className="bg-muted p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+            <details className="mt-2 text-xs" open={isVerboseMode}>
+              <summary className="cursor-pointer flex items-center gap-1">
+                Output:
+                <Badge variant="default" className="text-xs px-1.5 py-0.5 bg-green-600 hover:bg-green-700 text-white">
+                  {message.toolResponse.name || 'Tool'}
+                </Badge>
+              </summary>
+              <pre className="bg-muted p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-all mt-1">
                 {typeof message.toolResponse.output === 'object' ? JSON.stringify(message.toolResponse.output, null, 2) : String(message.toolResponse.output)}
               </pre>
             </details>
@@ -177,10 +190,16 @@ export default function ChatMessageDisplay({
 
           {/* Details for Tool Response Error */}
           {message.toolResponse && message.toolResponse.status === 'error' && message.toolResponse.errorDetails && (
-            <details className="mt-2 text-xs">
-              <summary className="cursor-pointer">Detalhes do Erro</summary>
-              <pre className="bg-muted p-2 rounded-md overflow-x-auto text-red-600 whitespace-pre-wrap break-all">
-                {`Code: ${message.toolResponse.errorDetails.code || 'N/A'}
+            <details className="mt-2 text-xs" open={isVerboseMode}>
+              <summary className="cursor-pointer flex items-center gap-1">
+                Error:
+                <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                  {message.toolResponse.name || 'Tool'}
+                </Badge>
+              </summary>
+              <pre className="bg-muted p-2 rounded-md overflow-x-auto text-red-600 whitespace-pre-wrap break-all mt-1">
+                {`Tool: ${message.toolResponse.name || 'N/A'}
+Code: ${message.toolResponse.errorDetails.code || 'N/A'}
 Message: ${message.toolResponse.errorDetails.message}${message.toolResponse.errorDetails.details ? `
 Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.stringify(message.toolResponse.errorDetails.details, null, 2) : message.toolResponse.errorDetails.details}` : ''}`}
               </pre>
@@ -191,6 +210,12 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
         {/* Seção para exibir imagens anexadas. */}
         {message.imageUrl && (
           <div className="mt-2"> {/* This mt-2 might need adjustment if details are present */}
+            {/*
+              IMPORTANT for Next.js Image optimization:
+              If message.imageUrl can be an external URL, its hostname must be configured
+              in next.config.js under images.domains or images.remotePatterns.
+              e.g., images: { remotePatterns: [{ protocol: 'https', hostname: 'example.com' }] }
+            */}
             <Image
               src={message.imageUrl}
               alt={message.fileName || "Imagem anexada"} // Texto alternativo para a imagem.
