@@ -3,6 +3,7 @@ import { Conversation } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
 import { MessageSquarePlus } from "lucide-react"; // Import the icon
+import EmptyState from '@/components/shared/EmptyState'; // Import EmptyState
 
 // TODO: Move AgentSelectItem to a shared types file
 interface AgentSelectItem {
@@ -202,15 +203,12 @@ export function ConversationSidebar({
                   ))}
                 </ul>
               ) : conversations.length === 0 ? (
-                <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                  <MessageSquarePlus className="w-12 h-12 text-gray-500 mb-3" />
-                  <h3 className="text-md font-semibold text-gray-300 mb-1">
-                    Inicie uma Nova Conversa
-                  </h3>
-                  <p className="text-sm text-gray-400">
-                    Clique no botão "New Chat" acima para começar um novo diálogo.
-                  </p>
-                </div>
+                <EmptyState
+                  icon={<MessageSquarePlus className="w-12 h-12 text-gray-500" />} // Adjusted icon size to match original
+                  title="Inicie uma Nova Conversa"
+                  description="Clique no botão New Chat acima para começar um novo diálogo."
+                  className="flex-grow justify-center text-gray-400 bg-transparent border-none shadow-none px-0 py-0" // Override default styling to match original layout better
+                />
               ) : (
                 <ul className="space-y-1">
                   {conversations.map((conv) => (

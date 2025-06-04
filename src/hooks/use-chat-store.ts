@@ -12,7 +12,8 @@ import {
   updateMessageFeedback,
   deleteMessageFromConversation,
   // finalizeMessageInConversation, // Not used in this hook, but available from service
-} from '@/services/indexed-db-conversation-service'; // UPDATED IMPORT
+// } from '@/services/indexed-db-conversation-service'; // Will be replaced by useConversationsStorage
+import { useConversationsStorage } from '@/hooks/useConversationsStorage'; // Import the new hook
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -100,6 +101,8 @@ export interface ChatStore {
 export function useChatStore(): ChatStore {
   const { currentUser } = useAuth();
   const router = useRouter();
+  const conversationStorage = useConversationsStorage(); // Instantiate the new hook
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]); // True state from DB
@@ -150,7 +153,7 @@ export function useChatStore(): ChatStore {
   useEffect(() => {
     if (currentUser?.uid) {
       setIsLoadingConversations(true);
-      getAllConversations(currentUser.uid)
+      conversationStorage.getAllConversations(currentUser.uid)
         .then((fetchedConversations) => {
           setConversations(fetchedConversations);
         })
@@ -160,7 +163,7 @@ export function useChatStore(): ChatStore {
         })
         .finally(() => setIsLoadingConversations(false));
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, conversationStorage]);
 
   const handleNewConversation = useCallback(async (defaultTitle: string = "New Chat"): Promise<Conversation | null> => {
     if (!currentUserId) {
@@ -168,7 +171,7 @@ export function useChatStore(): ChatStore {
       return null;
     }
     try {
-      const newConversation = await createNewConversation(currentUserId, defaultTitle);
+      const newConversation = await conversationStorage.createConversation(currentUserId, defaultTitle);
       setConversations((prevs) => [newConversation, ...prevs]);
       setMessages([]);
       addOptimisticMessage({ type: 'set_messages', messages: [] });
@@ -179,7 +182,7 @@ export function useChatStore(): ChatStore {
       toast({ title: "Error", description: "Failed to create new conversation.", variant: "destructive" });
       return null;
     }
-  }, [currentUserId, router, addOptimisticMessage]);
+  }, [currentUserId, router, addOptimisticMessage, conversationStorage]);
 
   const handleSelectConversation = useCallback(async (conversationId: string) => {
     setActiveConversationId(conversationId);
@@ -187,7 +190,7 @@ export function useChatStore(): ChatStore {
     setInputContinuation(null);
 
     try {
-      const conversation = await getConversationById(conversationId);
+      const conversation = await conversationStorage.getConversationById(conversationId);
       const uiMessages: ExtendedChatMessageUI[] = (conversation?.messages || []).map((dbMessage: Message) => ({
         id: dbMessage.id || uuidv4(),
         text: dbMessage.content || "", // Assuming content is string, adjust if structured
@@ -209,14 +212,14 @@ export function useChatStore(): ChatStore {
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [addOptimisticMessage]); // Removed router dependency
+  }, [addOptimisticMessage, conversationStorage]); // Removed router dependency, Added conversationStorage
 
   const handleDeleteConversation = useCallback(async (conversationId: string) => {
     if (!currentUserId) {
       toast({ title: "Error", description: "User not logged in.", variant: "destructive" }); return;
     }
     try {
-      await deleteConversationFromStorage(conversationId);
+      await conversationStorage.deleteConversation(conversationId);
       setConversations((prevs) => prevs.filter((conv) => conv.id !== conversationId));
       if (activeConversationId === conversationId) {
         setActiveConversationId(null);
@@ -229,18 +232,18 @@ export function useChatStore(): ChatStore {
       console.error("Error deleting conversation:", error);
       toast({ title: "Error", description: "Failed to delete conversation.", variant: "destructive" });
     }
-  }, [currentUserId, activeConversationId, router, addOptimisticMessage]);
+  }, [currentUserId, activeConversationId, router, addOptimisticMessage, conversationStorage]);
 
   const handleRenameConversation = useCallback(async (conversationId: string, newTitle: string) => {
     try {
-      await renameConversationInStorage(conversationId, newTitle);
+      await conversationStorage.renameConversation(conversationId, newTitle);
       setConversations((prevs) => prevs.map((conv) => (conv.id === conversationId ? { ...conv, title: newTitle } : conv)));
       toast({ title: "Success", description: "Conversation renamed." });
     } catch (error) {
       console.error("Error renaming conversation:", error);
       toast({ title: "Error", description: "Failed to rename conversation.", variant: "destructive" });
     }
-  }, []);
+  }, [conversationStorage]);
 
   useEffect(() => {
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -270,7 +273,7 @@ export function useChatStore(): ChatStore {
       }
     } // Case for no conversations and no active ID: remain on /chat or show empty state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversationId, conversations, isLoadingConversations, isLoadingMessages, router]); // handleSelectConversation removed from deps
+  }, [activeConversationId, conversations, isLoadingConversations, isLoadingMessages, router, handleSelectConversation]); // handleSelectConversation re-added as it's called
 
   useEffect(() => {
     if (activeConversationId) {
@@ -394,7 +397,7 @@ export function useChatStore(): ChatStore {
         conversationId: currentConvId,
         text: messageInputValue,
       };
-      await addMessageToConversation(currentConvId, userMessageToPersist);
+      await conversationStorage.addMessage(currentConvId, userMessageToPersist);
       // Update true `messages` state
       setMessages(prev => [...prev, { ...userMessagePayload, status: 'completed' }]);
       addOptimisticMessage({ type: 'update_message_status', messageId: userMessageId, newStatus: 'completed' });
@@ -580,7 +583,7 @@ export function useChatStore(): ChatStore {
               conversationId: currentConvId,
               text: msg.text,
             };
-            await addMessageToConversation(currentConvId, messageToPersist);
+            await conversationStorage.addMessage(currentConvId, messageToPersist);
           }
         }
         // Update the true `messages` state, including 'event' types for UI display
@@ -616,7 +619,7 @@ export function useChatStore(): ChatStore {
             conversationId: currentConvId,
             text: finalAgentText, // Ensure text field
         };
-        await addMessageToConversation(currentConvId, agentMessageToPersist);
+        await conversationStorage.addMessage(currentConvId, agentMessageToPersist);
         setMessages(prev => [...prev, finalAgentPayload]);
       }
 
@@ -653,7 +656,7 @@ export function useChatStore(): ChatStore {
             conversationId: currentConvId,
             text: errorMsg, // Ensure text field
           };
-          addMessageToConversation(currentConvId, agentErrorPersistObject)
+          conversationStorage.addMessage(currentConvId, agentErrorPersistObject)
             .catch(err => {
               console.error("Failed to persist agent error message to IndexedDB:", err);
               // Optionally, toast another error or handle this failure
@@ -679,7 +682,7 @@ export function useChatStore(): ChatStore {
 
     try {
       // Attempt to persist the feedback to the database
-      await updateMessageFeedback(activeConversationId, messageId, feedback);
+      await conversationStorage.updateMessageFeedback(activeConversationId, messageId, feedback);
 
       // If successful, update the true `messages` state to reflect the change
       const updatedMessagesTrueState = messages.map(msg =>
@@ -748,7 +751,7 @@ export function useChatStore(): ChatStore {
       // Revert optimistic update on error
       addOptimisticMessage({ type: "update_message_feedback", messageId, feedback: originalFeedback });
     }
-  };
+  }, [conversationStorage, messages, activeConversationId, waitingForFeedbackOnMessageId, addOptimisticMessage]); // Added conversationStorage and other relevant dependencies
 
   const handleRegenerate = async (
     messageIdToRegenerate: string,
@@ -791,7 +794,7 @@ export function useChatStore(): ChatStore {
     // Actual deletion from DB (can happen in background, errors logged but don't block UI flow)
     for (const msgToRemove of messagesToRemove) {
       try {
-        await deleteMessageFromConversation(activeConversationId, msgToRemove.id);
+        await conversationStorage.deleteMessage(activeConversationId, msgToRemove.id);
       } catch (error) {
         console.error(`Failed to delete message ${msgToRemove.id} from DB:`, error);
         // Not re-throwing or toasting for these, to keep regeneration flow smooth
@@ -871,7 +874,7 @@ export function useChatStore(): ChatStore {
           conversationId: activeConversationId,
           text: accumulatedAgentResponse, // Ensure text field
       };
-      await addMessageToConversation(activeConversationId, agentMessageToPersist);
+      await conversationStorage.addMessage(activeConversationId, agentMessageToPersist);
       setMessages(prev => [...prev, finalAgentPayload]); // Update true state
       setConversations(prev => prev.map(c => c.id === activeConversationId ? ({ ...c, updatedAt: new Date(), lastMessagePreview: accumulatedAgentResponse.substring(0,50) }) : c));
 

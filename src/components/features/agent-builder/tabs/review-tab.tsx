@@ -11,17 +11,19 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from 'zod';
 import { Badge } from '@/components/ui/badge'; // Existing import
 
-// Assuming ReviewTabProps includes setActiveEditTab and showHelpModal, though not used in this snippet
+import type { AvailableTool } from '@/types/tool-types'; // Import AvailableTool
+
 export interface ReviewTabProps {
   setActiveEditTab?: (tabId: string) => void;
   showHelpModal?: (contentKey: any) => void; // Adjust 'any' to your specific help content key type
+  availableTools: AvailableTool[]; // Add availableTools to props
 }
 
 
 export default function ReviewTab(props: ReviewTabProps) {
   const { watch, getValues } = useFormContext<SavedAgentConfiguration>();
   const { toast } = useToast();
-  // const { setActiveEditTab, showHelpModal } = props; // Assuming props are passed
+  const { setActiveEditTab, showHelpModal, availableTools } = props; // Destructure props
 
   const agentName = watch('agentName');
   const description = watch('agentDescription');
@@ -64,11 +66,17 @@ export default function ReviewTab(props: ReviewTabProps) {
     }
   };
 
-  // Helper to get tool names for display - assuming availableTools might be fetched or passed to a higher context
-  // For now, this is a placeholder as ReviewTab doesn't have direct access to availableTools details
+  // Helper to get tool names for display
   const getToolDisplayInfo = (toolId: string) => {
-    // In a real scenario, you'd look up tool details from availableTools or a context
-    return { id: toolId, name: toolId }; // Placeholder
+    const tool = availableTools.find(t => t.id === toolId);
+    // Fallback for custom tools where name might be in toolConfigsApplied
+    if (tool?.type === 'custom') {
+      const customToolConfig = toolConfigsApplied[toolId];
+      if (customToolConfig && customToolConfig.name) {
+        return { id: toolId, name: customToolConfig.name };
+      }
+    }
+    return tool ? { id: toolId, name: tool.name } : { id: toolId, name: toolId };
   };
 
   const renderToolConfigsForReview = (configs: Record<string, any> | undefined, appliedToolIds: string[]) => {

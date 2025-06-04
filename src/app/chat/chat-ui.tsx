@@ -107,6 +107,7 @@ import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
 // import { Message } from "@/types/chat"; // Message type is used by useChatStore
 import { Conversation, ChatMessageUI, TestRunConfig, ChatRunConfig } from "@/types/chat"; // Added ChatRunConfig
+import LoadingState from "@/components/shared/LoadingState"; // Import LoadingState
 // import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
 // import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -648,37 +649,37 @@ export function ChatUI() {
         <div className="flex-1 flex flex-col relative overflow-hidden">
           <div className="flex-1 overflow-hidden">
             <ScrollArea ref={scrollAreaRef} className="h-full p-4 pt-2">
-              {store.isLoadingMessages ? (
-                <div className="flex items-center justify-center min-h-[calc(100vh-180px)]">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="text-muted-foreground">Carregando mensagens...</p>
+              <LoadingState
+                isLoading={store.isLoadingMessages}
+                loadingText="Carregando mensagens..."
+                loadingType="spinner"
+                // No explicit error state managed here for messages, so error prop is omitted
+              >
+                {!currentUser ? (
+                  <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
+                    <LogIn size={48} className="mb-4 text-primary" />
+                    <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
+                    <p className="mb-4 text-lg">Por favor, faça login para usar o chat.</p>
+                    <Button onClick={handleLogin} variant="default" size="lg">
+                      <LogIn className="mr-2 h-5 w-5" /> Entrar com Google
+                    </Button>
                   </div>
-                </div>
-              ) : !currentUser ? ( // Keep login screen logic
-                <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
-                  <LogIn size={48} className="mb-4 text-primary" />
-                  <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
-                  <p className="mb-4 text-lg">Por favor, faça login para usar o chat.</p>
-                  <Button onClick={handleLogin} variant="default" size="lg">
-                    <LogIn className="mr-2 h-5 w-5" /> Entrar com Google
-                  </Button>
-                </div>
-              ) : store.optimisticMessages.length === 0 && !store.isPending && !pendingAgentConfig ? (
-                <div className="min-h-[calc(100vh-180px)]">
-                  <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
-                </div>
-              ) : (
-                <div className="pb-20">
-                  <MessageList
-                    messages={store.optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
-                    isPending={store.isPending}
-                    onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
-                    onFeedback={store.handleFeedback}
-                    isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
-                  />
-                </div>
-              )}
+                ) : store.optimisticMessages.length === 0 && !store.isPending && !pendingAgentConfig ? (
+                  <div className="min-h-[calc(100vh-180px)]">
+                    <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
+                  </div>
+                ) : (
+                  <div className="pb-20">
+                    <MessageList
+                      messages={store.optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
+                      isPending={store.isPending}
+                      onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
+                      onFeedback={store.handleFeedback}
+                      isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
+                    />
+                  </div>
+                )}
+              </LoadingState>
             </ScrollArea>
           </div>
 

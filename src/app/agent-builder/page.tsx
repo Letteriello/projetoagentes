@@ -27,6 +27,7 @@ import {
   List, // Icon for List view
   LayoutGrid, // Icon for Grid view
 } from "lucide-react";
+import EmptyState from '@/components/shared/EmptyState'; // Import EmptyState
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
 import { useAgents } from "@/contexts/AgentsContext";
@@ -423,16 +424,18 @@ export default function AgentBuilderPage({ searchParams = {} }: AgentBuilderPage
         </div>
       ) : (
         agents.length === 0 ? (
-          <div className="text-center py-12">
-            <Ghost className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-xl font-semibold text-gray-900 dark:text-gray-100">Nenhum agente encontrado</h3>
-            <p className="mt-1 text-gray-500 dark:text-gray-400">Comece criando um novo agente para vê-lo aqui.</p>
-            <div className="mt-6">
-              <Button onClick={handleCreateNewAgent} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="mr-2" /> Criar Primeiro Agente
-              </Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={<Ghost className="mx-auto h-12 w-12 text-gray-400" />}
+            title="Nenhum agente encontrado"
+            description="Comece criando um novo agente para vê-lo aqui."
+            actionButton={{
+              text: "Criar Primeiro Agente",
+              onClick: handleCreateNewAgent,
+              icon: <Plus className="mr-2 h-4 w-4" />, // lucide-react icons usually take size via className
+              className: "bg-blue-600 hover:bg-blue-700", // Or use variant="default" if style matches
+            }}
+            className="py-12" // Keep original padding
+          />
         ) : (
           viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
