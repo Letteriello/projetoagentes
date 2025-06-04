@@ -218,7 +218,7 @@ import type {
   // Add any other specific config types that were imported from agent-configs-fixed if they were missed
   // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
   // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
-
+  MCPServerConfig, // Added for MCP Server mock data
 } from '@/types/agent-types';
 // Import WorkflowStep directly from agent-configs-new
 import { WorkflowStep } from '@/types/agent-configs-new';
@@ -700,7 +700,16 @@ interface AgentBuilderDialogProps {
   agentToneOptions: string[];
   iconComponents: Record<string, React.ComponentType>;
   availableAgentsForSubSelector: Array<{ id: string; agentName: string }>;
+  mcpServers?: MCPServerConfig[]; // Prop if passed from parent, otherwise mock
+  onConfigureToolInDialog: (tool: AvailableTool) => void; // New prop from AgentBuilderPage
 }
+
+// Mock MCP Servers data for now
+const mockMcpServers: MCPServerConfig[] = [
+  { id: 'mcp-server-1', name: 'MCP Server Alpha', url: 'https://mcp.example.com/alpha', description: 'Primary MCP processing server.' },
+  { id: 'mcp-server-2', name: 'MCP Server Beta (Experimental)', url: 'https://mcp.example.com/beta', description: 'Experimental MCP server with new features.' },
+  { id: 'mcp-server-3', name: 'MCP Server Gamma (Legacy)', url: 'https://mcp.example.com/gamma', description: 'Legacy MCP server for specific tools.' },
+];
 
 const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   isOpen,
@@ -712,6 +721,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   agentToneOptions,
   iconComponents,
   availableAgentsForSubSelector,
+  mcpServers = mockMcpServers, // Use prop or default to mock
+  onConfigureToolInDialog, // Destructure the new prop
 }) => {
   const { apiKeys: availableApiKeys, isLoading: apiKeysLoading, error: apiKeysError } = useApiKeyVault();
   // TODO: Handle apiKeysLoading and apiKeysError appropriately
@@ -1500,15 +1511,17 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                   <Suspense fallback={<LoadingFallback />}>
                     <ToolsTab
                       availableTools={availableTools}
-                      // selectedTools, setSelectedTools, toolConfigurations, setToolConfiguration are managed by useFormContext in ToolsTab
+                      // selectedTools, setSelectedTools, toolConfigurations are from useFormContext
+                      handleToolConfigure={onConfigureToolInDialog} // Pass the handler to ToolsTab
                       iconComponents={iconComponents}
-                      InfoIconComponent={InfoIcon} // Pass the imported InfoIcon, ToolsTab expects InfoIconComponent
+                      InfoIconComponent={InfoIcon}
                       SettingsIcon={Settings}
-                    CheckIcon={Check}
-                    PlusCircleIcon={PlusCircle} // Keep passing for now, ToolsTabProps includes it
-                    Trash2Icon={Trash2} // Keep passing for now, ToolsTabProps includes it
-                    showHelpModal={showHelpModal}
-                    availableApiKeys={availableApiKeys || []}
+                      CheckIcon={Check}
+                      PlusCircleIcon={PlusCircle}
+                      Trash2Icon={Trash2}
+                      showHelpModal={showHelpModal}
+                      availableApiKeys={availableApiKeys || []}
+                      mcpServers={mcpServers} // Pass mcpServers from props (which defaults to mockMcpServers)
                     />
                   </Suspense>
                 </TabsContent>

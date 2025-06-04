@@ -762,9 +762,10 @@ async function basicChatFlowInternal(
           }
 
           if (toolExecutionFailed) {
+            // This block is for tools that failed due to callback blocking, before attempting to find/run the tool.
             executedToolResults.push({ name: toolRequest.name, input: modifiedToolInput as Record<string, unknown>, errorDetails: { message: errorMessage!, code: (resultOutput as any).code }, status: 'error', ref: toolRequest.ref });
             toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
-            // Tool Token Simulation for failed/blocked tool
+            // Tool Token Simulation for failed/blocked tool (callback blocked)
             const toolInputTokens = JSON.stringify(modifiedToolInput || {}).length / 4;
             const toolOutputTokens = JSON.stringify(resultOutput || {}).length / 4; // Output contains error
             const toolExecutionTokens = 1; // Minimal cost for blocked/failed execution attempt
@@ -783,6 +784,68 @@ async function basicChatFlowInternal(
             continue;
           }
 
+          // MCP Tool Simulation Logic
+          const currentToolDetail = input.agentToolsDetails?.find(td => td.id === toolRequest.name || td.name === toolRequest.name);
+          const isMCP = currentToolDetail?.config?.isMCPTool === true;
+          const mcpServerId = currentToolDetail?.config?.selectedMcpServerId as string | undefined;
+
+          if (isMCP && mcpServerId) {
+            winstonLogger.info(`[MCP Simulation] Simulating call for MCP tool "${toolRequest.name}" to server "${mcpServerId}" with input: ${JSON.stringify(toolRequest.input)}`, { agentId, flowName });
+
+            resultOutput = {
+              simulatedMcpResponse: true,
+              message: `Successfully simulated call to MCP tool '${toolRequest.name}' on server '${mcpServerId}'.`,
+              receivedInput: toolRequest.input,
+              mockData: { result: "some mock value from " + mcpServerId }
+            };
+            toolExecutionFailed = false; // Mark as success for simulation purposes
+
+            executedToolResults.push({
+              name: toolRequest.name,
+              input: toolRequest.input as Record<string, unknown>,
+              output: resultOutput,
+              status: 'success',
+              ref: toolRequest.ref
+            });
+
+            chatEvents.push({
+              id: `evt-mcp-sim-${toolRequest.name}-${Date.now()}`,
+              timestamp: new Date(),
+              eventType: 'TOOL_CALL',
+              toolName: toolRequest.name,
+              eventTitle: `Simulated MCP Tool Call: ${toolRequest.name}`,
+              eventDetails: `Simulated call to server '${mcpServerId}'. Output: ${JSON.stringify(resultOutput)}`
+            });
+
+            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
+
+            // Tool Token Simulation for simulated MCP tool
+            const mcpToolInputTokens = JSON.stringify(toolRequest.input || {}).length / 4;
+            const mcpToolOutputTokens = JSON.stringify(resultOutput || {}).length / 4;
+            const mcpToolExecutionTokens = 3; // Slightly different cost for simulated MCP
+            const totalMcpToolTokens = mcpToolInputTokens + mcpToolOutputTokens + mcpToolExecutionTokens;
+            if (flowContext?.trace && totalMcpToolTokens > 0) {
+              flowContext.trace({
+                type: 'custom_event', name: 'performance_metrics_event',
+                data: {
+                  id: `token-tool-${toolRequest.name}-mcp-sim-${Date.now()}`, timestamp: new Date().toISOString(), agentId: agentId, traceId: flowContext.traceId,
+                  eventType: 'performance_metrics', metricName: 'token_usage', value: totalMcpToolTokens, unit: 'tokens',
+                  details: { source: 'tool', toolName: toolRequest.name, inputTokens: mcpToolInputTokens, outputTokens: mcpToolOutputTokens, executionTokens: mcpToolExecutionTokens, status: 'mcp_simulated_success' }
+                }
+              });
+              winstonLogger.info(`[TokenUsage] Tool (MCP Simulated) Token Usage: ${totalMcpToolTokens} for tool ${toolRequest.name}, agent ${agentId}`, { agentId, flowName, totalToolTokens, toolName: toolRequest.name });
+            }
+
+            // Remove the pending event for this tool as we've added a specific MCP event
+            const pendingEventIndex = chatEvents.findIndex(event => event.id === pendingEventId);
+            if (pendingEventIndex > -1) {
+                chatEvents.splice(pendingEventIndex, 1);
+            }
+
+            continue; // Skip normal tool execution
+          }
+          // End of MCP Tool Simulation Logic
+
           const toolToRun = genkitTools.find(t => t.name === toolRequest.name) as AppTool | undefined;
 
           if (!toolToRun) {
@@ -790,19 +853,18 @@ async function basicChatFlowInternal(
             errorMessage = `Ferramenta ${toolRequest.name} não encontrada`;
             resultOutput = { error: errorMessage, code: 'TOOL_NOT_FOUND' };
             // ... (rest of error handling for TOOL_NOT_FOUND)
-            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput }); // Changed from toolResponseParts
+            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
             continue;
           }
 
-          let validatedInput = toolRequest.input;
-          if (toolToRun.inputSchema) {
+          let validatedInput = toolRequest.input; // Use original input for MCP tools if they bypass schema validation here
+          if (toolToRun.inputSchema) { // This validation might be skipped for already simulated MCP tools if `continue` was hit
             const validation = toolToRun.inputSchema.safeParse(toolRequest.input);
             if (!validation.success) {
               toolExecutionFailed = true;
               errorMessage = `Input inválido para ${toolRequest.name}: ${validation.error.issues.map(i => i.path.join('.') + ': ' + i.message).join(', ')}`;
               resultOutput = { error: errorMessage, code: 'INPUT_VALIDATION_ERROR', details: validation.error.issues };
-              // ... (rest of error handling for INPUT_VALIDATION_ERROR)
-              toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput }); // Changed from toolResponseParts
+              toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
               continue;
             }
             validatedInput = validation.data;
@@ -812,8 +874,7 @@ async function basicChatFlowInternal(
             toolExecutionFailed = true;
             errorMessage = `Ferramenta ${toolRequest.name} não possui função executável.`;
             resultOutput = { error: errorMessage, code: 'TOOL_NOT_EXECUTABLE' };
-            // ... (rest of error handling for TOOL_NOT_EXECUTABLE)
-            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput }); // Changed from toolResponseParts
+            toolResponsePartsForNextIteration.push({ toolRequest, output: resultOutput });
             continue;
           }
 
