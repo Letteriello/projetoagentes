@@ -132,38 +132,78 @@ export async function POST(req: NextRequest) {
     });
 
 
-    // Streaming callback for handling chunks
-    let accumulatedResponse = "";
-    const genkitStream = new ReadableStream({
+    const flowOutput = await basicChatFlow(actualBasicChatInput);
+
+    const stream = new ReadableStream({
       async start(controller) {
-        await basicChatFlow(actualBasicChatInput, (chunk) => {
-          // Assuming chunk is directly the string content or can be processed to string
-          // This part might need adjustment based on the actual chunk structure from basicChatFlow
-          let content = '';
-          if (typeof chunk === 'string') {
-            content = chunk;
-          } else if (chunk?.outputMessage) { // If basicChatFlow stream returns objects with outputMessage
-            content = chunk.outputMessage;
-          } else if (chunk?.response?.text) { // Adapting to potential genkit stream structure
-             content = chunk.response.text();
-          } else if (chunk?.text) { // Adapting to potential genkit stream structure for candidate
-             content = chunk.text();
+        // Enqueue chat events first
+        if (flowOutput.chatEvents && flowOutput.chatEvents.length > 0) {
+          for (const event of flowOutput.chatEvents) {
+            // Ensure events have proper id and timestamp if they were partial
+            const fullEvent = {
+              id: event.id || `evt-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+              timestamp: event.timestamp || new Date(),
+              ...event
+            };
+            controller.enqueue(JSON.stringify({ type: 'event', data: fullEvent }) + '\n');
           }
+        }
 
+        // Handle potential errors from the flow
+        if (flowOutput.error) {
+          const errorEvent = {
+            id: `err-${Date.now()}`,
+            timestamp: new Date(),
+            eventType: 'AGENT_CONTROL', // Or a more specific error type for flow errors
+            eventTitle: 'Flow Error',
+            eventDetails: flowOutput.error,
+          };
+          controller.enqueue(JSON.stringify({ type: 'event', data: errorEvent }) + '\n');
+          winstonLogger.error('Error from basicChatFlow', { api: 'chat-stream', agentId: chatInput.agentId, error: flowOutput.error });
+          // We might still want to send any accumulated text or decide to close.
+          // For now, we send the error event and proceed to outputMessage if any.
+        }
 
-          if (content) {
-            accumulatedResponse += content;
-            controller.enqueue(content);
-          }
-        });
+        // Enqueue the final output message (as text)
+        // TODO: Integrate actual text streaming from LLM if flowOutput.stream is available
+        if (flowOutput.outputMessage) {
+          // If LLM response streaming is implemented in basicChatFlow and populates flowOutput.stream:
+          // For example:
+          // if (flowOutput.stream) {
+          //   const reader = flowOutput.stream.getReader();
+          //   while (true) {
+          //     const { done, value } = await reader.read();
+          //     if (done) break;
+          //     // Assuming value is a text chunk
+          //     controller.enqueue(JSON.stringify({ type: 'text', data: value }) + '\n');
+          //   }
+          // } else if (flowOutput.outputMessage) { ... }
+          // For now, sending the whole message as one chunk:
+          controller.enqueue(JSON.stringify({ type: 'text', data: flowOutput.outputMessage }) + '\n');
+        }
+
+        // If there was no message and no error, maybe send a control message
+        if (!flowOutput.outputMessage && !flowOutput.error && (!flowOutput.chatEvents || flowOutput.chatEvents.length === 0)) {
+            controller.enqueue(JSON.stringify({ type: 'event', data: {
+                id: `ctrl-${Date.now()}`,
+                timestamp: new Date(),
+                eventType: 'AGENT_CONTROL',
+                eventTitle: 'No output',
+                eventDetails: 'The flow completed without generating a message or events.'
+            }}) + '\n');
+        }
+
         controller.close();
       },
     });
     
-    // Convert the Genkit stream to a Vercel AI SDK compatible stream
-    return streamToResponse(genkitStream, new Headers({
-        'Content-Type': 'text/plain; charset=utf-8',
-    }));
+    // Convert the stream to a Vercel AI SDK compatible stream
+    // The Vercel AI SDK's `StreamingTextResponse` can handle a stream of strings,
+    // where each string is a JSON object. The client then parses each line.
+    // Ensure the Content-Type is appropriate for ndjson or that the client handles text/plain.
+    return new StreamingTextResponse(stream, {
+      headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
+    });
 
   } catch (error: any) {
     // console.error('[Chat API Error]', error); // Removed redundant console.error

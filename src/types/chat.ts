@@ -59,6 +59,19 @@ export interface ChatMessageUI {
   feedback?: 'liked' | 'disliked' | null; // Added for message feedback
 }
 
+export interface ChatEvent {
+  id: string;
+  timestamp: Date;
+  eventType: 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL' | 'TOOL_CALL_PENDING';
+  eventTitle: string;
+  eventDetails?: string;
+  toolName?: string;
+}
+
+export type MessageListItem =
+  | ({ type: 'message' } & ChatMessageUI)
+  | ({ type: 'event' } & ChatEvent);
+
 // You might also want a type for the overall chat state if you use a reducer or context
 export interface ChatState {
   conversations: Conversation[];

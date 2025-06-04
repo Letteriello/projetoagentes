@@ -9,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch"; // Added Switch import
+import { Label } from "@/components/ui/label";   // Added Label import
 import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -49,9 +51,11 @@ interface ChatHeaderProps {
   handleNewConversation: () => void;
   isSidebarOpen?: boolean;
   isADKInitializing?: boolean;
-  onExportChatLog?: () => void; // Add this
+  onExportChatLog?: () => void;
   handleLogin: () => void;
   handleLogout: () => void;
+  isVerboseMode: boolean; // Added isVerboseMode prop
+  onToggleVerboseMode: () => void; // Added onToggleVerboseMode prop
 }
 
 export default function ChatHeader({
@@ -68,9 +72,11 @@ export default function ChatHeader({
   handleNewConversation,
   isSidebarOpen,
   isADKInitializing,
-  onExportChatLog, // Add this
+  onExportChatLog,
   handleLogin,
   handleLogout,
+  isVerboseMode, // Added isVerboseMode
+  onToggleVerboseMode, // Added onToggleVerboseMode
 }: ChatHeaderProps) {
   const { currentUser, loading: authLoading } = useAuth();
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -213,7 +219,7 @@ export default function ChatHeader({
           <Plus className="h-5 w-5" />
         </Button>
         
-        {/* Add Export Button Before ThemeToggle or New Conversation for grouping user actions */}
+        {/* Add Export Button */}
         {currentUser && onExportChatLog && (
           <Button
             variant="ghost"
@@ -225,6 +231,19 @@ export default function ChatHeader({
             <DownloadCloud className="h-5 w-5" />
           </Button>
         )}
+
+        {/* Verbose Mode Toggle */}
+        <div className="flex items-center gap-1.5 pr-2 border-r mr-2">
+          <Switch
+            id="verbose-mode"
+            checked={isVerboseMode}
+            onCheckedChange={onToggleVerboseMode}
+            aria-label="Modo Verbose"
+          />
+          <Label htmlFor="verbose-mode" className="text-sm text-muted-foreground cursor-pointer">
+            Verbose
+          </Label>
+        </div>
 
         {/* Alternador de tema */}
         <ThemeToggle className="text-muted-foreground hover:text-foreground" />

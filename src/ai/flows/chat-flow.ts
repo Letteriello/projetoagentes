@@ -154,6 +154,14 @@ export interface BasicChatOutput {
   toolRequests?: ChatToolRequest[];
   toolResults?: ToolExecutionResult[]; // Updated to use ToolExecutionResult
   error?: string;
+  chatEvents?: Partial<{ // Using Partial as ChatEvent is defined elsewhere
+    id: string;
+    timestamp: Date;
+    eventType: 'TOOL_CALL_PENDING' | 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL';
+    eventTitle: string;
+    eventDetails?: string;
+    toolName?: string;
+  }>[];
 }
 
 // Definir tipo completo para mensagens
@@ -170,6 +178,14 @@ async function basicChatFlowInternal(
 ): Promise<BasicChatOutput> {
   const flowName = 'basicChatFlowInternal'; // For logging context
   const agentId = input.agentId || 'unknown_agent'; // For logging context
+  const chatEvents: Partial<{
+    id: string;
+    timestamp: Date;
+    eventType: 'TOOL_CALL_PENDING' | 'TOOL_CALL' | 'TOOL_ERROR' | 'AGENT_CONTROL';
+    eventTitle: string;
+    eventDetails?: string;
+    toolName?: string;
+  }>[] = [];
 
   try {
     const messages: ChatMessage[] = [];
@@ -295,13 +311,24 @@ async function basicChatFlowInternal(
         let resultOutput: any; // Can be success output or error information for the LLM
         let errorMessage: string | undefined;
 
+        // Create TOOL_CALL_PENDING event
+        const pendingEventId = `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        chatEvents.push({
+          id: pendingEventId,
+          timestamp: new Date(),
+          eventType: 'TOOL_CALL_PENDING',
+          toolName: toolRequest.name,
+          eventTitle: `Chamando ferramenta ${toolRequest.name}...`,
+          eventDetails: JSON.stringify(toolRequest.input)
+        });
+
         try {
           const toolToRun = genkitTools.find(t => t.name === toolRequest.name) as AppTool | undefined;
 
           if (!toolToRun) {
             toolExecutionFailed = true;
             errorMessage = `Ferramenta ${toolRequest.name} não encontrada`;
-            resultOutput = { error: errorMessage, code: 'TOOL_NOT_FOUND' }; // Structure for LLM
+            resultOutput = { error: errorMessage, code: 'TOOL_NOT_FOUND' };
             executedToolResults.push({
               name: toolRequest.name,
               input: toolRequest.input as Record<string, unknown>,
@@ -309,8 +336,14 @@ async function basicChatFlowInternal(
               status: 'error',
               ref: toolRequest.ref,
             });
-            // Continue to next tool request if this one not found
-            // but still add a response part so LLM knows it was attempted
+            chatEvents.push({
+              id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              timestamp: new Date(),
+              eventType: 'TOOL_ERROR',
+              toolName: toolRequest.name,
+              eventTitle: `Erro: Ferramenta ${toolRequest.name} não encontrada`,
+              eventDetails: errorMessage,
+            });
             toolResponseParts.push({ toolRequest, output: resultOutput });
             continue;
           }
@@ -320,8 +353,8 @@ async function basicChatFlowInternal(
             const validation = toolToRun.inputSchema.safeParse(toolRequest.input);
             if (!validation.success) {
               toolExecutionFailed = true;
-              errorMessage = `Input inválido para ${toolRequest.name}: ${validation.error.toString()}`;
-              resultOutput = { error: errorMessage, code: 'INPUT_VALIDATION_ERROR', details: validation.error.issues }; // Structure for LLM
+              errorMessage = `Input inválido para ${toolRequest.name}: ${validation.error.issues.map(i => i.path.join('.') + ': ' + i.message).join(', ')}`;
+              resultOutput = { error: errorMessage, code: 'INPUT_VALIDATION_ERROR', details: validation.error.issues };
               executedToolResults.push({
                 name: toolRequest.name,
                 input: toolRequest.input as Record<string, unknown>,
@@ -329,8 +362,16 @@ async function basicChatFlowInternal(
                 status: 'error',
                 ref: toolRequest.ref,
               });
+              chatEvents.push({
+                id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                timestamp: new Date(),
+                eventType: 'TOOL_ERROR',
+                toolName: toolRequest.name,
+                eventTitle: `Erro de validação para ${toolRequest.name}`,
+                eventDetails: errorMessage,
+              });
               toolResponseParts.push({ toolRequest, output: resultOutput });
-              continue; // Skip execution if validation fails
+              continue;
             }
             validatedInput = validation.data;
           }
@@ -338,13 +379,21 @@ async function basicChatFlowInternal(
           if (typeof toolToRun.func !== 'function') {
             toolExecutionFailed = true;
             errorMessage = `Ferramenta ${toolRequest.name} não possui função executável.`;
-            resultOutput = { error: errorMessage, code: 'TOOL_NOT_EXECUTABLE' }; // Structure for LLM
+            resultOutput = { error: errorMessage, code: 'TOOL_NOT_EXECUTABLE' };
             executedToolResults.push({
               name: toolRequest.name,
               input: toolRequest.input as Record<string, unknown>,
               errorDetails: { message: errorMessage, code: 'TOOL_NOT_EXECUTABLE' },
               status: 'error',
               ref: toolRequest.ref,
+            });
+            chatEvents.push({
+              id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              timestamp: new Date(),
+              eventType: 'TOOL_ERROR',
+              toolName: toolRequest.name,
+              eventTitle: `Erro: ${toolRequest.name} não executável`,
+              eventDetails: errorMessage,
             });
             toolResponseParts.push({ toolRequest, output: resultOutput });
             continue;
@@ -353,10 +402,10 @@ async function basicChatFlowInternal(
           // Execute the tool function
           const toolRawOutput = await toolToRun.func(validatedInput);
 
-          // Check if the tool returned structured errorDetails itself
           if (toolRawOutput && typeof toolRawOutput === 'object' && 'errorDetails' in toolRawOutput && toolRawOutput.errorDetails) {
             toolExecutionFailed = true;
             const toolErrorDetails = toolRawOutput.errorDetails as ErrorDetails;
+            errorMessage = toolErrorDetails.message;
             executedToolResults.push({
               name: toolRequest.name,
               input: toolRequest.input as Record<string, unknown>,
@@ -364,11 +413,17 @@ async function basicChatFlowInternal(
               status: 'error',
               ref: toolRequest.ref,
             });
-            // For LLM: send the structured error from the tool
+            chatEvents.push({
+              id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              timestamp: new Date(),
+              eventType: 'TOOL_ERROR',
+              toolName: toolRequest.name,
+              eventTitle: `Erro em ${toolRequest.name}: ${toolErrorDetails.code || 'Tool Reported Error'}`,
+              eventDetails: toolErrorDetails.message + (toolErrorDetails.details ? ` Details: ${JSON.stringify(toolErrorDetails.details)}` : ''),
+            });
             resultOutput = { error: toolErrorDetails.message, code: toolErrorDetails.code, details: toolErrorDetails.details };
             toolResponseParts.push({ toolRequest, output: resultOutput });
           } else {
-            // Tool executed successfully and returned direct output
             resultOutput = toolRawOutput;
             executedToolResults.push({
               name: toolRequest.name,
@@ -377,19 +432,27 @@ async function basicChatFlowInternal(
               status: 'success',
               ref: toolRequest.ref,
             });
+            chatEvents.push({
+              id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              timestamp: new Date(),
+              eventType: 'TOOL_CALL',
+              toolName: toolRequest.name,
+              eventTitle: `Ferramenta ${toolRequest.name} executada`,
+              eventDetails: typeof resultOutput === 'string' ? resultOutput : JSON.stringify(resultOutput),
+            });
             toolResponseParts.push({ toolRequest, output: resultOutput });
           }
 
         } catch (e: any) {
           toolExecutionFailed = true;
+          errorMessage = e.message || 'Tool crashed during execution';
           const toolCrashError: ErrorDetails = {
-            message: e.message || 'Tool crashed during execution',
+            message: errorMessage,
             code: 'TOOL_CRASH',
             details: e.stack
           };
-          resultOutput = { error: toolCrashError.message, code: toolCrashError.code }; // Structure for LLM
+          resultOutput = { error: toolCrashError.message, code: toolCrashError.code };
 
-          // Ensure we record the error for the specific tool
           executedToolResults.push({
             name: toolRequest.name,
             input: toolRequest.input as Record<string, unknown>,
@@ -397,10 +460,15 @@ async function basicChatFlowInternal(
             status: 'error',
             ref: toolRequest.ref,
           });
-          // Also add a response part for the LLM to know about the error
+          chatEvents.push({
+            id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            timestamp: new Date(),
+            eventType: 'TOOL_ERROR',
+            toolName: toolRequest.name,
+            eventTitle: `Crash na ferramenta ${toolRequest.name}`,
+            eventDetails: errorMessage + (e.stack ? ` Stack: ${e.stack}`: ''),
+          });
           toolResponseParts.push({ toolRequest, output: resultOutput });
-          // Depending on desired behavior, you might choose to 'continue' or 'break' here.
-          // For now, it continues to process other tools if any.
         }
       }
 
@@ -438,6 +506,7 @@ async function basicChatFlowInternal(
       outputMessage: finalOutputText,
       toolRequests: executedToolRequests, 
       toolResults: executedToolResults, 
+      chatEvents: chatEvents, // Add chatEvents to output
     };
   } catch (e: any) {
     winstonLogger.error(`Error in ${flowName} (Agent: ${agentId})`, {
@@ -447,7 +516,7 @@ async function basicChatFlowInternal(
     });
     // enhancedLogger.logError is good here if createLoggableFlow doesn't capture enough detail or if error is caught before re-throwing
     // For now, createLoggableFlow will handle the primary error logging.
-    return { error: e.message || 'An unexpected error occurred' };
+    return { error: e.message || 'An unexpected error occurred', chatEvents }; // Also return chatEvents in case of early error
   }
 }
 
@@ -470,6 +539,7 @@ export const basicChatFlow = createLoggableFlow(
       hasStream: !!output.stream,
       hasError: !!output.error,
       toolRequestCount: output.toolRequests?.length || 0,
+      chatEventCount: output.chatEvents?.length || 0, // Added for logging
     }),
     agentIdExtractor: (input: BasicChatInput) => input.agentId || "unknown_agent"
   }

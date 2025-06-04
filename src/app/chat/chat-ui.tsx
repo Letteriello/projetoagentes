@@ -196,6 +196,7 @@ export function ChatUI() {
 
   // UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isVerboseMode, setIsVerboseMode] = useState<boolean>(false); // Added verbose mode state
   // const [inputValue, setInputValue] = useState(""); // From store
   // const [isPending, setIsPending] = useState(false); // From store
   // const [isLoadingMessages, setIsLoadingMessages] = useState(false); // From store
@@ -589,7 +590,10 @@ export function ChatUI() {
             handleNewConversation={() => store.handleNewConversation()}
             isADKInitializing={isADKInitializing}
             onExportChatLog={handleExportChatLog}
+            isVerboseMode={isVerboseMode} // Pass verbose mode state
+            onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)} // Pass toggle function
           >
+            {/* Test settings button can remain or be moved if header gets too cluttered */}
             <Button variant="outline" size="icon" onClick={() => setIsTestConfigPanelOpen(true)} title="Test Settings" className="ml-2">
               <Settings2 className="h-5 w-5" />
             </Button>
@@ -625,6 +629,7 @@ export function ChatUI() {
                     isPending={store.isPending}
                     onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
                     onFeedback={store.handleFeedback}
+                    isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
                   />
                 </div>
               )}

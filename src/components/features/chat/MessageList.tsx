@@ -4,13 +4,14 @@ import { FixedSizeList, ListOnScrollProps } from 'react-window';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChatMessageUI } from '@/types/chat';
+import { ChatMessageUI, MessageListItem } from '@/types/chat'; // Updated import
 import ChatMessageDisplay from './ChatMessageDisplay';
+import ChatEventDisplay from './ChatEventDisplay'; // Added import
 
 const ITEM_SIZE = 85; // Average item height in pixels - ADJUST AS NEEDED
 
 interface MessageListProps {
-  messages: ChatMessageUI[];
+  messages: MessageListItem[]; // Updated type
   isPending: boolean;
   className?: string;
   // containerRef is now managed by FixedSizeList's outerRef,
@@ -19,25 +20,36 @@ interface MessageListProps {
   onScroll?: (event: React.UIEvent<HTMLDivElement> | ListOnScrollProps) => void; // Adjusted type
   onRegenerate?: (messageId: string) => void;
   onFeedback?: (messageId: string, feedback: 'liked' | 'disliked' | null) => void;
+  isVerboseMode?: boolean; // Added isVerboseMode prop
 }
 
 // Row component for react-window
-const Row = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: { messages: ChatMessageUI[], onRegenerate?: MessageListProps['onRegenerate'], onFeedback?: MessageListProps['onFeedback'] } }) => {
-  const message = data.messages[index];
+const Row = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: { messages: MessageListItem[], onRegenerate?: MessageListProps['onRegenerate'], onFeedback?: MessageListProps['onFeedback'], isVerboseMode?: boolean } }) => {
+  const item = data.messages[index];
 
-  // Animation variants for message entry (can be simplified if complex animations are problematic with react-window)
-  // The original delay: 0.05 might not work as expected due to virtualization.
-  // For items that scroll into view, they are mounted then, so animation will run on mount.
+  if (item.type === 'event') {
+    return (
+      <div style={style}>
+        <ChatEventDisplay
+          eventTitle={item.eventTitle}
+          eventDetails={item.eventDetails}
+          eventType={item.eventType}
+          isVerboseMode={data.isVerboseMode} // Pass isVerboseMode
+        />
+      </div>
+    );
+  }
+
+  // item.type === 'message'
+  // Animation variants for message entry
   const messageVariants = {
     hidden: {
       opacity: 0,
-      x: message.sender === "user" ? 20 : -20,
-      // y: 10, // y might be problematic with fixed item heights
+      x: item.sender === "user" ? 20 : -20,
     },
     visible: {
       opacity: 1,
       x: 0,
-      // y: 0,
       transition: {
         type: "spring",
         stiffness: 260,
@@ -49,16 +61,17 @@ const Row = React.memo(({ index, style, data }: { index: number; style: React.CS
   return (
     <div style={style}>
       <motion.div
-        key={message.id} // key is important for framer-motion if elements are ever re-ordered/changed significantly
+        key={item.id}
         variants={messageVariants}
         initial="hidden"
         animate="visible"
-        className="w-full h-full flex items-center" // Ensure motion.div fills the style space and centers content
+        className="w-full h-full flex items-center"
       >
         <ChatMessageDisplay
-          message={message}
+          message={item}
           onRegenerate={data.onRegenerate}
-          onFeedback={data.onFeedback} // Pass onFeedback
+          onFeedback={data.onFeedback}
+          isVerboseMode={data.isVerboseMode} // Pass isVerboseMode
         />
       </motion.div>
     </div>
@@ -75,6 +88,7 @@ const MessageList: React.FC<MessageListProps> = ({
   onScroll,
   onRegenerate,
   onFeedback,
+  isVerboseMode, // Destructure isVerboseMode
 }) => {
   const listRef = useRef<FixedSizeList>(null);
 
@@ -111,7 +125,7 @@ const MessageList: React.FC<MessageListProps> = ({
           height={listHeight}
           itemCount={messages.length}
           itemSize={ITEM_SIZE}
-          itemData={{ messages, onRegenerate, onFeedback }}
+          itemData={{ messages, onRegenerate, onFeedback, isVerboseMode }} // Pass isVerboseMode to itemData
           width="100%"
           onScroll={handleScroll}
           className="custom-scrollbar" // Optional: if you have custom scrollbar styles
