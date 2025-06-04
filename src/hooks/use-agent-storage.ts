@@ -1,202 +1,167 @@
 // src/hooks/use-agent-storage.ts
 import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import {
-  addAgentDB,
-  deleteAgentDB,
-  getAllAgentsDB,
-  updateAgentDB,
-  getAgentByIdDB // Import if you need a direct get by ID here, otherwise getAllAgentsDB is fine
-} from '@/lib/agentIndexedDB'; // Ensure this path is correct
+  addAgent as addAgentToDB,
+  getAllAgents as getAllAgentsFromDB,
+  updateAgent as updateAgentInDB,
+  deleteAgent as deleteAgentFromDB,
+  getAgentById as getAgentByIdFromDB,
+  saveAgentOrder as saveAgentOrderInDB,
+  loadAgentOrder as loadAgentOrderFromDB,
+} from '@/services/indexed-db-agent-service';
 
 export function useAgentStorage() {
-  const loadAgents = async (): Promise<SavedAgentConfiguration[]> => {
+  // Renamed from originalLoadAgents to simply loadAgentsFromStorage
+  const loadAgentsFromStorage = async (userId?: string): Promise<SavedAgentConfiguration[]> => {
     try {
-      // Data is already mapped to Date objects by getAllAgentsDB
-      return await getAllAgentsDB();
+      // The new service returns Date objects directly.
+      return await getAllAgentsFromDB(userId);
     } catch (error) {
-      console.error('Error loading agents from IndexedDB:', error);
+      console.error('Error loading agents from IndexedDB service:', error);
       return [];
     }
   };
 
-  // addAgentInternal is renamed to addAgent to reflect its new role
-  const addAgent = async (
+  // Renamed from the internal addAgent to createAgentInStorage
+  const createAgentInStorage = async (
     agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>,
     userId?: string
   ): Promise<SavedAgentConfiguration> => {
     const newAgent: SavedAgentConfiguration = {
       ...agentConfigData,
       id: crypto.randomUUID(),
-      createdAt: new Date(), // Store as Date object initially
-      updatedAt: new Date(), // Store as Date object initially
+      createdAt: new Date(),
+      updatedAt: new Date(),
       ...(userId && { userId }),
     };
     try {
-      // addAgentDB will handle converting Dates to ISO strings for storage
-      await addAgentDB(newAgent);
-      return newAgent; // Return with Date objects
+      // The service's addAgentToDB handles internal date conversions.
+      return await addAgentToDB(newAgent);
     } catch (error) {
-      console.error('Error adding agent to IndexedDB:', error);
-      // Depending on error handling strategy, you might want to throw or return null
-      throw error; // Or handle more gracefully
+      console.error('Error adding agent via IndexedDB service:', error);
+      throw error;
     }
   };
 
-  const updateAgent = async (
+  const updateAgentInStorage = async (
     updatedAgentData: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> & { id: string }
   ): Promise<SavedAgentConfiguration | null> => {
     try {
-      const existingAgent = await getAgentByIdDB(updatedAgentData.id);
-      if (!existingAgent) {
+      // Note: getAgentByIdFromDB is not strictly necessary here if updateAgentInDB can handle non-existent agents gracefully,
+      // but it's good practice for validation and to return the full existing agent if needed.
+      // The service's updateAgentInDB will set the `updatedAt` field.
+      const agentToUpdate = await getAgentByIdFromDB(updatedAgentData.id);
+      if (!agentToUpdate) {
         console.error(`Agent with ID ${updatedAgentData.id} not found for update.`);
         return null;
       }
 
-      const updatedAgent: SavedAgentConfiguration = {
-        ...existingAgent,
-        ...updatedAgentData,
-        updatedAt: new Date(), // Update timestamp, store as Date
-      };
-      // updateAgentDB will handle converting Dates to ISO strings
-      await updateAgentDB(updatedAgent);
-      return updatedAgent; // Return with Date objects
+      // Construct the agent object for update.
+      // The service's updateAgentInDB will set/update `updatedAt`.
+      const partiallyUpdatedAgent = { ...agentToUpdate, ...updatedAgentData };
+
+      return await updateAgentInDB(partiallyUpdatedAgent);
     } catch (error) {
-      console.error('Error updating agent in IndexedDB:', error);
-      throw error; // Or handle more gracefully
+      console.error('Error updating agent via IndexedDB service:', error);
+      throw error;
     }
   };
 
-  const deleteAgent = async (id: string): Promise<boolean> => {
+  const deleteAgentFromStorage = async (id: string): Promise<boolean> => {
     try {
-      await deleteAgentDB(id);
+      await deleteAgentFromDB(id);
       return true;
     } catch (error) {
-      console.error('Error deleting agent from IndexedDB:', error);
+      console.error('Error deleting agent via IndexedDB service:', error);
       return false;
     }
   };
 
-  // The saveAgent function was previously an alias for addAgentInternal or an upsert.
-  // If an explicit "save" that acts as an upsert is still needed, it can be implemented like this:
-  // async function saveAgent(agent: SavedAgentConfiguration): Promise<SavedAgentConfiguration> {
-  //   try {
-  //     // updateAgentDB (via put) will create if not exist, or update if exist, based on key.
-  //     // So we can directly use it. Ensure agent.updatedAt is set.
-  //     agent.updatedAt = new Date(agent.updatedAt); // Ensure it's a Date object if coming from an unknown source
-  //     agent.createdAt = new Date(agent.createdAt); // Ensure it's a Date object
-  //     return await updateAgentDB(agent);
-  //   } catch (error) {
-  //     console.error('Error saving (upserting) agent to IndexedDB:', error);
-  //     throw error;
-  //   }
-  // }
-  // If saveAgent was meant to be strictly "add new", then addAgent is the correct replacement.
-  // The original code's saveAgent was a bit ambiguous, overwriting if ID matched.
-  // The new structure with addAgent (creates new) and updateAgent (updates existing) is clearer.
-
-  const AGENT_ORDER_STORAGE_KEY = 'agentOrder_v1';
-
+  // Agent Order functions now use the new service
   const saveAgentOrder = async (order: string[]): Promise<void> => {
     try {
-      localStorage.setItem(AGENT_ORDER_STORAGE_KEY, JSON.stringify(order));
+      await saveAgentOrderInDB(order); // Assumes global order, or key can be passed
     } catch (error) {
-      console.error('Error saving agent order to localStorage:', error);
-      // Optionally, re-throw or handle as per application's error strategy
+      console.error('Error saving agent order via IndexedDB service:', error);
+      // Optionally, re-throw or handle
     }
   };
 
-  const loadAgentOrder = (): string[] => {
+  // loadAgentOrder is now async as it calls the async service function
+  const loadAgentOrder = async (): Promise<string[]> => {
     try {
-      const storedOrder = localStorage.getItem(AGENT_ORDER_STORAGE_KEY);
-      if (storedOrder) {
-        return JSON.parse(storedOrder);
-      }
+      return await loadAgentOrderFromDB(); // Assumes global order, or key can be passed
     } catch (error) {
-      console.error('Error loading agent order from localStorage:', error);
-    }
-    return [];
-  };
-
-  // Modify loadAgents to use the order
-  const originalLoadAgents = async (): Promise<SavedAgentConfiguration[]> => {
-    try {
-      return await getAllAgentsDB();
-    } catch (error) {
-      console.error('Error loading agents from IndexedDB:', error);
+      console.error('Error loading agent order via IndexedDB service:', error);
       return [];
     }
   };
 
-  const loadAgentsWithOrder = async (): Promise<SavedAgentConfiguration[]> => {
-    const agents = await originalLoadAgents();
-    const order = loadAgentOrder();
+  // loadAgentsWithOrder now correctly awaits the async loadAgentOrder
+  const loadAgentsWithOrder = async (userId?: string): Promise<SavedAgentConfiguration[]> => {
+    const agents = await loadAgentsFromStorage(userId); // Use the renamed base loader
+    const order = await loadAgentOrder(); // Await the async function
 
     if (order.length > 0 && agents.length > 0) {
       const orderedAgents: SavedAgentConfiguration[] = [];
       const agentMap = new Map(agents.map(agent => [agent.id, agent]));
 
-      // Add agents based on saved order
       for (const id of order) {
         if (agentMap.has(id)) {
           orderedAgents.push(agentMap.get(id)!);
-          agentMap.delete(id); // Remove from map to track remaining agents
+          agentMap.delete(id);
         }
       }
-      // Add any remaining agents (newly added, not in order yet) to the end
       orderedAgents.push(...agentMap.values());
       return orderedAgents;
     }
-    return agents; // Return agents as is if no order or no agents
+    return agents;
   };
 
-
-  // Modify addAgent to update order
+  // addAgentAndUpdateOrder now uses the renamed createAgentInStorage and async load/save for order
   const addAgentAndUpdateOrder = async (
     agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>,
     userId?: string
   ): Promise<SavedAgentConfiguration> => {
-    const newAgent = await addAgent(agentConfigData, userId); // Uses the original addAgent logic renamed earlier
+    const newAgent = await createAgentInStorage(agentConfigData, userId);
     if (newAgent) {
       try {
-        const currentOrder = loadAgentOrder();
-        // Avoid adding duplicate if it somehow got there
+        const currentOrder = await loadAgentOrder();
         if (!currentOrder.includes(newAgent.id)) {
           const newOrder = [...currentOrder, newAgent.id];
           await saveAgentOrder(newOrder);
         }
       } catch (error) {
         console.error('Failed to update agent order after adding agent:', error);
-        // The agent was added, but order might be inconsistent.
-        // Depending on requirements, you might want to surface this error.
       }
     }
     return newAgent;
   };
 
-  // Modify deleteAgent to update order
+  // deleteAgentAndUpdateOrder now uses renamed deleteAgentFromStorage and async load/save for order
   const deleteAgentAndUpdateOrder = async (id: string): Promise<boolean> => {
-    const success = await deleteAgent(id); // Uses the original deleteAgent logic
+    const success = await deleteAgentFromStorage(id);
     if (success) {
       try {
-        const currentOrder = loadAgentOrder();
+        const currentOrder = await loadAgentOrder();
         const newOrder = currentOrder.filter(agentId => agentId !== id);
         if (newOrder.length !== currentOrder.length) {
           await saveAgentOrder(newOrder);
         }
       } catch (error) {
         console.error('Failed to update agent order after deleting agent:', error);
-        // The agent was deleted, but order might be inconsistent.
       }
     }
     return success;
   };
 
   return {
-    loadAgents: loadAgentsWithOrder, // Use the new ordered version
-    saveAgent: addAgentAndUpdateOrder, // Use the version that updates order
-    updateAgent, // updateAgent doesn't change order, so original is fine
-    deleteAgent: deleteAgentAndUpdateOrder, // Use the version that updates order
-    saveAgentOrder, // Export for direct use if needed
-    // loadAgentOrder is not exported as loadAgents handles it, but can be if needed
+    loadAgents: loadAgentsWithOrder,
+    saveAgent: addAgentAndUpdateOrder, // "saveAgent" in the returned object is an "add" operation
+    updateAgent: updateAgentInStorage, // Renamed for clarity internally
+    deleteAgent: deleteAgentAndUpdateOrder,
+    // Exporting these for potential direct use, though typically managed by above functions
+    saveAgentOrder,
+    loadAgentOrder,
   };
 }

@@ -393,79 +393,119 @@ export default function AgentBuilderPage() {
     }
   };
 
+  const headerContent = (
+    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <Cpu className="h-8 w-8 text-primary" />
+        <h1 className="text-2xl md:text-3xl font-bold">Construtor de Agentes</h1>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" onClick={() => { startTutorial(guidedTutorials[0].id); }} className="shadow-sm">
+          <Layers className="mr-2 h-4 w-4" /> Ver Tutoriais
+        </Button>
+        <Button
+          variant={buildMode === 'chat' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => { setBuildMode('chat'); setIsBuilderModalOpen(false); setEditingAgent(null); setSelectedAgentForMonitoring(null); }}
+          title="Construir com Chat IA"
+          className="shadow-sm"
+        >
+          <MessageSquareText className="mr-2 h-4 w-4" /> Conversar com IA
+        </Button>
+        <Button
+          variant={buildMode === 'form' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => { setBuildMode('form'); /* setIsBuilderModalOpen(!!editingAgent); // Keep existing modal logic for form */ }}
+          title="Editor Avançado (Formulário)"
+          className="shadow-sm"
+        >
+          <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
+        </Button>
+        <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => setViewMode('grid')}
+                className="shadow-sm"
+                aria-label="Visualização em Grade"
+              >
+                <LayoutGrid className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Grade</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => setViewMode('list')}
+                className="shadow-sm"
+                aria-label="Visualização em Lista"
+              >
+                <List className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Lista</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </header>
+  );
+
+  if (isLoadingAgents) {
+    return (
+      <div className="space-y-8 p-4">
+        {headerContent}
+        {/* Skeleton for Dashboard cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={`skeleton-dashboard-${index}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-[120px]" />
+                <Skeleton className="h-5 w-5 rounded-full" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-1/3 mb-1" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {/* Skeleton for "Novo Agente" button area */}
+        <div className="flex items-center justify-end pt-4 gap-2">
+           <Skeleton className="h-10 w-40" /> {/* Adjusted width for "Novo Agente (Formulário)" */}
+        </div>
+        {/* Skeleton for Agent Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-4">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={`skeleton-agent-${index}`} className="p-4 rounded-lg border border-border bg-card space-y-3 h-[200px] flex flex-col justify-between">
+              <div>
+                <div className="flex items-center space-x-3 mb-3">
+                  <Skeleton className="h-10 w-10 rounded-md" />
+                  <Skeleton className="h-5 w-3/5" />
+                </div>
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-4/5" />
+              </div>
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 p-4">
-      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Cpu className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl md:text-3xl font-bold">Construtor de Agentes</h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => { startTutorial(guidedTutorials[0].id); }} className="shadow-sm">
-            <Layers className="mr-2 h-4 w-4" /> Ver Tutoriais
-          </Button>
-          <Button
-            variant={buildMode === 'chat' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setBuildMode('chat'); setIsBuilderModalOpen(false); setEditingAgent(null); setSelectedAgentForMonitoring(null); }}
-            title="Construir com Chat IA"
-            className="shadow-sm"
-          >
-            <MessageSquareText className="mr-2 h-4 w-4" /> Conversar com IA
-          </Button>
-          <Button
-            variant={buildMode === 'form' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setBuildMode('form'); /* setIsBuilderModalOpen(!!editingAgent); // Keep existing modal logic for form */ }}
-            title="Editor Avançado (Formulário)"
-            className="shadow-sm"
-          >
-            <Edit3 className="mr-2 h-4 w-4" /> Editor Avançado
-          </Button>
-          <FeedbackButton onClick={() => setIsFeedbackModalOpen(true)} />
+      {headerContent}
 
-          {/* View Mode Toggle Buttons */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'outline'}
-                  size="icon"
-                  onClick={() => setViewMode('grid')}
-                  className="shadow-sm"
-                  aria-label="Visualização em Grade"
-                >
-                  <LayoutGrid className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Grade</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'outline'}
-                  size="icon"
-                  onClick={() => setViewMode('list')}
-                  className="shadow-sm"
-                  aria-label="Visualização em Lista"
-                >
-                  <List className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Lista</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </header>
-
-      {/* Dashboard Section */}
-      {!isLoadingAgents && savedAgents && savedAgents.length > 0 && (
+      {/* Actual Dashboard Section - only if agents exist */}
+      {savedAgents && savedAgents.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -474,7 +514,6 @@ export default function AgentBuilderPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalAgents}</div>
-              {/* <p className="text-xs text-muted-foreground">+20.1% from last month</p> */}
             </CardContent>
           </Card>
           <Card>
@@ -484,7 +523,6 @@ export default function AgentBuilderPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{agentsWithTools}</div>
-              {/* <p className="text-xs text-muted-foreground">+180.1% from last month</p> */}
             </CardContent>
           </Card>
           <Card>
@@ -494,13 +532,11 @@ export default function AgentBuilderPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{rootAgents}</div>
-              {/* <p className="text-xs text-muted-foreground">+19% from last month</p> */}
             </CardContent>
           </Card>
         </div>
       )}
       {/* End Dashboard Section */}
-
 
       {buildMode === 'chat' ? (
         <AgentCreatorChatUI
@@ -514,40 +550,9 @@ export default function AgentBuilderPage() {
               <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
             </Button>
           </div>
-          {isLoadingAgents && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {Array.from({ length: 3 }).map((_, index) => ( // Skeleton for Dashboard cards if needed, or for agent cards
-                <Card key={`skeleton-card-${index}`}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <Skeleton className="h-4 w-[150px]" />
-                    <Skeleton className="h-5 w-5" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-8 w-1/4 mb-1" />
-                    {/* <Skeleton className="h-3 w-1/2" /> */}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-          {isLoadingAgents && ( // Keep skeleton for agent list separate
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div key={`skeleton-agent-${index}`} className="p-4 rounded-lg border border-border bg-card space-y-4 h-[210px] flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center space-x-3 mb-3">
-                      <Skeleton className="h-10 w-10 rounded-md" />
-                      <Skeleton className="h-5 w-1/2" />
-                    </div>
-                    <Skeleton className="h-4 w-full mb-2" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </div>
-                  <Skeleton className="h-9 w-full" />
-                </div>
-              ))}
-            </div>
-          )}
-          {!isLoadingAgents && orderedAgents && orderedAgents.length > 0 ? (
+
+          {/* Conditional rendering for agent list OR empty state */}
+          {orderedAgents && orderedAgents.length > 0 ? (
             <div className="space-y-6">
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -575,21 +580,16 @@ export default function AgentBuilderPage() {
                   ))}
                 </div>
               ) : (
-                // List View using FixedSizeList
-                // TODO: The height of FixedSizeList (e.g., 700px) should be dynamic.
-                // Consider using a library like 'react-virtualized-auto-sizer'
-                // or calculate based on parent dimensions.
-                // AGENT_CARD_LIST_ITEM_SIZE and AgentRow will be defined outside this component.
-                <div style={{ height: '700px', width: '100%' }} className="flex flex-col"> {/* Removed gap-4 from here, apply spacing in AgentRow if needed */}
+                <div style={{ height: '700px', width: '100%' }} className="flex flex-col">
                   <FixedSizeList
                     ref={listRef}
-                    height={700} // Example fixed height
+                    height={700}
                     itemCount={orderedAgents.length}
                     itemSize={AGENT_CARD_LIST_ITEM_SIZE}
                     width="100%"
                     itemData={{
                       agents: orderedAgents,
-                      viewMode, // Should be 'list'
+                      viewMode,
                       handleEditAgent,
                       handleSaveAsTemplate,
                       handleViewAgentMonitoring,
@@ -610,23 +610,22 @@ export default function AgentBuilderPage() {
               )}
             </div>
           ) : (
-            !isLoadingAgents && (
-              <div className="text-center py-16 border-2 border-dashed border-border rounded-lg bg-card shadow-sm">
-                <Ghost className="mx-auto h-20 w-20 text-muted-foreground/70" />
-                <h2 className="mt-6 text-xl font-semibold text-foreground">
-                  Crie seu Primeiro Agente Inteligente
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                  Agentes são assistentes de IA personalizados que você pode construir para realizar tarefas específicas, automatizar processos ou interagir de formas únicas. Comece agora mesmo!
-                </p>
-                <Button onClick={handleOpenCreateAgentModal} className="mt-6">
-                  <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
-                </Button>
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Ou alterne para "Conversar com IA" para uma criação guiada.
-                </p>
-              </div>
-            )
+            // This is the empty state, shown only if not loading and no agents
+            <div className="text-center py-16 border-2 border-dashed border-border rounded-lg bg-card shadow-sm">
+              <Ghost className="mx-auto h-20 w-20 text-muted-foreground/70" />
+              <h2 className="mt-6 text-xl font-semibold text-foreground">
+                Crie seu Primeiro Agente Inteligente
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+                Agentes são assistentes de IA personalizados que você pode construir para realizar tarefas específicas, automatizar processos ou interagir de formas únicas. Comece agora mesmo!
+              </p>
+              <Button onClick={handleOpenCreateAgentModal} className="mt-6">
+                <Plus className="mr-2 h-4 w-4" /> Novo Agente (Formulário)
+              </Button>
+              <p className="mt-4 text-xs text-muted-foreground">
+                Ou alterne para "Conversar com IA" para uma criação guiada.
+              </p>
+            </div>
           )}
 
           {selectedAgentForMonitoring && buildMode === 'form' && (
@@ -641,23 +640,21 @@ export default function AgentBuilderPage() {
                     variant={currentViewTab === 'details' ? 'default' : 'outline'}
                     onClick={() => {
                       setCurrentViewTab('details');
-                      // Transition to editing this agent
                        handleEditAgent(selectedAgentForMonitoring);
-                       setSelectedAgentForMonitoring(null); // Close monitoring view
+                       setSelectedAgentForMonitoring(null);
                     }}
                   >
                     Configuração
                   </Button>
                   <Button
                     variant={currentViewTab === 'monitoring' ? 'default' : 'outline'}
-                    onClick={() => setCurrentViewTab('monitoring')} // Already in monitoring view
+                    onClick={() => setCurrentViewTab('monitoring')}
                   >
                     Monitoramento
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                 {/* Content for monitoring tab is below, no direct config editing here */}
                 {currentViewTab === 'monitoring' ? (
                   <div className="space-y-6">
                     <AgentMetricsView agentId={selectedAgentForMonitoring.id} />
@@ -674,17 +671,17 @@ export default function AgentBuilderPage() {
         </>
       )}
 
-      {/* This specific condition for AgentBuilderDialog ensures it only opens in 'form' mode for a new agent or when editing an existing one */}
+      {/* Modals section */}
       {buildMode === 'form' && isBuilderModalOpen && (
         <AgentBuilderDialog
-          isOpen={isBuilderModalOpen} // isBuilderModalOpen is the source of truth
+          isOpen={isBuilderModalOpen}
           onOpenChange={(isOpenValue: boolean) => {
             setIsBuilderModalOpen(isOpenValue);
             if (!isOpenValue) {
-              setEditingAgent(null); // Clear editing agent when dialog closes
+              setEditingAgent(null);
             }
           }}
-          editingAgent={editingAgent} // This can be null for new agent
+          editingAgent={editingAgent}
           onSave={handleSaveAgent}
           availableTools={defaultAvailableTools}
           agentTypeOptions={agentTypeOptions}
@@ -750,4 +747,12 @@ export default function AgentBuilderPage() {
 
 // AgentRow and AGENT_CARD_LIST_ITEM_SIZE will be appended here by the next operation.
 // Placeholder comment to ensure this line is unique for the next replace/append.
+// Note: The handleEditAgentWithMode function mentioned in comments for AgentCreatorChatUI
+// was not present in the original code, so it's not added here. If needed, it would be:
+// const handleEditAgentWithMode = (agentToEdit: SavedAgentConfiguration, mode: "form" | "chat") => {
+//   setEditingAgent(agentToEdit);
+//   setBuildMode(mode);
+//   if (mode === "form") setIsBuilderModalOpen(true);
+//   else setSelectedAgentForMonitoring(null); // Or other logic for chat build mode
+// };
 [end of src/app/agent-builder/page.tsx]

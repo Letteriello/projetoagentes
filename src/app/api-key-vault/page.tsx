@@ -69,12 +69,13 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { ApiKeyVaultEntry } from "@/types/apiKeyVaultTypes"; // Import the main type
+// ApiKeyVaultEntry will be replaced by ApiKeyEntry from the service
+import { ApiKeyEntry } from "@/services/api-key-service"; // Import the service type
+import { listApiKeys } from "@/services/api-key-service"; // Import the function
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 import withAuth from '@/components/auth/withAuth';
 
-// Use ApiKeyVaultEntry directly
-const initialApiKeys: ApiKeyVaultEntry[] = [];
+const initialApiKeys: ApiKeyEntry[] = [];
 
 // Define service type options
 const SERVICE_TYPE_OPTIONS = [
@@ -89,7 +90,7 @@ const SERVICE_TYPE_OPTIONS = [
 ];
 
 function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC convention
-  const [apiKeys, setApiKeys] = React.useState<ApiKeyVaultEntry[]>(initialApiKeys);
+  const [apiKeys, setApiKeys] = React.useState<ApiKeyEntry[]>(initialApiKeys);
   const [isLoadingApiKeys, setIsLoadingApiKeys] = React.useState(true); // Added loading state
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
 
@@ -115,11 +116,11 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
 
   // Renaming for clarity, though ConfirmationModal doesn't mandate this.
   const [isConfirmDeleteApiKeyOpen, setIsConfirmDeleteApiKeyOpen] = React.useState(false);
-  const [apiKeyToDelete, setApiKeyToDelete] = React.useState<ApiKeyVaultEntry | null>(null);
+  const [apiKeyToDelete, setApiKeyToDelete] = React.useState<ApiKeyEntry | null>(null);
   // deleteConfirmText is no longer needed with ConfirmationModal
 
   // State for "Edit Key" Dialog
-  const [editingApiKey, setEditingApiKey] = React.useState<ApiKeyVaultEntry | null>(null);
+  const [editingApiKey, setEditingApiKey] = React.useState<ApiKeyEntry | null>(null);
   const [isEditKeyDialogOpen, setIsEditKeyDialogOpen] = React.useState(false);
   const [editServiceName, setEditServiceName] = React.useState<string>("");
   const [editSelectedServiceType, setEditSelectedServiceType] = React.useState<string>("");
@@ -193,7 +194,7 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
     }
   };
 
-  const handleTriggerDeleteDialog = (key: ApiKeyVaultEntry) => {
+  const handleTriggerDeleteDialog = (key: ApiKeyEntry) => {
     setApiKeyToDelete(key); // Use renamed state setter
     setIsConfirmDeleteApiKeyOpen(true); // Use renamed state setter
     // setDeleteConfirmText(""); // Not needed anymore
@@ -231,7 +232,7 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
     // No 'else' part for invalid confirm text, as it's removed.
   };
 
-  const handleOpenEditDialog = (key: ApiKeyVaultEntry) => {
+  const handleOpenEditDialog = (key: ApiKeyEntry) => {
     setEditingApiKey(key);
     setEditServiceName(key.serviceName);
 
@@ -243,7 +244,7 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
       setEditCustomServiceType(key.serviceType);
     }
     setEditAssociatedAgentsInput((key.associatedAgents || []).join(", "));
-    setEditLastUsed(key.lastUsed || ""); // Assuming lastUsed can be an empty string if not set
+    // setEditLastUsed(key.lastUsed || ""); // lastUsed is not in ApiKeyEntry from service
     setIsEditKeyDialogOpen(true);
   };
 
@@ -269,13 +270,12 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
 
     const associatedAgents = editAssociatedAgentsInput.split(",").map(s => s.trim()).filter(s => s);
 
-    const payload: Partial<ApiKeyVaultEntry> = {
+    const payload: Partial<ApiKeyEntry> = { // Changed to Partial<ApiKeyEntry>
       serviceName: editServiceName.trim(),
       serviceType: finalServiceType,
       associatedAgents,
     };
-    // Optionally include lastUsed if you want to allow manual editing of it
-    // if (editLastUsed) payload.lastUsed = editLastUsed;
+    // lastUsed is not part of ApiKeyEntry from service, so cannot be part of payload directly
 
 
     try {
@@ -311,29 +311,20 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
 
   React.useEffect(() => {
     const fetchKeys = async () => {
-      setIsLoadingApiKeys(true); // Set loading true at the start
+      setIsLoadingApiKeys(true);
       try {
-        const response = await fetch("/api/apikeys");
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Error fetching API keys:", errorData);
-          // throw new Error(errorData.message || "Failed to fetch API key configurations");
-          // Don't throw, allow empty state
-          setApiKeys([]); // Ensure it's an empty array on error
-          return;
-        }
-        const data = await response.json();
-        setApiKeys(Array.isArray(data) ? data : []); // Ensure data is an array
+        const fetchedKeys = await listApiKeys(); // Use service function
+        setApiKeys(fetchedKeys);
       } catch (error) {
-        console.error("Failed to fetch API keys:", error);
+        console.error("Failed to load API keys:", error);
         setApiKeys([]); // Ensure it's an empty array on error
-        // toast({ title: "Erro ao Carregar", description: "Não foi possível carregar as configurações de chave API.", variant: "destructive" });
+        toast({ title: "Error", description: "Could not load API keys.", variant: "destructive" });
       } finally {
-        setIsLoadingApiKeys(false); // Set loading false in finally block
+        setIsLoadingApiKeys(false);
       }
     };
     fetchKeys();
-  }, []);
+  }, [toast]); // Added toast to dependencies as it's used in catch
 
   return (
     <div className="space-y-6 p-4">
@@ -454,8 +445,8 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
               <TableRow>
                 <TableHead>Nome do Serviço</TableHead>
                 <TableHead>Tipo de Serviço</TableHead>
-                <TableHead>Data de Registro</TableHead>
-                <TableHead>Último Uso</TableHead>
+                <TableHead>Data de Criação</TableHead> {/* Changed from Data de Registro */}
+                {/* <TableHead>Último Uso</TableHead> // Removed as not in service's ApiKeyEntry */}
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -466,7 +457,7 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
+                    {/* <TableCell><Skeleton className="h-5 w-1/4" /></TableCell> // Skeleton for LastUsed removed */}
                     <TableCell className="text-right space-x-1">
                       <div className="flex justify-end space-x-2">
                         <Skeleton className="h-8 w-8" />
@@ -501,8 +492,8 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                   <TableRow key={key.id}>
                     <TableCell className="font-medium">{key.serviceName}</TableCell>
                     <TableCell>{key.serviceType}</TableCell>
-                    <TableCell>{new Date(key.dateAdded).toLocaleDateString()}</TableCell>
-                    <TableCell>{key.lastUsed ? new Date(key.lastUsed).toLocaleDateString() : "Nunca"}</TableCell>
+                    <TableCell>{new Date(key.createdAt).toLocaleDateString()}</TableCell> {/* Changed to createdAt */}
+                    {/* <TableCell>{key.lastUsed ? new Date(key.lastUsed).toLocaleDateString() : "Nunca"}</TableCell> // lastUsed removed */}
                     <TableCell className="text-right space-x-1">
                       <Button
                         variant="ghost"
