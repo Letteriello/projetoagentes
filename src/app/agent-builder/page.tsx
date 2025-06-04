@@ -701,11 +701,12 @@ export default function AgentBuilderPage() {
   );
 }
 
-// AgentRow para listagem virtual
+/*
 interface AgentRowProps {
   index: number;
   style: React.CSSProperties;
 }
 
 // Constante para o tamanho dos itens da lista
-const AGENT_CARD_LIST_ITEM_SIZE = 200; // Altura em pixels para cada card na visualização em lista
+const AGENT_CARD_LIST_ITEM_SIZE = 200;
+*/ // Altura em pixels para cada card na visualização em lista

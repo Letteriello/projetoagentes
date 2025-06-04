@@ -6,8 +6,6 @@
     "dev": "set NODE_OPTIONS=--inspect=0.0.0.0:9229 && next dev --turbopack -p 9003",
     "dev:stable": "next dev --turbopack -p 9002",
     "dev:no-turbo": "set NODE_OPTIONS=--inspect=0.0.0.0:9229 && next dev -p 9003",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -52,15 +50,11 @@
     "firebase": "^11.8.1",
     "firebase-admin": "^13.4.0",
     "framer-motion": "^12.15.0",
-    "genkit": "^1.11.0",
-    "genkit-plugin-firestore": "^1.11.0", // Added firestore plugin
-    "genkit-plugin-vertexai": "^1.11.0", // Added vertexai plugin
-    "genkitx-openai": "^0.20.1",
     "https-browserify": "^1.0.0",
     "https-proxy-agent": "^7.0.6",
     "js-yaml": "^4.1.0",
+    "lru-cache": "^7.14.1",
     "lucide-react": "^0.475.0",
-    "lru-cache": "^7.14.1", // Added lru-cache
     "monaco-editor": "^0.52.2",
     "next": "^15.3.3",
     "os-browserify": "^0.3.0",
@@ -82,13 +76,11 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "util": "^0.12.5",
-    "zod": "^3.25.42"
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "zod": "^3.25.46"
   },
   "devDependencies": {
-    "axios": "^1.0.0",
     "@hookform/resolvers": "^5.0.1",
     "@playwright/test": "^1.52.0",
     "@tailwindcss/typography": "^0.5.16",
@@ -103,14 +95,13 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@types/react-window": "^1.8.8",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.0.0",
     "buffer": "^6.0.3",
     "eslint-config-next": "^15.3.3",
     "eslint-plugin-promise": "^7.2.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-security": "^3.0.1",
     "events": "^3.3.0",
-    "genkit-cli": "^1.11.1",
-    "genkitx-ollama": "^1.11.1",
     "handlebars-loader": "^1.7.3",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.0.0-beta.3",
@@ -119,6 +110,6 @@
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^1.8.11",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.8.3"
+    "typescript": "5.8.3"
   }
 }

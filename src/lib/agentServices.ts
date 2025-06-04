@@ -5,10 +5,24 @@
 // Descrição: Este módulo fornece serviços relacionados à gestão de agentes,
 //            incluindo salvamento, recuperação e atualização de configurações de agentes.
 // ----------------------------------------------------------------------
+/// <reference types="firebase" />
 
 import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { firestore } from '@/lib/firebaseClient';
-import { collection, doc, setDoc, addDoc, getDoc, getDocs, query, where, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+// Adicionado importação com types completos
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  DocumentData, 
+  QueryDocumentSnapshot,
+  DocumentSnapshot
+} from 'firebase/firestore';
 import { enhancedLogger } from '@/lib/logger'; // Import the logger
 
 /**
@@ -251,7 +265,7 @@ export async function getCommunityAgentTemplates(): Promise<SavedAgentConfigurat
     const templatesQuery = query(collection(firestore, 'agent-templates'));
     const templatesSnapshot = await getDocs(templatesQuery);
 
-    return templatesSnapshot.docs.map(doc => ({
+    return templatesSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
       ...doc.data(),
       id: doc.id
     } as SavedAgentConfiguration));
