@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2
+  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2, MessageSquare, Send, AlertTriangle
 } from "lucide-react"; // Added icons
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 import { cn } from "@/lib/utils";
@@ -43,7 +43,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { type MonitorEvent, ToolCallEvent, ErrorEvent, InfoEvent, TaskCompletionEvent, AgentStateEvent, PerformanceMetricsEvent } from '@/types/monitor-events';
+import { type MonitorEvent, ToolCallEvent, ErrorEvent, InfoEvent, TaskCompletionEvent, AgentStateEvent, PerformanceMetricsEvent, A2AMessageEvent } from '@/types/monitor-events'; // Added A2AMessageEvent
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   type AgentStatus,
@@ -236,6 +236,10 @@ export default function AgentMonitorPage() {
 
   const MAX_METRIC_DATAPOINTS_PER_AGENT = 30;
 
+  // State for A2A Messages
+  const [a2aMessages, setA2aMessages] = useState<A2AMessageEvent[]>([]);
+  const [a2aMessagesLoading, setA2aMessagesLoading] = useState<boolean>(false); // For future API calls
+  const [a2aMessagesError, setA2aMessagesError] = useState<string | null>(null);
 
   const agentUsageChartConfig = {
     count: {
@@ -503,6 +507,54 @@ export default function AgentMonitorPage() {
 
   // useEffect for mock data generation on component mount
   useEffect(() => {
+    // Mock A2A Messages
+    setA2aMessagesLoading(true);
+    try {
+      const mockMessages: A2AMessageEvent[] = [
+        {
+          id: 'a2a-msg-1',
+          timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
+          agentId: 'agent-001', // This is the sender in this context
+          eventType: 'a2a_message',
+          fromAgentId: 'agent-001',
+          toAgentId: 'agent-002',
+          messageContent: 'Hello agent-002, this is a test message.',
+          status: 'simulated_success',
+          channelId: 'channel-alpha',
+        },
+        {
+          id: 'a2a-msg-2',
+          timestamp: new Date(Date.now() - 1000 * 60 * 3).toISOString(), // 3 minutes ago
+          agentId: 'agent-002', // This is the receiver, but event is logged by sender or system
+          eventType: 'a2a_message',
+          fromAgentId: 'agent-002',
+          toAgentId: 'agent-003',
+          messageContent: { data: 'Some complex object data', value: 123 },
+          status: 'simulated_failed',
+          channelId: 'channel-beta',
+          errorDetails: { message: 'Simulated target agent offline' }
+        },
+        {
+          id: 'a2a-msg-3',
+          timestamp: new Date(Date.now() - 1000 * 60 * 1).toISOString(), // 1 minute ago
+          agentId: 'agent-system', // Logged by a system observer perhaps
+          eventType: 'a2a_message',
+          fromAgentId: 'agent-004',
+          toAgentId: 'corp-workflow-agent',
+          messageContent: 'Initiate workflow XYZ with params A, B, C.',
+          status: 'sent', // Actual status if it were a real system
+          channelId: 'workflow-intake-channel',
+        },
+      ];
+      setA2aMessages(mockMessages);
+    } catch (err) {
+      setA2aMessagesError('Failed to load mock A2A messages.');
+      console.error("Error in A2A mock data generation:", err);
+    } finally {
+      setA2aMessagesLoading(false);
+    }
+
+
     setAgentStatusLoading(true);
     setAverageResponseTimeLoading(true); // Combined for efficiency with agentIds
     try {
@@ -523,7 +575,13 @@ export default function AgentMonitorPage() {
         };
       });
 
-      const sseAgentIds = ['agent-001', 'agent-002', 'agent-003', 'agent-004', 'corp-workflow-agent']; // From monitor-stream route
+      const sseAgentIds = ['agent-001', 'agent-002', 'agent-003', 'agent-004', 'corp-workflow-agent'];
+      // Add agent IDs from mock A2A messages to ensure they appear in status list if not already present
+      a2aMessages.forEach(msg => {
+        if (!sseAgentIds.includes(msg.fromAgentId)) sseAgentIds.push(msg.fromAgentId);
+        if (!sseAgentIds.includes(msg.toAgentId)) sseAgentIds.push(msg.toAgentId);
+      });
+
       sseAgentIds.forEach(id => {
         if (!initialDisplayAgents[id]) {
           initialDisplayAgents[id] = { id, name: id, currentStatus: 'unknown', lastSeen: new Date().toISOString() };
@@ -578,13 +636,20 @@ export default function AgentMonitorPage() {
     eventSource.onmessage = (event) => {
       try {
         const newEvent = JSON.parse(event.data) as MonitorEvent;
-        setLiveEvents((prevEvents) => {
-          const updatedEvents = [newEvent, ...prevEvents];
-          if (updatedEvents.length > MAX_LIVE_EVENTS) {
-            return updatedEvents.slice(0, MAX_LIVE_EVENTS);
-          }
-          return updatedEvents;
-        });
+
+        if (newEvent.eventType === 'a2a_message') {
+          setA2aMessages(prev => [newEvent as A2AMessageEvent, ...prev.slice(0, MAX_LIVE_EVENTS -1)]);
+          // Also add to live events if desired, or handle separately
+           setLiveEvents((prevEvents) => {
+            const updatedEvents = [newEvent, ...prevEvents];
+            return updatedEvents.length > MAX_LIVE_EVENTS ? updatedEvents.slice(0, MAX_LIVE_EVENTS) : updatedEvents;
+          });
+        } else {
+          setLiveEvents((prevEvents) => {
+            const updatedEvents = [newEvent, ...prevEvents];
+            return updatedEvents.length > MAX_LIVE_EVENTS ? updatedEvents.slice(0, MAX_LIVE_EVENTS) : updatedEvents;
+          });
+        }
 
         // Update displayAgents based on the new event
         if (newEvent.eventType === 'agent_state') {
@@ -598,7 +663,7 @@ export default function AgentMonitorPage() {
               lastSeen: stateEvent.timestamp,
             }
           }));
-        } else {
+        } else if (newEvent.eventType !== 'a2a_message') { // Don't let a2a messages make agent 'busy' by default
           setDisplayAgents(prevAgents => {
             if (prevAgents[newEvent.agentId] && (prevAgents[newEvent.agentId].currentStatus === 'offline' || prevAgents[newEvent.agentId].currentStatus === 'unknown' || prevAgents[newEvent.agentId].currentStatus === 'idle')) {
               return {
@@ -792,11 +857,22 @@ export default function AgentMonitorPage() {
             if (asEvent.message) searchableContent += ` ${asEvent.message.toLowerCase()}`;
             break;
           case 'performance_metrics':
-            const pmEvent = event as PerformanceMetricsEvent;
-            searchableContent += ` ${pmEvent.metricName} ${pmEvent.value}`;
-            if(pmEvent.unit) searchableContent += ` ${pmEvent.unit}`;
-            if(pmEvent.details) searchableContent += ` ${JSON.stringify(pmEvent.details).toLowerCase()}`;
-            break;
+              const pmEvent = event as PerformanceMetricsEvent;
+              searchableContent += ` ${pmEvent.metricName} ${pmEvent.value}`;
+              if(pmEvent.unit) searchableContent += ` ${pmEvent.unit}`;
+              if(pmEvent.details) searchableContent += ` ${JSON.stringify(pmEvent.details).toLowerCase()}`;
+              break;
+            case 'a2a_message': // Make A2A messages searchable
+              const a2aEvent = event as A2AMessageEvent;
+              searchableContent += ` ${a2aEvent.fromAgentId} ${a2aEvent.toAgentId} ${a2aEvent.status}`;
+              if (a2aEvent.channelId) searchableContent += ` ${a2aEvent.channelId}`;
+              if (typeof a2aEvent.messageContent === 'string') {
+                searchableContent += ` ${a2aEvent.messageContent.toLowerCase()}`;
+              } else {
+                searchableContent += ` ${JSON.stringify(a2aEvent.messageContent).toLowerCase()}`;
+              }
+              if (a2aEvent.errorDetails) searchableContent += ` ${a2aEvent.errorDetails.message.toLowerCase()}`;
+              break;
         }
         if (!searchableContent.toLowerCase().includes(query)) {
           return false;
@@ -814,6 +890,7 @@ export default function AgentMonitorPage() {
     { value: 'info', label: 'Info' },
     { value: 'agent_state', label: 'Agent State' },
     { value: 'performance_metrics', label: 'Performance Metrics' },
+    { value: 'a2a_message', label: 'A2A Message' }, // Added A2A to filter options
   ];
 
   const feedStatusOptions = [
@@ -919,6 +996,24 @@ export default function AgentMonitorPage() {
         const pmEvent = event as PerformanceMetricsEvent;
         content = `Perf: ${pmEvent.metricName}: ${typeof pmEvent.value === 'number' ? pmEvent.value.toFixed(2) : pmEvent.value}${pmEvent.unit ? ' ' + pmEvent.unit : ''}`;
         styleClass += ' text-purple-500 dark:text-purple-400';
+        break;
+      case 'a2a_message':
+        const a2aEvent = event as A2AMessageEvent;
+        details = `A2A: ${a2aEvent.fromAgentId} -> ${a2aEvent.toAgentId}`;
+        content = `Msg: ${typeof a2aEvent.messageContent === 'string' ? a2aEvent.messageContent : JSON.stringify(a2aEvent.messageContent)} (Status: ${a2aEvent.status})`;
+        if (a2aEvent.channelId) content += ` (Channel: ${a2aEvent.channelId})`;
+
+        switch(a2aEvent.status) {
+          case 'sent': styleClass += ' text-sky-500 dark:text-sky-400'; break;
+          case 'received': styleClass += ' text-blue-500 dark:text-blue-400'; break;
+          case 'simulated_success': styleClass += ' text-green-500 dark:text-green-400'; break;
+          case 'simulated_failed':
+          case 'error':
+            styleClass += ' text-red-500 dark:text-red-400 font-medium';
+            if (a2aEvent.errorDetails) content += ` - Error: ${a2aEvent.errorDetails.message}`;
+            break;
+          default: styleClass += ' text-gray-500 dark:text-gray-300';
+        }
         break;
       default:
         const unknownEvent = event as any;
@@ -1259,6 +1354,70 @@ export default function AgentMonitorPage() {
         </div>
       )}
       {/* END OF VISUAL TRAJECTORY SECTION */}
+
+      {/* START OF A2A MESSAGES SECTION */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Mensagens A2A (Simuladas)</h2>
+        {a2aMessagesLoading ? (
+          <Skeleton className="h-[200px] w-full rounded-md" />
+        ) : a2aMessagesError ? (
+          <EmptyStateDisplay
+            icon={AlertTriangle}
+            title="Erro ao Carregar Mensagens A2A"
+            message={a2aMessagesError}
+          />
+        ) : a2aMessages.length === 0 ? (
+          <EmptyStateDisplay
+            icon={MessageSquare}
+            title="Nenhuma Mensagem A2A Registrada"
+            message="Mensagens de comunicação entre agentes aparecerão aqui."
+          />
+        ) : (
+          <ScrollArea className="h-[300px] w-full border rounded-md p-0 bg-muted/20 dark:bg-muted/10">
+            <div className="p-4">
+              <ul className="space-y-3">
+                {a2aMessages.map(msg => (
+                  <li key={msg.id} className="text-xs p-3 rounded-lg bg-background dark:bg-black/20 shadow-sm border border-border/50">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-mono text-muted-foreground text-[11px]">{format(new Date(msg.timestamp), "PP HH:mm:ss")}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                        msg.status === 'simulated_success' || msg.status === 'sent' || msg.status === 'received' ? 'bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100' :
+                        msg.status === 'simulated_failed' || msg.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-700 dark:text-red-100' :
+                        'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100'
+                      }`}>
+                        {msg.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="font-medium text-foreground">
+                      <Send size={12} className="inline mr-1.5 text-primary"/> De: <span className="font-mono">{msg.fromAgentId}</span>
+                    </div>
+                    <div className="font-medium text-foreground">
+                      <Inbox size={12} className="inline mr-1.5 text-primary"/> Para: <span className="font-mono">{msg.toAgentId}</span>
+                    </div>
+                    {msg.channelId && <div className="text-muted-foreground text-[11px] mt-0.5">Canal: {msg.channelId}</div>}
+                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-border/50">
+                      <strong className="text-muted-foreground">Conteúdo:</strong>
+                      <pre className="text-[11px] p-1.5 bg-muted/30 dark:bg-muted/10 rounded whitespace-pre-wrap break-all mt-0.5">
+                        {typeof msg.messageContent === 'string' ? msg.messageContent : JSON.stringify(msg.messageContent, null, 2)}
+                      </pre>
+                    </div>
+                    {msg.errorDetails && (
+                       <div className="mt-1.5 pt-1.5 border-t border-dashed border-red-500/30">
+                        <strong className="text-red-500 dark:text-red-400">Detalhes do Erro:</strong>
+                        <pre className="text-[11px] p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded whitespace-pre-wrap break-all mt-0.5">
+                          {msg.errorDetails.message}
+                          {msg.errorDetails.stack && `\n${msg.errorDetails.stack}`}
+                        </pre>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </ScrollArea>
+        )}
+      </div>
+      {/* END OF A2A MESSAGES SECTION */}
 
       {/* START OF PERFORMANCE METRICS CHARTS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">

@@ -60,10 +60,12 @@ import {
   ClipboardCopy,
   Undo2, // Import Undo2
   AlertTriangle, // Import AlertTriangle
+  Download, // Import Download icon
   // Wand2 // Already imported
 } from 'lucide-react';
 
 import { HelpModal } from '@/components/ui/HelpModal';
+import { generateAgentCardJson, generateAgentCardYaml } from '../../../lib/agent-utils'; // Added import
 import { aiConfigurationAssistantFlow, AiConfigurationAssistantOutput } from '@/ai/flows/aiConfigurationAssistantFlow';
 import AISuggestionDisplay from './AISuggestionDisplay';
 import { runFlow } from 'genkit';
@@ -686,6 +688,34 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   const handleExport = () => {
     // Handle export logic
+  };
+
+  const triggerDownload = (content: string, fileName: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateAgentCard = (format: 'json' | 'yaml') => {
+    const agentData = methods.getValues();
+    const agentName = agentData.name || 'agent'; // Use agent name for the file
+    if (format === 'json') {
+      const jsonString = generateAgentCardJson(agentData);
+      triggerDownload(jsonString, `${agentName}-agent-card.json`, 'application/json');
+    } else {
+      const yamlString = generateAgentCardYaml(agentData);
+      triggerDownload(yamlString, `${agentName}-agent-card.yaml`, 'application/x-yaml');
+    }
+    toast({
+      title: "Agent Card Gerado",
+      description: `O Agent Card (${format.toUpperCase()}) foi baixado.`,
+    });
   };
 
   // const handleToolConfigure = (toolId: string) => { // REMOVED
@@ -1464,10 +1494,20 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
               ) : (
                 // Editing existing agent
                 <>
-                  <Button variant="outline" type="button" onClick={handleExport} className="mr-auto"> {/* Added mr-auto to push to left */}
-                    <Share2 className="mr-2 h-4 w-4" /> {/* Or DownloadCloud icon */}
-                    Exportar Configuração
-                  </Button>
+                  <div className="mr-auto flex gap-2"> {/* Container for left-aligned buttons */}
+                    <Button variant="outline" type="button" onClick={handleExport}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Exportar Config.
+                    </Button>
+                    <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('json')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Gerar Agent Card (JSON)
+                    </Button>
+                    {/* <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('yaml')}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Gerar Agent Card (YAML)
+                    </Button> */}
+                  </div>
                   <DialogClose asChild>
                     <Button variant="outline" type="button">Cancelar</Button>
                   </DialogClose>
