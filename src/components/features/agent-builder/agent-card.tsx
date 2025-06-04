@@ -69,7 +69,7 @@ import type {
   CustomAgentConfig, // Assuming this will now come from agent-configs-new
   AvailableTool,
 } from '@/types/agent-configs-new'; // UPDATED IMPORT PATH
-import { cn, capitalize } from "@/lib/utils"; // Added capitalize
+import { cn } from "@/lib/utils";
 
 
 const getToolIconComponent = (

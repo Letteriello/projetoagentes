@@ -83,7 +83,7 @@ const DeployTab = lazy(() => import('./tabs/DeployTab')); // Import DeployTab
 
 import { SubAgentSelector } from './sub-agent-selector';
 import { v4 as uuidv4 } from 'uuid'; // For generating default IDs
-import useApiKeyVault from '../../../hooks/use-api-key-vault';
+import useApiKeyVault from '../../../hooks/use-api-key-vault'; // Import default está correto, pois o hook exporta default
 
 import type {
   SavedAgentConfiguration,

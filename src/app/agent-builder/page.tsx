@@ -45,7 +45,7 @@ import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs
 import type { AvailableTool } from '@/types/agent-types';
 
 import {
-  builderAvailableTools as defaultAvailableTools,
+  availableTools as defaultAvailableTools,
   iconComponents
 } from "@/data/agentBuilderConfig";
 
