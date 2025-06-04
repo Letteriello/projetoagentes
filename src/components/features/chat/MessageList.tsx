@@ -4,7 +4,8 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 import { ChatMessageUI } from '@/types/chat';
 import { forwardRef, useRef, useEffect } from 'react';
-import SimplerChatMessage from './SimplerChatMessage';
+// import SimplerChatMessage from './SimplerChatMessage'; // Original import
+import ChatMessageDisplay from './ChatMessageDisplay'; // Import ChatMessageDisplay
 
 interface MessageListProps {
   /** Array of messages to display */
@@ -83,7 +84,8 @@ const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({
               }}
               className="w-full"
             >
-              <SimplerChatMessage message={msg} onRegenerate={onRegenerate} onFeedback={onFeedback} />
+              {/* Use ChatMessageDisplay instead of SimplerChatMessage */}
+              <ChatMessageDisplay message={msg} onRegenerate={onRegenerate} />
             </motion.div>
           ))}
           {isPending && (

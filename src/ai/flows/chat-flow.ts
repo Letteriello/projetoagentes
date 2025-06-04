@@ -23,6 +23,7 @@ import { GenerateRequest, Part, ToolRequest, ToolResponse, Tool } from '@genkit-
 import type { MessageData } from '@/types/chat-types';
 import { createLoggableFlow } from '@/lib/logger'; // Import the wrapper
 import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed within
+import { winstonLogger } from '../../lib/winston-logger';
 import { z } from 'zod';
 import { ActionContext } from 'genkit';
 
@@ -439,7 +440,11 @@ async function basicChatFlowInternal(
       toolResults: executedToolResults, 
     };
   } catch (e: any) {
-    console.error(`Error in ${flowName} (Agent: ${agentId}):`, e);
+    winstonLogger.error(`Error in ${flowName} (Agent: ${agentId})`, {
+      error: e instanceof Error ? { message: e.message, stack: e.stack, name: e.name } : String(e),
+      agentId: agentId,
+      flowName: flowName
+    });
     // enhancedLogger.logError is good here if createLoggableFlow doesn't capture enough detail or if error is caught before re-throwing
     // For now, createLoggableFlow will handle the primary error logging.
     return { error: e.message || 'An unexpected error occurred' };
