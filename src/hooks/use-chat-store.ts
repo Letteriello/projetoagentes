@@ -488,6 +488,32 @@ export function useChatStore(): ChatStore {
           newMessagesToAdd.push(agentResponseMessage);
         }
 
+        // Process ChatEvents (including CALLBACK_SIMULATION)
+        if (data.chatEvents && Array.isArray(data.chatEvents)) {
+          data.chatEvents.forEach((event: any) => { // Assuming event structure from chat-flow
+            const chatEventMessage: ExtendedChatMessageUI = { // Map to MessageListItem of type 'event'
+              id: event.id || uuidv4(),
+              // Ensure all fields expected by MessageListItem type 'event' are here
+              type: 'event', // This signifies it's an event for MessageList
+              sender: 'system', // Events are system-generated
+              text: event.eventDetails || event.eventTitle, // Fallback for text content
+              timestamp: event.timestamp ? new Date(event.timestamp) : new Date(),
+              status: 'completed', // Events are considered complete
+              conversationId: currentConvId,
+              // Specific event fields for ChatEventDisplay's rawEventData & ChatEvent type
+              eventType: event.eventType,
+              eventTitle: event.eventTitle,
+              eventDetails: event.eventDetails,
+              toolName: event.toolName,
+              callbackType: event.callbackType,
+              callbackAction: event.callbackAction,
+              originalData: event.originalData,
+              modifiedData: event.modifiedData,
+            };
+            newMessagesToAdd.push(chatEventMessage);
+          });
+        }
+
         // Update optimistic messages: remove pending, add all new ones
         addOptimisticMessage({ type: 'remove_message', messageId: agentMessageId });
         newMessagesToAdd.forEach(msg => {
@@ -496,27 +522,28 @@ export function useChatStore(): ChatStore {
           addOptimisticMessage({ type: 'add_message', message: messageWithConvId });
         });
 
-        // Persist new messages to Firestore (tool calls, tool responses, final agent message)
-        // This part needs careful implementation to match Firestore structure
+        // Persist actual 'agent' messages to IndexedDB. 'event' types are for UI display only for now.
         for (const msg of newMessagesToAdd) {
-          const messageToPersist: Message = {
-            id: msg.id,
-            isUser: msg.sender === 'user',
-            content: msg.text,
-            timestamp: msg.timestamp, // Use Date object directly
-            conversationId: currentConvId,
-            text: msg.text, // Ensure text field
-            // Map toolCall/toolResponse if needed
-            // For now, assuming content/text is sufficient for display.
-          };
-          if (msg.sender !== 'user') { // User message already persisted
-             await addMessageToConversation(currentConvId, messageToPersist);
+          if (msg.sender === 'agent' && msg.id === agentMessageId) { // Persist the main agent response
+            const messageToPersist: Message = {
+              id: msg.id,
+              isUser: false,
+              content: msg.text,
+              timestamp: msg.timestamp,
+              conversationId: currentConvId,
+              text: msg.text,
+            };
+            await addMessageToConversation(currentConvId, messageToPersist);
           }
         }
+        // Update the true `messages` state, including 'event' types for UI display
         setMessages(prev => [...prev.filter(m => m.id !== agentMessageId), ...newMessagesToAdd]);
 
 
       } else { // Fallback to existing streaming logic if not JSON
+        // TODO: Streaming of structured chatEvents (like CALLBACK_SIMULATION) is not handled here.
+        // This would require the backend to send events as distinct chunks (e.g., JSON objects separated by newlines)
+        // and this client-side logic to parse them. For now, only text is streamed.
         const reader = response.body?.getReader(); const decoder = new TextDecoder();
         let accumulatedAgentResponse = "";
         if (reader) {
