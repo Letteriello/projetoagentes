@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     if (!apiKey || apiKey !== serverApiKey) {
       winstonLogger.warn('Unauthorized access attempt to /api/chat-stream', { api: 'chat-stream', remoteAddress: req.ip });
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Acesso não autorizado. Verifique sua chave de API ou token.' }, { status: 401 });
     }
 
     const chatInput: ChatInput = await req.json();
@@ -163,17 +163,30 @@ export async function POST(req: NextRequest) {
 
         // Handle potential errors from the flow
         if (flowOutput.error) {
+          let userFriendlyErrorDetail = "Erro interno no fluxo do agente.";
+          const lowerCaseFlowError = String(flowOutput.error).toLowerCase();
+          if (lowerCaseFlowError.includes("auth") || lowerCaseFlowError.includes("token")) {
+            userFriendlyErrorDetail = "Erro de autenticação no fluxo do agente.";
+          } else if (lowerCaseFlowError.includes("permission") || lowerCaseFlowError.includes("denied")) {
+            userFriendlyErrorDetail = "Permissão negada no fluxo do agente.";
+          } else if (flowOutput.error) { // Keep original error if it's not sensitive and more specific
+            userFriendlyErrorDetail = String(flowOutput.error);
+          }
+
           const errorEvent = {
             id: `err-${Date.now()}`,
             timestamp: new Date(),
-            eventType: 'AGENT_CONTROL', // Or a more specific error type for flow errors
-            eventTitle: 'Flow Error',
-            eventDetails: flowOutput.error,
+            eventType: 'AGENT_ERROR', // More specific eventType
+            eventTitle: 'Erro no Agente',
+            eventDetails: userFriendlyErrorDetail, // User-friendly detail
           };
           controller.enqueue(JSON.stringify({ type: 'event', data: errorEvent }) + '\n');
-          winstonLogger.error('Error from basicChatFlow', { api: 'chat-stream', agentId: chatInput.agentId, error: flowOutput.error });
-          // We might still want to send any accumulated text or decide to close.
-          // For now, we send the error event and proceed to outputMessage if any.
+          winstonLogger.error('Error reported by basicChatFlow', {
+            api: 'chat-stream',
+            agentId: chatInput.agentId,
+            originalError: flowOutput.error, // Log original error
+            reportedError: userFriendlyErrorDetail
+          });
         }
 
         // Enqueue the final output message (as text)
@@ -221,11 +234,25 @@ export async function POST(req: NextRequest) {
     // console.error('[Chat API Error]', error); // Removed redundant console.error
     winstonLogger.error('Error in chat-stream API', {
       api: 'chat-stream',
-      agentId: (error as any)?.config?.agentId || 'unknown', // Attempt to get agentId if available in error context
+      agentId: (req as any).agentId || chatInput?.agentId || 'unknown',
       error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error)
     });
+
+    // Refine HTTP error response based on error type, if possible
+    if (error instanceof Error) {
+      const lowerCaseError = error.message.toLowerCase();
+      if (lowerCaseError.includes("auth") || lowerCaseError.includes("token") || lowerCaseError.includes("unauthorized")) {
+        return NextResponse.json({ error: "Autenticação falhou ou sua sessão expirou." }, { status: 401 });
+      } else if (lowerCaseError.includes("permission") || lowerCaseError.includes("denied")) {
+        return NextResponse.json({ error: "Permissão negada para este recurso ou agente." }, { status: 403 });
+      } else if (lowerCaseError.includes("not found")) {
+        // Generic not found, could be agent or other resource
+        return NextResponse.json({ error: "Recurso não encontrado." }, { status: 404 });
+      }
+    }
+    // Default to 500 for other errors
     return NextResponse.json(
-      { error: error.message || 'An unexpected error occurred in chat API.' },
+      { error: 'Ocorreu um erro inesperado no servidor de chat. Por favor, tente novamente mais tarde.' },
       { status: 500 }
     );
   }

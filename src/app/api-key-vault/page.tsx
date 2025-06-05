@@ -157,6 +157,16 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
       finalServiceType = data.customServiceType!;
     }
 
+    // Simulated security check for "invalid" API key based on service name
+    if (data.serviceName.toLowerCase().includes("test_invalid_key")) {
+      toast({
+        title: "Chave API Inválida Detectada",
+        description: "A configuração fornecida para o serviço '" + data.serviceName + "' parece ser inválida ou insegura.",
+        variant: "destructive",
+      });
+      return; // Prevent further processing for this simulated invalid key
+    }
+
     const associatedAgents = data.associatedAgentsInput
       ? data.associatedAgentsInput.split(",").map(s => s.trim()).filter(s => s)
       : [];
@@ -268,6 +278,18 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
      if (!finalServiceType) {
       toast({ title: "Erro", description: "Tipo de serviço não pode ser vazio.", variant: "destructive" });
       return;
+    }
+
+    // Simulated security check for "invalid" API key based on service name
+    if (editServiceName.toLowerCase().includes("test_invalid_key")) {
+      toast({
+        title: "Chave API Inválida Detectada",
+        description: "A configuração atualizada para o serviço '" + editServiceName + "' parece ser inválida ou insegura.",
+        variant: "destructive",
+      });
+      setIsEditKeyDialogOpen(false); // Close the dialog
+      resetEditKeyForm(); // Reset form
+      return; // Prevent further processing
     }
 
     const associatedAgents = editAssociatedAgentsInput.split(",").map(s => s.trim()).filter(s => s);

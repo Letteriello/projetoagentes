@@ -8,7 +8,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Paperclip, SendHorizontal, Loader2 as Loader, Search, Sparkles, Code, Database, Globe, Bot, Mic } from "lucide-react"; // Added Mic
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Added DropdownMenu components
+import { Paperclip, SendHorizontal, Loader2 as Loader, Search, Sparkles, Code, Database, Globe, Bot, Mic, Settings2 } from "lucide-react"; // Added Mic and Settings2
 import AttachmentPopoverContent from "./AttachmentPopoverContent";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast"; // Import toast
@@ -294,24 +300,35 @@ useEffect(() => {
       onSubmit={handleFormSubmitInternal} // Use internal submit handler
       className="sticky bottom-0 flex items-end gap-2 p-3 border-t bg-background z-10"
     >
-      {/* Menu de ferramentas */}
-      <Popover open={isToolsMenuOpen} onOpenChange={setIsToolsMenuOpen}>
-        <PopoverTrigger asChild>
+      {/* Main Features Dropdown Menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <Button
             type="button"
             variant="outline"
             size="icon"
             className="flex-shrink-0 relative group hover:border-primary/70 transition-colors"
-            onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
             disabled={isPending}
-            title="Ferramentas"
+            title="Mais Opções"
           >
-            <Sparkles className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-            {selectedTool && (
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full border-2 border-background" />
-            )}
+            <Settings2 className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
           </Button>
-        </PopoverTrigger>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="w-56">
+          <DropdownMenuItem onSelect={() => setIsToolsMenuOpen(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            <span>Ferramentas</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setIsPopoverOpen(true)}>
+            <Paperclip className="mr-2 h-4 w-4" />
+            <span>Anexar / Gravar Voz</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Tools Popover (now opened programmatically) */}
+      <Popover open={isToolsMenuOpen} onOpenChange={setIsToolsMenuOpen}>
+        {/* No PopoverTrigger here anymore, it's opened by DropdownMenuItem */}
         <PopoverContent
           side="top"
           align="start"
@@ -339,29 +356,16 @@ useEffect(() => {
         </PopoverContent>
       </Popover>
 
-      {/* Anexo de arquivos */}
-      {/* Anexo de arquivos */}
+      {/* Attachments Popover (now opened programmatically) */}
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-        <PopoverTrigger asChild>
-          {/* This button can act as a generic trigger, or you can have separate triggers */}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="flex-shrink-0 relative group hover:border-primary/70 transition-colors"
-            // onClick={() => setIsPopoverOpen(!isPopoverOpen)} // Toggle popover for choice
-            disabled={isPending}
-            title="Anexar"
-          >
-            <Paperclip className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-            {(selectedFile || (attachmentType === 'audio' && selectedFileDataUri)) && (
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full border-2 border-background" />
-            )}
-          </Button>
-        </PopoverTrigger>
+        {/* No PopoverTrigger here anymore, it's opened by DropdownMenuItem */}
         <PopoverContent
           side="top"
           align="start"
+          // Anchor the popover to the new features button or the input area if needed.
+          // For now, default anchoring might be sufficient, or adjust with `anchorRef` if Popover supports it,
+          // or by ensuring it's placed logically in the DOM for relative positioning.
+          // The PopoverContent itself will decide to show choices or preview.
           className={cn(
             "w-auto p-0 border-none shadow-none bg-transparent mb-1",
             !(selectedFile || (attachmentType === 'audio' && selectedFileDataUri)) && "p-1 border bg-background shadow-md" // Style for choice menu
@@ -420,7 +424,7 @@ useEffect(() => {
           onChange={internalHandleChange}
           onKeyDown={handleTextareaKeyDown}
           disabled={isPending}
-          className="min-h-[44px] pr-12 resize-none overflow-y-hidden custom-scrollbar py-2.5 leading-tight"
+          className="min-h-[44px] pr-12 overflow-y-hidden custom-scrollbar py-2.5 leading-tight"
         />
         {/* Token Counter Display */}
         <div className="text-xs text-muted-foreground text-right px-3 py-1">

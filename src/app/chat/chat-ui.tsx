@@ -85,31 +85,14 @@ interface Gem {
   // Add other properties if necessary, like 'description' or 'iconName' if used by AgentSelectItem mapping
 }
 
-// Define the action type for optimistic updates - MOVED TO useChatStore
-// Adicionando isStreaming à interface ChatMessageUI - This specific interface is now in useChatStore
-// interface ExtendedChatMessageUI extends ChatMessageUI {
-//   isStreaming?: boolean;
-// }
-
-// type OptimisticUpdateAction =
-//   | { type: "add_message"; message: ExtendedChatMessageUI }
-//   | { type: "update_message_content"; id: string; content: string } // content, not text
-//   | { type: "update_message_status"; id: string; status: ChatMessageUI['status']; isStreaming?: boolean }
-//   | { type: "remove_message"; id: string }
-//   | { type: "set_messages"; messages: ExtendedChatMessageUI[] }
-//   | { type: "update_message_feedback"; id: string; feedback: 'liked' | 'disliked' | null }; // Added feedback action
-
 import ChatHeader from "@/components/features/chat/ChatHeader";
 // Corrigindo a importação do tipo ChatHeaderProps
 import type ChatHeaderProps from "@/components/features/chat/ChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
-// import { Message } from "@/types/chat"; // Message type is used by useChatStore
 import { Conversation, ChatMessageUI, TestRunConfig, ChatRunConfig } from "@/types/chat"; // Added ChatRunConfig
 import LoadingState from "@/components/shared/LoadingState"; // Import LoadingState
-// import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
-// import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -117,7 +100,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label"; 
 import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
-// import * as cs from "@/lib/firestoreConversationStorage"; // No longer directly used here
 import { useRouter, useParams } from "next/navigation";
 import { useChatStore, ActiveChatTarget } from '@/hooks/use-chat-store'; // IMPORT THE STORE
 
@@ -142,25 +124,23 @@ export function ChatUI() {
   const router = useRouter();
   const params = useParams();
   const { currentUser } = useAuth();
-  // const currentUserId = currentUser?.uid; // Now from store.currentUserId
 
-  const store = useChatStore(); // USE THE STORE
+  const store = useChatStore();
+
+  const [isFocusModeActive, setIsFocusModeActive] = useState(false);
+  const toggleFocusMode = () => setIsFocusModeActive(prev => !prev);
 
   const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
   const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
 
-  // State for current agent and conversation context
-  // Definindo uma interface estendida de SavedAgentConfigType que inclui todas as propriedades necessárias
   interface ExtendedSavedAgentConfigType {
     id: string;
     agentName: string;
     agentDescription: string;
     agentVersion: string;
-    // Campos adicionais que podem estar presentes
     agentModel?: string;
     globalInstruction?: string;
     agentTemperature?: number;
-    // O config não pode ser opcional para ser compatível com SavedAgentConfigType
     config: AgentConfig;
     tools: string[];
     toolConfigsApplied?: boolean;
@@ -175,7 +155,6 @@ export function ChatUI() {
   }
   
   const [currentAgent, setCurrentAgent] = useState<ExtendedSavedAgentConfigType | Gem | ADKAgentConfig | null>(null);
-  // const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null); // From store
 
   const activeChatTargetName = useMemo(() => {
     if (currentAgent) {
@@ -189,33 +168,43 @@ export function ChatUI() {
 
   const {
     savedAgents,
-    setSavedAgents, // This might be an issue if useAgents context also uses its own state management
+    setSavedAgents,
     addAgent,
     updateAgent,
     deleteAgent,
-    // isLoadingAgents // This might be an issue if useAgents context also uses its own state management
   } = useAgents();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // Simulated Tool Usage Constants & State
+  const TOOL_KEYWORD = "/tool_weather";
+  const MAX_TOOL_USES = 3;
+  const toolUseCountRef = useRef<Record<string, number>>({});
+
+  // Rate Limiting Constants
+  const RATE_LIMIT_WINDOW_MS = 15000; // 15 seconds
+  const RATE_LIMIT_MAX_MESSAGES = 5; // 5 messages per window
+
   // UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isVerboseMode, setIsVerboseMode] = useState<boolean>(false); // Added verbose mode state
-  // const [inputValue, setInputValue] = useState(""); // From store
-  // const [isPending, setIsPending] = useState(false); // From store
-  // const [isLoadingMessages, setIsLoadingMessages] = useState(false); // From store
-  const [isADKInitializing, setIsADKInitializing] = useState<boolean>(false); // Keep for ADK specific UI
+  // Rate Limiting State
+  const messageTimestampsRef = useRef<number[]>([]);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [timeToNextMessage, setTimeToNextMessage] = useState(0);
+  const rateLimitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Test Run Config State
+  const [isVerboseMode, setIsVerboseMode] = useState<boolean>(false);
+  const [isADKInitializing, setIsADKInitializing] = useState<boolean>(false);
+  const [isClient, setIsClient] = useState(false);
+
   const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
     temperature: undefined,
     streamingEnabled: true,
   });
   const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
 
-  // User-facing chat configuration state
   const [userChatConfig, setUserChatConfig] = useState<ChatRunConfig>({
     streamingEnabled: true,
     simulatedVoiceConfig: {
@@ -234,25 +223,13 @@ export function ChatUI() {
     }));
   };
 
-  // Message and Conversation State - MOVED TO useChatStore
-  // const [messages, setMessages] = useState<ExtendedChatMessageUI[]>([]);
-  // const [conversations, setConversations] = useState<Conversation[]>([]);
-  // const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  // const [inputContinuation, setInputContinuation] = useState<any>(null);
-
-  // File Handling State - REMOVED as it's now in MessageInputArea.tsx
-  // const [selectedFile, setSelectedFile] = useState<File | null>(null); // REMOVED
-  // const [selectedFileName, setSelectedFileName] = useState<string | null>(null); // REMOVED
-  // const [selectedFileDataUri, setSelectedFileDataUri] = useState<string | null>(null); // REMOVED
-
-  // Agent and Gem Selection State
   const [selectedGemId, setSelectedGemId] = useState<string | null>(
     initialGems[0]?.id ?? null
   );
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [selectedADKAgentId, setSelectedADKAgentId] = useState<string | null>(null);
   const [adkAgents, setADKAgents] = useState<ADKAgent[]>([]);
-  const [pendingAgentConfig, setPendingAgentConfig] = useState<AgentConfig | ExtendedSavedAgentConfigType | null>(null); // Keep for Agent Creator UI
+  const [pendingAgentConfig, setPendingAgentConfig] = useState<AgentConfig | ExtendedSavedAgentConfigType | null>(null);
   const [selectedAgentConfig, setSelectedAgentConfig] = useState<ExtendedSavedAgentConfigType | null>(null);
   const mappedAdkAgents: AgentSelectItem[] = adkAgents.map((agentConfig: ADKAgent): AgentSelectItem => ({
     id: agentConfig.id, 
@@ -261,7 +238,6 @@ export function ChatUI() {
 
   const usingADKAgent = useMemo(() => !!selectedADKAgentId, [selectedADKAgentId]);
 
-  // activeChatTarget is now a prop for store functions, but its computation logic can remain here
   const activeChatTarget = useMemo((): ActiveChatTarget | null => {
     if (usingADKAgent && selectedADKAgentId && adkAgents.length > 0) {
       const adkAgent = adkAgents.find((agent: ADKAgent) => agent.id === selectedADKAgentId);
@@ -278,24 +254,17 @@ export function ChatUI() {
     return initialGems.length > 0 ? { id: initialGems[0].id, name: initialGems[0].name, type: 'gem' as const, config: initialGems[0] } : null;
   }, [selectedAgentId, savedAgents, selectedGemId, selectedADKAgentId, adkAgents, usingADKAgent]);
 
-
-  // Optimistic messages logic MOVED TO useChatStore
-  // const [optimisticMessages, addOptimisticMessage] = useOptimistic(...)
-
-  // isLoadingConversations is now store.isLoadingConversations
-
   useEffect(() => {
-    setPendingAgentConfig(null); // This can remain if pendingAgentConfig is UI specific for agent creator
+    setIsClient(true);
+    setPendingAgentConfig(null);
+    // Cleanup timer on unmount
+    return () => {
+      if (rateLimitTimerRef.current) {
+        clearTimeout(rateLimitTimerRef.current);
+      }
+    };
   }, [selectedGemId, selectedAgentId, selectedADKAgentId]);
 
-  // useEffect for loading conversations - MOVED TO useChatStore
-
-  // handleSelectConversation is now store.handleSelectConversation
-  // No need to call addOptimisticMessage or router.push here, store handles it.
-
-  // useEffect for loading messages - MOVED TO useChatStore
-
-  // useEffect to sync activeConversationId from URL params
   useEffect(() => {
     const pathConvId = params.conversationId as string | undefined;
     if (pathConvId && pathConvId !== store.activeConversationId) {
@@ -304,7 +273,7 @@ export function ChatUI() {
   }, [params.conversationId, store.activeConversationId, store.handleSelectConversation]);
 
 
-  const handleLogin = async () => { // This can remain as UI specific logic
+  const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -319,27 +288,17 @@ export function ChatUI() {
     }
   };
 
-  const handleLogout = async () => { // This can remain as UI specific logic
+  const handleLogout = async () => {
     try {
       await signOut(auth);
       toast({ title: "Logout Successful", variant: "default" });
-      // Resetting store state related to user might be needed if not handled by auth context listeners
-      // For now, assuming useAuth and useChatStore handle this appropriately
-      // store.setMessages([]); // Example, if store needs explicit reset
-      // store.setConversations([]);
-      // store.setActiveConversationId(null);
-      setPendingAgentConfig(null); // UI specific state
+      setPendingAgentConfig(null);
     } catch (error) {
       console.error("Error during logout:", error);
       toast({ title: "Logout Failed", variant: "destructive" });
     }
   };
 
-  // handleFileChange is now INTERNAL to MessageInputArea.tsx
-  // removeSelectedFile is now INTERNAL to MessageInputArea.tsx
-
-  // handleFormSubmit is now largely store.submitMessage
-  // It now needs to accept the file and audio data from MessageInputArea
   const handleFormSubmitWrapper = async (
     event: React.FormEvent<HTMLFormElement>,
     file?: File | null,
@@ -347,11 +306,67 @@ export function ChatUI() {
     attachmentType?: 'file' | 'audio'
   ) => {
     event.preventDefault();
-    if (pendingAgentConfig && store.isPending) { // Check store.isPending
+
+    if (!currentUser) {
+      toast({
+        title: "Autenticação Necessária",
+        description: "Por favor, faça login para realizar esta ação.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Simulated Tool Usage Limit Check
+    if (store.inputValue.startsWith(TOOL_KEYWORD)) {
+      const currentToolUses = toolUseCountRef.current[TOOL_KEYWORD] || 0;
+      if (currentToolUses >= MAX_TOOL_USES) {
+        toast({
+          title: "Limite de Uso Atingido",
+          description: `Você atingiu o limite de uso para a ferramenta Weather (simulado).`,
+          variant: "warning",
+        });
+        return; // Prevent message submission
+      }
+      toolUseCountRef.current[TOOL_KEYWORD] = currentToolUses + 1;
+    }
+
+    // Rate Limiting Check
+    const currentTime = Date.now();
+    messageTimestampsRef.current = messageTimestampsRef.current.filter(
+      (timestamp) => currentTime - timestamp < RATE_LIMIT_WINDOW_MS
+    );
+
+    if (messageTimestampsRef.current.length >= RATE_LIMIT_MAX_MESSAGES) {
+      setIsRateLimited(true);
+      const oldestRecentTime = messageTimestampsRef.current.length > 0 ? messageTimestampsRef.current[0] : currentTime;
+      const newTimeToNext = Math.max(0, Math.ceil((oldestRecentTime + RATE_LIMIT_WINDOW_MS - currentTime) / 1000));
+      setTimeToNextMessage(newTimeToNext);
+
+      toast({
+        title: "Rate Limited",
+        description: `Too many messages. Please try again in ${newTimeToNext} seconds.`,
+        variant: "destructive",
+      });
+
+      if (rateLimitTimerRef.current) {
+        clearTimeout(rateLimitTimerRef.current);
+      }
+      rateLimitTimerRef.current = setTimeout(() => {
+        setIsRateLimited(false);
+        setTimeToNextMessage(0);
+      }, newTimeToNext * 1000);
+      return;
+    }
+    // End Rate Limiting Check
+
+    if (pendingAgentConfig && store.isPending) {
       toast({ title: "Aguarde", description: "Por favor, salve ou descarte a configuração do agente pendente antes de enviar uma nova mensagem.", variant: "default"});
       return;
     }
-    setPendingAgentConfig(null); // UI specific state for agent creator
+    setPendingAgentConfig(null);
+
+    messageTimestampsRef.current.push(currentTime);
+    messageTimestampsRef.current.sort((a, b) => a - b);
 
     const { id: msgToastId, update: updateMsgToast, dismiss: dismissMsgToast } = toast({
       title: "Sending Message...",
@@ -360,19 +375,16 @@ export function ChatUI() {
     });
 
     try {
-      // Pass the file, audioDataUri, userChatConfig, and testRunConfig to submitMessage.
       await store.submitMessage(
         store.inputValue,
         activeChatTarget,
-        // testRunConfig, // testRunConfig is now passed as the fourth argument
         attachmentType === 'audio' ? undefined : file,
         attachmentType === 'audio' ? audioDataUri : undefined,
-        userChatConfig, // Pass the current userChatConfig
-        testRunConfig // Pass the current testRunConfig
+        userChatConfig,
+        testRunConfig
       );
       updateMsgToast({
         title: "Message Sent!",
-        // description: "Your message has been sent.", // Optional description
         variant: "default"
       });
     } catch (error) {
@@ -383,19 +395,13 @@ export function ChatUI() {
         variant: "destructive"
       });
     } finally {
-      // Dismiss the toast after a short delay
       setTimeout(() => {
         dismissMsgToast();
-      }, 3000); // 3 seconds
+      }, 3000);
     }
-    inputRef.current?.focus(); // Keep UI focus logic
+    inputRef.current?.focus();
   };
 
-
-  // handleNewConversation is now store.handleNewConversation
-  // handleDeleteConversation is now store.handleDeleteConversation
-
-  // fetchADKAgents can remain UI specific for fetching ADK agents list
   const fetchADKAgents = async () => {
     setIsADKInitializing(true);
     try {
@@ -418,23 +424,22 @@ export function ChatUI() {
   };
 
   useEffect(() => {
-    fetchADKAgents(); // This can remain as UI specific logic
+    fetchADKAgents();
   }, []);
 
-  // handleSaveAgent and related pendingAgentConfig logic remains UI specific for agent creator
   const handleSaveAgent = (configToSave: ExtendedAgentConfig | ExtendedSavedAgentConfigType) => {
-    if (!currentUser) { /* ... */ return; }
+    if (!currentUser) { return; }
     try {
       if ('agentName' in configToSave) {
         saveAgentConfiguration(
-          { /* ... config ... */
-            id: configToSave.id || uuidv4(), // Ensure ID if new
+          {
+            id: configToSave.id || uuidv4(),
             agentName: configToSave.agentName || '',
             agentDescription: configToSave.agentDescription || '',
             agentVersion: configToSave.agentVersion || '1.0.0',
             config: configToSave.config,
             tools: configToSave.tools || [],
-            toolConfigsApplied: configToSave.toolConfigsApplied || {}, // ensure it's an object
+            toolConfigsApplied: configToSave.toolConfigsApplied || {},
             toolsDetails: configToSave.toolsDetails || [],
             createdAt: configToSave.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -446,7 +451,7 @@ export function ChatUI() {
          .catch((error: Error) => toast({ title: "Save Failed", description: error.message, variant: "destructive" }));
       } else if ('name' in configToSave) {
         saveAgentConfiguration(
-          { /* ... config ... */
+          {
             id: uuidv4(),
             agentName: configToSave.name || "New Agent",
             agentDescription: configToSave.description || "",
@@ -492,10 +497,9 @@ export function ChatUI() {
     toast({ title: "Draft Discarded" });
   };
 
-  // handleExportChatLog remains UI specific
   const handleExportChatLog = () => {
-    if (!store.activeConversationId) { /* ... */ return; }
-    if (store.optimisticMessages.length === 0) { /* ... */ return; }
+    if (!store.activeConversationId) { return; }
+    if (store.optimisticMessages.length === 0) { return; }
     const conversationName = activeChatTargetName || `conversation_${store.activeConversationId}`;
     const safeConversationName = conversationName.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filename = `${safeConversationName}_log.json`;
@@ -521,18 +525,11 @@ export function ChatUI() {
     toast({ title: "Exportado", description: `Histórico da conversa salvo em ${filename}` });
   };
 
-  // handleSuggestionClick remains UI specific
   const handleSuggestionClick = (suggestion: string) => {
     store.setInputValue(suggestion);
     inputRef.current?.focus();
   };
 
-  // handleFeedback is now store.handleFeedback
-  // handleRegenerate is now store.handleRegenerate
-
-  // handleInputChange is now store.setInputValue
-
-  // Scroll to bottom effect remains, but uses store's optimisticMessages and isPending
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollElement = scrollAreaRef.current.querySelector('div');
@@ -542,8 +539,6 @@ export function ChatUI() {
     }
   }, [store.optimisticMessages, store.isPending]);
 
-
-  // Test config related functions remain UI specific
   const handleTestConfigChange = (newConfig: Partial<TestRunConfig>) => {
     setTestRunConfig(prev => ({ ...prev, ...newConfig }));
   };
@@ -551,24 +546,6 @@ export function ChatUI() {
     setIsTestConfigPanelOpen(false);
     toast({ title: "Test Settings Applied" });
   };
-
-  // handleFileChange needs to be added to the store if not already.
-  // For now, assuming store.handleFileChange exists. If it's just simple state updates,
-  // store.setSelectedFile, store.setSelectedFileName, store.setSelectedFileDataUri can be used.
-  // Let's assume a simple version for now if handleFileChange is not in the store:
-  // const handleFileChangeForStore = (event: ChangeEvent<HTMLInputElement>) => { // REMOVED
-  //   const file = event.target.files?.[0];
-  //   if (file) {
-  //     store.setSelectedFile(file);
-  //     store.setSelectedFileName(file.name);
-  //     const reader = new FileReader();
-  //     reader.onloadend = () => store.setSelectedFileDataUri(reader.result as string);
-  //     reader.readAsDataURL(file);
-  //   } else {
-  //     store.clearSelectedFile();
-  //   }
-  // };
-
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -584,7 +561,7 @@ export function ChatUI() {
         )}
       </Suspense>
       <Suspense fallback={<div className="fixed md:relative inset-y-0 left-0 z-20 w-72 h-full bg-gray-800 text-gray-200 p-4">Carregando sidebar...</div>}>
-        {isClient && isSidebarOpen && ( // Ensure isClient and isSidebarOpen are true for Suspense
+        {isClient && isSidebarOpen && !isFocusModeActive && (
           <div
             className={cn(
               "fixed md:relative inset-y-0 left-0 z-20 w-72 h-full transition-transform duration-300 ease-in-out bg-gray-800",
@@ -602,10 +579,10 @@ export function ChatUI() {
               onRenameConversation={store.handleRenameConversation}
               isLoading={store.isLoadingConversations}
               currentUserId={store.currentUserId}
-              gems={initialGems} // Keep UI specific props
-              savedAgents={savedAgents} // Keep UI specific props
-              adkAgents={adkAgents} // Keep UI specific props
-              onSelectAgent={(agent) => { // Keep UI specific logic
+              gems={initialGems}
+              savedAgents={savedAgents}
+              adkAgents={adkAgents}
+              onSelectAgent={(agent) => {
                 if ('displayName' in agent) setSelectedADKAgentId(agent.id);
                 else if ('prompt' in agent) setSelectedGemId(agent.id);
                 else if ('agentName' in agent || 'id' in agent) setSelectedAgentId(agent.id);
@@ -634,13 +611,13 @@ export function ChatUI() {
             handleNewConversation={() => store.handleNewConversation()}
             isADKInitializing={isADKInitializing}
             onExportChatLog={handleExportChatLog}
-            isVerboseMode={isVerboseMode} // Pass verbose mode state
-            onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)} // Pass toggle function
-            // User Chat Config props
+            isVerboseMode={isVerboseMode}
+            onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)}
+            isFocusModeActive={isFocusModeActive}
+            onToggleFocusMode={toggleFocusMode}
             userChatConfig={userChatConfig}
             onUserChatConfigChange={handleUserChatConfigChange}
           >
-            {/* Test settings button can remain or be moved if header gets too cluttered */}
             <Button variant="outline" size="icon" onClick={() => setIsTestConfigPanelOpen(true)} title="Test Settings" className="ml-2">
               <Settings2 className="h-5 w-5" />
             </Button>
@@ -653,7 +630,6 @@ export function ChatUI() {
                 isLoading={store.isLoadingMessages}
                 loadingText="Carregando mensagens..."
                 loadingType="spinner"
-                // No explicit error state managed here for messages, so error prop is omitted
               >
                 {!currentUser ? (
                   <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
@@ -675,7 +651,7 @@ export function ChatUI() {
                       isPending={store.isPending}
                       onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
                       onFeedback={store.handleFeedback}
-                      isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
+                      isVerboseMode={isVerboseMode}
                     />
                   </div>
                 )}
@@ -683,7 +659,7 @@ export function ChatUI() {
             </ScrollArea>
           </div>
 
-          {pendingAgentConfig && ( // Keep pendingAgentConfig UI for agent creator
+          {pendingAgentConfig && (
             <Card className="m-4 border-primary shadow-lg absolute bottom-0 left-0 right-0 mb-20 bg-background z-10">
               <CardHeader>
                 <CardTitle>Revisar Configuração Proposta do Agente</CardTitle>
@@ -714,9 +690,8 @@ export function ChatUI() {
               formRef={useRef<HTMLFormElement>(null)}
               inputRef={inputRef}
               fileInputRef={fileInputRef}
-              onSubmit={handleFormSubmitWrapper} // Pass the updated wrapper
-              isPending={store.isPending || !!pendingAgentConfig} // Combine store pending with UI pending for agent creator
-              // selectedFile, selectedFileName, selectedFileDataUri, onRemoveAttachment, handleFileChange props are removed
+              onSubmit={handleFormSubmitWrapper}
+              isPending={store.isPending || !!pendingAgentConfig || isRateLimited}
               inputValue={store.inputValue}
               onInputChange={(e) => store.setInputValue(typeof e === 'string' ? e : e.target.value)}
             />
