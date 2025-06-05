@@ -117,14 +117,14 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
       Usuário: "Defina o objetivo como 'Resumir documentos longos'."
       Sua resposta JSON (para o sistema):
       {
-        "updatedConfig": { ... "config": { "type": "llm", "agentGoal": "Resumir documentos longos", ... }, ... },
+        "updatedConfig": { "agentName": "AgenteDeExemplo", "config": { "type": "llm", "agentGoal": "Resumir documentos longos", "outrosCamposPreservados": "..." }, "outrosCamposBasePreservados": "..." },
         "assistantMessage": "Entendido. O objetivo do agente agora é 'Resumir documentos longos'. Gostaria de adicionar tarefas específicas?"
       }
 
       Usuário: "Adicione a capacidade de buscar na web."
       Sua resposta JSON (para o sistema):
       {
-        "updatedConfig": { ... "tools": ["webSearch"], ... },
+        "updatedConfig": { "agentName": "AgenteDeExemplo", "tools": ["webSearch"], "config": {"type": "llm", "outrosCamposPreservados": "..."}, "outrosCamposBasePreservados": "..." },
         "assistantMessage": "Adicionei a ferramenta de busca na web. Algo mais?"
       }
 
@@ -133,7 +133,7 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
 
     try {
       // Make the generation request with JSON schema validation
-      const { text } = await ai.generate(systemPrompt);
+      const { text } = await ai.generate({ prompt: systemPrompt, model: gemini10Pro });
       
       // Parse the JSON response
       let responseValue;
