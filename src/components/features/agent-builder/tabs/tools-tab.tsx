@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle, Cpu, Edit3 } from "lucide-react";
+import { Loader2, Wand2 as SparklesIcon, CheckCircle2, Settings, Check, PlusCircle, Trash2, AlertTriangle, Cpu, Edit3, HelpCircle } from "lucide-react"; // Added HelpCircle
 
 // Definindo aliases para os ícones para evitar conflitos
 const PlusCircleIcon = PlusCircle;
@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label'; // Keep for direct use if any
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea'; // Added Textarea
 import { FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // Import Form components for forceToolUsage
 
 // Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
@@ -99,6 +100,10 @@ export default function ToolsTab({
   const [isCustomToolDialogOpen, setIsCustomToolDialogOpen] = React.useState(false);
   const [editingCustomToolData, setEditingCustomToolData] = React.useState<CustomToolData | undefined>(undefined);
   const [toolToDelete, setToolToDelete] = React.useState<string | null>(null); // For delete confirmation
+
+  // State for custom plugin installation
+  const [customPluginsJson, setCustomPluginsJson] = React.useState<string>("");
+  const [dynamicallyAddedTools, setDynamicallyAddedTools] = React.useState<AvailableTool[]>([]);
 
   // Usando o tipo definido acima
 
@@ -210,6 +215,55 @@ export default function ToolsTab({
     setIsCustomToolDialogOpen(false);
     setEditingCustomToolData(undefined);
   };
+
+  const handleInstallPlugins = () => {
+    if (!customPluginsJson.trim()) {
+      toast({ title: "Info", description: "Textarea is empty. Nothing to install.", variant: "default" });
+      return;
+    }
+    try {
+      const parsedPlugins = JSON.parse(customPluginsJson);
+
+      if (!Array.isArray(parsedPlugins)) {
+        toast({ title: "Error", description: "Invalid JSON format. Expected an array of tools.", variant: "destructive" });
+        return;
+      }
+
+      const newTools: AvailableTool[] = [];
+      for (const plugin of parsedPlugins) {
+        if (!plugin.id || !plugin.name || !plugin.description) {
+          toast({ title: "Error", description: `Each plugin must have id, name, and description. Problem with: ${JSON.stringify(plugin)}`, variant: "destructive" });
+          return; // Stop processing if any plugin is invalid
+        }
+        newTools.push({
+          id: plugin.id,
+          name: plugin.name,
+          description: plugin.description,
+          category: plugin.category || 'Custom Plugins', // Default category
+          icon: plugin.icon || 'HelpCircle', // Default icon
+          inputSchema: typeof plugin.inputSchema === 'object' ? JSON.stringify(plugin.inputSchema) : plugin.inputSchema, // Ensure string
+          // Default other fields as necessary
+          hasConfig: plugin.hasConfig || false, // Default to no config unless specified
+          type: 'plugin', // Add a type to distinguish these if needed
+        } as AvailableTool); // Added type assertion
+      }
+
+      // Combine with existing dynamically added tools, ensuring uniqueness by ID
+      setDynamicallyAddedTools(prevTools => {
+        const existingIds = new Set(prevTools.map(t => t.id));
+        const filteredNewTools = newTools.filter(nt => !existingIds.has(nt.id));
+        // Also filter out any new tools that might already be in the main availableTools prop
+        const propToolIds = new Set(availableTools.map(t => t.id));
+        const finalNewTools = filteredNewTools.filter(nt => !propToolIds.has(nt.id));
+        return [...prevTools, ...finalNewTools];
+      });
+
+      toast({ title: "Success", description: "Plugins installed successfully!" });
+      setCustomPluginsJson(""); // Clear textarea
+    } catch (error: any) {
+      toast({ title: "Error", description: `Invalid JSON: ${error.message}`, variant: "destructive" });
+    }
+  };
   
   const handleDeleteCustomTool = (toolId: string) => {
     const currentSelected = getValues('tools') || [];
@@ -247,6 +301,18 @@ export default function ToolsTab({
     const toolName = availableTools.find(t => t.id === toolId)?.name || toolId;
     toast({ title: "Configuração da Ferramenta Salva", description: `Configuração salva para ${toolName}.` });
   };
+
+  const allDisplayableTools = React.useMemo(() => {
+    const combined = [...availableTools, ...dynamicallyAddedTools];
+    // Ensure uniqueness in case of ID overlap
+    const uniqueToolsMap = new Map<string, AvailableTool>();
+    combined.forEach(tool => {
+      if (!uniqueToolsMap.has(tool.id)) {
+        uniqueToolsMap.set(tool.id, tool);
+      }
+    });
+    return Array.from(uniqueToolsMap.values());
+  }, [availableTools, dynamicallyAddedTools]);
 
   return (
     <div className="space-y-6">
@@ -460,11 +526,38 @@ export default function ToolsTab({
               </FormItem>
             )}
           />
+
+          {/* Plugin Installation UI */}
+          <Card className="mt-4 mb-6">
+            <CardHeader>
+              <CardTitle>Install Custom Tool Plugins</CardTitle>
+              <CardDescription>
+                Paste a JSON array of tool definitions to add them to the available tools list for this session.
+                Each tool must have at least "id", "name", and "description". Input schema can be provided via "inputSchema".
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Label htmlFor="custom-plugins-json">Tool Plugins (JSON format)</Label>
+              <Textarea
+                id="custom-plugins-json"
+                placeholder={`[{"id": "customTool1", "name": "My Custom Tool", "description": "Description of my tool...", "inputSchema": "{ \\"type\\": \\"object\\", \\"properties\\": { \\"param1\\": { \\"type\\": \\"string\\" } } }"}]`}
+                value={customPluginsJson}
+                onChange={(e) => setCustomPluginsJson(e.target.value)}
+                rows={5}
+                className="border-input focus-visible:ring-ring" // Added some styling
+              />
+              <Button onClick={handleInstallPlugins} size="sm" variant="outline">
+                <PlusCircleIcon className="mr-2 h-4 w-4" />
+                Install Plugins
+              </Button>
+            </CardContent>
+          </Card>
+
           <ScrollArea className="h-[350px] pr-4"> {/* Adjusted height due to new field */}
             <div className="space-y-4">
-              {availableTools.map((tool, index) => {
+              {allDisplayableTools.map((tool, index) => {
                 const isSelected = currentSelectedTools.includes(tool.id);
-                const hasConfig = tool.hasConfig; // From AvailableTool definition
+                const hasConfig = tool.hasConfig || tool.type === 'plugin'; // Plugins might have schema for config
                 const isConfigured = hasConfig && toolConfigsApplied[tool.id] && Object.keys(toolConfigsApplied[tool.id]).length > 0;
 
                 // For custom tools, name and description might be in toolConfigsApplied
@@ -475,50 +568,54 @@ export default function ToolsTab({
                   ? toolConfigsApplied[tool.id].description 
                   : tool.description;
 
+                // Determine if the tool is an original custom tool or a plugin-based tool
+                const isOriginalCustomTool = tool.type === 'custom';
+                const isPluginTool = tool.type === 'plugin';
+
                 return (
                   <Card key={tool.id} className="p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-grow min-w-0"> 
+                      <div className="flex items-center flex-grow min-w-0">
                         {getToolIcon(tool)}
-                        <div className="flex-grow min-w-0"> 
-                          <Label htmlFor={`tool-select-${tool.id}`} className="text-base font-semibold truncate" title={toolDisplayName}> 
+                        <div className="flex-grow min-w-0">
+                          <Label htmlFor={`tool-select-${tool.id}`} className="text-base font-semibold truncate" title={toolDisplayName}>
                             {toolDisplayName}
                           </Label>
-                          <p className="text-sm text-muted-foreground truncate" title={toolDisplayDescription}>{toolDisplayDescription}</p> 
+                          <p className="text-sm text-muted-foreground truncate" title={toolDisplayDescription}>{toolDisplayDescription}</p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2 flex-shrink-0"> {/* Reduced space-x-3 to space-x-2 */}
-                        {(hasConfig || tool.type === 'custom') && isSelected && (
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        {/* Config/Edit button: Show for original custom tools OR non-plugin tools that haveConfig */}
+                        {(isOriginalCustomTool || (hasConfig && !isPluginTool)) && isSelected && (
                           <Button
                             variant="outline"
-                            size="icon" // Changed to icon button
+                            size="icon"
                             onClick={() => {
-                              if (tool.type === 'custom') {
-                                const config = toolConfigsApplied[tool.id] || {}; // Get current config
-                                // For custom tools, populate initialData for editing
+                              if (isOriginalCustomTool) {
+                                const config = toolConfigsApplied[tool.id] || {};
                                 setEditingCustomToolData({
-                                  id: tool.id, // Important: pass ID for editing
-                                  name: config.name || tool.name, // Prefer name from config if available
-                                  description: config.description || tool.description, // Prefer desc from config
+                                  id: tool.id,
+                                  name: config.name || tool.name,
+                                  description: config.description || tool.description,
                                   inputSchema: config.inputSchema || tool.inputSchema || '{}',
                                   outputSchema: config.outputSchema || tool.outputSchema || '{}',
                                 });
                                 setIsCustomToolDialogOpen(true);
-                              } else if (hasConfig) { // Non-custom tool with config
+                              } else if (hasConfig && !isPluginTool) { // Regular tool with config
                                 setConfiguringTool(tool);
                                 setIsToolConfigModalOpen(true);
                               }
                             }}
-                            className="h-8 w-8" // Adjusted size for icon button
-                            title={tool.type === 'custom' ? "Editar Ferramenta Customizada" : "Configurar Ferramenta"}
+                            className="h-8 w-8"
+                            title={isOriginalCustomTool ? "Editar Ferramenta Customizada" : "Configurar Ferramenta"}
                           >
-                            {tool.type === 'custom' ? <Edit3 className="h-4 w-4" /> : <SettingsIcon className={cn("h-4 w-4", isConfigured ? "text-green-500" : "text-orange-500")} />}
-                            {/* Display configuration status for non-custom tools */}
-                            {tool.type !== 'custom' && isConfigured && <CheckIcon className="absolute top-0 right-0 h-3 w-3 text-green-500 transform translate-x-1/2 -translate-y-1/2" />}
-                            {tool.type !== 'custom' && !isConfigured && <AlertTriangle className="absolute top-0 right-0 h-3 w-3 text-orange-500 transform translate-x-1/2 -translate-y-1/2" />}
+                            {isOriginalCustomTool ? <Edit3 className="h-4 w-4" /> : <SettingsIcon className={cn("h-4 w-4", isConfigured ? "text-green-500" : "text-orange-500")} />}
+                            {!isOriginalCustomTool && !isPluginTool && isConfigured && <CheckIcon className="absolute top-0 right-0 h-3 w-3 text-green-500 transform translate-x-1/2 -translate-y-1/2" />}
+                            {!isOriginalCustomTool && !isPluginTool && !isConfigured && <AlertTriangle className="absolute top-0 right-0 h-3 w-3 text-orange-500 transform translate-x-1/2 -translate-y-1/2" />}
                           </Button>
                         )}
-                        {tool.type === 'custom' && (
+                        {/* Delete button: Only for original custom tools */}
+                        {isOriginalCustomTool && (
                           <Button
                             variant="destructive"
                             size="icon"

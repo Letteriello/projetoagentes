@@ -19,6 +19,8 @@ import {
   SlidersHorizontal, // Icon for Ferramentas
   Cog, // Icon for Configurações group
   Languages, // Icon for Language Selector
+  Store, // Icon for Marketplace
+  Users2, // Icon for Community
 } from "lucide-react";
 import {
   Sidebar,
@@ -68,6 +70,8 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { href: "/agent-builder", icon: Cpu, label: "Agentes" },
   { href: "/chat", icon: MessageSquare, label: "Chat" },
+  { href: "/marketplace", icon: Store, label: "Marketplace" },
+  { href: "/community", icon: Users2, label: "Comunidade" }, // Added Community
   { href: "/agent-monitor", icon: Activity, label: "Monitor" },
 ];
 

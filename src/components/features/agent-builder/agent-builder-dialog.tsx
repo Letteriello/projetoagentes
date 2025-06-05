@@ -167,11 +167,13 @@ import {
   Undo2, // Import Undo2
   AlertTriangle, // Import AlertTriangle
   Download, // Import Download icon
+  GitCommit, // Added for Git operations
+  RotateCcw, // Added for Git revert
   // Wand2 // Already imported
 } from 'lucide-react';
 
 import { HelpModal } from '@/components/ui/HelpModal';
-import { generateAgentCardJson, generateAgentCardYaml } from '../../../lib/agent-utils'; // Added import
+import { generateAgentManifestJson, generateAgentManifestYaml } from '../../../lib/agent-utils'; // Updated import
 import { aiConfigurationAssistantFlow, AiConfigurationAssistantOutput } from '@/ai/flows/aiConfigurationAssistantFlow';
 import AISuggestionDisplay from './AISuggestionDisplay';
 import { runFlow } from 'genkit';
@@ -1003,7 +1005,40 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         variant: "destructive",
       });
     } finally {
-      setTimeout(() => dismissSaveToast(), 5000);
+      setTimeout(() => dismissSaveToast(), 5000); // Auto-dismiss after 5 seconds
+    }
+  };
+
+  const handleSaveToGit = () => {
+    toast({
+      title: "Simulação: Salvo no Git",
+      description: "A configuração do agente foi 'salva' no repositório Git (simulado).",
+      duration: 3000,
+    });
+    // No actual Git operation
+  };
+
+  const handleRevertFromGit = () => {
+    if (editingAgent) {
+      // Re-use the logic from prepareFormDefaultValues to reset the form
+      // This effectively reverts to the state when the dialog was opened for this agent.
+      // In a real scenario, this would fetch from Git and then reset.
+      const defaultValsForEditingAgent = prepareFormDefaultValues(editingAgent);
+      methods.reset(defaultValsForEditingAgent);
+      setIsSystemPromptManuallyEdited(!!defaultValsForEditingAgent.config.manualSystemPromptOverride);
+
+      toast({
+        title: "Simulação: Revertido do Git",
+        description: "A configuração do agente foi 'revertida' para a última versão do Git (simulado e formulário resetado).",
+        duration: 3000,
+      });
+    } else {
+      toast({
+        title: "Simulação: Revertido do Git",
+        description: "Nenhum agente em edição para reverter (simulado).",
+        variant: "default",
+        duration: 3000,
+      });
     }
   };
 
@@ -1153,7 +1188,15 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   };
 
   const handleExport = () => {
-    // Handle export logic
+    // This function is now effectively replaced by handleGenerateManifest('json')
+    // Keeping it here in case of other export types in future, but for now it's unused for manifest.
+    const agentData = methods.getValues();
+    const jsonString = generateAgentManifestJson(agentData);
+    triggerDownload(jsonString, `${agentData.agentName || 'agent'}-manifest.json`, 'application/json');
+    toast({
+      title: "Agent Manifest (JSON) Gerado",
+      description: "O manifesto do agente (JSON) foi baixado.",
+    });
   };
 
   const triggerDownload = (content: string, fileName: string, mimeType: string) => {
@@ -1210,6 +1253,26 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       title: "Agent Card Gerado",
       description: `O Agent Card (${format.toUpperCase()}) foi baixado.`,
     });
+  };
+
+  const handleGenerateManifest = (format: 'json' | 'yaml') => {
+    const agentData = methods.getValues();
+    const agentName = agentData.agentName || 'agent'; // Use agent name for the file
+    if (format === 'json') {
+      const jsonString = generateAgentManifestJson(agentData);
+      triggerDownload(jsonString, `${agentName}-manifest.json`, 'application/json');
+      toast({
+        title: "Agent Manifest (JSON) Gerado",
+        description: "O manifesto do agente (JSON) foi baixado.",
+      });
+    } else {
+      const yamlString = generateAgentManifestYaml(agentData);
+      triggerDownload(yamlString, `${agentName}-manifest.yaml`, 'application/x-yaml');
+      toast({
+        title: "Agent Manifest (YAML) Gerado",
+        description: "O manifesto do agente (YAML) foi baixado.",
+      });
+    }
   };
 
   // const handleToolConfigure = (toolId: string) => { // REMOVED
@@ -1789,19 +1852,24 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
               ) : (
                 // Editing existing agent
                 <>
-                  <div className="mr-auto flex gap-2"> {/* Container for left-aligned buttons */}
-                    <Button variant="outline" type="button" onClick={handleExport}>
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Exportar Config.
-                    </Button>
-                    <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('json')}>
+                  <div className="mr-auto flex flex-wrap gap-2"> {/* Container for left-aligned buttons, added flex-wrap */}
+                    <Button variant="outline" type="button" onClick={() => handleGenerateManifest('json')}>
                       <Download className="mr-2 h-4 w-4" />
-                      Gerar Agent Card (JSON)
+                      Exportar Manifesto (JSON)
                     </Button>
-                    {/* <Button variant="outline" type="button" onClick={() => handleGenerateAgentCard('yaml')}>
+                    <Button variant="outline" type="button" onClick={() => handleGenerateManifest('yaml')}>
                       <Download className="mr-2 h-4 w-4" />
-                      Gerar Agent Card (YAML)
-                    </Button> */}
+                      Exportar Manifesto (YAML)
+                    </Button>
+                    {/* Git Simulation Buttons */}
+                    <Button variant="outline" type="button" onClick={handleSaveToGit}>
+                      <GitCommit className="mr-2 h-4 w-4" />
+                      Salvar no Git (Simulado)
+                    </Button>
+                    <Button variant="outline" type="button" onClick={handleRevertFromGit}>
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reverter do Git (Simulado)
+                    </Button>
                   </div>
                   <DialogClose asChild>
                     <Button variant="outline" type="button">Cancelar</Button>

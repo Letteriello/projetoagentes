@@ -335,6 +335,10 @@ export default function AgentBuilderPage() {
   } = useAgents();
   const { unlockAchievement } = useAchievements(); // Initialize achievements hook
   const prevAgentCountRef = React.useRef(0); // Ref to store previous agent count
+
+  // State for import confirmation
+  const [isImportConfirmationOpen, setIsImportConfirmationOpen] = React.useState(false);
+  const [agentToImportData, setAgentToImportData] = React.useState<Partial<SavedAgentConfiguration> | null>(null);
   
   // Efeito para carregar agentes do contexto
   useEffect(() => {
@@ -396,10 +400,12 @@ export default function AgentBuilderPage() {
     }
   };
 
-  // Efeito para verificar parâmetros URL
+  // Efeito para verificar parâmetros URL (tutorial e import de agente)
   useEffect(() => {
     if (searchParams) {
       const tutorialId = searchParams.get('tutorial');
+      const importData = searchParams.get('data');
+
       if (tutorialId) {
         const tutorial = tutorials.find((t) => t.id === tutorialId);
         if (tutorial) {
@@ -407,9 +413,39 @@ export default function AgentBuilderPage() {
           setCurrentTutorialStep(0);
           setIsTutorialModalOpen(true);
         }
+      } else if (importData) {
+        try {
+          const decodedJson = atob(importData);
+          const parsedAgentData = JSON.parse(decodedJson) as Partial<SavedAgentConfiguration>;
+
+          if (parsedAgentData && parsedAgentData.agentName && parsedAgentData.config) {
+            setAgentToImportData(parsedAgentData);
+            setIsImportConfirmationOpen(true);
+          } else {
+            toast({
+              title: "Erro na Importação",
+              description: "Os dados do agente a ser importado são inválidos ou estão incompletos.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("Falha ao decodificar ou parsear dados do agente:", error);
+          toast({
+            title: "Erro na Importação",
+            description: "Não foi possível processar os dados do agente para importação. O link pode estar corrompido.",
+            variant: "destructive",
+          });
+        }
+        // Clean the URL immediately after attempting to process to avoid re-processing on refresh / navigation issues
+        // Using router.replace to avoid adding to history stack
+        const currentPath = window.location.pathname;
+        const newSearchParams = new URLSearchParams(window.location.search);
+        newSearchParams.delete('data');
+        router.replace(`${currentPath}?${newSearchParams.toString()}`, undefined);
+
       }
     }
-  }, [searchParams, tutorials]);
+  }, [searchParams, router, toast]); // Added router and toast to dependencies
 
   // Filtrar agentes com base na busca
   const filteredAgents = agents.filter((agent) => 
@@ -726,7 +762,75 @@ export default function AgentBuilderPage() {
         />
       </div>
     );
-  };  // Renderização do componente principal
+  };
+
+  const handleConfirmImport = async () => {
+    if (!agentToImportData) return;
+
+    let agentName = agentToImportData.agentName || "Agente Importado";
+    // Check for name conflicts
+    let nameConflictCount = 0;
+    let newName = agentName;
+    while (agents.some(a => a.agentName === newName)) {
+      nameConflictCount++;
+      newName = `${agentName} (${nameConflictCount})`;
+    }
+    agentName = newName;
+
+    const newAgent: SavedAgentConfiguration = {
+      id: uuidv4(), // Generate new unique ID
+      originalAgentId: agentToImportData.id, // Store original ID if present
+      agentName: agentName,
+      agentDescription: agentToImportData.agentDescription || "",
+      agentVersion: agentToImportData.agentVersion || "1.0.0",
+      icon: agentToImportData.icon || "", // Ensure icon is handled
+      config: agentToImportData.config!, // Assert config is present due to earlier check
+      tools: agentToImportData.tools || [],
+      toolsDetails: agentToImportData.toolsDetails?.map(td => ({ // Map tool details
+        id: td.id,
+        name: td.name || td.id, // Fallback name
+        description: td.description || "",
+        hasConfig: td.hasConfig || false,
+        genkitToolName: td.genkitToolName,
+        // Ensure all fields expected by SavedAgentConfiguration.toolsDetails are present
+        // iconName: td.iconName || 'Default', // Example if iconName is part of your type
+        // label: td.label || td.name || td.id, // Example
+      })) || [],
+      toolConfigsApplied: agentToImportData.toolConfigsApplied || {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      // Ensure all other required fields from SavedAgentConfiguration are present with defaults
+      templateId: agentToImportData.templateId,
+      isTemplate: false, // Imported agents are typically not templates themselves
+      isFavorite: false,
+      tags: agentToImportData.tags || [],
+      userId: '', // Or get from current user context if available
+      // Default other complex objects if not in importData or if they need re-initialization
+      deploymentConfig: agentToImportData.deploymentConfig || { environmentVariables: [], resourceRequirements: { cpu: '', memory: ''} },
+      internalVersion: 1,
+      isLatest: true,
+    };
+
+    try {
+      await addAgent(newAgent); // Assuming addAgent now directly takes SavedAgentConfiguration
+      toast({
+        title: "Agente Importado",
+        description: `O agente "${newAgent.agentName}" foi importado com sucesso.`,
+      });
+    } catch (error) {
+      console.error("Erro ao importar agente:", error);
+      toast({
+        title: "Erro na Importação",
+        description: "Não foi possível adicionar o agente importado.",
+        variant: "destructive",
+      });
+    }
+
+    setIsImportConfirmationOpen(false);
+    setAgentToImportData(null);
+    // URL should have already been cleaned by the useEffect that detected 'data'
+  };
+  // Renderização do componente principal
       // Fechar modal e resetar estado
       setEditingAgent(null);
     } catch (error) {
@@ -1094,6 +1198,27 @@ export default function AgentBuilderPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        )}
+
+        {/* Import Confirmation Modal */}
+        {agentToImportData && (
+          <ConfirmationModal
+            name="Confirmar Importação de Agente"
+            isOpen={isImportConfirmationOpen}
+            onOpenChange={(open: boolean) => {
+              setIsImportConfirmationOpen(open);
+              if (!open) setAgentToImportData(null); // Clear data if modal is closed without confirming
+            }}
+            title={`Importar Agente: ${agentToImportData.agentName || 'Desconhecido'}?`}
+            description={
+              `Você está prestes a importar o agente "${agentToImportData.agentName || 'Desconhecido'}".
+              Descrição: ${agentToImportData.agentDescription || 'N/A'}.
+              Uma nova cópia será criada em sua lista de agentes.`
+            }
+            confirmText="Importar"
+            cancelText="Cancelar"
+            onAction={handleConfirmImport}
+          />
         )}
       </Suspense>
     </>
