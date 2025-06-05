@@ -1,6 +1,8 @@
 // src/data/agentBuilderConfig.ts
 import type { ReactNode, FC } from 'react';
-import type { AvailableTool, GeminiModelConfig } from '@/types/agent-configs-fixed';
+import type { AvailableTool } from '@/types/unified-agent-types'; // GeminiModelConfig removed from this line
+// If GeminiModelConfig is used, it needs its own correct import:
+// import type { GeminiModelConfig } from '...'; // Path to GeminiModelConfig source
 
 // Placeholder for initial Gemini model configurations or similar AI model settings
 export const initialGems: GeminiModelConfig[] = [];

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { FormProvider, useForm } from 'react-hook-form';
 import LLMBehaviorForm from './LLMBehaviorForm';
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { SavedAgentConfiguration } from '@/types/unified-agent-types';
 
 // Mock useToast
 jest.mock('@/hooks/use-toast', () => ({

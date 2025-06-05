@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 // allTools might be large, so using a simplified mock as requested.
 // import { allTools as mockAvailableTools } from '@/data/agent-builder/available-tools';
 import * as z from 'zod';
-import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/agent-configs-fixed';
+import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/unified-agent-types';
 
 // Mock @/ai/genkit and specifically the generate function
 // We need to mock the ai object and its generate method.

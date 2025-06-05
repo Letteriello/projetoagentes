@@ -1,6 +1,6 @@
 import { defineFlow } from 'genkit';
 import { z } from 'zod';
-import { ArtifactStorageType } from '../../types/agent-configs-new'; // Ensured path is correct
+import { ArtifactStorageType } from '../../types/unified-agent-types'; // Ensured path is correct
 import path from 'path'; // Import path for joining paths
 
 // Define the enum for storageType within the flow file or ensure it's correctly imported if defined elsewhere.
