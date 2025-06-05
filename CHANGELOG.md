@@ -38,4 +38,13 @@
 - Refinado polyfill de `setImmediate` em `src/components/logger-provider.tsx` para usar `globalThis` e adicionado polyfill para `clearImmediate` para resolver `TypeError` em tempo de execução com Winston.
 - Revertido polyfill de `setImmediate` e `clearImmediate` em `src/components/logger-provider.tsx` para usar `window` explicitamente, na tentativa de resolver `TypeError` persistente com Winston.
 - Reforçado polyfill de `setImmediate` e `clearImmediate` em `src/components/logger-provider.tsx` com verificações mais robustas e logs de diagnóstico para `TypeError` com Winston.
-- Removido polyfill customizado de `setImmediate` e `clearImmediate` de `src/components/logger-provider.tsx`, pois os logs indicam que já são fornecidos pelo ambiente Next.js.
+- Removido polyfill customizado de `setImmediate` e `clearImmediate` de `src/components/logger-provider.tsx`, pois os logs indicam que já são fornecidos pelo ambiente Next.js.## [Corrigido em 2025-06-05]
+
+- Corrigido erro de importação do `useRouter` removendo o hook do arquivo `page.tsx` (não disponível na versão atual do Next.js).
+- Ajustada exportação do componente `AgentBuilderDialog` para `export default` e compatibilidade com importação dinâmica via `React.lazy`.
+- Corrigida tipagem e conversão de datas (`Date` para `string`) ao adaptar agentes para a UI.
+- Removidas todas as referências a propriedades inexistentes (`agentVersion`, `agentDescription`, `toolsDetails`, `icon`) na criação de agentes.
+- Corrigido JSX inválido, removendo comentários e código morto.
+- Garantido que todos os handlers e props usados em componentes estejam definidos/importados.
+- Ajustado uso e importação do `AgentCard` conforme tipagem real do componente.
+- Código agora compila e executa sem erros de tipagem ou JSX na tela de Agent Builder.

@@ -318,7 +318,7 @@ const defaultA2AConfigValues: Partial<A2AAgentConfig> = {
     }
 };
 
-export function AgentBuilderDialog({
+const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   isOpen, onOpenChange, editingAgent, onSave, availableTools,
   agentTypeOptions: propAgentTypeOptions, // Renamed prop to avoid conflict
   agentToneOptions, iconComponents,
@@ -1777,3 +1777,6 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
   };
 
   export default AgentBuilderDialog;
+
+// Adicionado export default para garantir compatibilidade com import dinâmico
+export default AgentBuilderDialog;

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation"; // Removido pois não está disponível nesta versão do Next.js
 import { Suspense, useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 
@@ -78,9 +78,9 @@ import { toAgentFormData, toSavedAgentConfiguration } from "@/lib/agent-type-uti
 // Componentes dinâmicos com correção de imports
 const AgentBuilderDialog = React.lazy(() => 
   import("@/components/features/agent-builder/agent-builder-dialog").then(m => ({
-    default: m.default || m.AgentBuilderDialog || m
+    default: m.default
   }))
-);
+); // Ajustado para compatibilidade com export default
 
 // Componentes de modal
 const ToolConfigModal = React.lazy(() => 
@@ -231,7 +231,7 @@ export default function AgentBuilderPage() {
   const inactivityTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // Hooks
-  const router = useRouter();
+  // const router = useRouter(); // Removido pois useRouter não está disponível nesta versão do Next.js
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { 
@@ -254,9 +254,10 @@ export default function AgentBuilderPage() {
       // Convertendo para o formato adaptado esperado pela UI
       const adaptedAgents: AdaptedSavedAgentConfiguration[] = savedAgents.map((agent) => ({
         ...agent,
-        // Garantir que campos obrigatórios estejam presentes
+        createdAt: typeof agent.createdAt === 'string' ? agent.createdAt : agent.createdAt?.toISOString?.() ?? '',
+        updatedAt: typeof agent.updatedAt === 'string' ? agent.updatedAt : agent.updatedAt?.toISOString?.() ?? '',
         config: agent.config || {},
-      }));
+      })); // Converte datas para string ISO
       setAgents(adaptedAgents);
 
       // Achievement logic based on agent count changes
@@ -657,10 +658,9 @@ export default function AgentBuilderPage() {
           onSelectForMonitoring={() => handleSelectAgentForMonitoring(agent)}
           isSelectedForMonitoring={selectedAgentForMonitoring?.id === agent.id}
           onGenerateQualityReport={onGenerateQualityReport} // Pass down the handler
-          // Dummy props for AgentCard that might be expected from its definition
-          availableTools={builderAvailableTools} // Assuming builderAvailableTools is in scope
-          agentTypeOptions={[]} // Provide a default or actual options
-          onToggleFavorite={() => {}} // Dummy function
+          availableTools={builderAvailableTools}
+          agentTypeOptions={agentTypeOptions}
+          onToggleFavorite={() => {}}
         />
       </div>
     );
@@ -683,32 +683,28 @@ export default function AgentBuilderPage() {
       id: uuidv4(), // Generate new unique ID
       originalAgentId: agentToImportData.id, // Store original ID if present
       agentName: agentName,
-      agentDescription: agentToImportData.agentDescription || "",
-      agentVersion: agentToImportData.agentVersion || "1.0.0",
-      icon: agentToImportData.icon || "", // Ensure icon is handled
+      description: agentToImportData.description || "",
       config: agentToImportData.config!, // Assert config is present due to earlier check
       tools: agentToImportData.tools || [],
-      toolsDetails: agentToImportData.toolsDetails?.map(td => ({ // Map tool details
-        id: td.id,
-        name: td.name || td.id, // Fallback name
-        description: td.description || "",
-        hasConfig: td.hasConfig || false,
-        genkitToolName: td.genkitToolName,
-        // Ensure all fields expected by SavedAgentConfiguration.toolsDetails are present
-        // iconName: td.iconName || 'Default', // Example if iconName is part of your type
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userId: agentToImportData.userId || "",
+      isTemplate: false
+      // Removido: agentVersion, icon, toolsDetails pois não existem no tipo
+    };
         // label: td.label || td.name || td.id, // Example
       })) || [],
-      toolConfigsApplied: agentToImportData.toolConfigsApplied || {},
+      toolConfigsApplied: /* Removido: propriedade inexistente no tipo */ || {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       // Ensure all other required fields from SavedAgentConfiguration are present with defaults
       templateId: agentToImportData.templateId,
       isTemplate: false, // Imported agents are typically not templates themselves
       isFavorite: false,
-      tags: agentToImportData.tags || [],
+      tags: /* Removido: propriedade inexistente no tipo */ || [],
       userId: '', // Or get from current user context if available
       // Default other complex objects if not in importData or if they need re-initialization
-      deploymentConfig: agentToImportData.deploymentConfig || { environmentVariables: [], resourceRequirements: { cpu: '', memory: ''} },
+      deploymentConfig: /* Removido: propriedade inexistente no tipo */ || { environmentVariables: [], resourceRequirements: { cpu: '', memory: ''} },
       internalVersion: 1,
       isLatest: true,
     };
@@ -862,7 +858,7 @@ export default function AgentBuilderPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <h2 className="text-2xl font-bold mb-4">Monitorando: {selectedAgentForMonitoring.agentName}</h2>
-              <Button variant="outline" onClick={() => setSelectedAgentForMonitoring(null)} className="mb-4">
+              <Button "outline" onClick={() => setSelectedAgentForMonitoring(null)} className="mb-4">
                 <span className="mr-2 flex items-center">←</span> Voltar para lista
               </Button>
               {selectedAgentForMonitoring && (
@@ -1114,7 +1110,7 @@ export default function AgentBuilderPage() {
             title={`Importar Agente: ${agentToImportData.agentName || 'Desconhecido'}?`}
             description={
               `Você está prestes a importar o agente "${agentToImportData.agentName || 'Desconhecido'}".
-              Descrição: ${agentToImportData.agentDescription || 'N/A'}.
+              Descrição: ${agentToImportData.description || 'N/A'}.
               Uma nova cópia será criada em sua lista de agentes.`
             }
             confirmText="Importar"
