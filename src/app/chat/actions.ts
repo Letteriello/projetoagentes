@@ -2,8 +2,9 @@
 
 import { basicChatFlow } from '@/ai/flows/chat-flow';
 import { ChatInput, ChatOutput, ChatFormState, ChatToolDetail } from '@/types/chat-types';
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Import para o tipo
+import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { z } from 'zod';
+import { winstonLogger } from '@/lib/winston-logger'; // Import winstonLogger
 
 // Definindo um tipo mais simples para os detalhes da ferramenta passados para a action
 const AgentToolDetailSchema = z.object({
@@ -67,7 +68,10 @@ export async function submitChatMessage(
     try {
       history = JSON.parse(chatHistoryJson);
     } catch (error) {
-      console.error("Erro ao parsear o histórico do chat:", error);
+      winstonLogger.error("Erro ao parsear o histórico do chat JSON", {
+        error: error instanceof Error ? error.toString() : String(error),
+        chatHistoryJsonSubstring: chatHistoryJson.substring(0, 100), // Log a snippet
+      });
       return {
         message: "Erro interno ao processar o histórico do chat.",
         agentResponse: null,
@@ -82,18 +86,19 @@ export async function submitChatMessage(
   if (agentToolsDetailsJson) {
     try {
       parsedToolsDetails = JSON.parse(agentToolsDetailsJson);
-      
-      // Converter do formato do formulário para o formato esperado pelo chat
       if (parsedToolsDetails) {
         agentToolsDetails = parsedToolsDetails.map(tool => ({
           id: tool.id,
           name: tool.label,
-          description: tool.genkitToolName || tool.label,
-          enabled: true
+          description: tool.genkitToolName || tool.label, // Ensure description is populated
+          enabled: true // Assuming tools passed are intended to be enabled
         }));
       }
     } catch (error) {
-      console.error("Erro ao parsear os detalhes das ferramentas do agente:", error);
+      winstonLogger.error("Erro ao parsear os detalhes das ferramentas do agente JSON", {
+        error: error instanceof Error ? error.toString() : String(error),
+        agentToolsDetailsJsonSubstring: agentToolsDetailsJson.substring(0, 100), // Log a snippet
+      });
       return {
         message: "Erro interno ao processar os detalhes das ferramentas do agente.",
         agentResponse: null,
@@ -115,12 +120,19 @@ export async function submitChatMessage(
   try {
     const result: ChatOutput = await basicChatFlow(input);
     return {
-      message: "Resposta recebida.", // User-friendly success message
+      message: "Resposta recebida.",
       agentResponse: result.outputMessage,
       errors: null,
     };
   } catch (error) {
-    console.error("Erro ao chamar o fluxo de chat:", error); // Keep detailed log for developers
+    winstonLogger.error("Erro ao chamar o basicChatFlow em submitChatMessage", {
+      userInputLength: input.userMessage?.length,
+      modelName: input.modelName,
+      fileProvided: !!input.fileDataUri,
+      numTools: input.agentToolsDetails?.length,
+      error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error),
+    });
+
     let userFriendlyMessage = "Não foi possível processar sua mensagem. Verifique sua conexão ou tente novamente mais tarde.";
     let specificErrorField: { [key: string]: string[] } | null = null;
 
@@ -128,24 +140,18 @@ export async function submitChatMessage(
       const lowerCaseError = error.message.toLowerCase();
       if (lowerCaseError.includes("auth") || lowerCaseError.includes("token") || lowerCaseError.includes("unauthorized")) {
         userFriendlyMessage = "Sua sessão expirou ou a autenticação falhou. Por favor, faça login novamente.";
-        // Optionally, you could have a specific error field for auth if the form handles it
-        // specificErrorField = { auth: [userFriendlyMessage] };
       } else if (lowerCaseError.includes("permission") || lowerCaseError.includes("denied")) {
         userFriendlyMessage = "Você não tem permissão para realizar esta ação ou acessar este recurso.";
-      } else if (lowerCaseError.includes("not found") && lowerCaseError.includes("agent")) {
-        userFriendlyMessage = "O agente configurado não foi encontrado. Por favor, verifique a configuração.";
+      } else if (lowerCaseError.includes("not found") && (lowerCaseError.includes("agent") || lowerCaseError.includes("flow"))) {
+        userFriendlyMessage = "O agente ou fluxo configurado não foi encontrado. Por favor, verifique a configuração.";
+      } else if (lowerCaseError.includes("fetch failed") || lowerCaseError.includes("networkerror")) {
+        userFriendlyMessage = "Erro de rede ao tentar comunicar com o serviço. Verifique sua conexão e tente novamente.";
       } else {
-        // For other errors from basicChatFlow that are not caught above,
-        // provide a slightly more specific generic error.
         userFriendlyMessage = "Falha ao comunicar com o agente. Se o problema persistir, contate o suporte.";
-        // We can still pass the original error message for debugging if needed, but not directly to the user
-        // unless it's deemed safe or helpful. For now, just a generic message.
-        // specificErrorField = { flow: ["Erro interno do agente: " + error.message] }; // Example
       }
     }
+    // For non-Error instances or if more specific classification is needed, could add more checks here.
 
-    // The 'message' field in ChatFormState is the primary user-facing message.
-    // 'errors' can provide more detailed (but still safe) field-specific issues.
     return {
       message: userFriendlyMessage,
       agentResponse: null,

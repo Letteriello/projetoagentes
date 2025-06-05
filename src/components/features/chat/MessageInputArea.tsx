@@ -206,11 +206,22 @@ export default function MessageInputArea({
 
   const handleFormSubmitInternal = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (attachmentType === 'audio') {
+    if (isPending) return; // Prevent multiple submissions
+
+    // Determine the type of submission based on attachmentType and inputValue
+    if (attachmentType === 'audio' && selectedFileDataUri) {
       onSubmit(event, null, selectedFileDataUri, 'audio');
-    } else {
+    } else if (selectedFile) {
       onSubmit(event, selectedFile, null, 'file');
+    } else if (inputValue.trim()) {
+      // Pass null for file and audio data if only text is present
+      onSubmit(event, null, null, undefined);
+    } else {
+      // Nothing to submit (e.g. button was enabled by mistake or state is inconsistent)
+      console.warn("Submit called with no data");
+      return;
     }
+    onRemoveAttachmentInternal(); // Clear attachments after successful submission call
   };
 
   const handleTextareaKeyDown = (
@@ -226,24 +237,31 @@ export default function MessageInputArea({
     }
   };
 
-  const internalHandleChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>,
-  ) => {
-    onInputChange(event);
+  const adjustTextareaHeight = (textareaElement: HTMLTextAreaElement | null) => {
+    if (!textareaElement) return;
 
-    // Dynamic height adjustment
-    const textarea = event.target;
+    const textarea = textareaElement;
     textarea.rows = 1; // Reset rows to 1 to correctly calculate scrollHeight
-    // Ensure line-height is properly computed. If it's 'normal', this might need a default.
+
     const computedStyle = getComputedStyle(textarea);
     let lineHeight = parseInt(computedStyle.lineHeight, 10);
-    if (isNaN(lineHeight) && computedStyle.lineHeight === 'normal') {
-      // Estimate line height if "normal" - this is an approximation
-      // A more robust solution might involve a hidden div or ensuring CSS sets a specific line-height
+
+    if (isNaN(lineHeight) || lineHeight === 0) {
+      // If lineHeight is not a number (e.g. "normal"), try to calculate it based on font size.
+      // The 'leading-tight' class usually sets line-height to 1.25.
+      // So, fontSize * 1.25 would be more accurate if 'leading-tight' is reliably applied.
       const fontSize = parseInt(computedStyle.fontSize, 10);
-      lineHeight = Math.floor(fontSize * 1.2); // Common approximation for "normal"
+      if (!isNaN(fontSize)) {
+        // Attempt to use a multiplier that matches common 'tight' leading, or a general fallback.
+        // If CSS 'leading-tight' corresponds to 1.25, use that. Otherwise, 1.2 is a general estimate.
+        lineHeight = Math.floor(fontSize * (computedStyle.lineHeight === 'normal' ? 1.2 : 1.25));
+      }
     }
 
+    // Final fallback if lineHeight is still invalid
+    if (isNaN(lineHeight) || lineHeight === 0) {
+      lineHeight = 16; // Default fallback line height in pixels (e.g., for 14px font size)
+    }
 
     const scrollHeight = textarea.scrollHeight;
     const newRows = Math.min(
@@ -259,6 +277,20 @@ export default function MessageInputArea({
     }
   };
 
+  // Effect to adjust height when inputValue changes programmatically
+  useEffect(() => {
+    if (inputRef.current) {
+      adjustTextareaHeight(inputRef.current);
+    }
+  }, [inputValue, inputRef]); // inputRef added as it's used
+
+  const internalHandleChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>,
+  ) => {
+    onInputChange(event); // Propagate change to parent
+    adjustTextareaHeight(event.target); // Adjust height on user input
+  };
+
   // Função para selecionar uma ferramenta
   const handleToolSelect = (toolId: string) => {
     setSelectedTool(toolId);
@@ -270,14 +302,29 @@ export default function MessageInputArea({
       // Adiciona o comando da ferramenta no início do input
       const tool = availableTools.find(t => t.id === toolId);
       if (tool) {
+        // Construct a simulated event object or simply pass the string
+        // If onInputChange expects a string directly for programmatic changes, that's simpler.
+        // Assuming onInputChange can handle a string directly for programmatic updates:
+        // onInputChange(`/${toolId} ${inputValue}`);
+        // Or, if it must be a ChangeEvent:
+        const newValue = `/${toolId} ${inputValue}`;
         onInputChange({
-          target: {
-            value: `/${toolId} ${inputValue}`,
-          },
+          target: { value: newValue } as HTMLTextAreaElement,
+          currentTarget: { value: newValue } as HTMLTextAreaElement,
+          // Add any other properties if onInputChange expects a more complete event
         } as React.ChangeEvent<HTMLTextAreaElement>);
+        // Ensure this also triggers height adjustment via the useEffect listening to inputValue
       }
     }
   };
+
+useEffect(() => {
+  // Adjust height initially if there's a pre-filled inputValue
+  if (inputRef.current) {
+    adjustTextareaHeight(inputRef.current);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // Run once on mount
 
 useEffect(() => {
   if (inputValue.trim() === "") {

@@ -331,8 +331,7 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
               <AccordionItem value="item-1">
                 <AccordionTrigger className="text-xs hover:no-underline py-2">
                   <div className="flex items-center text-muted-foreground">
-                    {/* <Info size={14} className="mr-2" /> Removed Info icon as it's not imported */}
-                    Retrieved Context (Verbose Mode)
+                    Retrieved Context
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="text-xs bg-muted/30 p-3 rounded-md">

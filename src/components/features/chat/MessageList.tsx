@@ -1,6 +1,7 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FixedSizeList, ListOnScrollProps } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +23,8 @@ interface MessageListProps {
   onFeedback?: (messageId: string, feedback: 'liked' | 'disliked' | null) => void;
   isVerboseMode?: boolean; // Added isVerboseMode prop
 }
+
+const SCROLL_THRESHOLD = 10; // Pixels from bottom to consider "at bottom"
 
 // Row component for react-window
 const Row = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: { messages: MessageListItem[], onRegenerate?: MessageListProps['onRegenerate'], onFeedback?: MessageListProps['onFeedback'], isVerboseMode?: boolean } }) => {
@@ -99,50 +102,89 @@ const MessageList: React.FC<MessageListProps> = ({
   isVerboseMode, // Destructure isVerboseMode
 }) => {
   const listRef = useRef<FixedSizeList>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const prevMessagesLengthRef = useRef(messages.length);
+  const prevIsPendingRef = useRef(isPending);
 
-  // Auto-scroll to bottom when new messages arrive or pending state changes
   useEffect(() => {
-    if (messages.length > 0) {
-      // When pending is true, we might not want to scroll if the user scrolled up.
-      // However, if a new message just arrived, we typically do.
-      // For simplicity, scroll to the last actual message.
-      // If isPending is true and it's the only thing, listRef might not scroll to it.
-      listRef.current?.scrollToItem(messages.length - 1, 'end');
+    const newMessagesAdded = messages.length > prevMessagesLengthRef.current;
+    const pendingStateChanged = prevIsPendingRef.current !== isPending;
+
+    // Scroll to bottom if:
+    // 1. New messages were added and user was already at the bottom.
+    // 2. OR, if the pending indicator just disappeared (message finished streaming) and user is at bottom.
+    // 3. OR, if it's the initial load with messages.
+    if (
+      listRef.current &&
+      messages.length > 0 &&
+      isAtBottom &&
+      (newMessagesAdded || (!isPending && pendingStateChanged))
+    ) {
+      listRef.current.scrollToItem(messages.length - 1, 'end');
+    } else if (newMessagesAdded && messages.length === 1) {
+      // Special case: if it's the very first message, always scroll.
+      listRef.current?.scrollToItem(0, 'end');
     }
-  }, [messages, messages.length]); // Removed isPending from deps for now to avoid scrolling issues when user scrolls up and pending appears
+
+    // Update refs for the next render
+    prevMessagesLengthRef.current = messages.length;
+    prevIsPendingRef.current = isPending;
+  }, [messages, messages.length, isPending, isAtBottom]); // Add isAtBottom and isPending
+
+  // listHeight is now dynamic via AutoSizer, so it's not a fixed const here.
+  // We need to pass the dynamic height to handleScroll if its calculations depend on it.
+  // Let's store the current list height in a state or ref if handleScroll needs it.
+  const currentListHeightRef = useRef(0);
 
   const handleScroll = useCallback((scrollProps: ListOnScrollProps) => {
+    const { scrollOffset, scrollHeight } = scrollProps;
+    const clientHeight = currentListHeightRef.current; // Use the stored dynamic height
+
+    if (clientHeight > 0) { // Ensure clientHeight is positive before calculation
+      if (scrollHeight <= clientHeight) {
+        setIsAtBottom(true);
+      } else {
+        const isNowAtBottom = scrollOffset + clientHeight >= scrollHeight - SCROLL_THRESHOLD;
+        setIsAtBottom(isNowAtBottom);
+      }
+    } else {
+      // If clientHeight is 0 (e.g. initial render before AutoSizer provides it),
+      // assume not at bottom or maintain current state. Or default to true if list is empty.
+      setIsAtBottom(scrollHeight <= 0);
+    }
+
     if (onScroll) {
-      // FixedSizeList's onScroll provides different props than a native div scroll event.
-      // Adapt or inform the parent component about this change if necessary.
       onScroll(scrollProps);
     }
-  }, [onScroll]);
-
-  // TODO: The height of FixedSizeList (e.g., 600px) should be dynamic.
-  // Consider using a library like 'react-virtualized-auto-sizer'
-  // or calculate based on parent dimensions.
-  const listHeight = 600;
+  }, [onScroll]); // Removed listHeight, will use currentListHeightRef
 
   return (
-    <div className={cn('flex flex-col flex-1 overflow-hidden', className)}> {/* Changed overflow-y-auto to overflow-hidden as FixedSizeList handles its own scrolling */}
-      <div className="flex-1"> {/* This div will be targeted by AutoSizer or for height calculation */}
-        <FixedSizeList
-          ref={listRef}
-          outerRef={containerRef} // Pass the containerRef to outerRef of FixedSizeList
-          height={listHeight}
-          itemCount={messages.length}
-          itemSize={ITEM_SIZE}
-          itemData={{ messages, onRegenerate, onFeedback, isVerboseMode }} // Pass isVerboseMode to itemData
-          width="100%"
-          onScroll={handleScroll}
-          className="custom-scrollbar" // Optional: if you have custom scrollbar styles
-        >
-          {Row}
-        </FixedSizeList>
+    <div className={cn('flex flex-col flex-1 overflow-hidden', className)}>
+      <div className="flex-1 h-full"> {/* Ensure this wrapper takes full height for AutoSizer */}
+        <AutoSizer>
+          {({ height, width }) => {
+            // Update the ref with the current height for handleScroll
+            currentListHeightRef.current = height;
+            return (
+              <FixedSizeList
+                ref={listRef}
+                outerRef={containerRef}
+                height={height}
+                itemCount={messages.length}
+                itemSize={ITEM_SIZE}
+                itemData={{ messages, onRegenerate, onFeedback, isVerboseMode }}
+                width={width}
+                onScroll={handleScroll}
+                className="custom-scrollbar"
+              >
+                {Row}
+              </FixedSizeList>
+            );
+          }}
+        </AutoSizer>
       </div>
       {isPending && (
-        <div className={cn("flex items-end gap-2.5 justify-start w-full p-4")}> {/* Added padding for pending indicator */}
+        <div className={cn("flex items-end gap-2.5 justify-start w-full p-4 border-t")}> {/* Added border-t for separation */}
           <div className="flex-shrink-0 p-1.5 rounded-full bg-card border border-border/50 self-start">
             <Bot className="h-5 w-5 text-primary" />
           </div>
