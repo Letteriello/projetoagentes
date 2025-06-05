@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "set NODE_OPTIONS=--inspect=0.0.0.0:9229 && next dev --turbopack -p 9003",
+    "dev": "set NODE_OPTIONS=--inspect=0.0.0.0:9231 && next dev --turbopack -p 9005",
     "dev:stable": "next dev --turbopack -p 9002",
     "dev:no-turbo": "set NODE_OPTIONS=--inspect=0.0.0.0:9229 && next dev -p 9003",
     "build": "next build",
