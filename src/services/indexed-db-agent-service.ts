@@ -1,5 +1,6 @@
 import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import { openDatabase } from '@/lib/indexed-db-manager';
+import { retryWithBackoff, isRetryableIDBError, RetryConfig } from '@/lib/utils';
 
 // Interface para o agente armazenável no IndexedDB
 interface StorableAgent extends Omit<SavedAgentConfiguration, 'createdAt' | 'updatedAt'> {
@@ -11,9 +12,14 @@ interface StorableAgent extends Omit<SavedAgentConfiguration, 'createdAt' | 'upd
 export const AGENT_STORE_NAME = 'agents';
 export const AGENT_ORDER_STORE_NAME = 'agentOrder';
 
+// Default retry configuration for IndexedDB operations
+const idbRetryConfig: RetryConfig = {
+  maxRetries: 2, // Fewer retries for local DB operations
+  initialDelayMs: 100,
+  shouldRetry: isRetryableIDBError,
+  logRetries: true,
+};
 
-// Helper functions for date conversion
-// No changes to helper functions themselves
 // Função auxiliar para converter para Date se for string
 const toDate = (date: Date | string): Date => {
   return date instanceof Date ? date : new Date(date);
@@ -23,7 +29,6 @@ const toStorableAgent = (agent: SavedAgentConfiguration): StorableAgent => {
   const createdAt = toDate(agent.createdAt);
   const updatedAt = toDate(agent.updatedAt);
   
-  // Usa o spread operator para copiar todas as propriedades existentes
   const { createdAt: _, updatedAt: __, ...rest } = agent;
   
   return {
@@ -43,15 +48,24 @@ const fromStorableAgent = (storable: StorableAgent | null | undefined): SavedAge
 };
 
 export async function addAgent(agent: SavedAgentConfiguration): Promise<SavedAgentConfiguration> {
-  const db = await openDatabase();
-  const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
-  const store = tx.objectStore(AGENT_STORE_NAME);
-  const storableAgent = toStorableAgent(agent);
-  await store.add(storableAgent);
-  return fromStorableAgent(storableAgent) as SavedAgentConfiguration; // Já verificamos que não é null
+  return retryWithBackoff(async () => {
+    const db = await openDatabase();
+    const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(AGENT_STORE_NAME);
+    const storableAgent = toStorableAgent(agent);
+    try {
+      await store.add(storableAgent);
+      await tx.done;
+      return fromStorableAgent(storableAgent) as SavedAgentConfiguration;
+    } catch (error) {
+      console.error('Error in addAgent (attempt):', error);
+      throw error;
+    }
+  }, idbRetryConfig);
 }
 
 export async function getAgentById(id: string): Promise<SavedAgentConfiguration | null> {
+  // Read operations typically don't need retries unless specific transient read errors are common
   try {
     const db = await openDatabase();
     const tx = db.transaction(AGENT_STORE_NAME, 'readonly');
@@ -60,7 +74,6 @@ export async function getAgentById(id: string): Promise<SavedAgentConfiguration 
     
     if (!storableAgent) return null;
     
-    // Garante que o agente retornado seja do tipo StorableAgent
     const typedAgent = storableAgent as StorableAgent;
     return fromStorableAgent(typedAgent);
   } catch (error) {
@@ -70,6 +83,7 @@ export async function getAgentById(id: string): Promise<SavedAgentConfiguration 
 }
 
 export async function getAllAgents(userId?: string): Promise<SavedAgentConfiguration[]> {
+  // Read operations typically don't need retries
   try {
     const db = await openDatabase();
     const tx = db.transaction(AGENT_STORE_NAME, 'readonly');
@@ -84,9 +98,9 @@ export async function getAllAgents(userId?: string): Promise<SavedAgentConfigura
     }
 
     const storableAgents = await request;
+
     if (!Array.isArray(storableAgents)) return [];
   
-    // Filtra e converte os agentes, garantindo que tenham o formato correto
     return storableAgents
       .filter((agent): agent is StorableAgent => {
         return agent && 
@@ -104,46 +118,68 @@ export async function getAllAgents(userId?: string): Promise<SavedAgentConfigura
 }
 
 export async function updateAgent(agent: SavedAgentConfiguration): Promise<SavedAgentConfiguration> {
-  try {
+  return retryWithBackoff(async () => {
     const db = await openDatabase();
     const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
     const store = tx.objectStore(AGENT_STORE_NAME);
     
-    // Cria uma cópia do agente com a data de atualização atual
-    const updatedAgent = {
+    const updatedAgentData = {
       ...agent,
       updatedAt: new Date()
     };
-    
-    const agentToStore = toStorableAgent(updatedAgent);
-    await store.put(agentToStore);
-    
-    // Como estamos atualizando um agente que já existe, podemos garantir que o retorno não será nulo
-    return updatedAgent;
-  } catch (error) {
-    console.error('Erro ao atualizar agente:', error);
-    throw error; // Propaga o erro para ser tratado pelo chamador
-  }
+    const agentToStore = toStorableAgent(updatedAgentData);
+
+    try {
+      await store.put(agentToStore);
+      await tx.done;
+      return updatedAgentData;
+    } catch (error) {
+      console.error('Erro ao atualizar agente (attempt):', error);
+      throw error;
+    }
+  }, idbRetryConfig);
 }
 
 export async function deleteAgent(id: string): Promise<void> {
-  const db = await openDatabase();
-  const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
-  const store = tx.objectStore(AGENT_STORE_NAME);
-  await store.delete(id);
+  return retryWithBackoff(async () => {
+    const db = await openDatabase();
+    const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(AGENT_STORE_NAME);
+    try {
+      await store.delete(id);
+      await tx.done;
+    } catch (error) {
+      console.error('Error in deleteAgent (attempt):', error);
+      throw error;
+    }
+  }, idbRetryConfig);
 }
 
 export async function saveAgentOrder(order: string[], agentOrderKey: string = 'currentOrder'): Promise<void> {
-  const db = await openDatabase();
-  const tx = db.transaction(AGENT_ORDER_STORE_NAME, 'readwrite');
-  const store = tx.objectStore(AGENT_ORDER_STORE_NAME);
-  await store.put(order, agentOrderKey);
+  return retryWithBackoff(async () => {
+    const db = await openDatabase();
+    const tx = db.transaction(AGENT_ORDER_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(AGENT_ORDER_STORE_NAME);
+    try {
+      await store.put(order, agentOrderKey);
+      await tx.done;
+    } catch (error) {
+      console.error('Error in saveAgentOrder (attempt):', error);
+      throw error;
+    }
+  }, idbRetryConfig);
 }
 
 export async function loadAgentOrder(agentOrderKey: string = 'currentOrder'): Promise<string[]> {
-  const db = await openDatabase();
-  const tx = db.transaction(AGENT_ORDER_STORE_NAME, 'readonly');
-  const store = tx.objectStore(AGENT_ORDER_STORE_NAME);
-  const order = await store.get(agentOrderKey);
-  return Array.isArray(order) ? order : [];
+  // Read operation
+  try {
+    const db = await openDatabase();
+    const tx = db.transaction(AGENT_ORDER_STORE_NAME, 'readonly');
+    const store = tx.objectStore(AGENT_ORDER_STORE_NAME);
+    const order = await store.get(agentOrderKey);
+    return Array.isArray(order) ? order : [];
+  } catch (error) {
+    console.error('Error loading agent order:', error);
+    return [];
+  }
 }
