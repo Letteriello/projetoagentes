@@ -1,94 +1,59 @@
 "use client";
 
 import * as React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 
 interface ConfirmationModalProps {
+  name: string;
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   title: string;
-  description: React.ReactNode; // Allow ReactNode for more flexible descriptions
-  onConfirm: () => void;
-  confirmText?: string;
-  cancelText?: string;
-  confirmButtonVariant?: ButtonProps["variant"];
-  isConfirmDisabled?: boolean;
-  isConfirmLoading?: boolean; // Added for loading state
-  children?: React.ReactNode; // Optional trigger
+  description: string;
+  confirmText: string;
+  cancelText: string;
+  onAction: () => void;
+  variant?: "default" | "destructive";
 }
 
-// Minimal ButtonProps type to get variant
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?:
-    | "default"
-    | "destructive"
-    | "outline"
-    | "secondary"
-    | "ghost"
-    | "link"
-    | null;
-  // Add other props if needed, like size
-}
-
-export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+export default function ConfirmationModal({
+  name,
   isOpen,
   onOpenChange,
   title,
   description,
-  onConfirm,
-  confirmText = "Confirmar",
-  cancelText = "Cancelar",
-  confirmButtonVariant = "default",
-  isConfirmDisabled = false,
-  isConfirmLoading = false,
-  children,
-}) => {
-  const handleConfirm = () => {
-    if (isConfirmLoading) return;
-    onConfirm();
-    // Optionally close on confirm, or let parent decide by not calling onOpenChange(false) here
-    // For now, let's assume parent handles closing if needed after onConfirm completes.
-  };
-
+  confirmText,
+  cancelText,
+  onAction,
+  variant = "default"
+}: ConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      {children && <DialogTrigger asChild>{children}</DialogTrigger>}{" "}
-      {/* Optional trigger if not controlled externally */}
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader className="flex flex-col items-center gap-2">
+          {variant === "destructive" && (
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 mb-2">
+              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+          )}
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription asChild>
-            {typeof description === "string" ? (
-              <p>{description}</p>
-            ) : (
-              description
-            )}
-          </DialogDescription>
+          <DialogDescription className="text-center">{description}</DialogDescription>
         </DialogHeader>
-        <DialogFooter className="mt-4">
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isConfirmLoading}>
-              {cancelText}
-            </Button>
-          </DialogClose>
-          <Button
-            variant={confirmButtonVariant}
-            onClick={handleConfirm}
-            disabled={isConfirmDisabled || isConfirmLoading}
+        <DialogFooter className="flex flex-row justify-between sm:justify-between gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {cancelText}
+          </Button>
+          <Button 
+            variant={variant === "destructive" ? "destructive" : "default"} 
+            onClick={() => {
+              onAction();
+            }}
           >
-            {isConfirmLoading ? "Processando..." : confirmText}
+            {confirmText}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
+}

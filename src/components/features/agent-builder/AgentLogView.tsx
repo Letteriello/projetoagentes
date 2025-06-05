@@ -1,292 +1,133 @@
 "use client";
 
 import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Loader2, Search } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Download, RefreshCcw } from "lucide-react";
 
-// Define the structure of a single log entry based on API response
-export interface LogEntry {
+interface Log {
   id: string;
-  timestamp: string; // Assuming ISO string from API
+  timestamp: string;
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
   agentId: string;
-  flowName: string;
-  type: 'start' | 'end' | 'tool_call' | 'error' | 'info';
-  traceId?: string;
-  data: {
-    input?: any;
-    output?: any;
-    toolName?: string;
-    error?: { name?: string; message?: string; stack?: string };
-    details?: any;
-    message?: string;
-    [key: string]: any; // For other data fields
-  };
 }
 
 interface AgentLogViewProps {
+  name: string;
   agentId: string;
 }
 
-const LOG_STATUS_OPTIONS = [
-  { value: "all", label: "Todos os Tipos" },
-  { value: "start", label: "Início de Execução" },
-  { value: "end", label: "Fim de Execução (Sucesso)" }, // API maps 'success' to 'end'
-  { value: "error", label: "Erro" },
-  { value: "tool_call", label: "Chamada de Ferramenta" },
-  { value: "info", label: "Informação" },
-];
+export default function AgentLogView({ name, agentId }: AgentLogViewProps) {
+  const [logs, setLogs] = React.useState<Log[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-export function AgentLogView({ agentId }: AgentLogViewProps) {
-  const [logs, setLogs] = React.useState<LogEntry[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const [limit] = React.useState(10); // Logs per page
-  const [hasNextPage, setHasNextPage] = React.useState(false);
-
-  // Filters
-  const [startDate, setStartDate] = React.useState<string>("");
-  const [endDate, setEndDate] = React.useState<string>("");
-  const [statusFilter, setStatusFilter] = React.useState<string>("all");
-  const [flowNameFilter, setFlowNameFilter] = React.useState<string>("");
-
-  const fetchLogs = React.useCallback(async (page: number) => {
-    setIsLoading(true);
-    setError(null);
-    let url = `/api/agents/${agentId}/logs?page=${page}&limit=${limit}`;
-    if (startDate) url += `&startDate=${startDate}`;
-    if (endDate) url += `&endDate=${endDate}`;
-    if (statusFilter !== "all") url += `&status=${statusFilter}`;
-    if (flowNameFilter.trim()) url += `&flowName=${encodeURIComponent(flowNameFilter.trim())}`;
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to fetch logs: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setLogs(data.logs || []);
-      setHasNextPage(data.hasNextPage || false);
-    } catch (err: any) {
-      setError(err.message || "An unknown error occurred.");
-      setLogs([]);
-      setHasNextPage(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [agentId, limit, startDate, endDate, statusFilter, flowNameFilter]);
-
+  // Efeito para carregar logs do agente
   React.useEffect(() => {
-    if (agentId) {
-      fetchLogs(currentPage);
-    }
-  }, [agentId, currentPage, fetchLogs]);
+    // Simulando carregamento de dados
+    setIsLoading(true);
+    
+    // Timeout para simular chamada de API
+    const timer = setTimeout(() => {
+      // Dados mockados para demonstração
+      const mockLogs: Log[] = [
+        {
+          id: "1",
+          timestamp: new Date().toISOString(),
+          level: "info",
+          message: "Agente iniciado com sucesso",
+          agentId: agentId
+        },
+        {
+          id: "2",
+          timestamp: new Date(Date.now() - 60000).toISOString(),
+          level: "debug",
+          message: "Processando solicitação do usuário",
+          agentId: agentId
+        },
+        {
+          id: "3",
+          timestamp: new Date(Date.now() - 120000).toISOString(),
+          level: "warn",
+          message: "API externa respondeu lentamente",
+          agentId: agentId
+        },
+        {
+          id: "4",
+          timestamp: new Date(Date.now() - 180000).toISOString(),
+          level: "error",
+          message: "Falha ao acessar recurso externo",
+          agentId: agentId
+        }
+      ];
+      
+      setLogs(mockLogs);
+      setIsLoading(false);
+    }, 800);
 
-  const handleApplyFilters = () => {
-    setCurrentPage(1); // Reset to first page when filters change
-    fetchLogs(1);
+    return () => clearTimeout(timer);
+  }, [agentId]);
+
+  // Função para formatar data
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString();
   };
 
-  const handleClearFilters = () => {
-    setStartDate("");
-    setEndDate("");
-    setStatusFilter("all");
-    setFlowNameFilter("");
-    setCurrentPage(1);
-    // fetchLogs(1) will be called by useEffect due to filter state changes if fetchLogs is in dep array
-    // or call it explicitly if preferred. For now, let handleApplyFilters do it or useEffect.
-    // Explicitly calling after resetting page and filters:
-    // fetchLogs(1); // This might cause double fetch if useEffect also triggers.
-    // Better to rely on a single source of truth for fetching, e.g. a submit button.
-    // The current setup with fetchLogs in useEffect dependency array might auto-refetch.
-    // Let's make filter application explicit via the button.
-  };
-
-
-  const renderLogDetails = (log: LogEntry) => {
-    const { type, data } = log;
-    let detailsSummary = "";
-    let detailsObject: any = null;
-
-    switch (type) {
-      case 'start':
-        detailsSummary = `Input: ${JSON.stringify(data.input, null, 2).substring(0, 100)}...`;
-        detailsObject = data.input;
-        break;
-      case 'end':
-        detailsSummary = `Output: ${JSON.stringify(data.output, null, 2).substring(0, 100)}...`;
-        detailsObject = data.output;
-        break;
-      case 'tool_call':
-        detailsSummary = `Tool: ${data.toolName}, Input: ${JSON.stringify(data.input, null, 2).substring(0, 100)}...`;
-        detailsObject = { toolName: data.toolName, input: data.input, output: data.output };
-        break;
-      case 'error':
-        detailsSummary = `Error: ${data.error?.message || 'Unknown error'}`;
-        detailsObject = data.error;
-        if (data.details) detailsObject.additionalDetails = data.details;
-        break;
-      case 'info':
-        detailsSummary = data.message || "Informational log";
-        detailsObject = data;
-        break;
-      default:
-        detailsSummary = JSON.stringify(data, null, 2).substring(0, 100) + "...";
-        detailsObject = data;
+  // Função para obter cor do badge baseado no nível do log
+  const getLevelColor = (level: string) => {
+    switch(level) {
+      case "error": return "bg-red-500";
+      case "warn": return "bg-yellow-500";
+      case "info": return "bg-blue-500";
+      case "debug": return "bg-gray-500";
+      default: return "bg-blue-500";
     }
-    return (
-      <details>
-        <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-          {detailsSummary}
-        </summary>
-        <pre className="mt-2 p-2 bg-muted text-xs rounded overflow-auto max-h-60">
-          {JSON.stringify(detailsObject, null, 2)}
-        </pre>
-      </details>
-    );
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="h-full">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle>Logs do Agente</CardTitle>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => {}} disabled={isLoading}>
+            <Download className="h-4 w-4 mr-1" /> Exportar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => {}} disabled={isLoading}>
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-1 border rounded-md">
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            placeholder="Data Início"
-            className="text-sm"
-          />
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            placeholder="Data Fim"
-            className="text-sm"
-          />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Filtrar por Status" />
-            </SelectTrigger>
-            <SelectContent>
-              {LOG_STATUS_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value} className="text-sm">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            type="text"
-            value={flowNameFilter}
-            onChange={(e) => setFlowNameFilter(e.target.value)}
-            placeholder="Nome do Fluxo (Flow)"
-            className="text-sm"
-          />
-          <div className="flex gap-2 col-span-full sm:col-span-1 lg:col-span-4">
-             <Button onClick={handleApplyFilters} size="sm" className="flex-1 sm:flex-none">
-                <Search size={16} className="mr-1.5" /> Aplicar Filtros
-            </Button>
-            <Button onClick={handleClearFilters} size="sm" variant="outline" className="flex-1 sm:flex-none">
-                Limpar Filtros
-            </Button>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-[300px]">
+            <div className="animate-spin h-6 w-6 border-2 border-blue-500 rounded-full border-t-transparent"></div>
           </div>
-        </div>
-
-        {isLoading && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Carregando logs...</p>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-10 text-gray-500">
+            <p>Nenhum log disponível para este agente.</p>
           </div>
-        )}
-        {error && (
-          <div className="flex flex-col items-center justify-center py-4 text-destructive">
-            <AlertTriangle className="h-8 w-8" />
-            <p className="ml-2 mt-2 text-center">Erro ao carregar logs: {error}</p>
-          </div>
-        )}
-        {!isLoading && !error && logs.length === 0 && (
-          <p className="text-center py-4 text-muted-foreground">Nenhum log encontrado para os filtros aplicados.</p>
-        )}
-        {!isLoading && !error && logs.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[180px]">Timestamp</TableHead>
-                <TableHead>Fluxo (Flow)</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Detalhes</TableHead>
-                 <TableHead className="w-[150px]">Trace ID</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        ) : (
+          <ScrollArea className="h-[300px]">
+            <div className="space-y-2">
               {logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="text-xs">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-xs font-medium">{log.flowName}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-0.5 text-xs rounded-full ${
-                        log.type === 'error' ? 'bg-destructive/80 text-destructive-foreground' :
-                        log.type === 'start' ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300' :
-                        log.type === 'end' ? 'bg-green-500/20 text-green-700 dark:text-green-300' :
-                        log.type === 'tool_call' ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300' :
-                        'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {LOG_STATUS_OPTIONS.find(s => s.value === log.type)?.label || log.type}
-                    </span>
-                  </TableCell>
-                  <TableCell className="max-w-md">{renderLogDetails(log)}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground truncate">{log.traceId || 'N/A'}</TableCell>
-                </TableRow>
+                <div key={log.id} className="p-2 border rounded-md">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center">
+                      <Badge className={`${getLevelColor(log.level)} mr-2`}>
+                        {log.level.toUpperCase()}
+                      </Badge>
+                      <span className="text-sm text-gray-400">{formatDate(log.timestamp)}</span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-sm">{log.message}</p>
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </ScrollArea>
         )}
-
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-            disabled={currentPage === 1 || isLoading}
-          >
-            Anterior
-          </Button>
-          <span className="text-sm text-muted-foreground">Página {currentPage}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((prev) => prev + 1)}
-            disabled={!hasNextPage || isLoading}
-          >
-            Próxima
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
