@@ -43,12 +43,7 @@ import { winstonLogger } from '../../lib/winston-logger';
 import { z } from 'zod';
 import { ActionContext } from '@genkit-ai/core';
 import { GenerateResponse } from '@genkit-ai/ai';
-<<<<<<< HEAD
-import { AgentConfig, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
-=======
-// LLMModelDetails might be imported from llm-models.ts or directly if used explicitly
-import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/unified-agent-types'; // Adjust path as needed
->>>>>>> b49d3373ebd7f0451b28edd3f3d051cfa4caec3b
+import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/unified-agent-types';
 import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
 
 // Import new flows and their schemas

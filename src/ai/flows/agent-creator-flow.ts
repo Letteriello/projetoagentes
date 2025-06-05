@@ -2,16 +2,7 @@
 import { ai } from '@/ai/genkit';
 import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
-<<<<<<< HEAD
-import { 
-  SavedAgentConfiguration,
-  AgentConfig,
-  LLMAgentConfig,
-  WorkflowAgentConfig
-} from '@/types/agent-configs-fixed';
-=======
 import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/unified-agent-types';
->>>>>>> b49d3373ebd7f0451b28edd3f3d051cfa4caec3b
 import { winstonLogger } from '../../lib/winston-logger';
 
 const AgentCreatorChatInputSchema = z.object({
@@ -31,8 +22,8 @@ const AgentCreatorChatOutputSchema = z.object({
 
 function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<SavedAgentConfiguration> {
     config.agentName = config.agentName || "";
-    config.description = config.description || "";
-    config.version = config.version || "1.0.0";
+    config.agentDescription = config.agentDescription || "";
+    config.agentVersion = config.agentVersion || "1.0.0";
     config.tools = config.tools || [];
     config.toolConfigsApplied = config.toolConfigsApplied || {};
     config.toolsDetails = config.toolsDetails || [];
@@ -51,11 +42,10 @@ function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<Sav
         llmConfig.agentPersonality = "";
         llmConfig.agentRestrictions = [];
         llmConfig.agentModel = "gemini10Pro"; // Default model
-        llmConfig.temperature = 0.7;
-    } else if (config.config?.type === 'workflow' && typeof (config.config as WorkflowAgentConfig).workflowDescription === 'undefined') {
+        llmConfig.agentTemperature = 0.7;
+    } else if (config.config?.type === 'workflow' && typeof (config.config as WorkflowAgentConfig).workflowType === 'undefined') {
         const workflowConfig = config.config as Partial<WorkflowAgentConfig>;
-        workflowConfig.detailedWorkflowType = "sequential";
-        workflowConfig.workflowDescription = "";
+        workflowConfig.workflowType = "sequential";
     }
     // A2A has no specific fields beyond base by default in this structure
     return config;

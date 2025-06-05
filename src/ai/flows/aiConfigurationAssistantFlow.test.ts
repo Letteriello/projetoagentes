@@ -6,12 +6,8 @@ import {
 } from './aiConfigurationAssistantFlow';
 import { ai } from '@/ai/genkit';
 import * as z from 'zod';
-<<<<<<< HEAD
 import { createMockSavedAgentConfig as createMockAgent, baseLLMConfig, baseAgentConfig, mockActionContext } from './test-utils';
-import type { LLMAgentConfig, SavedAgentConfiguration } from '@/types/agent-configs-fixed';
-=======
 import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/unified-agent-types';
->>>>>>> b49d3373ebd7f0451b28edd3f3d051cfa4caec3b
 
 // ===== MOCKS CENTRAIS =====
 // Se precisar de mocks de tools, defina-os localmente ou centralize no test-utils.ts
@@ -284,20 +280,23 @@ const createMockSavedAgentConfig = (override?: Partial<SavedAgentConfiguration>)
   const defaultConfig: SavedAgentConfiguration = {
     id: 'agent-test-123',
     agentName: 'Test Agent',
-    description: 'A test agent description.',
-
+    agentDescription: 'A test agent description.',
+    agentVersion: '1.0.0',
     config: {
-      model: 'gpt-4',
+      agentModel: 'gpt-4',
+      agentTemperature: 0.7,
       framework: 'genkit',
       type: 'llm',
       agentGoal: 'Goal',
-      agentTasks: ['Task']
+      agentTasks: ['Task'],
+      agentPersonality: '',
+      agentRestrictions: [],
     } as LLMAgentConfig,
     tools: [],
     toolsDetails: [],
     toolConfigsApplied: {},
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     isTemplate: false,
     userId: 'user-test-id'
   };
@@ -308,50 +307,86 @@ const createMockSavedAgentConfig = (override?: Partial<SavedAgentConfiguration>)
 export const testAgent: SavedAgentConfiguration = {
   ...createMockAgent(),
   agentName: 'Custom Name',
+  agentDescription: 'Custom agent description.',
+  agentVersion: '1.0.0',
   userId: 'user-test-id',
   config: {
     type: 'llm',
     framework: 'genkit',
-    ...baseLLMConfig
+    agentModel: 'gpt-4',
+    agentTemperature: 0.7,
+    agentGoal: '',
+    agentTasks: [],
+    agentPersonality: '',
+    agentRestrictions: [],
   }
 };
 
 export const testLLMConfig: LLMAgentConfig = {
   ...baseLLMConfig,
-  temperature: 0.7
+  agentModel: 'gpt-4',
+  agentTemperature: 0.7,
+  agentGoal: '',
+  agentTasks: [],
+  agentPersonality: '',
+  agentRestrictions: [],
 };
 
 // Correção para linha ~98
 const savedConfig: SavedAgentConfiguration = {
   ...createMockAgent(),
   id: 'agent1',
+  agentDescription: 'Test agent description.',
+  agentVersion: '1.0.0',
   userId: 'user-test-id',
   config: {
     type: 'llm',
     framework: 'genkit',
-    ...baseLLMConfig
+    agentModel: 'gpt-4',
+    agentTemperature: 0.7,
+    agentGoal: '',
+    agentTasks: [],
+    agentPersonality: '',
+    agentRestrictions: [],
   }
 };
 
 // Correção para linha ~101
 const llmConfig: LLMAgentConfig = {
   ...baseLLMConfig,
+  agentModel: 'gpt-4',
+  agentTemperature: 0.7,
   agentGoal: 'To be tested',
-  agentTasks: ['get tested']
+  agentTasks: ['get tested'],
+  agentPersonality: '',
+  agentRestrictions: [],
 };
 
 // Correção para linha ~246
 const complexConfig: LLMAgentConfig = {
-  ...baseLLMConfig
+  ...baseLLMConfig,
+  agentModel: 'gpt-4',
+  agentTemperature: 0.7,
+  agentGoal: '',
+  agentTasks: [],
+  agentPersonality: '',
+  agentRestrictions: [],
 };
 
 const validConfig: SavedAgentConfiguration = {
   ...createMockAgent(),
   agentName: 'Test Agent',
+  agentDescription: 'Test agent description.',
+  agentVersion: '1.0.0',
   userId: 'user-test-id',
   config: {
     type: 'llm',
     framework: 'genkit',
-    ...baseLLMConfig
+    agentModel: 'gpt-4',
+    agentTemperature: 0.7,
+    agentGoal: '',
+    agentTasks: [],
+    agentPersonality: '',
+    agentRestrictions: [],
   }
 };

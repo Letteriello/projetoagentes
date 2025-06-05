@@ -435,22 +435,20 @@ User Query: "Create blog posts about technology trends"
     
     const workflowType = parsedWorkflowJson.suggestedWorkflowType;
 
-    // Validate against the allowed types
+    // Valores válidos de WorkflowDetailedType conforme tipos centralizados
     const allowedTypes: WorkflowDetailedType[] = [
-      'conversational', 'data_processing', 'decision_making', 'information_retrieval',
-      'content_generation', 'task_automation', 'analytical', 'creative', 'educational',
-      'entertainment', 'customer_support', 'research_assistant', 'code_assistant', 'personal_assistant'
+      'sequential', 'parallel', 'loop', 'graph', 'stateMachine'
     ];
     
     if (allowedTypes.includes(workflowType)) {
       return workflowType as WorkflowDetailedType;
     } else {
-      console.warn(`[getWorkflowDetailedType] LLM returned an unexpected workflow type: '${workflowType}'. Defaulting to 'conversational'. Query was: "${query}"`);
-      return 'conversational'; // Default to 'conversational' if the response is not one of the allowed types
+      console.warn(`[getWorkflowDetailedType] LLM returned an unexpected workflow type: '${workflowType}'. Defaulting to 'sequential'. Query was: "${query}"`);
+      return 'sequential'; // Default to 'sequential' if the response is not one of the allowed types
     }
 
   } catch (error) {
     console.error(`[getWorkflowDetailedType] Error determining workflow type for query "${query}":`, error);
-    return 'conversational'; // Default to 'conversational' on error
+    return 'sequential'; // Default to 'sequential' on error
   }
 };

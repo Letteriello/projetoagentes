@@ -8,10 +8,8 @@ import {
 export * from './tool-types'; // Provides AvailableTool, ToolConfigData, ToolConfigField etc.
 export * from './workflow-types'; // Provides WorkflowDetailedType from agent-configs originally
 
-// =============================================
-// Tipos Básicos
-// =============================================
-
+// ======================================// Tipos Básicos
+// ======================================
 export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
 export type AgentType = "llm" | "workflow" | "custom" | "a2a";
 // WorkflowDetailedType is re-exported from workflow-types.ts which gets it from agent-configs.ts
@@ -21,10 +19,8 @@ export type StatePersistenceType = "session" | "memory" | "database";
 export type ArtifactStorageType = "local" | "cloud" | "memory" | "filesystem";
 export type StateScope = 'GLOBAL' | 'AGENT' | 'TEMPORARY';
 
-// =============================================
-// Interfaces de Configuração
-// =============================================
-
+// ======================================// Interfaces de Configuração
+// ======================================
 // ToolConfigField is available via re-export from './tool-types'
 // ToolConfigData is available via re-export from './tool-types'
 
@@ -115,10 +111,8 @@ export interface ModelSafetySettingItem { // From agent-configs.ts & unified-age
   threshold: string;
 }
 
-// =============================================
-// Configurações de Agente
-// =============================================
-
+// ======================================// Configurações de Agente
+// ======================================
 export interface AgentConfigBase {
   type: AgentType;
   framework: AgentFramework;
@@ -204,10 +198,8 @@ export type AgentConfig =
   | A2AAgentSpecialistConfig;
 //  | (Record<string, any> & { type: string }); // Keep this for flexibility if needed, but prefer specific types
 
-// =============================================
-// Configuração de Implantação
-// =============================================
-
+// ======================================// Configuração de Implantação
+// ======================================
 export interface EnvironmentVariable { // From agent-configs.ts & unified-agent-types
   key: string;
   value: string;
@@ -235,16 +227,12 @@ export interface DeploymentConfig { // From agent-configs.ts & unified-agent-typ
   // targetConcurrency?: number;
 }
 
-// =============================================
-// Ferramentas (ToolDetail is now AvailableTool from tool-types.ts)
-// =============================================
-// AvailableTool is re-exported from tool-types.ts.
+// ======================================// Ferramentas (ToolDetail is now AvailableTool from tool-types.ts)
+// ======================================// AvailableTool is re-exported from tool-types.ts.
 // ToolDetail from original unified-agent-types.ts is effectively replaced by AvailableTool.
 
-// =============================================
-// Configuração de Agente Salva
-// =============================================
-
+// ======================================// Configuração de Agente Salva
+// ======================================
 export interface SavedAgentConfiguration {
   id: string;
   agentName: string;
@@ -279,19 +267,15 @@ export interface SavedAgentConfiguration {
   tool_trajectory_avg_score?: number; // From agent-types.ts (SavedAgentConfiguration)
 }
 
-// =============================================
-// Tipos para Formulários
-// =============================================
-
+// ======================================// Tipos para Formulários
+// ======================================
 // Omit utility fields and userId for form data, id is optional for creation
 export type AgentFormData = Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId' | 'tool_trajectory_avg_score' | 'isFavorite'> & {
   id?: string; // id is optional when creating a new agent
 };
 
-// =============================================
-// Tipos Utilitários
-// =============================================
-
+// ======================================// Tipos Utilitários
+// ======================================
 export type AnyAgent =
   | SavedAgentConfiguration
   | AgentFormData

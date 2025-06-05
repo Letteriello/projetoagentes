@@ -385,10 +385,8 @@ export async function getAverageResponseTimes(
   }));
 }
 
-// =============================================
-// Log Writing Functions
-// =============================================
-
+// ======================================// Log Writing Functions
+// ======================================
 /**
  * Writes a log entry to Firestore.
  *
