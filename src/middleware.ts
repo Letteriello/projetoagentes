@@ -10,8 +10,6 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const authTokenCookie = request.cookies.get('fb-auth-token'); // Conceptual token
 
-  console.log(`Middleware: Intercepting path: ${pathname}`);
-
   // Avoid redirect loops for public paths and Next.js internals
   if (
     publicPaths.includes(pathname) ||
@@ -19,21 +17,17 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/') || // Assuming API routes might have their own auth or are public
     pathname.includes('.') // Generally, exclude file requests (e.g., favicon.ico, images)
   ) {
-    console.log(`Middleware: Allowing public or internal path: ${pathname}`);
     return NextResponse.next();
   }
 
   // Check if the current path is protected
   if (protectedPaths.some(path => pathname.startsWith(path))) {
-    console.log(`Middleware: Path ${pathname} is protected.`);
     if (!authTokenCookie) {
-      console.log(`Middleware: No auth token found. Redirecting ${pathname} to /login.`);
       const loginUrl = new URL('/login', request.url);
       // Preserve search params if any, e.g., for redirecting back after login
       loginUrl.searchParams.set('redirectedFrom', pathname);
       return NextResponse.redirect(loginUrl);
     }
-    console.log(`Middleware: Auth token found. Allowing access to ${pathname}.`);
   }
 
   return NextResponse.next();

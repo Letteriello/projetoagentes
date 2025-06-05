@@ -14,8 +14,10 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { EnvironmentProvider } from '@/contexts/EnvironmentContext';
 import { LoggerProvider } from '@/components/logger-provider';
-import Joyride, { Step, CallBackProps, STATUS, EVENTS, ACTIONS } from "react-joyride";
-import OnboardingModal from '@/components/ui/OnboardingModal'; // Added OnboardingModal import
+import dynamic from 'next/dynamic';
+const Joyride = dynamic(() => import('react-joyride'), { ssr: false });
+import type { Step, CallBackProps, STATUS, EVENTS, ACTIONS } from "react-joyride";
+const OnboardingModal = dynamic(() => import('@/components/ui/OnboardingModal'), { ssr: false });
 import Link from 'next/link'; // Added for Help Widget
 import { Button } from '@/components/ui/button'; // Added for Help Widget
 import { HelpCircle, Lightbulb } from 'lucide-react'; // Added for Help Widget & Tips
@@ -73,57 +75,6 @@ const initialSteps: Step[] = [
   }
 ];
 
-// Script to polyfill Node.js modules early in the page lifecycle
-function NodePolyfillScript() {
-  return (
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
-          // Polyfill Node.js modules in browser
-          if (typeof window !== 'undefined') {
-            // @ts-ignore
-            window.process = window.process || { env: {}, nextTick: function(fn) { setTimeout(fn, 0); } };
-            // @ts-ignore
-            window.Buffer = window.Buffer || { isBuffer: function() { return false; } };
-            // @ts-ignore
-            window.fs = window.fs || {};
-            // @ts-ignore
-            window.path = window.path || { 
-              join: function() { return Array.from(arguments).join('/').replace(/\\\\/+/g, '/'); }, 
-              resolve: function() { return Array.from(arguments).join('/').replace(/\\\\/+/g, '/'); } 
-            };
-            // @ts-ignore
-            window.child_process = window.child_process || {};
-            // @ts-ignore
-            window.net = window.net || {};
-            // @ts-ignore
-            window.tls = window.tls || {};
-            // @ts-ignore
-            window.http = window.http || {};
-            // @ts-ignore
-            window.https = window.https || {};
-            // @ts-ignore
-            window.crypto = window.crypto || {};
-            // @ts-ignore
-            window.stream = window.stream || {};
-            // @ts-ignore
-            window.zlib = window.zlib || {};
-            // @ts-ignore
-            window.util = window.util || {};
-            // @ts-ignore
-            window.url = window.url || {};
-            // @ts-ignore
-            window.os = window.os || {};
-            // @ts-ignore
-            window.assert = window.assert || function() {};
-            console.log('[Polyfills] Node.js module polyfills loaded for browser');
-          }
-        `,
-      }}
-    />
-  );
-}
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -178,7 +129,6 @@ export default function RootLayout({
 
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status, type, lifecycle, action } = data;
-    console.log('Joyride callback data:', data);
 
     if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
       setRunTour(false);
@@ -188,7 +138,6 @@ export default function RootLayout({
       setRunTour(false);
       localStorage.setItem('hasCompletedTour', 'true');
     } else if (type === EVENTS.TARGET_NOT_FOUND) {
-      console.error(`Target not found for step: ${data.step?.target}`);
       // Optional: move to next step or stop tour
       // For now, Joyride will show its own error in the tooltip.
       // if (data.index + 1 < tourSteps.length) {
@@ -272,7 +221,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        <NodePolyfillScript />
       </head>
       <body className={`${inter.variable} antialiased font-sans`} suppressHydrationWarning>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:border focus:rounded-md">
