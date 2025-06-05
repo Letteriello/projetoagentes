@@ -14,7 +14,7 @@ import {
   aiConfigurationAssistantFlow,
   AiConfigurationAssistantInputSchema,
 } from "@/ai/flows/aiConfigurationAssistantFlow";
-import { SavedAgentConfiguration } from "@/types/agent-configs-fixed";
+import { SavedAgentConfiguration } from "@/types/unified-agent-types";
 import type { ApiResponse } from "@/types/api-types";
 
 // Temporary in-memory store for agents to simulate a backend

@@ -7,7 +7,7 @@
 // ----------------------------------------------------------------------
 /// <reference types="firebase" />
 
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { SavedAgentConfiguration } from '@/types/unified-agent-types';
 import { firestore } from '@/lib/firebaseClient';
 // Adicionado importação com types completos
 import { 

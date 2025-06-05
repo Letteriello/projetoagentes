@@ -5,7 +5,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { savedAgentConfigurationSchema } from '@/lib/zod-schemas';
 import CustomBehaviorForm from './CustomBehaviorForm';
-import type { SavedAgentConfiguration, CustomAgentConfig } from '@/types/agent-configs-fixed';
+import type { SavedAgentConfiguration, CustomAgentConfig } from '@/types/unified-agent-types';
 import { TooltipProvider } from '@/components/ui/tooltip'; // Required for tooltips to render
 
 // Mock JsonEditorField

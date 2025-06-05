@@ -1,7 +1,7 @@
   import { defineFlow } from '@genkit-ai/flow';
 import { z } from 'zod';
 import { winstonLogger } from '@/lib/winston-logger'; // Assuming logger path
-import type { SavedAgentConfiguration } from '@/types/agent-configs-new'; // Or relevant type for agent config
+import type { SavedAgentConfiguration } from '@/types/unified-agent-types'; // Or relevant type for agent config
 
 // Input schema for the flow
 export const LangchainAgentFlowInputSchema = z.object({

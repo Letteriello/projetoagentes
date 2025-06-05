@@ -5,7 +5,7 @@ import {
   updateAgent,
   deleteAgent,
 } from "@/app/agent-builder/actions";
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { SavedAgentConfiguration } from '@/types/unified-agent-types';
 import { winstonLogger } from '@/lib/winston-logger';
 import { writeLogEntry } from '@/lib/logService';
 

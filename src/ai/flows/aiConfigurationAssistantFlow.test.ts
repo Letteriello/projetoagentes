@@ -6,8 +6,12 @@ import {
 } from './aiConfigurationAssistantFlow';
 import { ai } from '@/ai/genkit';
 import * as z from 'zod';
+<<<<<<< HEAD
 import { createMockSavedAgentConfig as createMockAgent, baseLLMConfig, baseAgentConfig, mockActionContext } from './test-utils';
 import type { LLMAgentConfig, SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+=======
+import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/unified-agent-types';
+>>>>>>> b49d3373ebd7f0451b28edd3f3d051cfa4caec3b
 
 // ===== MOCKS CENTRAIS =====
 // Se precisar de mocks de tools, defina-os localmente ou centralize no test-utils.ts

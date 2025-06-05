@@ -23,7 +23,7 @@ import { EventDebugPanel } from "@/components/features/chat/streaming/EventDebug
 import SimpleChatHeader from "@/components/features/chat/SimpleChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 // import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
-import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-configs-fixed';
+import type { SavedAgentConfiguration, AgentConfig } from '@/types/unified-agent-types';
 import { getToolsByIds } from "@/ai/tools";
 import type { Tool } from '@genkit-ai/sdk';
 

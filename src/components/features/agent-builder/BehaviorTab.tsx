@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import LLMBehaviorForm from "./LLMBehaviorForm";
 import WorkflowBehaviorForm from "./WorkflowBehaviorForm";
 import CustomBehaviorForm from "./CustomBehaviorForm";
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // MODIFIED
+import { SavedAgentConfiguration } from '@/types/unified-agent-types'; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 
 // MODIFIED: Simplified props

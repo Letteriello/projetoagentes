@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import type { SavedAgentConfiguration } from '@/types/unified-agent-types';
 
 // Props para o componente MultiAgentTab.
 interface MultiAgentTabProps {
