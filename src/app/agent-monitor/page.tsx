@@ -304,6 +304,12 @@ const [successRate, setSuccessRate] = useState<number | null>(null);
 const [estimatedCostToday, setEstimatedCostToday] = useState<number | null>(null);
 const [keyMetricsLoading, setKeyMetricsLoading] = useState<boolean>(true);
 
+  // States for Task 8.1: Relatórios de Uso de Agentes (Simulados)
+  const [yearlyAgentUsageData, setYearlyAgentUsageData] = useState<Array<{ year: number; agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRate: number; }>>([]);
+  const [monthlyAgentUsageData, setMonthlyAgentUsageData] = useState<Array<{ year: number; month: number; /* 1-12 */ agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRate: number; }>>([]);
+  const [selectedReportYear, setSelectedReportYear] = useState<number>(new Date().getFullYear());
+  const [selectedReportMonth, setSelectedReportMonth] = useState<number | 'all'>(new Date().getMonth() + 1); // Default to current month (1-12) or 'all'
+
 // Agent Type Definitions
 const AGENT_TYPES = ["All Types", "LLM", "Workflow", "Customizado"] as const;
 type AgentType = typeof AGENT_TYPES[number];
@@ -319,6 +325,21 @@ const [feedFilterAgentType, setFeedFilterAgentType] = useState<AgentType>("All T
 
 // State for Anomaly Alerts
 const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
+
+  // Chart Configs for Task 8.1
+  const yearlyUsageChartConfig = {
+    usageCount: { label: "Utilizações", color: "hsl(var(--chart-1))" },
+    estimatedCost: { label: "Custo Est. ($)", color: "hsl(var(--chart-2))" },
+    successRate: { label: "Taxa Sucesso (%)", color: "hsl(var(--chart-3))" },
+    agentName: { label: "Agente" },
+  } satisfies ChartConfig;
+
+  const monthlyUsageChartConfig = {
+    usageCount: { label: "Utilizações", color: "hsl(var(--chart-1))" },
+    estimatedCost: { label: "Custo Est. ($)", color: "hsl(var(--chart-2))" },
+    successRate: { label: "Taxa Sucesso (%)", color: "hsl(var(--chart-3))" },
+    agentName: { label: "Agente" },
+  } satisfies ChartConfig;
 
   const agentUsageChartConfig = {
     count: {
@@ -589,6 +610,13 @@ const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
     setToolUsageMetricsError(null);
     setFeedFilterToolName(''); // Clear tool name filter
     setFeedFilterAgentType("All Types"); // Clear agent type filter
+
+    // Clear Task 8.1 states
+    setYearlyAgentUsageData([]);
+    setMonthlyAgentUsageData([]);
+    // Reset year/month selectors to current? Or leave as is? For now, leave.
+    // setSelectedReportYear(new Date().getFullYear());
+    // setSelectedReportMonth(new Date().getMonth() + 1);
   };
 
   // useEffect for mock data generation on component mount
@@ -749,6 +777,69 @@ const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
     }, 300); // Simulate small fetch time
   };
 
+  // Mock Data Generation Functions for Task 8.1
+  const generateMockYearlyAgentUsage = (agents: DisplayAgent[], years: number[]): Array<{ year: number; agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRate: number; }> => {
+    const data: Array<{ year: number; agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRate: number; }> = [];
+    agents.forEach(agent => {
+      years.forEach(year => {
+        const usageCount = Math.floor(Math.random() * 4001) + 1000; // 1000-5000
+        const estimatedCost = usageCount * (Math.random() * 0.04 + 0.01); // usageCount * (0.01 - 0.05)
+        const successRate = Math.random() * 0.29 + 0.7; // 0.70 - 0.99
+        data.push({
+          year,
+          agentId: agent.id,
+          agentName: agent.name || agent.id,
+          usageCount,
+          estimatedCost,
+          successRate,
+        });
+      });
+    });
+    return data;
+  };
+
+  const generateMockMonthlyAgentUsage = (agents: DisplayAgent[], year: number): Array<{ year: number; month: number; agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRate: number; }> => {
+    const data: Array<{ year: number; month: number; agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRate: number; }> = [];
+    agents.forEach(agent => {
+      for (let month = 1; month <= 12; month++) {
+        const usageCount = Math.floor(Math.random() * 451) + 50; // 50-500
+        const estimatedCost = usageCount * (Math.random() * 0.04 + 0.01); // usageCount * (0.01 - 0.05)
+        const successRate = Math.random() * 0.29 + 0.7; // 0.70 - 0.99
+        data.push({
+          year,
+          month,
+          agentId: agent.id,
+          agentName: agent.name || agent.id,
+          usageCount,
+          estimatedCost,
+          successRate,
+        });
+      }
+    });
+    return data;
+  };
+
+  const loadAgentUsageReportsData = () => {
+    const currentYear = new Date().getFullYear();
+    const yearsToGenerate = [currentYear, currentYear - 1, currentYear - 2];
+    const agentList = Object.values(displayAgents);
+
+    if (agentList.length === 0) {
+        // Handle case with no agents, maybe set empty data or log a message
+        setYearlyAgentUsageData([]);
+        setMonthlyAgentUsageData([]);
+        return;
+    }
+
+    const yearlyData = generateMockYearlyAgentUsage(agentList, yearsToGenerate);
+    setYearlyAgentUsageData(yearlyData);
+
+    // Generate monthly data only for the initially selected year
+    const monthlyData = generateMockMonthlyAgentUsage(agentList, selectedReportYear);
+    setMonthlyAgentUsageData(monthlyData);
+  };
+
+
   useEffect(() => {
     loadMockA2AMessages();
     loadMockAgentStatusAndAvgResponseData(); // Depends on a2aMessages being available if used for agent IDs
@@ -757,7 +848,58 @@ const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
     loadMockSimulatedToolPerformanceData();
     loadMockHeatmapData();
     loadMockKeyMetrics();
+    // Load data for Task 8.1 - must be called after displayAgents is potentially populated
   }, []); // Empty dependency array ensures this runs only once on mount
+
+  useEffect(() => {
+    // This effect will run when displayAgents changes, specifically its length.
+    // This ensures that mock data using agent names is generated after agents are available.
+    if (Object.keys(displayAgents).length > 0) {
+      loadAgentUsageReportsData();
+    }
+    // Ensure monthly data is also reloaded if the selected year changes
+    // This dependency array ensures that if selectedReportYear changes externally (though not typical for this setup yet)
+    // or if displayAgents changes, monthly data is re-evaluated.
+  }, [displayAgents, selectedReportYear]);
+
+
+  // Memoized selectors for Task 8.1 chart data
+  const filteredYearlyReportData = useMemo(() => {
+    return yearlyAgentUsageData.filter(d => d.year === selectedReportYear);
+  }, [yearlyAgentUsageData, selectedReportYear]);
+
+  const filteredMonthlyReportData = useMemo(() => {
+    if (selectedReportMonth === 'all') {
+      // Aggregate monthly data for the selected year
+      const aggregatedData: Record<string, { agentId: string; agentName?: string; usageCount: number; estimatedCost: number; successRateSum: number; successRateCount: number; year: number; }> = {};
+      monthlyAgentUsageData
+        .filter(d => d.year === selectedReportYear)
+        .forEach(item => {
+          if (!aggregatedData[item.agentId]) {
+            aggregatedData[item.agentId] = {
+              agentId: item.agentId,
+              agentName: item.agentName || item.agentId,
+              usageCount: 0,
+              estimatedCost: 0,
+              successRateSum: 0,
+              successRateCount: 0,
+              year: item.year,
+            };
+          }
+          aggregatedData[item.agentId].usageCount += item.usageCount;
+          aggregatedData[item.agentId].estimatedCost += item.estimatedCost;
+          aggregatedData[item.agentId].successRateSum += item.successRate;
+          aggregatedData[item.agentId].successRateCount += 1;
+        });
+      return Object.values(aggregatedData).map(agg => ({
+        ...agg,
+        successRate: agg.successRateCount > 0 ? agg.successRateSum / agg.successRateCount : 0,
+      }));
+    } else {
+      // Filter for specific month and year
+      return monthlyAgentUsageData.filter(d => d.year === selectedReportYear && d.month === selectedReportMonth);
+    }
+  }, [monthlyAgentUsageData, selectedReportYear, selectedReportMonth]);
 
   const handleReloadAllData = async () => {
     console.log("Reloading all data...");
@@ -776,6 +918,7 @@ const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
     loadMockSimulatedToolPerformanceData();
     loadMockHeatmapData();
     loadMockKeyMetrics();
+    loadAgentUsageReportsData(); // Reload Task 8.1 data
     // Note: liveEvents and errorFrequencyByAgentData (derived from liveEvents) are not reloaded here
     // as SSE handles live updates.
   };
@@ -1545,6 +1688,196 @@ const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
         </Card>
       </div>
       {/* END OF KEY METRICS CARDS SECTION */}
+
+      {/* START OF TASK 8.1 AGENT USAGE REPORTS SECTION */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Relatórios de Uso de Agentes (Simulados)</CardTitle>
+          <CardDescription>Filtre e visualize dados de uso anual e mensal por agente.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="reportYearSelect">Selecionar Ano do Relatório</Label>
+              <Select
+                value={selectedReportYear.toString()}
+                onValueChange={(value) => {
+                  const year = parseInt(value, 10);
+                  setSelectedReportYear(year);
+                  // Regenerate monthly data for the new selected year
+                  if (Object.keys(displayAgents).length > 0) {
+                    setMonthlyAgentUsageData(generateMockMonthlyAgentUsage(Object.values(displayAgents), year));
+                  }
+                }}
+              >
+                <SelectTrigger id="reportYearSelect" className="h-9 text-sm mt-1">
+                  <SelectValue placeholder="Selecione o Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(yearlyAgentUsageData.map(d => d.year)))
+                    .sort((a, b) => b - a)
+                    .map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="reportMonthSelect">Selecionar Mês do Relatório</Label>
+              <Select
+                value={selectedReportMonth.toString()}
+                onValueChange={(value) => setSelectedReportMonth(value === 'all' ? 'all' : parseInt(value, 10))}
+              >
+                <SelectTrigger id="reportMonthSelect" className="h-9 text-sm mt-1">
+                  <SelectValue placeholder="Selecione o Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Meses</SelectItem>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                    <SelectItem key={month} value={month.toString()}>
+                      {new Date(0, month -1).toLocaleString('default', { month: 'long' })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Yearly Agent Usage Card */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Relatório Anual de Uso de Agentes (Simulado) - {selectedReportYear}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredYearlyReportData.length > 0 ? (
+            <ChartContainer config={yearlyUsageChartConfig} className="min-h-[300px] w-full">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={filteredYearlyReportData} margin={{ top: 5, right: 20, left: 5, bottom: 50 /* Increased bottom margin for labels */ }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="agentName"
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={10}
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                  />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} fontSize={10} />
+                  <ChartTooltip
+                    cursor={true}
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(value, payload) => {
+                          // Assuming payload[0].payload contains the full data item
+                          return payload && payload.length && payload[0].payload.agentName ? `Agente: ${payload[0].payload.agentName}` : value;
+                        }}
+                        formatter={(value, name, props) => {
+                          const dataItem = props.payload as any; // Cast to any to access original data
+                          if (name === 'usageCount') return [`${(value as number).toLocaleString()}`, "Utilizações"];
+                          if (name === 'estimatedCost') return [`$${(value as number).toFixed(2)}`, "Custo Est."];
+                          if (name === 'successRate') return [`${((value as number) * 100).toFixed(1)}%`, "Taxa Sucesso"];
+                          // Include all relevant data from the payload for the tooltip
+                          const { agentName, usageCount, estimatedCost, successRate } = dataItem;
+                          const tooltipData = [
+                            `Utilizações: ${usageCount.toLocaleString()}`,
+                            `Custo Est.: $${estimatedCost.toFixed(2)}`,
+                            `Taxa Sucesso: ${(successRate * 100).toFixed(1)}%`
+                          ];
+                          // This part might need adjustment based on how ChartTooltipContent expects data
+                          // For now, the formatter above handles individual lines. If a single block is needed, adjust here.
+                          return [tooltipData.join('\n'), `Agente: ${agentName}`];
+                        }}
+                        itemStyle={{ fontSize: '12px' }}
+                        formatter={(value, name, entry) => {
+                            const payload = entry.payload as any;
+                            if (name === 'usageCount') return [value, yearlyUsageChartConfig.usageCount.label];
+                            if (name === 'estimatedCost') return [payload.estimatedCost.toFixed(2), yearlyUsageChartConfig.estimatedCost.label];
+                            if (name === 'successRate') return [(payload.successRate * 100).toFixed(1) + '%', yearlyUsageChartConfig.successRate.label];
+                            return [value, name];
+                        }}
+                        payloadFormatter={(payload) => { // Custom payload to show all metrics
+                            if (payload && payload.length > 0 && payload[0].payload) {
+                                const item = payload[0].payload;
+                                return [
+                                    { name: yearlyUsageChartConfig.usageCount.label, value: item.usageCount, color: yearlyUsageChartConfig.usageCount.color },
+                                    { name: yearlyUsageChartConfig.estimatedCost.label, value: `$${item.estimatedCost.toFixed(2)}`, color: yearlyUsageChartConfig.estimatedCost.color },
+                                    { name: yearlyUsageChartConfig.successRate.label, value: `${(item.successRate * 100).toFixed(1)}%`, color: yearlyUsageChartConfig.successRate.color },
+                                ];
+                            }
+                            return payload;
+                        }}
+                      />
+                    }
+                  />
+                  <Legend content={<ChartLegendContent />} />
+                  <Bar dataKey="usageCount" fill="var(--color-usageCount)" radius={4} name={yearlyUsageChartConfig.usageCount.label} />
+                  {/* Other bars can be added here if needed, or keep them in tooltip only */}
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay
+              icon={BarChartBig}
+              title="Nenhum Dado Anual de Uso"
+              message={`Nenhum dado de uso de agente disponível para o ano ${selectedReportYear}.`}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Monthly Agent Usage Card */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>
+            Relatório Mensal de Uso de Agentes (Simulado) -
+            {selectedReportMonth === 'all' ? 'Todos os Meses (Agregado)' : new Date(0, (selectedReportMonth as number) -1).toLocaleString('default', { month: 'long' })} {selectedReportYear}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredMonthlyReportData.length > 0 ? (
+            <ChartContainer config={monthlyUsageChartConfig} className="min-h-[300px] w-full">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={filteredMonthlyReportData} margin={{ top: 5, right: 20, left: 5, bottom: 50 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="agentName" tickLine={false} axisLine={false} fontSize={10} interval={0} angle={-45} textAnchor="end" />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} fontSize={10} />
+                  <ChartTooltip
+                    cursor={true}
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(value, payload) => payload && payload.length && payload[0].payload.agentName ? `Agente: ${payload[0].payload.agentName}` : value}
+                        payloadFormatter={(payload) => { // Custom payload to show all metrics
+                            if (payload && payload.length > 0 && payload[0].payload) {
+                                const item = payload[0].payload;
+                                return [
+                                    { name: monthlyUsageChartConfig.usageCount.label, value: item.usageCount.toLocaleString(), color: monthlyUsageChartConfig.usageCount.color },
+                                    { name: monthlyUsageChartConfig.estimatedCost.label, value: `$${item.estimatedCost.toFixed(2)}`, color: monthlyUsageChartConfig.estimatedCost.color },
+                                    { name: monthlyUsageChartConfig.successRate.label, value: `${(item.successRate * 100).toFixed(1)}%`, color: monthlyUsageChartConfig.successRate.color },
+                                ];
+                            }
+                            return payload;
+                        }}
+                      />
+                    }
+                  />
+                  <Legend content={<ChartLegendContent />} />
+                  <Bar dataKey="usageCount" fill="var(--color-usageCount)" radius={4} name={monthlyUsageChartConfig.usageCount.label} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay
+              icon={BarChartBig}
+              title="Nenhum Dado Mensal de Uso"
+              message={`Nenhum dado de uso de agente disponível para ${selectedReportMonth === 'all' ? 'Todos os Meses' : new Date(0, (selectedReportMonth as number) -1).toLocaleString('default', { month: 'long' })} de ${selectedReportYear}.`}
+            />
+          )}
+        </CardContent>
+      </Card>
+      {/* END OF TASK 8.1 AGENT USAGE REPORTS SECTION */}
 
 
       {/* START OF AGENT ACTIVITY HEATMAP SECTION */}
