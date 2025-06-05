@@ -1,9 +1,10 @@
 // src/ai/flows/agent-creator-flow.ts
 import { ai } from '@/ai/genkit';
-import { gemini10Pro } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/googleai'; // Added for dynamic model creation
 import * as z from 'zod';
 import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/unified-agent-types';
 import { winstonLogger } from '../../lib/winston-logger';
+import { llmModels } from '../../data/llm-models'; // Import consolidated models
 
 const AgentCreatorChatInputSchema = z.object({
   userNaturalLanguageInput: z.string(),
@@ -41,7 +42,22 @@ function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<Sav
         llmConfig.agentTasks = [];
         llmConfig.agentPersonality = "";
         llmConfig.agentRestrictions = [];
-        llmConfig.agentModel = "gemini10Pro"; // Default model
+
+        // Determine default model for new agents
+        const defaultAgentModelId = 'gemini-1.5-flash-latest';
+        let defaultModelForNewAgents = llmModels.find(m => m.id === defaultAgentModelId);
+        if (!defaultModelForNewAgents && llmModels.length > 0) {
+            winstonLogger.warn(`Default model ${defaultAgentModelId} not found for new agents, falling back to the first available model: ${llmModels[0].id}`);
+            defaultModelForNewAgents = llmModels[0];
+        }
+
+        if (defaultModelForNewAgents) {
+            llmConfig.agentModel = defaultModelForNewAgents.id;
+        } else {
+            winstonLogger.error("No LLM models found in llmModels list. Cannot set a default model for new agents.");
+            llmConfig.agentModel = "default-model-if-list-empty"; // Fallback if list is empty
+        }
+
         llmConfig.agentTemperature = 0.7;
     } else if (config.config?.type === 'workflow' && typeof (config.config as WorkflowAgentConfig).workflowType === 'undefined') {
         const workflowConfig = config.config as Partial<WorkflowAgentConfig>;
@@ -132,8 +148,31 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
     `;
 
     try {
+      // Select model for the agent creator flow's own logic
+      const agentCreatorModelId = 'gemini-1.5-pro-latest'; // Preferred model for this flow
+      let agentCreatorModelDetails = llmModels.find(m => m.id === agentCreatorModelId);
+
+      if (!agentCreatorModelDetails && llmModels.length > 0) {
+          winstonLogger.warn(`Model ${agentCreatorModelId} not found for agent creator flow, falling back to the first available model: ${llmModels[0].id}`);
+          agentCreatorModelDetails = llmModels[0];
+      }
+
+      if (!agentCreatorModelDetails) {
+          winstonLogger.error("No LLM models found in llmModels list for agentCreatorChatFlow. Cannot proceed.");
+          throw new Error("No LLM models available for agentCreatorChatFlow.");
+      }
+
+      // Assuming googleAI for Google provider based on original gemini10Pro usage.
+      // This would need to be more dynamic if the chosen model could be from another provider.
+      // For example: if (agentCreatorModelDetails.provider === 'OpenAI') { genkitAgentCreatorModel = openai(agentCreatorModelDetails.id) }
+      if (agentCreatorModelDetails.provider !== 'Google' && agentCreatorModelDetails.provider !== 'OpenAI') { // Adjusted to allow OpenAI as well, assuming openai is imported and handled
+        winstonLogger.warn(`Agent creator model ${agentCreatorModelDetails.id} is from provider ${agentCreatorModelDetails.provider}. Ensure Genkit is configured for this provider.`);
+        // Potentially throw error if provider not supported by this flow's specific setup
+      }
+      const genkitAgentCreatorModel = googleAI(agentCreatorModelDetails.id as any); // Cast to 'any' to satisfy Genkit's specific model type if IDs are generic strings
+
       // Make the generation request with JSON schema validation
-      const { text } = await ai.generate({ prompt: systemPrompt, model: gemini10Pro });
+      const { text } = await ai.generate({ prompt: systemPrompt, model: genkitAgentCreatorModel });
       
       // Parse the JSON response
       let responseValue;

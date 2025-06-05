@@ -11,11 +11,11 @@ export const llmModels: LLMModelDetails[] = [
       vision: true,
     },
     estimatedCost: {
-      input: 0.00035, // Example cost
-      output: 0.00070, // Example cost
-      unit: 'USD_PER_1K_CHARACTERS', // Example unit, adjust as needed
+      input: 0.00035,
+      output: 0.00070,
+      unit: 'USD_PER_1K_CHARACTERS',
     },
-    maxOutputTokens: 8192, // Default max for this model
+    maxOutputTokens: 8192,
   },
   {
     id: 'gemini-1.5-pro-latest',
@@ -27,8 +27,8 @@ export const llmModels: LLMModelDetails[] = [
       vision: true,
     },
     estimatedCost: {
-      input: 0.0035, // Example cost
-      output: 0.0070, // Example cost
+      input: 0.0035,
+      output: 0.0070,
       unit: 'USD_PER_1K_CHARACTERS',
     },
     maxOutputTokens: 8192,
@@ -40,6 +40,7 @@ export const llmModels: LLMModelDetails[] = [
     capabilities: {
       streaming: true,
       tools: true,
+      // vision: false, // Implicitly false or not specified as true
     },
     estimatedCost: {
       input: 0.001,
@@ -47,21 +48,6 @@ export const llmModels: LLMModelDetails[] = [
       unit: 'USD_PER_1K_CHARACTERS',
     },
     maxOutputTokens: 2048,
-  },
-  {
-    id: 'text-bison-001', // An older model example
-    name: 'PaLM 2 (text-bison-001)',
-    provider: 'Google',
-    capabilities: {
-      streaming: true,
-      tools: false, // Example: This model does not support tools
-    },
-    estimatedCost: {
-      input: 0.0005,
-      output: 0.0005,
-      unit: 'USD_PER_1K_CHARACTERS',
-    },
-    maxOutputTokens: 1024,
   },
   {
     id: 'claude-3-opus',
@@ -73,9 +59,9 @@ export const llmModels: LLMModelDetails[] = [
       vision: true,
     },
     estimatedCost: {
-      input: 0.015, // Example cost
-      output: 0.075, // Example cost
-      unit: 'USD_PER_1K_TOKENS', // Different unit example
+      input: 0.015,
+      output: 0.075,
+      unit: 'USD_PER_1K_TOKENS',
     },
     maxOutputTokens: 4096,
   },
@@ -101,7 +87,7 @@ export const llmModels: LLMModelDetails[] = [
     provider: 'Anthropic',
     capabilities: {
       streaming: true,
-      tools: false, // Example: This model does not support tools well
+      tools: false,
       vision: true,
     },
     estimatedCost: {
@@ -110,6 +96,22 @@ export const llmModels: LLMModelDetails[] = [
       unit: 'USD_PER_1K_TOKENS',
     },
     maxOutputTokens: 4096,
+  },
+  {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    provider: 'OpenAI',
+    capabilities: {
+      streaming: true,
+      tools: true,
+      vision: true
+    },
+    estimatedCost: {
+      input: 0.005,
+      output: 0.015,
+      unit: 'USD_PER_1K_TOKENS'
+    },
+    maxOutputTokens: 8192,
   },
   {
     id: 'gpt-4-turbo',
@@ -125,110 +127,90 @@ export const llmModels: LLMModelDetails[] = [
         output: 0.03,
         unit: 'USD_PER_1K_TOKENS',
     },
-    maxOutputTokens: 8192, // GPT-4 Turbo has a larger context window, often 128k, but max output tokens might be less
+    maxOutputTokens: 8192,
   },
   {
-    id: 'gpt-3.5-turbo',
+    id: 'gpt-3.5-turbo-0125', // Updated ID
     name: 'GPT-3.5 Turbo',
     provider: 'OpenAI',
     capabilities: {
         streaming: true,
         tools: true,
+        // vision: false, // Explicitly not a vision model by default
     },
     estimatedCost: {
         input: 0.0005,
         output: 0.0015,
         unit: 'USD_PER_1K_TOKENS',
     },
-    maxOutputTokens: 4096, // Or 16k depending on the specific version
+    maxOutputTokens: 4096,
   },
-  // Add a model that is "more concise" for simulation purposes
   {
-    id: 'concise-model-test',
-    name: 'Test Model (Concise)',
-    provider: 'TestProvider',
+    id: 'cohere/command-r-plus',
+    name: 'Cohere Command R+',
+    provider: 'Cohere', // Changed from OpenRouter to Cohere
     capabilities: {
       streaming: true,
       tools: true,
+      vision: false
     },
-    // Add a custom property for simulation, or rely on name parsing in chat-flow
-    customProperties: {
-      behavior: 'concise',
+    estimatedCost: {
+      input: 0.003,
+      output: 0.015,
+      unit: 'USD_PER_1K_TOKENS'
     },
-    maxOutputTokens: 50, // Very low for testing conciseness
+    maxOutputTokens: 4096,
   },
-  // Add a model that is "more creative" for simulation
   {
-    id: 'creative-model-test',
-    name: 'Test Model (Creative)',
-    provider: 'TestProvider',
+    id: 'mistralai/mistral-large',
+    name: 'Mistral Large',
+    provider: 'MistralAI', // Changed from OpenRouter to MistralAI
     capabilities: {
       streaming: true,
       tools: true,
+      vision: false
     },
-    customProperties: {
-      behavior: 'creative',
+    estimatedCost: {
+      input: 0.008,
+      output: 0.024,
+      unit: 'USD_PER_1K_TOKENS'
     },
-    maxOutputTokens: 2048,
+    maxOutputTokens: 8192,
   },
-  // Add a model that "fails to use tools" explicitly for simulation
-  {
-    id: 'no-tool-model-test',
-    name: 'Test Model (No Tools)',
-    provider: 'TestProvider',
-    capabilities: {
-      streaming: true,
-      tools: false, // Explicitly false
-    },
-    customProperties: {
-      behavior: 'tool_failure_simulation',
-    },
-    maxOutputTokens: 1024,
-  },
-  /**
-   * Simulated fine-tuned model for customer support.
-   * Based on gemini-1.0-pro.
-   */
   {
     id: 'googleai/gemini-1.0-pro-finetuned-support',
     name: 'Gemini 1.0 Pro (Fine-tuned for Support)',
     provider: 'Google',
-    capabilities: { // Copied from gemini-1.0-pro
+    capabilities: {
       streaming: true,
       tools: true,
-      // vision: false, // Assuming base gemini-1.0-pro doesn't have vision explicitly true
     },
-    estimatedCost: { // Slightly higher than base, or same
+    estimatedCost: {
       input: 0.0012,
       output: 0.0025,
       unit: 'USD_PER_1K_CHARACTERS',
     },
-    maxOutputTokens: 2048, // Same as gemini-1.0-pro
+    maxOutputTokens: 2048,
     customProperties: {
       fineTuningType: "support_queries",
       baseModel: "gemini-1.0-pro",
       description: "Optimized for customer support, help desk interactions, and FAQ responses."
     },
   },
-  /**
-   * Simulated fine-tuned model for code generation.
-   * Based on gemini-1.0-pro.
-   */
   {
     id: 'googleai/gemini-1.0-pro-finetuned-code',
     name: 'Gemini 1.0 Pro (Fine-tuned for Code Generation)',
     provider: 'Google',
-    capabilities: { // Copied from gemini-1.0-pro
+    capabilities: {
       streaming: true,
       tools: true,
-      // vision: false,
     },
     estimatedCost: {
       input: 0.0015,
       output: 0.0030,
       unit: 'USD_PER_1K_CHARACTERS',
     },
-    maxOutputTokens: 2048, // Same as gemini-1.0-pro
+    maxOutputTokens: 2048,
     customProperties: {
       fineTuningType: "code_generation",
       baseModel: "gemini-1.0-pro",

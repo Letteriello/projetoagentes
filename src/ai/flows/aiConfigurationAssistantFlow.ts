@@ -1,11 +1,13 @@
 // Removed NextRequest as it's not used.
 // import { NextRequest } from 'next/server';
 import { ai } from '@/ai/genkit';
-import { gemini10Pro } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/googleai'; // Ensured googleAI is imported
 import * as z from 'zod';
 import { allTools } from '@/data/agent-builder/available-tools';
 import { AvailableTool } from '@/types/tool-types';
 import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/unified-agent-types'; // Simplified imports
+import { llmModels } from '../../data/llm-models'; // Import consolidated models
+import { winstonLogger } from '../../lib/winston-logger'; // For logging model selection
 
 // 1. Define Input Schema
 /**
@@ -178,7 +180,7 @@ ${tasks.map(t => `- ${t}`).join('\n')}
 Based on this, please suggest the following configuration aspects:
 - agentPersonality: A suitable personality for the agent.
 - agentRestrictions: Any important restrictions or ethical considerations.
-- agentModel: A recommended AI model (e.g., gemini-1.5-pro-latest, gpt-4-turbo).
+- agentModel: A recommended AI model ID from the 'Available models' list below.
 - agentTemperature: A suitable temperature for the model (e.g., 0.7).
 - agentTools: A list of relevant tools from the provided list that would help the agent achieve its goal and tasks.
   - For each tool you suggest, if it has configuration options defined in its \`configFields\` (provided in the 'Available tools' list below), also provide a \`suggestedConfigData\` object.
@@ -188,6 +190,9 @@ Based on this, please suggest the following configuration aspects:
 
 Available tools (with their ID, Name, Description, and ConfigFields):
 ${availableToolsList?.map(t => `${t.name} (ID: ${t.id}, Description: ${t.description}, GenkitToolName: ${t.genkitToolName || 'N/A'}, ConfigFields: ${t.configFields ? JSON.stringify(t.configFields) : 'None'})`).join('\n') || 'No tools available.'}
+
+Available models (ID, Name, Provider):
+${llmModels.map(m => `- ID: ${m.id}, Name: ${m.name}${m.provider ? ', Provider: ' + m.provider : ''}`).join('\n') || 'No models available in the list.'}
 `;
         // Information about currently selected tools, if any, to avoid redundant suggestions
         // or to suggest configuration changes for them.
@@ -200,12 +205,12 @@ Please consider these existing tools. Avoid suggesting them again unless you are
         }
 
         prompt += `
-Please provide your suggestions in a single JSON object format that strictly matches the following fields from AiConfigurationAssistantOutputSchema: "suggestedPersonality", "suggestedRestrictions", "suggestedModel", "suggestedTemperature", "suggestedTools".
+Please provide your suggestions in a single JSON object format that strictly matches the following fields from AiConfigurationAssistantOutputSchema: "suggestedPersonality", "suggestedRestrictions", "suggestedModel" (must be an ID from the 'Available models' list), "suggestedTemperature", "suggestedTools".
 Example JSON output:
 {
   "suggestedPersonality": "Helpful and efficient assistant",
   "suggestedRestrictions": ["Avoid giving financial advice", "Stick to the defined tasks"],
-  "suggestedModel": "gemini-1.5-pro-latest",
+  "suggestedModel": "gemini-1.5-flash-latest", // Ensure this ID is from the provided list
   "suggestedTemperature": 0.5,
   "suggestedTools": [{ "id": "webSearch", "name": "Web Search", "description": "Searches the web for information.", "suggestedConfigData": {"apiKeyName": "YOUR_SEARCH_API_KEY"} }]
 }`;
@@ -312,8 +317,27 @@ Please consider these existing tools. Avoid suggesting tools that are already pr
 
     // console.log("[aiConfigurationAssistantFlow] Generated prompt for LLM:", promptForLLM);
 
-    // 2. Call the LLM (Gemini 1.0 Pro in this case) with the generated prompt.
-    const llmResponse = await ai.generate({model: gemini10Pro, prompt: promptForLLM, config: {temperature: 0.7} });
+    // 2. Call the LLM with the generated prompt.
+    const assistantModelId = 'gemini-1.5-pro-latest'; // Preferred model for this flow's logic
+    let assistantModelDetails = llmModels.find(m => m.id === assistantModelId);
+
+    if (!assistantModelDetails && llmModels.length > 0) {
+        winstonLogger.warn(`Model ${assistantModelId} not found for AI config assistant flow, falling back to the first available model: ${llmModels[0].id}`);
+        assistantModelDetails = llmModels[0];
+    }
+
+    if (!assistantModelDetails) {
+        winstonLogger.error("No LLM models found in llmModels list for aiConfigurationAssistantFlow. Cannot proceed.");
+        throw new Error("No LLM models available for aiConfigurationAssistantFlow.");
+    }
+    // Assuming googleAI for Google provider. Needs adjustment if other providers are used for this specific flow's logic.
+    if (assistantModelDetails.provider !== 'Google' && assistantModelDetails.provider !== 'OpenAI') {
+        winstonLogger.warn(`AI Config Assistant model ${assistantModelDetails.id} is from provider ${assistantModelDetails.provider}. Ensure Genkit is configured for this provider for the assistant flow itself.`);
+    }
+    const genkitAssistantModel = googleAI(assistantModelDetails.id as any);
+
+
+    const llmResponse = await ai.generate({model: genkitAssistantModel, prompt: promptForLLM, config: {temperature: 0.7} });
     const responseText = llmResponse.text();
 
     if (!responseText) {
@@ -424,8 +448,25 @@ User Query: "Create blog posts about technology trends"
 `;
 
   try {
+    // Select a model for workflow type determination (can be a faster/cheaper one)
+    const workflowClassifierModelId = 'gemini-1.5-flash-latest';
+    let workflowClassifierModelDetails = llmModels.find(m => m.id === workflowClassifierModelId);
+    if (!workflowClassifierModelDetails && llmModels.length > 0) {
+        winstonLogger.warn(`Model ${workflowClassifierModelId} for workflow type classification not found, falling back to ${llmModels[0].id}.`);
+        workflowClassifierModelDetails = llmModels[0];
+    }
+
+    if (!workflowClassifierModelDetails) {
+        winstonLogger.error("No LLM models found for getWorkflowDetailedType. Cannot proceed.");
+        throw new Error("No LLM models available for getWorkflowDetailedType.");
+    }
+    if (workflowClassifierModelDetails.provider !== 'Google' && workflowClassifierModelDetails.provider !== 'OpenAI') {
+         winstonLogger.warn(`Workflow type classifier model ${workflowClassifierModelDetails.id} is from provider ${workflowClassifierModelDetails.provider}. Ensure Genkit is configured for this provider for this sub-task.`);
+    }
+    const genkitWorkflowClassifierModel = googleAI(workflowClassifierModelDetails.id as any);
+
     const llmWorkflowResponse = await ai.generate({
-      model: gemini10Pro,
+      model: genkitWorkflowClassifierModel,
       prompt: workflowDetailedTypePrompt, 
       config: { temperature: 0.1 } // Low temperature for more deterministic categorization
     });
