@@ -1,743 +1,1128 @@
 "use client";
 
-
 import * as React from "react";
-import { ReactNode } from "react";
-import * as React from "react"; import { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
+
+// Importação de componentes UI
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
+  CardDescription,
   CardFooter,
 } from "@/components/ui/card";
 import {
-  Cpu,
-  Plus,
-  Layers,
-  Info,
-  Search,
-  Calculator,
-  FileText,
-  CalendarDays,
-  Network,
-  Database,
-  Code2,
-  Briefcase,
-  Stethoscope,
-  Plane,
-  Workflow,
-  Brain,
-  FileJson,
-  Settings2 as ConfigureIcon,
-  GripVertical,
-  ClipboardCopy,
-  AlertCircle,
-  Trash2 as DeleteIcon,
-  Edit as EditIcon,
-  MessageSquare as ChatIcon,
-  Copy as CopyIcon,
-  Eye as EyeIcon,
-  EyeOff as EyeOffIcon,
-  Save as SaveIcon,
-  LucideIcon,
-} from "lucide-react"; // Updated icons
-import { Cpu, Plus, Layers, Info, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Briefcase, Stethoscope, Plane, Workflow, Brain, FileJson, Settings2 as ConfigureIcon, GripVertical, ClipboardCopy, AlertCircle, Trash2 as DeleteIcon, Edit as EditIcon, MessageSquare as ChatIcon, Copy as CopyIcon, Eye as EyeIcon, EyeOff as EyeOffIcon, Save as SaveIcon } from "lucide-react"; // Updated icons
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription as DialogDesc,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+
+// Importação de ícones
+import { 
+  Search, 
+  Plus, 
+  List, 
+  LayoutGrid, 
+  Users, 
+  Wrench, 
+  Ghost, 
+  Book, 
+  MessageSquareText,
+  Settings,
+  Trash2,
+  Info // Added for ContextualHelp
+} from "lucide-react";
+import { Gauge, RefreshCw } from "lucide-react";
+import { TbBuildingStore, TbBarbell } from "react-icons/tb";
+import { RiArrowGoBackFill } from "react-icons/ri";
+
+// Importações de hooks
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
-import { cn } from "@/lib/utils";
-import { AgentCard } from "@/components/features/agent-builder/agent-card";
-import { AgentBuilderDialog } from "@/components/features/agent-builder/agent-builder-dialog";
-import { AgentCard } from '@/components/features/agent-builder/agent-card';
-import AgentBuilderDialog from '@/components/features/agent-builder/agent-builder-dialog';
+import { useAgentStorage } from "@/hooks/use-agent-storage";
+import { useAchievements } from "@/hooks/useAchievements"; // Added useAchievements
+import ContextualHelp from "@/components/shared/ContextualHelp"; // Added ContextualHelp
+import EmptyState from "@/components/shared/EmptyState"; // Added EmptyState
+import Link from "next/link"; // Added Link for ContextualHelp
+
+// Importações de tipos
+import { 
+  SavedAgentConfiguration,
+  Tool
+} from "@/types/agent-configs-fixed";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  AdaptedSavedAgentConfiguration,
+  AdaptedAgentFormData,
+  ToolConfigData
+} from "@/types/agent-types-unified";
+import {
+  AvailableTool,
+  MCPServerConfig,
+  ApiKeyEntry
+} from "@/types/tool-types";
 
-export interface AvailableTool {
-  id: string;
-  label: string;
-  name: string;
-  type: "genkit_native";
-  icon: LucideIcon | undefined;
-  description: string;
-  hasConfig?: boolean; // Changed from needsConfiguration
-  genkitToolName?: string;
-  configFields?: Array<{
-    id: string;
-    label: string;
-    type: "text" | "password" | "select";
-    options?: Array<{ label: string; value: string }>;
-    placeholder?: string;
-    description?: string;
-  }>;
-}
+// Importações de utilitários
+import { toAgentFormData, toSavedAgentConfiguration } from "@/lib/agent-type-utils";
 
-export const availableTools: AvailableTool[] = [
+// Componentes dinâmicos com correção de imports
+const AgentBuilderDialog = React.lazy(() => 
+  import("@/components/features/agent-builder/agent-builder-dialog").then(m => ({
+    default: m.default || m.AgentBuilderDialog || m
+  }))
+);
+
+// Componentes de modal
+const ToolConfigModal = React.lazy(() => 
+  import("@/components/features/agent-builder/tool-config-modal")
+);
+
+const HelpModal = React.lazy(() => 
+  import("@/components/ui/help-modal")
+);
+
+const FeedbackModal = React.lazy(() => 
+  import("@/components/features/agent-builder/feedback-modal")
+);
+
+const ConfirmationModal = React.lazy(() => 
+  import("@/components/ui/confirmation-modal")
+);
+
+const TemplateNameModal = React.lazy(() => 
+  import("@/components/features/agent-builder/save-as-template-dialog")
+);
+
+const AgentMetricsView = React.lazy(() => 
+  import("@/components/features/agent-builder/AgentMetricsView")
+);
+
+const AgentLogView = React.lazy(() => 
+  import("@/components/features/agent-builder/AgentLogView")
+);
+
+// Mock data para compilação
+const tutorials = [
   {
-    id: "webSearch",
-    label: "Busca na Web (Google)",
-    name: "webSearch",
-    type: "genkit_native",
-    icon: Search,
-    description:
-      "Permite ao agente pesquisar na internet (via Genkit). Esta ferramenta tentará usar as variáveis de ambiente GOOGLE_API_KEY e GOOGLE_CSE_ID para funcionar. A configuração na UI serve para documentar e guiar o prompt do sistema.",
-    hasConfig: true,
-    genkitToolName: "performWebSearch",
+    id: 'createAgent',
+    title: 'Como criar um agente',
+    steps: [
+      {
+        title: 'Passo 1: Clique em Novo Agente',
+        content: 'Comece clicando no botão <b>Novo Agente</b> no topo da página.'
+      },
+      {
+        title: 'Passo 2: Configure seu agente',
+        content: 'Preencha os campos obrigatórios, como nome e descrição.'
+      }
+    ]
+  }
+];// Mock para ferramentas disponíveis
+const builderAvailableTools: AvailableTool[] = [
+  {
+    id: 'web-search',
+    name: 'Pesquisa Web',
+    description: 'Permite ao agente buscar informações na internet',
+    category: 'knowledge',
+    icon: 'search',
+    needsApiKey: true
   },
   {
-    id: "calculator",
-    label: "Calculadora",
-    name: "calculator",
-    type: "genkit_native",
-    icon: Calculator,
-    description: "Permite realizar cálculos matemáticos (via função Genkit).",
-    genkitToolName: "calculator",
-  }, // Fixed escaped quote
-  {
-    id: "knowledgeBase",
-    label: "Consulta à Base de Conhecimento (RAG)",
-    name: "knowledgeBase",
-    type: "genkit_native",
-    icon: FileText,
-    description:
-      "Permite buscar em bases de conhecimento ou documentos (ex: RAG via Genkit). Requer configuração do ID da base e, possivelmente, chaves de API.",
-    hasConfig: true,
-    genkitToolName: "queryKnowledgeBase",
-  }, // Fixed escaped quote
-  {
-    id: "calendarAccess",
-    label: "Acesso à Agenda/Calendário",
-    name: "calendarAccess",
-    type: "genkit_native",
-    icon: CalendarDays,
-    description:
-      "Permite verificar ou criar eventos na agenda (requer fluxo Genkit e auth). Requer configuração do endpoint da API ou ID do fluxo.",
-    hasConfig: true,
-    genkitToolName: "accessCalendar",
-  }, // Fixed escaped quote
-  {
-    id: "customApiIntegration",
-    label: "Integração com API Externa (OpenAPI)",
-    name: "customApiIntegration",
-    type: "genkit_native",
-    icon: Network,
-    description:
-      "Permite interagir com serviços web externos (via OpenAPI, requer fluxo Genkit). Requer URL do esquema OpenAPI e, opcionalmente, chave API.",
-    hasConfig: true,
-    genkitToolName: "invokeOpenAPI",
-  }, // Fixed escaped quote
-  {
-    id: "databaseAccess",
-    label: "Acesso a Banco de Dados (SQL)",
-    name: "databaseAccess",
-    type: "genkit_native",
-    icon: Database,
-    description:
-      "Permite consultar e interagir com bancos de dados SQL (requer fluxo Genkit). Requer configuração detalhada da conexão.",
-    hasConfig: true,
-    genkitToolName: "queryDatabase",
-  }, // Fixed escaped quote
-  {
-    id: "codeExecutor",
-    label: "Execução de Código (Python Sandbox)",
-    name: "codeExecutor",
-    type: "genkit_native",
-    icon: Code2,
-    description:
-      "Permite executar trechos de código Python em um ambiente seguro (requer fluxo Genkit). Pode requerer configuração do endpoint do sandbox.",
-    hasConfig: true,
-    genkitToolName: "executeCode",
-  }, // Fixed escaped quote
+    id: 'code-interpreter',
+    name: 'Interpretador de Código',
+    description: 'Permite ao agente executar código Python',
+    category: 'coding',
+    icon: 'code',
+    needsMcpServer: true
+  }
 ];
 
-export const agentToneOptions = [
-  { id: "friendly", label: "Amigável e Prestativo" },
-  { id: "professional", label: "Profissional e Direto" },
-  { id: "formal", label: "Formal e Educado" },
-  { id: "casual", label: "Casual e Descontraído" },
-  { id: "funny", label: "Engraçado e Divertido" },
-  { id: "analytical", label: "Analítico e Detalhista" },
-  { id: "concise", label: "Conciso e Objetivo" },
-  { id: "empathetic", label: "Empático e Compreensivo" },
-  { id: "creative", label: "Criativo e Inspirador" },
+// Mock para servidores MCP
+const mockMcpServers: MCPServerConfig[] = [
+  {
+    id: 'mcp-1',
+    name: 'MCP Local',
+    description: 'Servidor MCP local para desenvolvimento',
+    url: 'http://localhost:3000/api/mcp'
+  }
 ];
 
-export const agentTypeOptions = [
+// Mock para API Keys
+const availableApiKeys: ApiKeyEntry[] = [
   {
-    id: "llm" as const,
-    label: "Agente LLM (Ex: LlmAgent, para Decisão e Linguagem)",
-    icon: Brain as ReactNode,
-    description:
-      "Usa Modelos de Linguagem (LLMs) para raciocinar, planear, gerar respostas e usar ferramentas. A descrição do agente é usada por outros agentes LLM para decidir se devem delegar tarefas a ele.",
-  },
-  {
-    id: "workflow" as const,
-    label: "Agente de Fluxo de Trabalho (Ex: SequentialAgent, ParallelAgent)",
-    icon: Workflow as ReactNode,
-    description:
-      "Estes agentes especializados controlam o fluxo de execução de seus subagentes com base em lógica predefinida e determinística, sem consultar um LLM para a orquestração em si.",
-  },
-  {
-    id: "custom" as const,
-    label: "Agente Personalizado (Ex: CustomAgent, via Genkit Flow)",
-    icon: FileJson as ReactNode,
-    description:
-      "Implemente lógica operacional única e fluxos de controle específicos, estendendo BaseAgent. Tipicamente orquestram outros agentes e gerenciam estado. Requer desenvolvimento de fluxo Genkit customizado (equivalente a implementar _run_async_impl).",
-  },
+    id: 'api-key-1',
+    name: 'OpenAI API Key',
+    key: '****',
+    service: 'openai',
+    createdAt: new Date().toISOString()
+  }
 ];
 
-export type AgentFramework =
-  | "genkit"
-  | "crewai"
-  | "langchain"
-  | "custom"
-  | "none"; // Added AgentFramework type
-
-export interface AgentConfigBase {
-  agentName: string;
-  agentDescription: string;
-  agentVersion: string;
-  agentTools: string[];
-  isRootAgent?: boolean; // Indica se este é um agente raiz em um sistema multi-agente
-  subAgents?: string[]; // Lista de IDs de agentes que podem ser delegados
-  globalInstruction?: string; // Instrução global que se aplica a todos os agentes na árvore
-  agentFramework?: AgentFramework; // Added agentFramework
+// Interface para props do AgentRow
+interface AgentRowProps {
+  agent: AdaptedSavedAgentConfiguration;
+  index: number;
+  style: React.CSSProperties;
+  onEdit: (agent: AdaptedSavedAgentConfiguration) => void;
+  onDelete: (agent: AdaptedSavedAgentConfiguration) => void;
+  onDuplicate: (agent: AdaptedSavedAgentConfiguration) => void;
+  onSaveTemplate: (agent: AdaptedSavedAgentConfiguration) => void;
+  onGenerateQualityReport: (agent: AdaptedSavedAgentConfiguration) => void; // Added for Task 8.2
 }
 
-export interface LLMAgentConfig extends AgentConfigBase {
-  agentType: "llm";
-  agentGoal: string;
-  agentTasks: string;
-  agentPersonality: string;
-  agentRestrictions: string;
-  agentModel: string;
-  agentTemperature: number;
-}
-
-export interface WorkflowAgentConfig extends AgentConfigBase {
-  agentType: "workflow";
-  detailedWorkflowType?: "sequential" | "parallel" | "loop";
-  workflowDescription: string;
-  loopMaxIterations?: number;
-  loopTerminationConditionType?: "none" | "subagent_signal";
-  loopExitToolName?: string;
-  loopExitStateKey?: string;
-  loopExitStateValue?: string;
-  agentGoal?: string; // Opcional para workflows, para descrição geral
-  agentTasks?: string; // Opcional
-  agentPersonality?: string; // Opcional
-  agentRestrictions?: string; // Opcional
-  agentModel?: string; // Opcional
-  agentTemperature?: number; // Opcional
-  // workflowSteps?: Array<{ agentId: string; order?: number; inputMappings?: any; outputKey?: string }>;
-}
-
-export interface CustomAgentConfig extends AgentConfigBase {
-  agentType: "custom";
-  customLogicDescription: string;
-  agentGoal?: string; // Opcional
-  agentTasks?: string; // Opcional
-  agentPersonality?: string; // Opcional
-  agentRestrictions?: string; // Opcional
-  agentModel?: string; // Opcional
-  agentTemperature?: number; // Opcional
-}
-
-export type AgentConfig =
-  | LLMAgentConfig
-  | WorkflowAgentConfig
-  | CustomAgentConfig;
-
-export interface AgentTemplate {
-  id: string;
-  name: string;
-  config: AgentConfig;
-}
-
-export interface ToolConfigData {
-  googleApiKey?: string;
-  googleCseId?: string;
-  openapiSpecUrl?: string;
-  openapiApiKey?: string;
-  dbType?: string;
-  dbConnectionString?: string;
-  dbUser?: string;
-  dbPassword?: string;
-  dbName?: string;
-  dbHost?: string;
-  dbPort?: string;
-  dbDescription?: string;
-  knowledgeBaseId?: string;
-  calendarApiEndpoint?: string;
-}
-
-export interface SavedAgentConfiguration extends AgentConfigBase {
-  id: string;
-  templateId: string;
-  systemPromptGenerated?: string;
-  toolsDetails: Array<{
-    id: string;
-    label: string;
-    iconName?: keyof typeof iconComponents | "default";
-    needsConfiguration?: boolean;
-    genkitToolName?: string;
-  }>;
-  toolConfigsApplied?: Record<string, ToolConfigData>;
-
-  // Common agent properties
-  agentType:
-    | "llm"
-    | "workflow"
-    | "custom"
-    | "a2a"
-    | "sequential"
-    | "parallel"
-    | "loop"
-    | "task"; // Expanded
-  agentGoal?: string;
-  agentTasks?: string;
-  agentPersonality?: string;
-  agentRestrictions?: string;
-  agentModel?: string;
-  agentTemperature?: number;
-
-  // Workflow specific
-  workflowDescription?: string;
-  detailedWorkflowType?: "sequential" | "parallel" | "loop";
-  loopMaxIterations?: number;
-  loopTerminationConditionType?: "none" | "subagent_signal";
-  loopExitToolName?: string;
-  loopExitStateKey?: string;
-  loopExitStateValue?: string;
-
-  // Custom/A2A specific
-  customLogicDescription?: string;
-
-  // Framework configuration
-  agentFramework?: AgentFramework; // Changed string to AgentFramework
-
-  // State and Memory
-  enableStatePersistence?: boolean;
-  statePersistenceType?: "session" | "memory" | "database";
-  initialStateValues?: Array<{
-    key: string;
-    value: string;
-    scope: "global" | "agent" | "temporary";
-    description: string;
-  }>;
-  enableStateSharing?: boolean;
-  stateSharingStrategy?: "all" | "explicit" | "none";
-  enableRAG?: boolean;
-
-  // Artifacts
-  enableArtifacts?: boolean;
-  artifactStorageType?: "memory" | "filesystem" | "cloud";
-  artifacts?: any[];
-  cloudStorageBucket?: string;
-  localStoragePath?: string;
-
-  // RAG and Memory
-  ragMemoryConfig?: {
-    enabled: boolean;
-    serviceType: string;
-    projectId: string;
-    location: string;
-    ragCorpusName: string;
-    similarityTopK: number;
-    vectorDistanceThreshold: number;
-    embeddingModel: string;
-    knowledgeSources: any[];
-    includeConversationContext: boolean;
-    persistentMemory: boolean;
-  };
-
-  // A2A specific
-  a2aConfig?: {
-    enabled: boolean;
-    communicationChannels: any[];
-    defaultResponseFormat: string;
-    maxMessageSize: number;
-    loggingEnabled: boolean;
-  };
-}
-
-export const iconComponents: Record<
-  string,
-  React.FC<React.SVGProps<SVGSVGElement>>
-> = {
-  Search,
-  Calculator,
-  FileText,
-  CalendarDays,
-  Network,
-  Database,
-  Code2,
-  Cpu,
-  Briefcase,
-  Stethoscope,
-  Plane,
-  Workflow,
-  Brain: Cpu,
-  FileJson,
-  GripVertical,
-  ConfigureIcon,
-  ClipboardCopy,
-  AlertCircle,
-  DeleteIcon,
-  EditIcon,
-  ChatIcon,
-  CopyIcon,
-  EyeIcon,
-  EyeOffIcon,
-  SaveIcon,
-  Plus,
-  Layers,
-  Info,
-  Default: Cpu,
+// Função utilitária para salvar templates
+const saveAgentTemplate = async (template: AdaptedSavedAgentConfiguration): Promise<void> => {
+  // Implementação temporária para compilar
+  console.log("Salvando template:", template);
+  return Promise.resolve();
 };
 
-export const agentTemplates: AgentTemplate[] = [
-  {
-    id: "custom_llm",
-    name: "LLM Personalizado (Começar do Zero)",
-    config: {
-      agentType: "llm",
-      agentName: "",
-      agentDescription: "Agente LLM configurado manualmente a partir do zero.",
-      agentVersion: "1.0.0",
-      agentTools: [],
-      agentGoal: "",
-      agentTasks: "",
-      agentPersonality: agentToneOptions[0].label,
-      agentRestrictions: "",
-      agentModel: "googleai/gemini-2.0-flash",
-      agentTemperature: 0.7,
-    },
-  },
-  {
-    id: "support",
-    name: "Modelo: Agente de Suporte ao Cliente (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Agente de Suporte ao Cliente",
-      agentDescription:
-        "Agente prestativo para responder perguntas comuns e ajudar com problemas. Delega tarefas complexas a outros agentes ou humanos quando necessário.",
-      agentGoal:
-        "Fornecer suporte rápido e eficiente, esclarecendo dúvidas comuns dos clientes sobre produtos e serviços.",
-      agentTasks:
-        "1. Responder a perguntas frequentes (FAQs) sobre funcionalidades, preços e políticas.\n2. Solucionar problemas básicos de usuários seguindo um script predefinido.\n3. Coletar informações do cliente para abrir um ticket de suporte se o problema for complexo.\n4. Direcionar o usuário para a documentação relevante ou tutoriais.\n5. Escalonar para um agente humano se não conseguir resolver o problema ou se o cliente solicitar.",
-      agentPersonality: "Empático e Compreensivo",
-      agentRestrictions:
-        "Nunca fornecer informações financeiras ou pessoais do cliente, a menos que seja para confirmar a identidade para um processo seguro. Manter um tom profissional e cortês. Limitar o escopo das respostas aos produtos e serviços da empresa.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.5,
-      agentVersion: "1.0.0",
-      agentTools: ["knowledgeBase", "webSearch"],
-    },
-  },
-  {
-    id: "recommendation",
-    name: "Modelo: Agente de Recomendações (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Agente de Recomendações de Produtos",
-      agentDescription:
-        "Ajuda usuários a descobrir produtos/serviços com base em suas preferências e histórico. Sua descrição para outros agentes é: 'Sou um especialista em recomendações de produtos, capaz de analisar preferências e sugerir os itens mais relevantes do catálogo.'",
-      agentGoal:
-        "Aumentar o engajamento do usuário e as vendas, sugerindo produtos ou serviços que sejam altamente relevantes para suas necessidades e interesses.",
-      agentTasks:
-        "1. Perguntar sobre as preferências do usuário (ex: tipo de produto, faixa de preço, marca, características desejadas).\n2. Analisar o histórico de compras ou navegação do usuário (se disponível e permitido).\n3. Sugerir 2-3 produtos do catálogo que melhor se encaixem nas preferências.\n4. Comparar os produtos sugeridos, destacando prós e contras de cada um.\n5. Fornecer links diretos para as páginas dos produtos recomendados.",
-      agentPersonality: "Amigável e Prestativo",
-      agentRestrictions:
-        "Apenas recomendar produtos disponíveis no catálogo atual. Não inventar características ou benefícios dos produtos. Se não encontrar uma recomendação adequada, informar o usuário e talvez pedir mais detalhes.",
-      agentModel: "googleai/gemini-1.5-pro-latest",
-      agentTemperature: 0.7,
-      agentVersion: "1.0.0",
-      agentTools: ["knowledgeBase"],
-    },
-  },
-  {
-    id: "writer",
-    name: "Modelo: Assistente de Escrita Criativa (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Assistente de Escrita Criativa",
-      agentDescription:
-        "Ajuda a gerar ideias, rascunhos de conteúdo original, e superar bloqueios criativos. Pode ser delegado para tarefas de brainstorming ou geração de texto.",
-      agentGoal:
-        "Auxiliar usuários na criação de diversos tipos de conteúdo textual, como posts para blogs, e-mails marketing, descrições de produtos, ou até mesmo ideias para histórias.",
-      agentTasks:
-        "1. Realizar brainstorming de tópicos com base em uma palavra-chave ou tema fornecido.\n2. Gerar parágrafos iniciais ou seções de texto sobre um assunto.\n3. Sugerir diferentes títulos ou chamadas para um conteúdo.\n4. Resumir textos longos em pontos-chave.\n5. Ajudar a refinar o tom ou estilo de um texto existente.",
-      agentPersonality: "Criativo e Inspirador",
-      agentRestrictions:
-        "Evitar plágio a todo custo. Se usar informações de fontes externas (requer ferramenta de busca), deve ser capaz de citá-las ou indicar a necessidade de verificação. Não gerar conteúdo ofensivo ou inadequado.",
-      agentModel: "googleai/gemini-1.5-pro-latest",
-      agentTemperature: 0.8,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch"],
-    },
-  },
-  {
-    id: "grammar_checker",
-    name: "Modelo: Revisor de Gramática e Estilo (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Revisor de Gramática e Estilo",
-      agentDescription:
-        "Revisa textos, corrige erros ortográficos, gramaticais, de pontuação e melhora a clareza e o estilo da escrita. É focado em precisão linguística.",
-      agentGoal:
-        "Aprimorar a qualidade de textos, tornando-os gramaticalmente corretos, claros, concisos e estilisticamente adequados ao propósito.",
-      agentTasks:
-        "1. Identificar e corrigir erros de ortografia e gramática.\n2. Sugerir melhorias na estrutura frasal para maior clareza e fluidez.\n3. Verificar e corrigir a pontuação.\n4. Oferecer feedback sobre o tom e o estilo do texto, sugerindo alternativas se necessário.\n5. Explicar brevemente as correções mais importantes para fins de aprendizado do usuário.",
-      agentPersonality: "Analítico e Detalhista",
-      agentRestrictions:
-        "Focar exclusivamente na revisão do texto fornecido. Não alterar o significado original do conteúdo. Não adicionar informações novas. Se uma frase for ambígua, apontar a ambiguidade em vez de reescrevê-la com uma interpretação arbitrária.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.3,
-      agentVersion: "1.0.0",
-      agentTools: [],
-    },
-  },
-  {
-    id: "translator_pt_en",
-    name: "Modelo: Tradutor Simples (Português-Inglês) (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Tradutor Português-Inglês",
-      agentDescription:
-        "Realiza traduções de textos entre Português (Brasil) e Inglês (Americano), buscando naturalidade e precisão. Adequado para traduções rápidas de frases ou parágrafos.",
-      agentGoal:
-        "Fornecer traduções precisas e naturais de textos entre o português brasileiro e o inglês americano.",
-      agentTasks:
-        "1. Receber texto em português e traduzi-lo para o inglês.\n2. Receber texto em inglês e traduzi-lo para o português.\n3. Manter o contexto e o significado original do texto durante a tradução.\n4. Lidar com expressões idiomáticas de forma adequada, se possível, ou indicar a dificuldade.",
-      agentPersonality: "Conciso e Objetivo",
-      agentRestrictions:
-        "Limitar-se estritamente à tradução. Não interpretar, expandir ou resumir o texto original. Se encontrar termos muito técnicos ou culturais de difícil tradução direta, pode indicar a necessidade de revisão por um tradutor humano para contextos críticos.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.4,
-      agentVersion: "1.0.0",
-      agentTools: [],
-    },
-  },
-  {
-    id: "legal_analyst_basic",
-    name: "Modelo: Analista Jurídico Básico (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Analista Jurídico Básico",
-      agentDescription:
-        'Auxilia na compreensão de conceitos legais básicos e pesquisa de informações jurídicas gerais. Sua descrição para outros agentes é: "Sou um agente de IA projetado para ajudar com informações legais básicas. Não forneço aconselhamento legal e sempre recomendo a consulta a um profissional."',
-      agentGoal:
-        "Ajudar usuários leigos a entenderem conceitos legais, resumir termos de forma simples e encontrar informações sobre leis ou jurisprudência (com o uso da ferramenta de busca), sem fornecer aconselhamento legal.",
-      agentTasks:
-        "1. Explicar termos legais comuns em linguagem acessível.\n2. Resumir cláusulas de documentos (se o texto for fornecido pelo usuário), identificando pontos chave.\n3. Utilizar a ferramenta de busca na web para encontrar leis, decretos ou artigos sobre um tópico jurídico específico.\n4. Enfatizar repetidamente que as informações fornecidas são para fins educativos e NÃO constituem aconselhamento legal.",
-      agentPersonality: "Profissional e Direto",
-      agentRestrictions:
-        "NÃO FORNECER ACONSELHAMENTO LEGAL SOB NENHUMA CIRCUNSTÂNCIA. Sempre recomendar que o usuário consulte um advogado qualificado para questões legais. Usar linguagem clara e evitar interpretações da lei. Citar fontes (ex: links de leis) quando utilizar a ferramenta de busca.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.3,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch", "knowledgeBase"],
-    },
-  },
-  {
-    id: "medical_triage_info",
-    name: "Modelo: Assistente de Triagem Médica (Informativo) (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Assistente de Triagem Médica (Informativo)",
-      agentDescription:
-        'Fornece informações gerais sobre sintomas, possíveis condições e direciona para cuidados, SEM FAZER DIAGNÓSTICOS. Sua descrição para outros agentes é: "Sou um agente de IA para fornecer informações gerais sobre saúde e sintomas. Não substituo um profissional médico e sempre oriento a busca por consulta especializada."',
-      agentGoal:
-        "Informar usuários sobre sintomas comuns, possíveis causas gerais (com base em conhecimento público e busca na web), e ajudar a entender quando procurar diferentes níveis de cuidado médico. NÃO SUBSTITUI UMA CONSULTA MÉDICA.",
-      agentTasks:
-        "1. Coletar informações sobre os sintomas que o usuário está experienciando.\n2. Com base nos sintomas, utilizar a ferramenta de busca na web para encontrar informações gerais sobre possíveis condições associadas (evitando linguagem de diagnóstico).\n3. Sugerir níveis de cuidado apropriados (ex: autocuidado, marcar consulta médica, procurar atendimento de urgência), com base na gravidade aparente dos sintomas descritos e informações de fontes confiáveis.\n4. Fornecer informações sobre tipos de especialistas médicos que podem ser relevantes para os sintomas descritos.\n5. Sempre, e repetidamente, enfatizar que as informações são apenas para fins educativos e que um diagnóstico e tratamento só podem ser fornecidos por um profissional de saúde qualificado.",
-      agentPersonality: "Empático e Compreensivo",
-      agentRestrictions:
-        "NÃO FAZER DIAGNÓSTICOS. NÃO PRESCREVER MEDICAMENTOS OU TRATAMENTOS. NÃO SUBSTITUIR UMA CONSULTA MÉDICA. Enfatizar que as informações são gerais e não personalizadas. Orientar fortemente a busca por um profissional de saúde para qualquer preocupação médica.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.5,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch", "knowledgeBase"],
-    },
-  },
-  {
-    id: "travel_planner_basic",
-    name: "Modelo: Planejador de Viagens Inicial (LLM)",
-    config: {
-      agentType: "llm",
-      agentName: "Planejador de Viagens Inicial",
-      agentDescription:
-        'Ajuda usuários a pesquisar destinos, voos, acomodações e sugerir itinerários básicos. Pode ser usado por outros agentes para obter sugestões de viagem. Descrição: "Sou um assistente de IA para ajudar no planejamento inicial de viagens, pesquisando destinos e opções."',
-      agentGoal:
-        "Ajudar usuários a pesquisar e esboçar planos para suas viagens, fornecendo sugestões de destinos, atrações, e estimativas de custos (se possível com ferramentas).",
-      agentTasks:
-        "1. Coletar preferências do usuário: destino desejado (ou tipo de destino), orçamento aproximado, datas de viagem, interesses (ex: praia, aventura, cultura).\n2. Utilizar a ferramenta de busca na web para pesquisar destinos que se encaixem nos critérios e listar principais atrações.\n3. (Se uma ferramenta de API de viagens estiver configurada) Pesquisar exemplos de voos e acomodações, informando que são exemplos e os preços podem variar.\n4. Esboçar um itinerário básico de 3-5 dias para um destino sugerido.\n5. Fornecer dicas gerais sobre o destino (ex: melhor época para visitar, moeda).",
-      agentPersonality: "Amigável e Prestativo",
-      agentRestrictions:
-        "Sempre informar que preços de voos/hotéis e disponibilidade são apenas exemplos e devem ser verificados em plataformas de reserva. Não realizar nenhuma reserva ou transação financeira. Focar em sugestões e planejamento inicial. Se usar uma API externa, respeitar os termos de uso.",
-      agentModel: "googleai/gemini-1.5-flash-latest",
-      agentTemperature: 0.7,
-      agentVersion: "1.0.0",
-      agentTools: ["webSearch", "customApiIntegration"],
-    },
-  },
-];
-
+// Componente principal da página
 export default function AgentBuilderPage() {
+  // Estado para agentes
+  const [agents, setAgents] = useState<AdaptedSavedAgentConfiguration[]>([]);
+  const [selectedAgentForMonitoring, setSelectedAgentForMonitoring] = useState<AdaptedSavedAgentConfiguration | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Estados para modais
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
+  const [isToolConfigModalOpen, setIsToolConfigModalOpen] = useState(false);
+  const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isTutorialModalOpen, setIsTutorialModalOpen] = useState(false);
+  
+  // Estado para edição
+  const [editingAgent, setEditingAgent] = useState<AdaptedAgentFormData | null>(null);
+  const [agentToDelete, setAgentToDelete] = useState<AdaptedSavedAgentConfiguration | null>(null);
+  const [agentToSaveAsTemplate, setAgentToSaveAsTemplate] = useState<AdaptedSavedAgentConfiguration | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [configuringTool, setConfiguringTool] = useState<AvailableTool | null>(null);
+  const [currentSelectedApiKeyId, setCurrentSelectedApiKeyId] = useState<string | undefined>();
+  
+  // States for Task 8.2: Quality Report Modal
+  const [isQualityReportModalOpen, setIsQualityReportModalOpen] = useState(false);
+  const [qualityReportData, setQualityReportData] = useState<{
+    agentName: string;
+    metrics: Array<{ name: string; value: string | number; description?: string }>;
+    suggestions: string[];
+  } | null>(null);
+
+  // Estados para tutorial
+  // Estado para tutoriais
+  const [activeTutorial, setActiveTutorial] = useState<any>(null);
+  const [currentTutorialStep, setCurrentTutorialStep] = useState(0);
+
+  // State for ContextualHelp (Inactivity)
+  const [showInactivityHelp, setShowInactivityHelp] = React.useState(false);
+  const [userHasInteracted, setUserHasInteracted] = React.useState(false);
+  const inactivityTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  // Hooks
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { savedAgents, setSavedAgents } = useAgents();
+  const { 
+    savedAgents, 
+    addAgent, 
+    updateAgent, 
+    deleteAgent, 
+    isLoadingAgents 
+  } = useAgents();
+  const { unlockAchievement } = useAchievements(); // Initialize achievements hook
+  const prevAgentCountRef = React.useRef(0); // Ref to store previous agent count
 
-  const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
-  const [editingAgent, setEditingAgent] =
-    React.useState<SavedAgentConfiguration | null>(null);
-  const [isMounted, setIsMounted] = React.useState(false);
+  // State for import confirmation
+  const [isImportConfirmationOpen, setIsImportConfirmationOpen] = React.useState(false);
+  const [agentToImportData, setAgentToImportData] = React.useState<Partial<SavedAgentConfiguration> | null>(null);
+  
+  // Efeito para carregar agentes do contexto
+  useEffect(() => {
+    if (savedAgents) {
+      // Convertendo para o formato adaptado esperado pela UI
+      const adaptedAgents: AdaptedSavedAgentConfiguration[] = savedAgents.map((agent) => ({
+        ...agent,
+        // Garantir que campos obrigatórios estejam presentes
+        config: agent.config || {},
+      }));
+      setAgents(adaptedAgents);
 
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
+      // Achievement logic based on agent count changes
+      const currentAgentCount = adaptedAgents.length;
+      if (prevAgentCountRef.current !== currentAgentCount) {
+        if (currentAgentCount === 1 && prevAgentCountRef.current === 0) {
+          unlockAchievement('agent-created');
+        }
+        if (currentAgentCount === 5 && prevAgentCountRef.current === 4) {
+          unlockAchievement('five-agents');
+        }
+        prevAgentCountRef.current = currentAgentCount;
+      }
+    } else { // If savedAgents is null or undefined (e.g. initial load or error)
+      prevAgentCountRef.current = 0; // Reset if agent list is not available
+    }
+  }, [savedAgents, unlockAchievement]);
 
-  const handleOpenCreateAgentModal = () => {
-    setEditingAgent(null); // Garante que estamos criando um novo agente
-    // A lógica para resetar os campos do formulário agora está dentro de AgentBuilderDialog
-    setIsBuilderModalOpen(true);
+  // Effect to initialize prevAgentCountRef on mount if savedAgents is already populated
+  useEffect(() => {
+    if (savedAgents) {
+      prevAgentCountRef.current = savedAgents.length;
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Effect for inactivity contextual help
+  useEffect(() => {
+    // Set a timer only if user hasn't interacted yet
+    if (!userHasInteracted) {
+      inactivityTimerRef.current = setTimeout(() => {
+        if (!userHasInteracted) { // Check again before showing
+          setShowInactivityHelp(true);
+        }
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [userHasInteracted]);
+
+  const handleUserInteraction = () => {
+    setUserHasInteracted(true);
+    setShowInactivityHelp(false); // Hide help once user interacts
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
   };
 
-  const handleEditAgent = (agentToEdit: SavedAgentConfiguration) => {
-    setEditingAgent(agentToEdit);
-    setIsBuilderModalOpen(true);
+  // Efeito para verificar parâmetros URL (tutorial e import de agente)
+  useEffect(() => {
+    if (searchParams) {
+      const tutorialId = searchParams.get('tutorial');
+      const importData = searchParams.get('data');
+
+      if (tutorialId) {
+        const tutorial = tutorials.find((t) => t.id === tutorialId);
+        if (tutorial) {
+          setActiveTutorial(tutorial);
+          setCurrentTutorialStep(0);
+          setIsTutorialModalOpen(true);
+        }
+      } else if (importData) {
+        try {
+          const decodedJson = atob(importData);
+          const parsedAgentData = JSON.parse(decodedJson) as Partial<SavedAgentConfiguration>;
+
+          if (parsedAgentData && parsedAgentData.agentName && parsedAgentData.config) {
+            setAgentToImportData(parsedAgentData);
+            setIsImportConfirmationOpen(true);
+          } else {
+            toast({
+              title: "Erro na Importação",
+              description: "Os dados do agente a ser importado são inválidos ou estão incompletos.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("Falha ao decodificar ou parsear dados do agente:", error);
+          toast({
+            title: "Erro na Importação",
+            description: "Não foi possível processar os dados do agente para importação. O link pode estar corrompido.",
+            variant: "destructive",
+          });
+        }
+        // Clean the URL immediately after attempting to process to avoid re-processing on refresh / navigation issues
+        // Using router.replace to avoid adding to history stack
+        const currentPath = window.location.pathname;
+        const newSearchParams = new URLSearchParams(window.location.search);
+        newSearchParams.delete('data');
+        router.replace(`${currentPath}?${newSearchParams.toString()}`, undefined);
+
+      }
+    }
+  }, [searchParams, router, toast]); // Added router and toast to dependencies
+
+  // Filtrar agentes com base na busca
+  const filteredAgents = agents.filter((agent) => 
+    agent.agentName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );  // Handlers para ações
+  const handleCreateNewAgent = () => {
+    handleUserInteraction(); // User interacted
+    setEditingAgent({
+      agentName: "",
+      description: "",
+      type: "llm",
+      tools: [],
+      systemPrompt: "",
+      model: "gpt-3.5-turbo",
+      temperature: 0.7,
+      maxTokens: 2048
+    });
+    setIsCreateModalOpen(true);
   };
 
-  const handleSaveAgent = (agentConfig: SavedAgentConfiguration) => {
+  const handleEditAgent = (agent: AdaptedSavedAgentConfiguration) => {
+    // Converter de SavedAgentConfiguration para AgentFormData
+    setEditingAgent(toAgentFormData(agent));
+    setIsEditModalOpen(true);
+  };
+
+  const handleDuplicateAgent = (agent: AdaptedSavedAgentConfiguration) => {
+    const duplicatedAgentData: AdaptedAgentFormData = {
+      ...toAgentFormData(agent),
+      id: undefined, // Remover ID para criar um novo
+      agentName: `${agent.agentName} (Cópia)`
+    };
+    
+    setEditingAgent(duplicatedAgentData);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleDeleteAgent = (agent: AdaptedSavedAgentConfiguration) => {
+    setAgentToDelete(agent);
+    setIsConfirmDeleteAgentOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (agentToDelete) {
+      try {
+        const success = await deleteAgent(agentToDelete.id);
+        if (success) {
+          toast({
+            title: "Agente excluído",
+            description: `O agente "${agentToDelete.agentName}" foi excluído com sucesso.`
+          });
+        } else {
+          toast({
+            title: "Erro ao excluir",
+            description: "Não foi possível excluir o agente. Tente novamente.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao excluir agente:", error);
+        toast({
+          title: "Erro ao excluir",
+          description: "Ocorreu um erro ao excluir o agente. Tente novamente.",
+          variant: "destructive"
+        });
+      }
+      setIsConfirmDeleteAgentOpen(false);
+      setAgentToDelete(null);
+    }
+  };
+
+  const handleSaveAsTemplate = (agent: AdaptedSavedAgentConfiguration) => {
+    setAgentToSaveAsTemplate(agent);
+    setTemplateName(`${agent.agentName} Template`);
+    setIsSaveTemplateModalOpen(true);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (agentToSaveAsTemplate && templateName) {
+      try {
+        // Clone o agente, mas marque como template
+        const templateAgent: AdaptedSavedAgentConfiguration = {
+          ...agentToSaveAsTemplate,
+          id: uuidv4(), // Novo ID para o template
+          agentName: templateName,
+          isTemplate: true
+        };
+        
+        // Salvar template (implementação temporária)
+        await saveAgentTemplate(templateAgent);
+        
+        toast({
+          title: "Template salvo",
+          description: `O template "${templateName}" foi salvo com sucesso!`
+        });
+        
+        setIsSaveTemplateModalOpen(false);
+        setAgentToSaveAsTemplate(null);
+        setTemplateName("");
+      } catch (error) {
+        console.error("Erro ao salvar template:", error);
+        toast({
+          title: "Erro ao salvar template",
+          description: "Ocorreu um erro ao salvar o template. Tente novamente.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Função para configurar uma ferramenta
+  const handleConfigureTool = (tool: AvailableTool) => {
+    setConfiguringTool(tool);
+    setIsToolConfigModalOpen(true);
+  };
+
+  // Função para salvar configuração de ferramenta
+  const handleSaveToolConfig = (toolId: string, configData: ToolConfigData) => {
     if (editingAgent) {
-      setSavedAgents((prevAgents: SavedAgentConfiguration[]) =>
-        prevAgents.map((agent: SavedAgentConfiguration) =>
-          agent.id === editingAgent.id ? agentConfig : agent,
-        ),
-      );
-      toast({
-        title: "Agente Atualizado!",
-        description: `O agente "${agentConfig.agentName}" foi atualizado.`,
-      });
-    } else {
-      setSavedAgents((prevAgents) => [...prevAgents, agentConfig]);
-      toast({
-        title: "Agente Criado!",
-        description: `O agente "${agentConfig.agentName}" foi adicionado à sua lista.`,
+      // Adicionando ou atualizando configuração da ferramenta
+      setEditingAgent((prevAgent) => {
+        if (!prevAgent) return null;
+        
+        return {
+          ...prevAgent,
+          toolConfigsApplied: {
+            ...(prevAgent.toolConfigsApplied || {}),
+            [toolId]: configData
+          }
+        };
       });
     }
-    setEditingAgent(null); // Limpa o agente em edição após salvar
+    
+    setIsToolConfigModalOpen(false);
+    setConfiguringTool(null);
+  };  // Handlers para o tutorial
+  const handleTutorialNext = () => {
+    if (activeTutorial && currentTutorialStep < activeTutorial.steps.length - 1) {
+      setCurrentTutorialStep(currentTutorialStep + 1);
+    } else {
+      closeTutorialModal();
+    }
   };
 
-  const handleDeleteAgent = (agentIdToDelete: string) => {
-    setSavedAgents((prev: SavedAgentConfiguration[]) =>
-      prev.filter(
-        (agent: SavedAgentConfiguration) => agent.id !== agentIdToDelete,
-      ),
+  const handleTutorialPrev = () => {
+    if (currentTutorialStep > 0) {
+      setCurrentTutorialStep(currentTutorialStep - 1);
+    }
+  };
+
+  const closeTutorialModal = () => {
+    setIsTutorialModalOpen(false);
+    setActiveTutorial(null);
+    setCurrentTutorialStep(0);
+    
+    // Remover parâmetro tutorial da URL
+    const params = new URLSearchParams(window.location.search);
+    params.delete('tutorial');
+    const newRelativePathQuery = `${window.location.pathname}?${params.toString()}`;
+    router.replace(newRelativePathQuery);
+  };
+
+  // Handler para selecionar agente para monitoramento
+  const handleSelectAgentForMonitoring = (agent: AdaptedSavedAgentConfiguration) => {
+    setSelectedAgentForMonitoring(prev => 
+      prev?.id === agent.id ? null : agent
     );
-    toast({
-      title: "Agente Excluído",
-      description: "O agente foi removido da lista.",
-    });
   };
 
-  return (
-    <div className="space-y-8 p-4">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Cpu className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Agentes</h1>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                >
-                  <Info className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs bg-popover text-popover-foreground">
-                <p>
-                  Gerencie seus agentes de IA existentes ou crie novos para
-                  automatizar tarefas e otimizar seus fluxos de trabalho.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-        <Button
-          onClick={handleOpenCreateAgentModal}
-          className={cn(isMounted && "button-live-glow")}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Agente
-        </Button>
-      </header>
+  // Cálculo de estatísticas
+  const totalAgents = agents.length;
+  const agentsWithTools = agents.filter(agent => 
+    agent.config.tools && agent.config.tools.length > 0
+  ).length;
 
-      {savedAgents.length > 0 ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {savedAgents.map((agent) => (
-              <AgentCard
-                key={agent.id}
-                agent={agent}
-                onEdit={() => handleEditAgent(agent)}
-                onTest={() =>
-                  toast({
-                    title: "Em breve!",
-                    description: "Funcionalidade de teste no chat.",
-                  })
-                }
-                onDelete={() => handleDeleteAgent(agent.id)}
-                availableTools={availableTools}
-                agentTypeOptions={agentTypeOptions}
-              />
-            ))}
+  // Handler for Task 8.2: Generate Quality Report
+  const handleGenerateQualityReport = (agent: AdaptedSavedAgentConfiguration) => {
+    // Simulate report generation
+    const mockMetrics = [
+      { name: "Exact Match (EM)", value: `${(Math.random() * 30 + 60).toFixed(1)}%`, description: "Percentual de respostas idênticas às esperadas." },
+      { name: "ROUGE-L (F1)", value: (Math.random() * 0.2 + 0.7).toFixed(2), description: "Similaridade baseada na maior subsequência comum." },
+      { name: "Consistência da Resposta", value: `${(Math.random() * 20 + 75).toFixed(1)}%` },
+      { name: "Utilização de Ferramentas (Sucesso)", value: `${(Math.random() * 15 + 80).toFixed(1)}%` },
+      { name: "Latência Média (ms)", value: Math.floor(Math.random() * 800 + 200) },
+    ];
+    const mockSuggestions = [
+      "Considere refinar o prompt para cenários de ambiguidade.",
+      `Para o agente "${agent.agentName}", adicione a ferramenta 'DatabaseAccess' para consultas diretas.`,
+      "Revise os logs de erro para identificar padrões de falha.",
+      "Aumente a diversidade do evalset para cobrir mais casos de uso.",
+      // Placeholder for AI Configuration Assistant
+      "Integrar com 'AI Configuration Assistant' para sugestões de otimização de prompt e configuração de modelo (feature futura)."
+    ];
+
+    setQualityReportData({
+      agentName: agent.agentName,
+      metrics: mockMetrics,
+      suggestions: mockSuggestions,
+    });
+    setIsQualityReportModalOpen(true);
+  };
+
+  // Renderização conditional com base no estado de carregamento
+  if (isLoadingAgents) {
+    return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
+  }
+  // Handler para salvar agente (criação ou edição)
+  const handleSaveAgent = async (formData: AdaptedAgentFormData) => {
+    setIsCreateModalOpen(false);
+    setIsEditModalOpen(false);
+
+    try {
+      // Determinar se estamos editando ou criando
+      if (formData.id) {
+        // Edição de agente existente
+        const updatedAgent = await updateAgent(formData.id, {
+          agentName: formData.agentName,
+          description: formData.description || "",
+          config: {
+            tools: formData.tools.map(toolId => {
+              const tool = builderAvailableTools.find(t => t.id === toolId);
+              return {
+                id: toolId,
+                name: tool?.name || toolId,
+                enabled: true,
+                config: formData.toolConfigsApplied?.[toolId]?.config || {}
+              };
+            }),
+            systemPrompt: formData.systemPrompt,
+            model: formData.model,
+            temperature: formData.temperature,
+            maxTokens: formData.maxTokens,
+            scriptContent: formData.scriptContent,
+            scriptPath: formData.scriptPath
+          }
+          // Removido isPublic para compatibilidade com o tipo
+        });
+
+        if (updatedAgent) {
+          toast({
+            title: "Agente atualizado",
+            description: `O agente ${updatedAgent.agentName} foi atualizado com sucesso!`
+          });
+        } else {
+          toast({
+            title: "Erro ao atualizar agente",
+            description: "Houve um problema ao atualizar o agente. Tente novamente.",
+            variant: "destructive"
+          });
+        }
+      } else {
+        // Criação de novo agente
+        const newAgent = await addAgent({
+          agentName: formData.agentName,
+          description: formData.description || "",
+          config: {
+            tools: formData.tools.map(toolId => {
+              const tool = builderAvailableTools.find(t => t.id === toolId);
+              return {
+                id: toolId,
+                name: tool?.name || toolId,
+                enabled: true,
+                config: formData.toolConfigsApplied?.[toolId]?.config || {}
+              };
+            }),
+            systemPrompt: formData.systemPrompt,
+            model: formData.model,
+            temperature: formData.temperature,
+            maxTokens: formData.maxTokens,
+            scriptContent: formData.scriptContent,
+            scriptPath: formData.scriptPath
+          }
+          // Removido isPublic para compatibilidade com o tipo
+        });
+
+        if (newAgent) {
+          toast({
+            title: "Agente criado",
+            description: `O agente ${newAgent.agentName} foi criado com sucesso!`
+          });
+        } else {
+          toast({
+            title: "Erro ao criar agente",
+            description: "Houve um problema ao criar o agente. Tente novamente.",
+            variant: "destructive"
+          });
+        }
+      }
+
+  // Componente de renderização para cada linha/card de agente
+  const RenderAgentRow = ({ agent, index, style, onGenerateQualityReport }: AgentRowProps) => {
+    return (
+      <div style={style} className="px-1 py-2">
+        <AgentCard
+          agent={agent}
+          onEdit={() => handleEditAgent(agent)}
+          onDelete={() => handleDeleteAgent(agent)}
+          onDuplicate={() => handleDuplicateAgent(agent)}
+          onSaveTemplate={() => handleSaveAsTemplate(agent)}
+          onSelectForMonitoring={() => handleSelectAgentForMonitoring(agent)}
+          isSelectedForMonitoring={selectedAgentForMonitoring?.id === agent.id}
+          onGenerateQualityReport={onGenerateQualityReport} // Pass down the handler
+          // Dummy props for AgentCard that might be expected from its definition
+          availableTools={builderAvailableTools} // Assuming builderAvailableTools is in scope
+          agentTypeOptions={[]} // Provide a default or actual options
+          onToggleFavorite={() => {}} // Dummy function
+        />
+      </div>
+    );
+  };
+
+  const handleConfirmImport = async () => {
+    if (!agentToImportData) return;
+
+    let agentName = agentToImportData.agentName || "Agente Importado";
+    // Check for name conflicts
+    let nameConflictCount = 0;
+    let newName = agentName;
+    while (agents.some(a => a.agentName === newName)) {
+      nameConflictCount++;
+      newName = `${agentName} (${nameConflictCount})`;
+    }
+    agentName = newName;
+
+    const newAgent: SavedAgentConfiguration = {
+      id: uuidv4(), // Generate new unique ID
+      originalAgentId: agentToImportData.id, // Store original ID if present
+      agentName: agentName,
+      agentDescription: agentToImportData.agentDescription || "",
+      agentVersion: agentToImportData.agentVersion || "1.0.0",
+      icon: agentToImportData.icon || "", // Ensure icon is handled
+      config: agentToImportData.config!, // Assert config is present due to earlier check
+      tools: agentToImportData.tools || [],
+      toolsDetails: agentToImportData.toolsDetails?.map(td => ({ // Map tool details
+        id: td.id,
+        name: td.name || td.id, // Fallback name
+        description: td.description || "",
+        hasConfig: td.hasConfig || false,
+        genkitToolName: td.genkitToolName,
+        // Ensure all fields expected by SavedAgentConfiguration.toolsDetails are present
+        // iconName: td.iconName || 'Default', // Example if iconName is part of your type
+        // label: td.label || td.name || td.id, // Example
+      })) || [],
+      toolConfigsApplied: agentToImportData.toolConfigsApplied || {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      // Ensure all other required fields from SavedAgentConfiguration are present with defaults
+      templateId: agentToImportData.templateId,
+      isTemplate: false, // Imported agents are typically not templates themselves
+      isFavorite: false,
+      tags: agentToImportData.tags || [],
+      userId: '', // Or get from current user context if available
+      // Default other complex objects if not in importData or if they need re-initialization
+      deploymentConfig: agentToImportData.deploymentConfig || { environmentVariables: [], resourceRequirements: { cpu: '', memory: ''} },
+      internalVersion: 1,
+      isLatest: true,
+    };
+
+    try {
+      await addAgent(newAgent); // Assuming addAgent now directly takes SavedAgentConfiguration
+      toast({
+        title: "Agente Importado",
+        description: `O agente "${newAgent.agentName}" foi importado com sucesso.`,
+      });
+    } catch (error) {
+      console.error("Erro ao importar agente:", error);
+      toast({
+        title: "Erro na Importação",
+        description: "Não foi possível adicionar o agente importado.",
+        variant: "destructive",
+      });
+    }
+
+    setIsImportConfirmationOpen(false);
+    setAgentToImportData(null);
+    // URL should have already been cleaned by the useEffect that detected 'data'
+  };
+  // Renderização do componente principal
+    // Fechar modal e resetar estado
+    setEditingAgent(null);
+  } catch (error) {
+      console.error("Erro ao salvar agente:", error);
+      toast({
+        title: "Erro ao salvar agente",
+        description: "Houve um problema ao processar sua solicitação. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };  // Renderização do componente
+  return (
+    <>
+      <div className="container mx-auto py-6 space-y-6">
+        {/* Cabeçalho */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Construtor de Agentes</h1>
+            <p className="text-gray-500">Crie, gerencie e monitore seus agentes de IA</p>
+          </div>
+          <div className="flex space-x-2">
+            <Button onClick={handleCreateNewAgent}>
+              <Plus className="mr-2 h-4 w-4" /> Novo Agente
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsFeedbackModalOpen(true)}
+            >
+              <MessageSquareText className="mr-2 h-4 w-4" /> Feedback
+            </Button>
           </div>
         </div>
-      ) : (
-        <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
-          <Layers className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-medium text-foreground">
-            Nenhum agente criado ainda
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Comece clicando no botão acima para configurar seu primeiro agente
-            de IA.
-          </p>
-          <Button
-            onClick={handleOpenCreateAgentModal}
-            className={cn("mt-6", isMounted && "button-live-glow")}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Criar Novo Agente
-          </Button>
-        </div>
-      )}
 
-      <AgentBuilderDialog
-        isOpen={isBuilderModalOpen}
-        onOpenChange={(isOpen) => {
-          setIsBuilderModalOpen(isOpen);
-          if (!isOpen) {
-            setEditingAgent(null); // Garante que o estado de edição seja limpo ao fechar
+        {/* Cards de estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">Total de Agentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Users className="mr-2 h-4 w-4 text-gray-500" />
+                <span className="text-2xl font-bold">{agents.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">Ferramentas Disponíveis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Wrench className="mr-2 h-4 w-4 text-gray-500" />
+                <span className="text-2xl font-bold">{builderAvailableTools.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">Tutoriais</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Book className="mr-2 h-4 w-4 text-gray-500" />
+                <span className="text-2xl font-bold">{tutorials.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">Desempenho Médio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Gauge className="mr-2 h-4 w-4 text-gray-500" />
+                <span className="text-2xl font-bold">98%</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Controles de visualização */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Pesquisar agentes..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  handleUserInteraction(); // User interacted
+                }}
+                onFocus={handleUserInteraction} // User interacted
+              />
+            </div>
+          </div>
+          <div>
+            {isLoadingAgents ? (
+              <div className="flex items-center">
+                <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                <span>Carregando...</span>
+              </div>
+            ) : (
+              <span className="text-sm text-gray-500">
+                {filteredAgents.length} {filteredAgents.length === 1 ? 'agente' : 'agentes'}
+              </span>
+            )}
+          </div>
+        </div>        {/* Exibição condicional: Monitoramento de Agente ou Lista de Agentes */}
+        {selectedAgentForMonitoring ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Monitorando: {selectedAgentForMonitoring.agentName}</h2>
+              <Button variant="outline" onClick={() => setSelectedAgentForMonitoring(null)} className="mb-4">
+                <span className="mr-2 flex items-center">←</span> Voltar para lista
+              </Button>
+              {selectedAgentForMonitoring && (
+                <Suspense fallback={<div>Carregando métricas...</div>}>
+                  <AgentMetricsView name="Métricas" agentId={selectedAgentForMonitoring.id} />
+                </Suspense>
+              )}
+            </div>
+            <Suspense fallback={<div>Carregando logs...</div>}>
+              <AgentLogView name="Logs" agentId={selectedAgentForMonitoring.id} />
+            </Suspense>
+          </div>
+        ) : (
+          // Check if there are no agents at all
+          agents.length === 0 ? (
+            <EmptyState
+              title="Nenhum Agente Criado Ainda"
+              description="Parece que você não tem nenhum agente. Comece criando seu primeiro agente para automatizar tarefas e interagir com IA."
+              icon={<Ghost className="h-16 w-16" />} // Using Ghost as per original, Cpu or Plus could also work
+              actionButton={{
+                text: "Criar Novo Agente",
+                onClick: handleCreateNewAgent,
+                icon: <Plus className="mr-2 h-4 w-4" />,
+                variant: "default"
+              }}
+              className="my-12" // Add some margin for better spacing
+            />
+          ) : // Check if there are agents, but none match the filter
+          filteredAgents.length === 0 ? (
+            <EmptyState
+              title="Nenhum Agente Encontrado"
+              description="Nenhum agente corresponde à sua pesquisa. Tente um termo diferente ou limpe a pesquisa."
+              icon={<Search className="h-16 w-16" />}
+              className="my-12"
+              // No action button for "no search results" or a different one like "Clear Search"
+            />
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAgents.map((agent: AdaptedSavedAgentConfiguration, index: number) => (
+                <RenderAgentRow
+                  key={agent.id}
+                  agent={agent}
+                  index={index}
+                  style={{}}
+                  onEdit={handleEditAgent}
+                  onDelete={handleDeleteAgent}
+                  onDuplicate={handleDuplicateAgent}
+                  onSaveTemplate={handleSaveAsTemplate}
+                  onGenerateQualityReport={handleGenerateQualityReport} // Pass handler
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredAgents.map((agent: AdaptedSavedAgentConfiguration, index: number) => (
+                <RenderAgentRow
+                  key={agent.id}
+                  agent={agent}
+                  index={index}
+                  style={{}}
+                  onEdit={handleEditAgent}
+                  onDelete={handleDeleteAgent}
+                  onDuplicate={handleDuplicateAgent}
+                  onSaveTemplate={handleSaveAsTemplate}
+                  onGenerateQualityReport={handleGenerateQualityReport} // Pass handler
+                />
+              ))}
+            </div>
+          )
+        )}
+
+        <ContextualHelp
+          type="alert"
+          show={showInactivityHelp && !userHasInteracted && agents.length === 0} // Show only if no agents and no interaction
+          icon={<Info className="h-4 w-4" />}
+          alertTitle="Precisa de Ajuda?"
+          content={
+            <>
+              Parece que você ainda não criou nenhum agente. Precisa de ajuda para começar? Confira nossos{" "}
+              <Link href="/tutorials" className="underline hover:text-primary" onClick={handleUserInteraction}>
+                tutoriais
+              </Link>{" "}
+              ou clique em &quot;Novo Agente&quot; para iniciar.
+            </>
           }
-        }}
-        editingAgent={editingAgent}
-        onSave={handleSaveAgent}
-        availableTools={availableTools}
-        agentTypeOptions={agentTypeOptions}
-        agentToneOptions={agentToneOptions}
-        iconComponents={iconComponents}
-      />
-    </div>
+        />
+      </div> {/* Modais - Carregamento lazy com Suspense */}
+      <Suspense fallback={<div>Carregando...</div>}>
+        {/* Modal de Criação/Edição */}
+        {isCreateModalOpen && editingAgent && (
+          <AgentBuilderDialog
+            name="Criar Agente"
+            isOpen={isCreateModalOpen}
+            onOpenChange={(open: boolean) => {
+              setIsCreateModalOpen(open);
+              if (open) handleUserInteraction(); // Interaction when modal opens
+            }}
+            initialData={editingAgent}
+            onSave={(data) => {
+              handleSaveAgent(data);
+              handleUserInteraction(); // Interaction on save
+            }}
+            availableTools={builderAvailableTools}
+            onConfigureTool={(tool) => {
+              handleConfigureTool(tool);
+              handleUserInteraction(); // Interaction on tool config
+            }}
+          />
+        )}
+        
+        {isEditModalOpen && editingAgent && (
+          <AgentBuilderDialog
+            name="Editar Agente"
+            isOpen={isEditModalOpen}
+            onOpenChange={(open: boolean) => {
+              setIsEditModalOpen(open);
+              if (open) handleUserInteraction(); // Interaction when modal opens
+            }}
+            initialData={editingAgent}
+            onSave={(data) => {
+              handleSaveAgent(data);
+              handleUserInteraction(); // Interaction on save
+            }}
+            availableTools={builderAvailableTools}
+            onConfigureTool={(tool) => {
+              handleConfigureTool(tool);
+              handleUserInteraction(); // Interaction on tool config
+            }}
+          />
+        )}
+        
+        {/* Modais adicionais */}
+        {isSaveTemplateModalOpen && agentToSaveAsTemplate && (
+          <TemplateNameModal
+            name="Salvar como Template"
+            isOpen={isSaveTemplateModalOpen}
+            onOpenChange={(open: boolean) => setIsSaveTemplateModalOpen(open)}
+            templateName={templateName}
+            onTemplateNameChange={setTemplateName}
+            onSave={handleSaveTemplate}
+          />
+        )}
+
+        {agentToDelete && (
+          <ConfirmationModal
+            name="Confirmação"
+            isOpen={isConfirmDeleteAgentOpen}
+            onOpenChange={(open: boolean) => {
+              setIsConfirmDeleteAgentOpen(open);
+              if (!open) setAgentToDelete(null);
+            }}
+            title="Confirmar Exclusão"
+            description={`Tem certeza que deseja excluir o agente "${agentToDelete.agentName}"? Esta ação não pode ser desfeita.`}
+            confirmText="Excluir"
+            cancelText="Cancelar"
+            onAction={handleDeleteConfirm}
+          />
+        )}
+        
+        {isToolConfigModalOpen && configuringTool && editingAgent && (
+          <ToolConfigModal
+            name="Configuração de Ferramentas"
+            isOpen={isToolConfigModalOpen}
+            onOpenChange={(open: boolean) => setIsToolConfigModalOpen(open)}
+            configuringTool={configuringTool}
+            onSave={handleSaveToolConfig}
+            availableApiKeys={availableApiKeys}
+            mcpServers={mockMcpServers}
+            selectedApiKeyId={currentSelectedApiKeyId}
+          />
+        )}
+        
+        {isTutorialModalOpen && activeTutorial && (
+          <HelpModal
+            name="Ajuda"
+            onClose={closeTutorialModal}
+            title={activeTutorial?.steps?.[currentTutorialStep]?.title || 'Tutorial'}
+            isTutorial={true}
+            currentStep={currentTutorialStep}
+            totalSteps={activeTutorial?.steps?.length || 0}
+            onNextStep={handleTutorialNext}
+            onPrevStep={handleTutorialPrev}
+            size="lg"
+          >
+            <div dangerouslySetInnerHTML={{ __html: (activeTutorial?.steps?.[currentTutorialStep]?.content as string) || '' }} />
+          </HelpModal>
+        )}
+
+        {isFeedbackModalOpen && (
+          <FeedbackModal
+            name="Feedback"
+            isOpen={isFeedbackModalOpen}
+            onOpenChange={(open: boolean) => setIsFeedbackModalOpen(open)}
+          />
+        )}
+
+        {/* Quality Report Modal (Task 8.2) */}
+        {isQualityReportModalOpen && qualityReportData && (
+          <Dialog open={isQualityReportModalOpen} onOpenChange={setIsQualityReportModalOpen}>
+            <DialogContent className="sm:max-w-2xl"> {/* Wider modal */}
+              <DialogHeader>
+                <DialogTitle>Relatório de Qualidade do Agente: {qualityReportData.agentName}</DialogTitle>
+                <DialogDesc> {/* Using DialogDesc to avoid conflict */}
+                  Uma análise simulada da performance e sugestões de melhoria para o agente.
+                </DialogDesc>
+              </DialogHeader>
+              <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto pr-2"> {/* Scrollable content */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-foreground">Métricas de Avaliação (Simuladas)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {qualityReportData.metrics.map(metric => (
+                      <Card key={metric.name} className="bg-muted/30">
+                        <CardHeader className="pb-2 pt-3 px-4">
+                          <CardTitle className="text-sm font-medium">{metric.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pb-3 px-4">
+                          <p className="text-2xl font-bold text-primary">{String(metric.value)}</p>
+                          {metric.description && <p className="text-xs text-muted-foreground mt-1">{metric.description}</p>}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-foreground">Sugestões de Melhoria</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    {qualityReportData.suggestions.map((suggestion, index) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setIsQualityReportModalOpen(false)}>Fechar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Import Confirmation Modal */}
+        {agentToImportData && (
+          <ConfirmationModal
+            name="Confirmar Importação de Agente"
+            isOpen={isImportConfirmationOpen}
+            onOpenChange={(open: boolean) => {
+              setIsImportConfirmationOpen(open);
+              if (!open) setAgentToImportData(null); // Clear data if modal is closed without confirming
+            }}
+            title={`Importar Agente: ${agentToImportData.agentName || 'Desconhecido'}?`}
+            description={
+              `Você está prestes a importar o agente "${agentToImportData.agentName || 'Desconhecido'}".
+              Descrição: ${agentToImportData.agentDescription || 'N/A'}.
+              Uma nova cópia será criada em sua lista de agentes.`
+            }
+            confirmText="Importar"
+            cancelText="Cancelar"
+            onAction={handleConfirmImport}
+          />
+        )}
+      </Suspense>
+    </>
   );
 }

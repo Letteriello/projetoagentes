@@ -13,7 +13,7 @@ export interface CommunicationChannel {
     timeout?: number; // Em ms, para comunicação síncrona
     retryPolicy?: {
         maxRetries: number;
-        retryInterval: number;
+        delayMs: number; // Changed from retryInterval to delayMs
     };
 }
 

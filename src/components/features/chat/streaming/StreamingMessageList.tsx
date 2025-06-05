@@ -12,18 +12,29 @@ export interface StreamingMessageItem {
   role: "user" | "model" | "system" | "tool";
   isPartial: boolean;
   timestamp: number;
+  toolUsed?: {
+    name: string;
+    status?: "pending" | "success" | "error";
+    input?: Record<string, any>;
+    output?: any;
+  };
+  feedback?: 'liked' | 'disliked' | null; // Added feedback state
 }
 
 interface StreamingMessageListProps {
   messages: StreamingMessageItem[];
   isProcessing?: boolean;
   className?: string;
+  onRegenerate?: (messageId: string) => void;
+  onFeedback?: (messageId: string, feedback: 'liked' | 'disliked' | null) => void; // Added onFeedback prop
 }
 
 export function StreamingMessageList({
   messages,
   isProcessing = false,
   className,
+  onRegenerate,
+  onFeedback, // Added onFeedback
 }: StreamingMessageListProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -66,10 +77,15 @@ export function StreamingMessageList({
                   transition={{ duration: 0.3 }}
                 >
                   <StreamingMessage
+                    id={message.id} // Pass id
                     content={message.content}
                     role={message.role}
                     isPartial={message.isPartial}
                     timestamp={message.timestamp}
+                    toolUsed={message.toolUsed}
+                    onRegenerate={onRegenerate}
+                    feedback={message.feedback} // Pass feedback state
+                    onFeedback={onFeedback} // Pass onFeedback callback
                   />
                 </motion.div>
               ))

@@ -1,5 +1,11 @@
 import { Tool } from '@genkit-ai/sdk';
 import { performWebSearchTool } from './web-search-tool';
+import { calculatorTool } from './calculator-tool';
+import { knowledgeBaseTool } from './knowledge-base-tool';
+import { customApiTool } from './custom-api-tool';
+import { calendarAccessTool } from './calendar-access-tool';
+import { databaseAccessTool } from './database-access-tool';
+import { codeExecutorTool } from './code-executor-tool'; // Added import
 
 /**
  * Registro central de todas as ferramentas disponíveis para os agentes do Genkit
@@ -14,6 +20,12 @@ export interface ToolRegistry {
  */
 export const availableTools: ToolRegistry = {
   webSearch: performWebSearchTool,
+  calculator: calculatorTool,
+  knowledgeBase: knowledgeBaseTool,
+  customApiIntegration: customApiTool,
+  calendarAccess: calendarAccessTool,
+  databaseAccess: databaseAccessTool,
+  codeExecutor: codeExecutorTool, // Added codeExecutorTool
   // Adicione outras ferramentas aqui à medida que forem implementadas
   // example: exampleTool,
   // dataAnalysis: dataAnalysisTool,

@@ -77,6 +77,7 @@ export interface SavedAgentConfiguration extends AgentConfig {
   systemPromptGenerated?: string;
   toolsDetails?: AvailableTool[];
   toolConfigsApplied?: Record<string, ToolConfigData>;
+  tool_trajectory_avg_score?: number; // New optional property
 }
 
 // Tipos específicos para diferentes tipos de agente
@@ -141,3 +142,35 @@ export interface A2AAgentConfig extends AgentConfig {
   agentModel?: string;
   agentTemperature?: number;
 }
+// src/types/agent-types.ts
+export type {
+  AgentFramework,
+  AgentType,
+  WorkflowDetailedType,
+  TerminationConditionType,
+  StatePersistenceType,
+  ArtifactStorageType,
+  StateScope,
+  ToolConfigField,
+  // AvailableTool, // Removed from here
+  ToolConfigData,
+  CommunicationChannel,
+  A2AConfig,
+  ArtifactDefinition,
+  ArtifactsConfig,
+  InitialStateValue,
+  StateValidationRule,
+  StatePersistenceConfig,
+  KnowledgeSource,
+  RagMemoryConfig,
+  AgentConfigBase,
+  LLMAgentConfig,
+  WorkflowAgentConfig,
+  CustomAgentConfig,
+  A2AAgentSpecialistConfig,
+  AgentConfig,
+  SavedAgentConfiguration
+} from './agent-configs';
+
+// Re-export AvailableTool from its new single source of truth
+export type { AvailableTool } from './tool-types';

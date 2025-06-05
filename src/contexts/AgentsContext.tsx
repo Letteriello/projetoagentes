@@ -1,148 +1,82 @@
-
+// src/contexts/AgentsContext.tsx
 "use client";
 
-import type { SavedAgentConfiguration } from '@/app/agent-builder/page';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 import * as React from 'react';
-import { firestore } from '@/lib/firebaseClient'; // Import Firestore client
-import {
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  query,
-  where,
-  orderBy,
-  Timestamp
-} from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast'; 
-
-// Placeholder for userId - replace with actual user management later
-const PLACEHOLDER_USER_ID = "defaultUser";
+import { useToast } from '@/hooks/use-toast';
+import { useAgentStorage } from '@/hooks/use-agent-storage'; // Import the new hook
 
 interface AgentsContextType {
   savedAgents: SavedAgentConfiguration[];
-  setSavedAgents: React.Dispatch<React.SetStateAction<SavedAgentConfiguration[]>>; // Kept for direct manipulation if ever needed, though Firestore ops are preferred
   addAgent: (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<SavedAgentConfiguration | null>;
-  updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
-  deleteAgent: (agentId: string) => Promise<void>;
+  updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>) => Promise<SavedAgentConfiguration | null>;
+  deleteAgent: (agentId: string) => Promise<boolean>;
+  fetchAgents: () => Promise<void>;
   isLoadingAgents: boolean;
+  agentsMap: Map<string, SavedAgentConfiguration>; // Added agentsMap
 }
 
 const AgentsContext = React.createContext<AgentsContextType | undefined>(undefined);
 
 export function AgentsProvider({ children }: { children: React.ReactNode }) {
   const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
+  const [agentsMap, setAgentsMap] = React.useState<Map<string, SavedAgentConfiguration>>(new Map()); // Added agentsMap state
   const [isLoadingAgents, setIsLoadingAgents] = React.useState<boolean>(true);
   const { toast } = useToast();
+  const { loadAgents, saveAgent: saveAgentToStorage, updateAgent: updateAgentInStorage, deleteAgent: deleteAgentFromStorage } = useAgentStorage(); // Use the hook
 
-  React.useEffect(() => {
-    const fetchAgents = async () => {
-      setIsLoadingAgents(true);
-      try {
-        const agentsCollectionRef = collection(firestore, 'agents');
-        // TODO: Replace PLACEHOLDER_USER_ID with actual authenticated user ID when auth is implemented
-        const q = query(agentsCollectionRef, where("userId", "==", PLACEHOLDER_USER_ID), orderBy("updatedAt", "desc"));
-        
-        const querySnapshot = await getDocs(q);
-        const agents: SavedAgentConfiguration[] = [];
-        querySnapshot.forEach((docSnap) => { // Renamed doc to docSnap to avoid conflict with firebase/firestore doc function
-          const data = docSnap.data();
-          // Ensure all fields are correctly mapped, especially Timestamps to Dates
-          // This mapping needs to be comprehensive and match the SavedAgentConfiguration structure.
-          const agentData: SavedAgentConfiguration = {
-            id: docSnap.id,
-            userId: data.userId,
-            agentName: data.agentName,
-            agentDescription: data.agentDescription,
-            agentVersion: data.agentVersion,
-            // Assuming agentConfiguration holds the specific type details (LLM, Workflow, etc.)
-            // and common fields are at the top level of the Firestore document.
-            agentType: data.agentType, 
-            agentGoal: data.agentGoal,
-            agentTasks: data.agentTasks,
-            agentPersonality: data.agentPersonality,
-            agentRestrictions: data.agentRestrictions,
-            agentModel: data.agentModel,
-            agentTemperature: data.agentTemperature,
-            agentTools: data.agentTools || [],
-            toolConfigsApplied: data.toolConfigsApplied || {},
-            systemPromptGenerated: data.systemPromptGenerated || "",
-            isRootAgent: data.isRootAgent || false,
-            subAgents: data.subAgents || [],
-            globalInstruction: data.globalInstruction || "",
-            enableStatePersistence: data.enableStatePersistence || false,
-            statePersistenceType: data.statePersistenceType || 'memory',
-            initialStateValues: data.initialStateValues || [],
-            enableStateSharing: data.enableStateSharing || false,
-            stateSharingStrategy: data.stateSharingStrategy || 'explicit',
-            enableRAG: data.enableRAG || false,
-            ragMemoryConfig: data.ragMemoryConfig, 
-            enableArtifacts: data.enableArtifacts || false,
-            artifactStorageType: data.artifactStorageType || 'memory',
-            artifacts: data.artifacts || [],
-            cloudStorageBucket: data.cloudStorageBucket,
-            localStoragePath: data.localStoragePath,
-            a2aConfig: data.a2aConfig,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
-            // Ensure all other specific fields for different agent types are mapped here
-            // For example, for LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentConfig
-            // This might require a more dynamic mapping or ensuring Firestore structure matches these types.
-            // The current SavedAgentConfiguration is a union type, so direct spreading might not be safe
-            // without ensuring the Firestore data strictly matches one of the union members.
-            // For simplicity, we assume top-level fields cover most common properties.
-            // Detailed specific properties might be nested under an 'agentConfiguration' field or similar
-            // if they are not flat in Firestore. If they are flat, they need to be explicitly listed.
-            ...(data.agentConfiguration || {}), // Spread if specific config is nested
-          };
-          agents.push(agentData);
-        });
-        setSavedAgents(agents);
-      } catch (error) {
-        console.error("Error fetching agents from Firestore:", error);
-        toast({
-          title: "Erro ao Carregar Agentes",
-          description: "Não foi possível buscar os agentes salvos. Tente novamente mais tarde.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingAgents(false);
-      }
-    };
-
-    fetchAgents();
-  }, [toast]);
-
-  const addAgent = async (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<SavedAgentConfiguration | null> => {
+  const fetchAgents = React.useCallback(async () => {
     setIsLoadingAgents(true);
     try {
-      const fullAgentData = {
-        ...agentConfigData, // Spread all properties from the form
-        userId: PLACEHOLDER_USER_ID,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      const docRef = await addDoc(collection(firestore, 'agents'), fullAgentData);
-      
-      const newAgentForState: SavedAgentConfiguration = {
-        ...agentConfigData, // Use the input data which should conform to one of the union types
-        id: docRef.id,
-        userId: PLACEHOLDER_USER_ID,
-        createdAt: new Date(), 
-        updatedAt: new Date(), 
-      };
-
-      setSavedAgents(prev => [newAgentForState, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
-      toast({ title: "Agente Adicionado", description: `"${newAgentForState.agentName}" foi salvo com sucesso.` });
-      return newAgentForState;
+      // Carregar agentes de forma assíncrona e segura
+      const agentsFromStorage = await loadAgents();
+      const processedAgents = Array.isArray(agentsFromStorage)
+        ? agentsFromStorage.filter(Boolean).sort((a, b) => {
+            if (!a.updatedAt || !b.updatedAt) return 0;
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          })
+        : [];
+      setSavedAgents(processedAgents);
+      const newAgentsMap = new Map<string, SavedAgentConfiguration>();
+      for (const agent of processedAgents) {
+        newAgentsMap.set(agent.id, agent);
+      }
+      setAgentsMap(newAgentsMap);
     } catch (error) {
-      console.error("Error adding agent to Firestore:", error);
+      console.error("Erro ao buscar agentes do localStorage:", error);
+      setSavedAgents([]);
+      toast({
+        title: "Erro ao Carregar Agentes",
+        description: `Não foi possível buscar os agentes salvos localmente. ${error instanceof Error ? error.message : ''}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  }, [loadAgents, toast]); // Add loadAgents to dependency array
+
+  React.useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
+
+  const addAgent = async (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<SavedAgentConfiguration | null> => {
+    setIsLoadingAgents(true); // Keep for consistency, though operation is fast
+    try {
+      // Replace API call with localStorage save
+      const newAgent = saveAgentToStorage(agentConfigData); // saveAgentToStorage is addAgentInternal from the hook
+      if (newAgent) {
+        // Update state, ensuring it's sorted
+        setSavedAgents(prev => [newAgent, ...prev].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+        setAgentsMap(prevMap => new Map(prevMap).set(newAgent.id, newAgent)); // Update agentsMap
+        toast({ title: "Agente Adicionado", description: `"${newAgent.agentName}" foi salvo com sucesso localmente.` });
+        return newAgent;
+      }
+      throw new Error("Falha ao salvar o agente localmente.");
+    } catch (error) {
+      console.error("Erro ao adicionar agente no localStorage:", error);
       toast({
         title: "Erro ao Adicionar Agente",
-        description: "Não foi possível salvar o agente. Tente novamente.",
+        description: `Não foi possível salvar o agente localmente. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
       return null;
@@ -151,57 +85,71 @@ export function AgentsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateAgent = async (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => {
-    setIsLoadingAgents(true);
-    const agentRef = doc(firestore, 'agents', agentId);
+  const updateAgent = async (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>) => {
+    setIsLoadingAgents(true); // Keep for consistency
     try {
-      // Construct the update payload carefully, excluding fields that shouldn't be directly updated (like id, userId, createdAt)
-      const { id, userId, createdAt, updatedAt, ...updatePayload } = agentConfigUpdate;
-      
-      await updateDoc(agentRef, {
-        ...updatePayload, // This will spread all fields from agentConfigUpdate
-        updatedAt: serverTimestamp(),
-      });
-      
-      setSavedAgents(prev =>
-        prev.map(agent =>
-          agent.id === agentId ? { ...agent, ...updatePayload, updatedAt: new Date() } : agent
-        ).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-      );
-      toast({ title: "Agente Atualizado", description: "As alterações foram salvas." });
+      // Replace API call with localStorage update
+      const updatedAgent = updateAgentInStorage({ ...agentConfigUpdate, id: agentId });
+      if (updatedAgent) {
+        setSavedAgents(prev =>
+          prev.map(agent => (agent.id === agentId ? updatedAgent : agent))
+              .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        );
+        setAgentsMap(prevMap => new Map(prevMap).set(updatedAgent.id, updatedAgent)); // Update agentsMap
+        toast({ title: "Agente Atualizado", description: "As alterações foram salvas localmente." });
+        return updatedAgent;
+      }
+      throw new Error("Falha ao atualizar o agente localmente. Agente não encontrado.");
     } catch (error) {
-      console.error("Error updating agent in Firestore:", error);
+      console.error("Erro ao atualizar agente no localStorage:", error);
       toast({
         title: "Erro ao Atualizar Agente",
-        description: "Não foi possível salvar as alterações. Tente novamente.",
+        description: `Não foi possível salvar as alterações localmente. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
+      return null;
     } finally {
       setIsLoadingAgents(false);
     }
   };
 
-  const deleteAgent = async (agentId: string) => {
-    setIsLoadingAgents(true);
-    const agentRef = doc(firestore, 'agents', agentId);
+  const deleteAgent = async (agentId: string): Promise<boolean> => {
+    setIsLoadingAgents(true); // Keep for consistency
     try {
-      await deleteDoc(agentRef);
-      setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
-      toast({ title: "Agente Excluído", description: "O agente foi removido com sucesso." });
-    } catch (error) {
-      console.error("Error deleting agent from Firestore:", error);
+      // Replace API call with localStorage delete
+      const success = deleteAgentFromStorage(agentId);
+      if (success) {
+        setSavedAgents(prev => prev.filter(agent => agent.id !== agentId));
+        setAgentsMap(prevMap => { // Update agentsMap
+          const newMap = new Map(prevMap);
+          newMap.delete(agentId);
+          return newMap;
+        });
+        toast({ title: "Agente Deletado", description: "O agente foi removido com sucesso localmente." });
+        return true;
+      }
+      // If deleteAgentFromStorage returns false, it means agent was not found.
       toast({
-        title: "Erro ao Excluir Agente",
-        description: "Não foi possível remover o agente. Tente novamente.",
+        title: "Erro ao Deletar Agente",
+        description: "Não foi possível remover o agente localmente. Agente não encontrado.",
         variant: "destructive",
       });
+      return false;
+    } catch (error) {
+      console.error("Erro ao deletar agente no localStorage:", error);
+      toast({
+        title: "Erro ao Deletar Agente",
+        description: `Não foi possível remover o agente localmente. ${error instanceof Error ? error.message : ''}`,
+        variant: "destructive",
+      });
+      return false;
     } finally {
       setIsLoadingAgents(false);
     }
   };
-  
+
   return (
-    <AgentsContext.Provider value={{ savedAgents, setSavedAgents, addAgent, updateAgent, deleteAgent, isLoadingAgents }}>
+    <AgentsContext.Provider value={{ savedAgents, agentsMap, addAgent, updateAgent, deleteAgent, fetchAgents, isLoadingAgents }}>
       {children}
     </AgentsContext.Provider>
   );

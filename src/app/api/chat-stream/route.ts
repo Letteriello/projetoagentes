@@ -1,56 +1,266 @@
-import { basicChatFlow, BasicChatInput } from "@/ai/flows/chat-flow";
-import { NextRequest, NextResponse } from "next/server";
-import { Ratelimit } from "@upstash/ratelimit";
-import { kv } from "@vercel/kv";
+import { StreamingTextResponse, streamToResponse } from 'ai';
+import { NextRequest, NextResponse } from 'next/server';
+import { basicChatFlow, BasicChatInput } from '@/ai/flows/chat-flow';
+import { winstonLogger } from '../../../lib/winston-logger';
+import { constructSystemPromptForGenkit, AgentConfigForPrompt } from '@/lib/agent-genkit-utils';
+import { ReadableStream } from 'node:stream/web';
 
-// Initialize rate limiter
-const ratelimit = new Ratelimit({
-  redis: kv,
-  // Allow 5 requests from the same IP address within a 10-second window
-  limiter: Ratelimit.slidingWindow(5, "10 s"),
-});
+// Define the structure for AgentToolDetail, mirroring what BasicChatInput might expect
+interface AgentToolDetail {
+  id: string; // Corresponds to the key in allAvailableTools and toolConfigsApplied
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
+// Define the structure of the configuration stored for an agent
+// This is a simplified version for this mock. A real one might come from a DB.
+interface SavedAgentConfiguration {
+  id: string;
+  name: string;
+  config: AgentConfigForPrompt; // Using the imported type for the 'config' part
+  toolConfigsApplied: Record<string, any>; // Configurations for each enabled tool
+  tools: AgentToolDetail[]; // List of tools associated with the agent and their enabled status
+}
+
+// Define the expected structure of the incoming request body
+interface ChatInput {
+  agentId: string; // ID of the agent to use
+  userMessage: string;
+  history?: Array<{role: string; content: any}>;
+  fileDataUri?: string;
+  audioDataUri?: string; // Added audioDataUri
+  modelName?: string;
+  temperature?: number;
+  // agentToolsDetails from the chatInput will be overridden by the fetched agent's tools configuration
+}
+
+// Mock function to simulate fetching agent configuration
+// In a real application, this would query a database or configuration service.
+async function fetchAgentConfiguration(agentId: string): Promise<SavedAgentConfiguration | null> {
+  winstonLogger.debug(`Fetching configuration for agentId: ${agentId}`, { agentId, api: 'chat-stream' });
+  // Simulate fetching for a specific agentId
+  if (agentId === 'agent_123_llm_tool_user') {
+    return {
+      id: 'agent_123_llm_tool_user',
+      name: 'Helpful LLM Assistant with Tools',
+      config: {
+        type: 'llm',
+        globalInstruction: 'You are an advanced AI assistant. Be helpful and concise.',
+        agentGoal: 'Assist the user with their tasks by providing information and using available tools effectively.',
+        agentTasks: [
+          'Understand user queries.',
+          'Utilize configured tools to gather information or perform actions.',
+          'Format responses clearly.',
+          'Maintain a friendly and professional tone.'
+        ],
+        agentPersonality: 'A helpful and slightly witty AI assistant that aims to be efficient.',
+        agentRestrictions: [
+          'Do not provide financial advice.',
+          'Do not generate harmful or offensive content.',
+          'Always disclose when you are using a tool for a simulated action.'
+        ],
+      },
+      toolConfigsApplied: {
+        performWebSearch: { apiKey: 'mock_search_api_key_from_agent_config' }, // Example config for web search
+        knowledgeBase: { knowledgeBaseId: 'kb_finance_agent_123', defaultSimilarityTopK: 5 },
+        calendarAccess: { defaultCalendarId: 'user_primary_calendar_from_agent_config' }
+        // Other tools might have empty {} if no specific config is needed beyond defaults in their factories
+      },
+      tools: [ // These are the tools enabled for this agent
+        { id: 'performWebSearch', name: 'Web Search', description: 'Searches the web.', enabled: true },
+        { id: 'calculator', name: 'Calculator', description: 'Calculates math expressions.', enabled: true },
+        { id: 'knowledgeBase', name: 'Knowledge Base', description: 'Queries a knowledge base.', enabled: true },
+        { id: 'calendarAccess', name: 'Calendar Access', description: 'Accesses calendar.', enabled: true },
+        // customApiTool, databaseAccessTool, codeExecutorTool could be added here too
+      ],
+    };
+  } else if (agentId === 'agent_simple_llm') {
+     return {
+      id: 'agent_simple_llm',
+      name: 'Simple LLM Assistant (No Tools)',
+      config: {
+        type: 'llm',
+        globalInstruction: 'You are a basic AI assistant. Answer questions directly.',
+        agentGoal: 'Provide answers based on your general knowledge.',
+        agentPersonality: 'A very straightforward and factual AI.',
+      },
+      toolConfigsApplied: {},
+      tools: [], // No tools enabled for this agent
+    };
+  }
+  return null; // Agent not found
+}
+
 
 export async function POST(req: NextRequest) {
-  const ip = req.ip ?? "127.0.0.1";
-  const { success, limit, reset, remaining } = await ratelimit.limit(ip);
-
-  if (!success) {
-    return new Response("Too many requests. Please try again later.", {
-      status: 429,
-      headers: {
-        "X-RateLimit-Limit": limit.toString(),
-        "X-RateLimit-Remaining": remaining.toString(),
-        "X-RateLimit-Reset": reset.toString(),
-      },
-    });
-  }
-
   try {
-    const chatInput = (await req.json()) as BasicChatInput;
+    // API Key Authentication
+    const authHeader = req.headers.get('Authorization');
+    const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const serverApiKey = process.env.CHAT_API_KEY;
 
-    // Validate essential inputs (optional: add more comprehensive validation)
-    if (!chatInput.userMessage && !chatInput.fileDataUri) {
-      return NextResponse.json(
-        { error: "User message or file is required." },
-        { status: 400 },
-      );
+    if (!apiKey || apiKey !== serverApiKey) {
+      winstonLogger.warn('Unauthorized access attempt to /api/chat-stream', { api: 'chat-stream', remoteAddress: req.ip });
+      return NextResponse.json({ error: 'Acesso não autorizado. Verifique sua chave de API ou token.' }, { status: 401 });
     }
 
-    const stream = await basicChatFlow(chatInput);
+    const chatInput: ChatInput = await req.json();
 
-    // Return the stream directly
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8", // Or 'application/octet-stream' if preferred
-        "Transfer-Encoding": "chunked",
+    if (!chatInput.agentId) {
+      return NextResponse.json({ error: "agentId is required" }, { status: 400 });
+    }
+
+    const agentConfig = await fetchAgentConfiguration(chatInput.agentId);
+
+    if (!agentConfig) {
+      return NextResponse.json({ error: `Agent configuration not found for agentId: ${chatInput.agentId}` }, { status: 404 });
+    }
+
+    // Construct system prompt using the agent's specific configuration
+    const systemPrompt = constructSystemPromptForGenkit(agentConfig.config);
+
+    // Prepare the input for basicChatFlow
+    const actualBasicChatInput: BasicChatInput = {
+      userMessage: chatInput.userMessage,
+      history: chatInput.history,
+      fileDataUri: chatInput.fileDataUri,
+      audioDataUri: chatInput.audioDataUri, // Pass audioDataUri
+      modelName: chatInput.modelName, // User can still override model per request if desired
+      temperature: chatInput.temperature, // User can still override temp per request
+      systemPrompt: systemPrompt, // Generated system prompt
+      agentToolsDetails: agentConfig.tools, // Tools are taken from the fetched agent config
+      toolConfigsApplied: agentConfig.toolConfigsApplied, // Tool configurations from fetched agent config
+    };
+
+    winstonLogger.debug("Prepared BasicChatInput for flow", {
+      api: 'chat-stream',
+      agentId: chatInput.agentId,
+      userMessageLength: actualBasicChatInput.userMessage.length,
+      modelName: actualBasicChatInput.modelName,
+      systemPromptLength: actualBasicChatInput.systemPrompt?.length,
+      numAgentTools: actualBasicChatInput.agentToolsDetails?.length,
+      toolConfigsKeys: Object.keys(actualBasicChatInput.toolConfigsApplied || {}),
+    });
+
+
+    const flowOutput = await basicChatFlow(actualBasicChatInput);
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Enqueue chat events first
+        if (flowOutput.chatEvents && flowOutput.chatEvents.length > 0) {
+          for (const event of flowOutput.chatEvents) {
+            // Ensure events have proper id and timestamp if they were partial
+            const fullEvent = {
+              id: event.id || `evt-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+              timestamp: event.timestamp || new Date(),
+              ...event
+            };
+            controller.enqueue(JSON.stringify({ type: 'event', data: fullEvent }) + '\n');
+          }
+        }
+
+        // Handle potential errors from the flow
+        if (flowOutput.error) {
+          let userFriendlyErrorDetail = "Erro interno no fluxo do agente.";
+          const lowerCaseFlowError = String(flowOutput.error).toLowerCase();
+          if (lowerCaseFlowError.includes("auth") || lowerCaseFlowError.includes("token")) {
+            userFriendlyErrorDetail = "Erro de autenticação no fluxo do agente.";
+          } else if (lowerCaseFlowError.includes("permission") || lowerCaseFlowError.includes("denied")) {
+            userFriendlyErrorDetail = "Permissão negada no fluxo do agente.";
+          } else if (flowOutput.error) { // Keep original error if it's not sensitive and more specific
+            userFriendlyErrorDetail = String(flowOutput.error);
+          }
+
+          const errorEvent = {
+            id: `err-${Date.now()}`,
+            timestamp: new Date(),
+            eventType: 'AGENT_ERROR', // More specific eventType
+            eventTitle: 'Erro no Agente',
+            eventDetails: userFriendlyErrorDetail, // User-friendly detail
+          };
+          controller.enqueue(JSON.stringify({ type: 'event', data: errorEvent }) + '\n');
+          winstonLogger.error('Error reported by basicChatFlow', {
+            api: 'chat-stream',
+            agentId: chatInput.agentId,
+            originalError: flowOutput.error, // Log original error
+            reportedError: userFriendlyErrorDetail
+          });
+        }
+
+        // Enqueue the final output message (as text)
+        // TODO: Integrate actual text streaming from LLM if flowOutput.stream is available
+        if (flowOutput.outputMessage) {
+          // If LLM response streaming is implemented in basicChatFlow and populates flowOutput.stream:
+          // For example:
+          // if (flowOutput.stream) {
+          //   const reader = flowOutput.stream.getReader();
+          //   while (true) {
+          //     const { done, value } = await reader.read();
+          //     if (done) break;
+          //     // Assuming value is a text chunk
+          //     controller.enqueue(JSON.stringify({ type: 'text', data: value }) + '\n');
+          //   }
+          // } else if (flowOutput.outputMessage) { ... }
+          // For now, sending the whole message as one chunk:
+          controller.enqueue(JSON.stringify({ type: 'text', data: flowOutput.outputMessage }) + '\n');
+        }
+
+        // If there was no message and no error, maybe send a control message
+        if (!flowOutput.outputMessage && !flowOutput.error && (!flowOutput.chatEvents || flowOutput.chatEvents.length === 0)) {
+            controller.enqueue(JSON.stringify({ type: 'event', data: {
+                id: `ctrl-${Date.now()}`,
+                timestamp: new Date(),
+                eventType: 'AGENT_CONTROL',
+                eventTitle: 'No output',
+                eventDetails: 'The flow completed without generating a message or events.'
+            }}) + '\n');
+        }
+
+        controller.close();
       },
     });
+    
+    // Convert the stream to a Vercel AI SDK compatible stream
+    // The Vercel AI SDK's `StreamingTextResponse` can handle a stream of strings,
+    // where each string is a JSON object. The client then parses each line.
+    // Ensure the Content-Type is appropriate for ndjson or that the client handles text/plain.
+    return new StreamingTextResponse(stream, {
+      headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
+    });
+
   } catch (error: any) {
-    console.error("[API Chat Stream] Error:", error);
-    // Ensure a Response object is returned for errors as well
+    // console.error('[Chat API Error]', error); // Removed redundant console.error
+    winstonLogger.error('Error in chat-stream API', {
+      api: 'chat-stream',
+      agentId: (req as any).agentId || chatInput?.agentId || 'unknown',
+      error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error)
+    });
+
+    // Refine HTTP error response based on error type, if possible
+    if (error instanceof Error) {
+      const lowerCaseError = error.message.toLowerCase();
+      if (lowerCaseError.includes("auth") || lowerCaseError.includes("token") || lowerCaseError.includes("unauthorized")) {
+        return NextResponse.json({ error: "Autenticação falhou ou sua sessão expirou." }, { status: 401 });
+      } else if (lowerCaseError.includes("permission") || lowerCaseError.includes("denied")) {
+        return NextResponse.json({ error: "Permissão negada para este recurso ou agente." }, { status: 403 });
+      } else if (lowerCaseError.includes("not found")) {
+        // Generic not found, could be agent or other resource
+        return NextResponse.json({ error: "Recurso não encontrado." }, { status: 404 });
+      }
+    }
+    // Default to 500 for other errors
     return NextResponse.json(
-      { error: error.message || "An unexpected error occurred." },
-      { status: 500 },
+      { error: 'Ocorreu um erro inesperado no servidor de chat. Por favor, tente novamente mais tarde.' },
+      { status: 500 }
     );
   }
 }
+
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+// This is required to enable streaming
+export const dynamicParams = true;
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;

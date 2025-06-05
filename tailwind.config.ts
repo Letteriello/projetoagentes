@@ -65,6 +65,35 @@ export default {
   				ring: 'hsl(var(--sidebar-ring))'
   			}
   		},
+		spacing: {
+			'spacing-xxs': '0.125rem',
+			'spacing-xs': '0.25rem',
+			'spacing-xs-plus': '0.375rem',
+			'spacing-sm': '0.5rem',
+			'spacing-sm-plus': '0.625rem',
+			'spacing-sm-plus-plus': '0.75rem',
+			'spacing-sm-lgish': '0.875rem',
+			'spacing-md': '1rem',
+			'spacing-lg': '1.5rem',
+			'spacing-xl': '2rem',
+			'spacing-xl-plus': '2.25rem',
+			'spacing-2xl': '2.5rem',
+			'spacing-2xl-plus': '2.75rem',
+			'spacing-3xl': '3rem'
+		},
+		fontSize: {
+			'font-size-xs': '0.75rem',
+			'font-size-sm': '0.875rem',
+			'font-size-base': '1rem',
+			'font-size-lg': '1.125rem',
+			'font-size-xl': '1.25rem',
+			'font-size-2xl': '1.5rem'
+		},
+		boxShadow: {
+			'shadow-sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+			'shadow-md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+			'shadow-lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'
+		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
@@ -86,11 +115,52 @@ export default {
   				to: {
   					height: '0'
   				}
-  			}
+			},
+			'jiggle': {
+				'0%, 100%': { transform: 'translateX(0)' },
+				'25%': { transform: 'translateX(-1px)' },
+				'75%': { transform: 'translateX(1px)' },
+			},
+			'bounce-sm': {
+				'0%, 100%': { transform: 'translateY(0)' },
+				'50%': { transform: 'translateY(-3px)' },
+			},
+			'soft-fade-in': {
+				from: { opacity: '0' },
+				to: { opacity: '1' },
+			},
+			'subtle-scale': {
+				from: { transform: 'scale(1)' },
+				to: { transform: 'scale(1.03)' },
+			},
+			'press-down': {
+				from: { transform: 'scale(1)' },
+				to: { transform: 'scale(0.98)' },
+			},
+			'shake-sm': {
+				'0%, 100%': { transform: 'translateX(0)' },
+				'10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-2px)' },
+				'20%, 40%, 60%, 80%': { transform: 'translateX(2px)' },
+			},
+			'pulse-button-glow': {
+				'0%, 100%': {
+					boxShadow: '0 0 5px 0px hsl(var(--primary) / 0.2), 0 0 8px 0px hsl(var(--primary) / 0.1)',
+				},
+				'50%': {
+					boxShadow: '0 0 8px 2px hsl(var(--primary) / 0.3), 0 0 12px 2px hsl(var(--primary) / 0.2)',
+				},
+			},
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+			'accordion-up': 'accordion-up 0.2s ease-out',
+			'jiggle': 'jiggle 0.3s ease-in-out',
+			'bounce-sm': 'bounce-sm 0.3s ease-out',
+			'soft-fade-in': 'soft-fade-in 0.3s ease-out',
+			'subtle-scale': 'subtle-scale 0.2s ease-out forwards',
+			'press-down': 'press-down 0.15s ease-out',
+			'shake-sm': 'shake-sm 0.5s ease-in-out',
+			'pulse-button-glow': 'pulse-button-glow 3s ease-in-out infinite',
   		}
   	}
   },

@@ -1,81 +1,30 @@
-import { useState } from "react";
-// Use PrismLight for smaller bundle size and explicit language registration
-import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
-// Corrected import path for okaidia style (ESM)
-import { okaidia } from "react-syntax-highlighter/dist/esm/styles/prism";
-// Import languages you want to support, e.g., clike for basic C-like syntax, javascript, python, etc.
-import clike from "react-syntax-highlighter/dist/esm/languages/prism/clike";
-import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
-import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
-import css from "react-syntax-highlighter/dist/esm/languages/prism/css";
-import jsx from "react-syntax-highlighter/dist/esm/languages/prism/jsx";
-import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript";
-import json from "react-syntax-highlighter/dist/esm/languages/prism/json";
-import java from "react-syntax-highlighter/dist/esm/languages/prism/java";
-import csharp from "react-syntax-highlighter/dist/esm/languages/prism/csharp";
-import cpp from "react-syntax-highlighter/dist/esm/languages/prism/cpp";
-import go from "react-syntax-highlighter/dist/esm/languages/prism/go";
-import php from "react-syntax-highlighter/dist/esm/languages/prism/php";
-import ruby from "react-syntax-highlighter/dist/esm/languages/prism/ruby";
-import rust from "react-syntax-highlighter/dist/esm/languages/prism/rust";
-import swift from "react-syntax-highlighter/dist/esm/languages/prism/swift";
-import kotlin from "react-syntax-highlighter/dist/esm/languages/prism/kotlin";
-import bash from "react-syntax-highlighter/dist/esm/languages/prism/bash";
-import sql from "react-syntax-highlighter/dist/esm/languages/prism/sql";
-import yaml from "react-syntax-highlighter/dist/esm/languages/prism/yaml";
-import markup from "react-syntax-highlighter/dist/esm/languages/prism/markup"; // For HTML, XML etc.
-import { useState, useEffect } from 'react';
-// Use PrismLight for smaller bundle size and explicit language registration
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
-// Using CommonJS import for better compatibility
-import { okaidia } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-// Import languages using CommonJS syntax for better compatibility
-import clike from 'react-syntax-highlighter/dist/cjs/languages/prism/clike';
-import javascript from 'react-syntax-highlighter/dist/cjs/languages/prism/javascript';
-import python from 'react-syntax-highlighter/dist/cjs/languages/prism/python';
-import css from 'react-syntax-highlighter/dist/cjs/languages/prism/css';
-import jsx from 'react-syntax-highlighter/dist/cjs/languages/prism/jsx';
-import typescript from 'react-syntax-highlighter/dist/cjs/languages/prism/typescript';
-import json from 'react-syntax-highlighter/dist/cjs/languages/prism/json';
-import java from 'react-syntax-highlighter/dist/cjs/languages/prism/java';
-import csharp from 'react-syntax-highlighter/dist/cjs/languages/prism/csharp';
-import cpp from 'react-syntax-highlighter/dist/cjs/languages/prism/cpp';
-import go from 'react-syntax-highlighter/dist/cjs/languages/prism/go';
-import php from 'react-syntax-highlighter/dist/cjs/languages/prism/php';
-import ruby from 'react-syntax-highlighter/dist/cjs/languages/prism/ruby';
-import rust from 'react-syntax-highlighter/dist/cjs/languages/prism/rust';
-import swift from 'react-syntax-highlighter/dist/cjs/languages/prism/swift';
-import kotlin from 'react-syntax-highlighter/dist/cjs/languages/prism/kotlin';
-import bash from 'react-syntax-highlighter/dist/cjs/languages/prism/bash';
-import sql from 'react-syntax-highlighter/dist/cjs/languages/prism/sql';
-import yaml from 'react-syntax-highlighter/dist/cjs/languages/prism/yaml';
-import markup from 'react-syntax-highlighter/dist/cjs/languages/prism/markup'; // For HTML, XML etc.
-
+// REMOVED: import { okaidia } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { minimalistLight, minimalistDark } from './codeblockThemes';
+import { useTheme } from '../../../contexts/ThemeContext';
+// Import languages using CommonJS syntax
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import java from 'react-syntax-highlighter/dist/esm/languages/prism/java';
+import csharp from 'react-syntax-highlighter/dist/esm/languages/prism/csharp';
+import cpp from 'react-syntax-highlighter/dist/esm/languages/prism/cpp';
+import go from 'react-syntax-highlighter/dist/esm/languages/prism/go';
+import php from 'react-syntax-highlighter/dist/esm/languages/prism/php';
+import ruby from 'react-syntax-highlighter/dist/esm/languages/prism/ruby';
+import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust';
+import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
+import kotlin from 'react-syntax-highlighter/dist/esm/languages/prism/kotlin';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
+import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup'; // markup geralmente é html/xml
+import { useState, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 
-// Register the languages
-SyntaxHighlighter.registerLanguage("clike", clike);
-SyntaxHighlighter.registerLanguage("javascript", javascript);
-SyntaxHighlighter.registerLanguage("python", python);
-SyntaxHighlighter.registerLanguage("css", css);
-SyntaxHighlighter.registerLanguage("jsx", jsx);
-SyntaxHighlighter.registerLanguage("typescript", typescript);
-SyntaxHighlighter.registerLanguage("json", json);
-SyntaxHighlighter.registerLanguage("java", java);
-SyntaxHighlighter.registerLanguage("csharp", csharp);
-SyntaxHighlighter.registerLanguage("cpp", cpp);
-SyntaxHighlighter.registerLanguage("go", go);
-SyntaxHighlighter.registerLanguage("php", php);
-SyntaxHighlighter.registerLanguage("ruby", ruby);
-SyntaxHighlighter.registerLanguage("rust", rust);
-SyntaxHighlighter.registerLanguage("swift", swift);
-SyntaxHighlighter.registerLanguage("kotlin", kotlin);
-SyntaxHighlighter.registerLanguage("bash", bash);
-SyntaxHighlighter.registerLanguage("sql", sql);
-SyntaxHighlighter.registerLanguage("yaml", yaml);
-SyntaxHighlighter.registerLanguage("markup", markup);
-SyntaxHighlighter.registerLanguage("html", markup); // Alias for markup
-SyntaxHighlighter.registerLanguage("xml", markup); // Alias for markup
 const registeredLanguages = new Set<string>();
 
 const registerLanguage = (name: string, lang: any) => {
@@ -85,7 +34,7 @@ const registerLanguage = (name: string, lang: any) => {
   }
 };
 
-// Register languages with type safety
+// Register languages
 registerLanguage('clike', clike);
 registerLanguage('javascript', javascript);
 registerLanguage('python', python);
@@ -126,8 +75,8 @@ interface CodeBlockProps {
   style?: React.CSSProperties;
 }
 
-export function CodeBlock({ language, value }: CodeBlockProps) {
-  const [copyStatus, setCopyStatus] = useState("Copy");
+type CopyState = 'idle' | 'loading' | 'success' | 'error';
+
 /**
  * A code block component with syntax highlighting using Prism.js
  */
@@ -136,12 +85,13 @@ export function CodeBlock({
   value,
   className = '',
   showLineNumbers = false,
-  wrapLines = true,
-  wrapLongLines = true,
+  wrapLines = true, // Defaulting to true as per one of the versions
+  wrapLongLines = true, // Defaulting to true as per one of the versions
   style,
   ...props
 }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false);
+  const { theme: appTheme } = useTheme();
+  const [copyState, setCopyState] = useState<CopyState>('idle');
   const [isClient, setIsClient] = useState(false);
 
   // Ensure we're in the browser before rendering
@@ -149,96 +99,58 @@ export function CodeBlock({
     setIsClient(true);
   }, []);
 
+  const syntaxTheme = appTheme === 'dark' ? minimalistDark : minimalistLight;
+
   // Sanitize language to ensure it's registered
   const safeLanguage = (() => {
     const lang = (language || 'text').toLowerCase();
-    // Check if the language is registered, fallback to 'text' if not
     return registeredLanguages.has(lang) ? lang : 'text';
   })();
 
   const handleCopy = async () => {
-    if (!value) return;
-    
+    if (!value || copyState !== 'idle') return; // Prevent multiple copies
+    setCopyState('loading');
     try {
       await navigator.clipboard.writeText(value);
-      setCopyStatus("Copied!");
-    } catch (err) {
-      console.error("Failed to copy code: ", err);
-      setCopyStatus("Error!");
-    } finally {
-      setTimeout(() => setCopyStatus("Copy"), 2000); // Reset after 2 seconds
-      setCopied(true);
-      
-      // Reset the copied status after 2 seconds
-      const timer = setTimeout(() => setCopied(false), 2000);
-      return () => clearTimeout(timer);
+      setCopyState('success');
     } catch (err) {
       console.error('Failed to copy code: ', err);
+      setCopyState('error');
+    } finally {
+      setTimeout(() => setCopyState('idle'), 2000); // Reset after 2 seconds
     }
   };
 
   // Don't render on the server to avoid hydration issues
   if (!isClient) {
     return (
-      <div className={cn('bg-gray-100 dark:bg-gray-800 p-4 rounded-md', className)}>
-        <pre className="m-0 p-0 overflow-hidden">
-          <code className={`language-${safeLanguage}`}>{value}</code>
-        </pre>
+      <div className={cn(
+        'relative my-4 bg-gray-900 rounded-lg overflow-hidden',
+        'border border-gray-700', // Consistent with preferred styling
+        className
+      )}>
+        <div className="flex justify-between items-center bg-gray-800/80 px-4 py-2 border-b border-gray-700">
+          <span className="text-xs text-gray-400 font-mono">
+            {safeLanguage}
+          </span>
+        </div>
+        <div className="overflow-x-auto p-4">
+          <pre className="m-0">
+            <code className={`language-${safeLanguage} text-sm`}>{value}</code>
+          </pre>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="relative my-2 bg-gray-800 rounded-lg overflow-hidden">
-      <button
-        onClick={handleCopy}
-        disabled={copyStatus !== "Copy"}
-        className={cn(
-          "absolute top-2 right-2 px-2 py-1 text-xs rounded z-10", // Added z-index
-          copyStatus === "Copy"
-            ? "bg-gray-600 hover:bg-gray-500 text-white"
-            : "",
-          copyStatus === "Copied!" ? "bg-green-600 text-white" : "",
-          copyStatus === "Error!" ? "bg-red-600 text-white" : "",
-        )}
-      >
-        {copyStatus}
-      </button>
-      <SyntaxHighlighter
-        style={okaidia} // Reinstate okaidia style
-        language={language || "clike"} // Default to 'clike' or 'text' if no language provided
-        PreTag="div"
-        className="!p-4 !text-sm custom-scrollbar" // Apply padding here and custom scrollbar class if needed
-        showLineNumbers={false} // Optional: set to true to show line numbers
-        wrapLines={true} // Optional: enable line wrapping
-        wrapLongLines={true} // Optional: enable long line wrapping (might need custom styling)
-      >
-        {value}
-      </SyntaxHighlighter>
-      {/* Add a style tag for scrollbar if needed, or handle via global CSS */}
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #4b5563; /* gray-600 */
-          border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #6b7280; /* gray-500 */
-        }
-      `}</style>
     <div 
       className={cn(
         'relative my-4 bg-gray-900 rounded-lg overflow-hidden',
         'border border-gray-700',
         className
       )}
-      style={style}
+      style={style} // Keep custom style prop if provided
       {...props}
     >
       <div className="flex justify-between items-center bg-gray-800/80 px-4 py-2 border-b border-gray-700">
@@ -247,23 +159,29 @@ export function CodeBlock({
         </span>
         <button
           onClick={handleCopy}
-          disabled={copied}
+          disabled={copyState !== 'idle'}
           className={cn(
             'px-2.5 py-1 text-xs rounded-md font-medium transition-colors',
             'flex items-center gap-1.5',
             'text-gray-300 hover:text-white',
             'bg-gray-700/50 hover:bg-gray-600/50',
-            'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500',
+            'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500', // Using a generic primary color for focus
             'disabled:opacity-70 disabled:cursor-not-allowed',
-            copied ? 'text-green-400' : ''
+            copyState === 'success' ? 'text-green-400' : '',
+            copyState === 'error' ? 'text-red-400' : ''
           )}
-          aria-label={copied ? 'Copiado!' : 'Copiar código'}
+          aria-label={copyState === 'success' ? 'Copiado!' : (copyState === 'error' ? 'Erro ao copiar' : 'Copiar código')}
           title="Copiar para a área de transferência"
         >
-          {copied ? (
+          {copyState === 'success' ? (
             <>
               <span className="text-green-400">✓</span>
               <span>Copiado!</span>
+            </>
+          ) : copyState === 'error' ? (
+            <>
+              <span className="text-red-400">✗</span>
+              <span>Erro</span>
             </>
           ) : (
             <>
@@ -276,22 +194,27 @@ export function CodeBlock({
       
       <div className="overflow-x-auto">
         <SyntaxHighlighter
-          style={okaidia}
+          style={syntaxTheme}
           language={safeLanguage}
           PreTag="div"
-          className="!m-0 !p-4 !bg-transparent !bg-gray-900 text-sm leading-relaxed"
+          className="!m-0 !p-4 !bg-transparent text-sm leading-relaxed custom-scrollbar" // Use Tailwind for padding, bg, text size, leading. Added custom-scrollbar.
           showLineNumbers={showLineNumbers}
           wrapLines={wrapLines}
           wrapLongLines={wrapLongLines}
+          // Removed redundant customStyle properties that are covered by Tailwind classes above
+          // background: 'transparent' -> !bg-transparent
+          // fontSize: '0.875rem' -> text-sm
+          // padding: '1rem' -> !p-4
+          // margin: 0 -> !m-0
+          // lineHeight: '1.5' -> leading-relaxed (close enough, can be adjusted if specific value is critical)
           customStyle={{
-            margin: 0,
-            padding: '1rem',
-            background: 'transparent',
-            fontSize: '0.875rem',
-            lineHeight: '1.5',
+            // Keep only styles not easily achievable or specific overrides for SyntaxHighlighter
+            // Example: If SyntaxHighlighter needs specific background even with parent bg-gray-900
+            // For now, assuming !bg-transparent on className is enough.
+            // If `!bg-gray-900` was intended for SyntaxHighlighter itself, it can be added to className.
           }}
           codeTagProps={{
-            className: `language-${safeLanguage} block`,
+            className: `language-${safeLanguage} block`, // `block` is good practice
             style: {
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             },
@@ -300,6 +223,28 @@ export function CodeBlock({
           {value}
         </SyntaxHighlighter>
       </div>
+       {/* Custom scrollbar styles - can be moved to a global CSS file if preferred */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent; /* Track is part of the CodeBlock bg */
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #4b5563; /* gray-600 */
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #6b7280; /* gray-500 */
+        }
+        /* For Firefox */
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #4b5563 transparent;
+        }
+      `}</style>
     </div>
   );
 }

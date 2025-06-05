@@ -136,6 +136,53 @@ export const mcpTools: Omit<AvailableTool, 'icon'>[] & { iconName?: string }[] =
         description: "Executar navegador em modo headless (sem interface gráfica)"
       }
     ]
+  },
+  {
+    id: "calendar-manager-mcp",
+    name: "Calendar Manager MCP (Simulated)",
+    description: "Simulates managing calendar events (create, list, delete) via a secure MCP connection.",
+    iconName: "Terminal", // Placeholder for CalendarDays; getIconComponent in this file is limited.
+    isMCPTool: true,
+    mcpServerId: "secure-mcp-server-1",
+    mcpServerName: "Secure MCP Server",
+    mcpToolName: "calendarManager",
+    hasConfig: true,
+    configType: "calendarManagerMcp",
+    parameters: [
+      { name: "action", type: "string", required: true, description: "Action to perform: 'list_events', 'create_event', 'delete_event'." },
+      { name: "eventDetails", type: "object", required: false, description: "Object containing event details (e.g., title, date, attendees). Required for 'create_event'." },
+      { name: "eventId", type: "string", required: false, description: "ID of the event to delete. Required for 'delete_event'." },
+      { name: "dateRangeStart", type: "string", required: false, description: "Start date for 'list_events' (ISO format)." },
+      { name: "dateRangeEnd", type: "string", required: false, description: "End date for 'list_events' (ISO format)." }
+    ],
+    documentation: "Allows the agent to manage calendar events on behalf of the user via a secure MCP channel. Supports listing, creating, and deleting events.",
+    examples: [
+      { title: "List upcoming week's events", description: "Lists events for the first week of July 2024.", code: "calendarManager.list_events({ dateRangeStart: '2024-07-01T00:00:00Z', dateRangeEnd: '2024-07-07T23:59:59Z' })" },
+      { title: "Create a new meeting", description: "Creates a new meeting titled 'Project Sync'.", code: "calendarManager.create_event({ eventDetails: { title: 'Project Sync', date: '2024-07-03T10:00:00Z', attendees: ['user@example.com'] } })" }
+    ]
+  },
+  {
+    id: "crm-integrator-mcp",
+    name: "CRM Integrator MCP (Simulated)",
+    description: "Simulates fetching or updating customer data in a CRM via a secure MCP connection.",
+    iconName: "Search", // Placeholder for Users; getIconComponent in this file is limited.
+    isMCPTool: true,
+    mcpServerId: "secure-mcp-server-1",
+    mcpServerName: "Secure MCP Server",
+    mcpToolName: "crmIntegrator",
+    hasConfig: true,
+    configType: "crmIntegratorMcp",
+    parameters: [
+      { name: "action", type: "string", required: true, description: "Action: 'get_contact', 'update_contact', 'search_contacts'." },
+      { name: "contactId", type: "string", required: false, description: "ID of the contact for 'get_contact' or 'update_contact'." },
+      { name: "contactData", type: "object", required: false, description: "Data for 'update_contact'." },
+      { name: "searchQuery", type: "string", required: false, description: "Query for 'search_contacts' (e.g., email, name)." }
+    ],
+    documentation: "Provides secure access to CRM data. Allows fetching, updating, and searching customer contact information.",
+    examples: [
+      { title: "Get contact by ID", description: "Fetches contact details for a given ID.", code: "crmIntegrator.get_contact({ contactId: 'contact_12345' })" },
+      { title: "Search for contacts by email", description: "Searches for contacts matching an email address.", code: "crmIntegrator.search_contacts({ searchQuery: 'test@example.com' })" }
+    ]
   }
 ];
 

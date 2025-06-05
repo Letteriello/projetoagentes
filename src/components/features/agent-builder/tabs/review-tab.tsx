@@ -1,0 +1,227 @@
+import * as React from 'react'; // Ensure React is imported
+import { useFormContext } from 'react-hook-form';
+import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
+import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // For styling
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // For displaying alerts
+import { Loader2, Wand2 as SparklesIcon, AlertTriangle, CheckCircle } from 'lucide-react'; // Icons
+import { useToast } from "@/hooks/use-toast";
+import { z } from 'zod';
+import { Badge } from '@/components/ui/badge'; // Existing import
+
+import type { AvailableTool } from '@/types/tool-types'; // Import AvailableTool
+
+export interface ReviewTabProps {
+  setActiveEditTab?: (tabId: string) => void;
+  showHelpModal?: (contentKey: any) => void; // Adjust 'any' to your specific help content key type
+  availableTools: AvailableTool[]; // Add availableTools to props
+}
+
+
+export default function ReviewTab(props: ReviewTabProps) {
+  const { watch, getValues } = useFormContext<SavedAgentConfiguration>();
+  const { toast } = useToast();
+  const { setActiveEditTab, showHelpModal, availableTools } = props; // Destructure props
+
+  const agentName = watch('agentName');
+  const description = watch('agentDescription');
+  const agentTone = watch('config.agentPersonality'); // Corrected path based on LLMBehaviorForm
+  const tools = watch('tools') || []; // This is an array of tool IDs
+  const toolConfigsApplied = watch('toolConfigsApplied') || {}; // Watch this specifically
+  const config = watch('config') || {}; // This is the full config object (general config)
+
+  const [isLoadingAlerts, setIsLoadingAlerts] = React.useState(false);
+  const [inconsistencyAlerts, setInconsistencyAlerts] = React.useState<string[]>([]);
+  const [hasFetched, setHasFetched] = React.useState(false); // To track if fetch attempt was made
+
+  const fetchInconsistencyAlerts = async () => {
+    setIsLoadingAlerts(true);
+    setHasFetched(true); // Mark that a fetch attempt has been made
+    const currentConfig = getValues();
+    try {
+      // Pass "inconsistencyAlerts" context
+      const result = await getAiConfigurationSuggestionsAction(currentConfig, "inconsistencyAlerts"); 
+      if (result.success && result.suggestions?.inconsistencyAlerts) {
+        setInconsistencyAlerts(result.suggestions.inconsistencyAlerts);
+        if (result.suggestions.inconsistencyAlerts.length > 0) {
+          toast({ title: "Alertas de Inconsistência Encontrados", description: "Por favor, revise os alertas.", variant: "destructive" });
+        } else {
+          toast({ title: "Verificação de Inconsistência Concluída", description: "Nenhum alerta de inconsistência encontrado." });
+        }
+      } else if (result.success) { // No inconsistencyAlerts field or it's empty
+        setInconsistencyAlerts([]);
+        toast({ title: "Verificação de Inconsistência Concluída", description: "Nenhum alerta de inconsistência encontrado." });
+      }
+      else {
+        toast({ title: "Falha ao Verificar Inconsistências", description: result.error, variant: "destructive" });
+        setInconsistencyAlerts([]); // Clear previous alerts on error
+      }
+    } catch (e: any) {
+      toast({ title: "Erro ao Verificar Inconsistências", description: e.message, variant: "destructive" });
+      setInconsistencyAlerts([]);
+    } finally {
+      setIsLoadingAlerts(false);
+    }
+  };
+
+  // Helper to get tool names for display
+  const getToolDisplayInfo = (toolId: string) => {
+    const tool = availableTools.find(t => t.id === toolId);
+    // Fallback for custom tools where name might be in toolConfigsApplied
+    if (tool?.type === 'custom') {
+      const customToolConfig = toolConfigsApplied[toolId];
+      if (customToolConfig && customToolConfig.name) {
+        return { id: toolId, name: customToolConfig.name };
+      }
+    }
+    return tool ? { id: toolId, name: tool.name } : { id: toolId, name: toolId };
+  };
+
+  const renderToolConfigsForReview = (configs: Record<string, any> | undefined, appliedToolIds: string[]) => {
+    if (!configs || Object.keys(configs).length === 0) {
+      // If no configs, but there are tools selected, mention they use default settings or no config needed.
+      if (appliedToolIds.length > 0) {
+        return <p className="text-sm text-muted-foreground">Selected tools are using default settings or require no specific configuration.</p>;
+      }
+      return <p className="text-sm text-muted-foreground">No tool configurations applied.</p>;
+    }
+
+    return (
+      <ul className="list-disc pl-5 space-y-2 text-sm">
+        {Object.entries(configs).map(([toolId, configData]) => {
+          let displayValue = JSON.stringify(configData, null, 2);
+          // Ensure configData is an object before checking properties
+          if (typeof configData === 'object' && configData !== null) {
+            if (configData.selectedApiKeyId) {
+              displayValue = `API Key configured via Vault (ID: ${configData.selectedApiKeyId})`;
+            } else if (configData.apiKeyId) {
+              displayValue = `API Key configured via Vault (ID: ${configData.apiKeyId})`;
+            }
+          }
+
+          return (
+            <li key={toolId}>
+              <span className="font-semibold">{getToolDisplayInfo(toolId).name}:</span> {/* Use getToolDisplayInfo for name */}
+              <pre className="whitespace-pre-wrap text-xs bg-muted p-1 rounded-md inline-block ml-2 mt-1">
+                <code>{displayValue}</code>
+              </pre>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-medium">{agentName || 'Unnamed Agent'}</h4>
+            <p className="text-muted-foreground">{description || 'No description provided'}</p>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium">Tone:</span>
+            <Badge variant="outline">{agentTone || 'Not specified'}</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuration Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-medium">Tools ({tools.length})</h4>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {tools.map((toolId: string) => {
+                const toolInfo = getToolDisplayInfo(toolId); // Use helper
+                return (
+                  <Badge key={toolInfo.id} variant={'secondary'}> {/* Removed 'configured' variant logic as it's not available here */}
+                    {toolInfo.name}
+                  </Badge>
+                );
+              })}
+              {tools.length === 0 && <span className="text-sm text-muted-foreground">No tools selected</span>}
+            </div>
+          </div>
+
+          <div className="mt-3"> {/* Add some margin-top for separation */}
+            <h4 className="font-medium">Tool Configurations Applied</h4>
+            {renderToolConfigsForReview(toolConfigsApplied, tools)}
+          </div>
+
+          <div>
+            <h4 className="font-medium">Memory Configuration (State Persistence)</h4>
+            <pre className="mt-2 p-2 bg-muted rounded text-sm overflow-x-auto">
+              {JSON.stringify(config.statePersistence || { type: "none" }, null, 2)}
+            </pre>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Verificação de Inconsistências (IA)</CardTitle>
+              <CardDescription>
+                Análise da configuração do agente para problemas lógicos ou componentes ausentes.
+              </CardDescription>
+            </div>
+            <Button onClick={fetchInconsistencyAlerts} disabled={isLoadingAlerts} variant="outline">
+              {isLoadingAlerts ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4 text-yellow-500" />}
+              Verificar Agora
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingAlerts && (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="ml-2">Verificando inconsistências...</p>
+            </div>
+          )}
+          {!isLoadingAlerts && hasFetched && inconsistencyAlerts.length === 0 && (
+            <Alert variant="default" className="border-green-500 text-green-700">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle>Nenhuma Inconsistência Encontrada</AlertTitle>
+              <AlertDescription>
+                A verificação automática não detectou problemas lógicos ou de configuração maiores.
+              </AlertDescription>
+            </Alert>
+          )}
+          {!isLoadingAlerts && inconsistencyAlerts.length > 0 && (
+            <div className="space-y-3">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Alertas de Inconsistência Detectados!</AlertTitle>
+              </Alert>
+              <ul className="list-disc space-y-2 pl-5 text-sm text-red-700 bg-red-50 p-4 rounded-md">
+                {inconsistencyAlerts.map((alert, index) => (
+                  <li key={index}>{alert}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-2">
+                Considere revisar as abas relevantes para corrigir esses problemas antes de salvar o agente.
+              </p>
+            </div>
+          )}
+          {!isLoadingAlerts && !hasFetched && (
+              <div className="text-sm text-muted-foreground p-4 text-center">
+                  Clique em "Verificar Agora" para que a IA analise a configuração do seu agente.
+              </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

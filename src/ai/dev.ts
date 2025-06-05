@@ -1,19 +1,44 @@
-
+// src/ai/dev.ts
 import { config } from 'dotenv';
 config();
 
-// O fluxo ai-configuration-assistant.ts foi removido, então a importação abaixo também é removida.
-// import '@/ai/flows/ai-configuration-assistant.ts';
+import { agentCreatorChatFlow } from './flows/agent-creator-flow'; // Adicionar import
+import { basicChatFlow } from './flows/chat-flow'; // Assuming basicChatFlow is exported from here
+import { aiConfigurationAssistantFlow } from './flows/aiConfigurationAssistantFlow';
+import { workflowAgentRunnerFlow } from './flows/workflow-agent-flow'; // Import the new flow
+// Import other tools or plugins if needed for the dev server
+import './tools/web-search-tool.ts'; // Example if this registers a tool globally for dev
 
-// Importa o fluxo de chat e a nova ferramenta de busca
-import '@/ai/flows/chat-flow.ts';
-import '@/ai/tools/web-search-tool.ts';
+// Flows are typically discovered by the Genkit CLI or need to be exported
+// for the main application entry point (e.g., in genkit.ts or a Next.js API route).
+// This file, when run with `genkit start -- node your-compiled-dev.js`,
+// will execute, thus ensuring flows and tools are initialized and registered if they do so upon import.
 
+console.log('Development server entry point: Flows and tools should be initialized.');
+console.log('Registered flows (ensure they are exported or globally registered):');
+console.log('- agentCreatorChatFlow:', !!agentCreatorChatFlow);
+console.log('- basicChatFlow:', !!basicChatFlow);
+console.log('- aiConfigurationAssistantFlow:', !!aiConfigurationAssistantFlow);
+console.log('- workflowAgentRunnerFlow:', !!workflowAgentRunnerFlow); // Log the new flow
 
-// Se houver outros fluxos de desenvolvimento para importar, eles podem ser adicionados aqui.
-// No entanto, geralmente os fluxos são importados onde são usados (ex: Server Actions)
-// ou o Genkit CLI pode descobri-los automaticamente se estiverem em um diretório padrão
-// dependendo da configuração do Genkit.
-// Para este arquivo dev.ts, geralmente se importa o que é necessário para o Genkit CLI "start".
-// Se nenhum fluxo específico precisa ser explicitamente iniciado/registrado aqui,
-// este arquivo pode até ficar vazio ou ser usado para outras configurações de dev do Genkit.
+// To make flows available to the Genkit dev server/UI, ensure they are either:
+// 1. Exported from your main `genkit.ts` (if you have one that `configureGenkit` uses)
+// 2. Or, if this `dev.ts` is your main entry for `genkit start`, ensure they are discoverable.
+//    The Genkit CLI (`genkit start`) typically discovers flows defined with `defineFlow`
+//    when the file containing them is executed.
+
+import { langchainAgentFlow } from './flows/langchain-agent-flow';
+import { crewAIAgentFlow } from './flows/crewai-agent-flow';
+
+export default {
+  flows: [
+    agentCreatorChatFlow,
+    basicChatFlow,
+    aiConfigurationAssistantFlow,
+    workflowAgentRunnerFlow,
+    langchainAgentFlow,
+    crewAIAgentFlow,
+  ],
+  // tools: [], // Add tools if you have any to export
+  // instruments: [], // Add instruments if any
+};

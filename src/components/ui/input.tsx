@@ -38,7 +38,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+            "hover:border-ring/75", // Added hover effect
+            "focus-visible:animate-pulse-button-glow", // Focus animation
+            "aria-[invalid=true]:border-destructive aria-[invalid=true]:animate-shake-sm", // Error state styling and animation
             hasAction ? "pr-10" : "", // Add padding-right if action button is present
+            "flex h-spacing-2xl w-full rounded-md border border-input bg-background px-spacing-sm-plus-plus py-spacing-sm text-font-size-base ring-offset-background file:border-0 file:bg-transparent file:text-font-size-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-font-size-sm",
+            hasAction ? "pr-spacing-2xl" : "", // Add padding-right if action button is present
             className,
           )}
           ref={ref}
@@ -50,7 +55,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             onClick={onActionClick}
             aria-label={actionButtonAriaLabel}
             className={cn(
-              "absolute right-0 top-0 flex items-center justify-center h-full w-10 text-muted-foreground hover:text-foreground",
+              "absolute right-0 top-0 flex items-center justify-center h-full w-spacing-2xl text-muted-foreground hover:text-foreground",
               actionButtonClassName,
             )}
           >
