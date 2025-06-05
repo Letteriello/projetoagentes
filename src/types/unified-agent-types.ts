@@ -269,6 +269,32 @@ export interface SavedAgentConfiguration {
 
 // ======================================// Tipos para Formulários
 // ======================================
+
+// AgentSummary: A lightweight version of SavedAgentConfiguration for list displays
+export interface AgentSummary {
+  id: string;
+  userId: string;
+  agentName: string;
+  agentDescription?: string;
+  agentType: AgentType; // 'llm' | 'workflow' | 'custom' | 'a2a'
+  icon?: string;
+  framework?: AgentFramework; // 'genkit' | 'crewai' | 'langchain' | 'custom' | 'none'
+  isRootAgent?: boolean; // Derived from agent.config.isRootAgent
+  templateId?: string;
+  toolsSummary?: {
+    count: number;
+    configuredNeeded: boolean; // True if any tool needs configuration or if toolConfigsApplied is missing/empty for tools that expect it
+  };
+  updatedAt: Date; // For sorting, ensure it's a Date object
+  agentVersion?: string;
+  isTemplate?: boolean;
+  isFavorite?: boolean;
+  tags?: string[];
+  category?: string;
+  // Consider any other fields absolutely essential for AgentCard that are small.
+  // Avoid large objects or long strings like system prompts, goals, full tool schemas etc.
+}
+
 // Omit utility fields and userId for form data, id is optional for creation
 export type AgentFormData = Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId' | 'tool_trajectory_avg_score' | 'isFavorite'> & {
   id?: string; // id is optional when creating a new agent
