@@ -31,6 +31,7 @@ export const KnowledgeBaseInputSchema = z.object({
 });
 
 // 3. Define Output Schema for the tool's handler
+// Error field removed as errors will be thrown.
 export const KnowledgeBaseOutputSchema = z.object({
   retrievedChunks: z.array(
     z.object({
@@ -42,7 +43,7 @@ export const KnowledgeBaseOutputSchema = z.object({
     })
   ).describe("Array of retrieved knowledge chunks."),
   summary: z.string().optional().describe("Optional summary generated from the retrieved chunks (if supported by the RAG system)."),
-  error: z.string().optional().describe("Error message if the query failed."),
+  // error: z.string().optional().describe("Error message if the query failed."), // Removed
   debugInfo: z.record(z.any()).optional().describe("Optional debug information from the RAG system."),
 });
 
@@ -50,116 +51,127 @@ export const KnowledgeBaseOutputSchema = z.object({
 export function createKnowledgeBaseTool(
   config: KnowledgeBaseToolConfig
 ): ToolDefinition<typeof KnowledgeBaseInputSchema, typeof KnowledgeBaseOutputSchema> {
-  const toolName = config.name || 'knowledgeBaseQuery';  const toolDescription =
+  const toolName = config.name || 'knowledgeBaseQuery';
+  const toolDescription =
     config.description ||
     `Queries a configured knowledge base (ID: ${config.knowledgeBaseId}) using RAG principles.`;
 
-  console.log(`[${toolName}] Initialized for KB ID: ${config.knowledgeBaseId}. Endpoint: ${config.serviceEndpoint || 'N/A'}`);
+  // Runtime check for knowledgeBaseId, though TypeScript should enforce it at compile time.
+  if (!config.knowledgeBaseId) {
+    const errorMsg = `[${toolName}] Critical configuration error: knowledgeBaseId is missing. Tool cannot be created.`;
+    console.error(errorMsg);
+    // This error during setup phase should ideally prevent tool registration or use.
+    // Depending on how tools are registered, this might need a more robust handling
+    // than just a console error if it can't halt execution.
+    // For now, we'll let it proceed but it will fail if called.
+  } else {
+    console.log(`[${toolName}] Initialized for KB ID: ${config.knowledgeBaseId}. Endpoint: ${config.serviceEndpoint || 'N/A'}`);
+  }
 
   return ai.defineTool(
     {
       name: toolName,
       description: toolDescription,
       inputSchema: KnowledgeBaseInputSchema,
-      outputSchema: KnowledgeBaseOutputSchema,
+      outputSchema: KnowledgeBaseOutputSchema, // Updated schema
     },
-    async (input: z.infer<typeof KnowledgeBaseInputSchema>) => {
+    async (input: z.infer<typeof KnowledgeBaseInputSchema>): Promise<z.infer<typeof KnowledgeBaseOutputSchema>> => {
       const { query, similarityTopK, vectorDistanceThreshold, flowName, agentId } = input;
 
+      // Ensure knowledgeBaseId was provided during tool creation.
+      if (!config.knowledgeBaseId) {
+        throw new Error(`[${toolName}] Tool is misconfigured: knowledgeBaseId was not provided at creation. Cannot process query: "${query}".`);
+      }
+
       const effectiveTopK = similarityTopK ?? config.defaultSimilarityTopK ?? 3;
-      const effectiveThreshold = vectorDistanceThreshold ?? config.defaultVectorDistanceThreshold; // Can be undefined
+      const effectiveThreshold = vectorDistanceThreshold ?? config.defaultVectorDistanceThreshold;
 
       console.log(
         `[${toolName}] Received query for KB '${config.knowledgeBaseId}': "${query}". TopK: ${effectiveTopK}, Threshold: ${effectiveThreshold}. Flow: ${flowName}, Agent: ${agentId}`
       );
 
-      // Simulate RAG system interaction
-      // In a real system, this would involve:
-      // 1. (Optional) Query expansion/rewriting.
-      // 2. Generating an embedding for the query.
-      // 3. Searching a vector database for similar document chunks.
-      // 4. Retrieving the original text of those chunks.
-      // 5. (Optional) Re-ranking the chunks.
-      // 6. (Optional) Passing the query and retrieved chunks to an LLM to generate a synthesized answer/summary.
-      // 7. Handling API calls, authentication (config.apiKey), errors, etc.
-
       if (config.apiKey) {
         console.log(`[${toolName}] API key provided (simulated usage for KB: ${config.knowledgeBaseId}).`);
       }
 
-      // Example simulation based on knowledgeBaseId
-      if (config.knowledgeBaseId === "product_manual_v3") {
-        let chunks = [];
-        if (query.toLowerCase().includes("setup")) {
-          chunks.push({
-            id: "doc1_chunk3",
-            content: "To set up the device, first connect the power cable, then press the power button. Refer to page 5 for diagrams.",
-            source: "product_manual_v3.pdf",
-            score: 0.92,
-            metadata: { page: 5, section: "2.1 Setup" },
-          });
-        }
-        if (query.toLowerCase().includes("troubleshooting") || query.toLowerCase().includes("issue")) {
-          chunks.push({
-            id: "doc1_chunk15",
-            content: "If the device does not power on, check the fuse and ensure the power outlet is working. Common issues are listed on page 25.",
-            source: "product_manual_v3.pdf",
-            score: 0.88,
-            metadata: { page: 25, section: "5.1 Troubleshooting" },
-          });
-        }
-        if (chunks.length === 0) {
-          chunks.push({
-            id: "doc1_generic_chunk",
-            content: `No specific information found for "${query}" in product_manual_v3. General information: This product is designed for ease of use.`,
-            source: "product_manual_v3.pdf",
-            score: 0.65,            metadata: { section: "General" },
-          });
-        }
-        // Simulate taking top K chunks
-        const finalChunks = chunks.slice(0, effectiveTopK);
+      try {
+        // Example simulation based on knowledgeBaseId
+        if (config.knowledgeBaseId === "product_manual_v3") {
+          let chunks = [];
+          if (query.toLowerCase().includes("setup")) {
+            chunks.push({
+              id: "doc1_chunk3",
+              content: "To set up the device, first connect the power cable, then press the power button. Refer to page 5 for diagrams.",
+              source: "product_manual_v3.pdf",
+              score: 0.92,
+              metadata: { page: 5, section: "2.1 Setup" },
+            });
+          }
+          if (query.toLowerCase().includes("troubleshooting") || query.toLowerCase().includes("issue")) {
+            chunks.push({
+              id: "doc1_chunk15",
+              content: "If the device does not power on, check the fuse and ensure the power outlet is working. Common issues are listed on page 25.",
+              source: "product_manual_v3.pdf",
+              score: 0.88,
+              metadata: { page: 25, section: "5.1 Troubleshooting" },
+            });
+          }
+          if (chunks.length === 0) {
+            // Simulate no specific chunks found, but not an error condition for this specific KB
+            // Could also throw an error here if "no results found" should be an error.
+            // For this example, we'll return empty chunks for "product_manual_v3" if no keywords match.
+             chunks.push({
+              id: "doc1_generic_chunk_not_found",
+              content: `No specific information found for "${query}" in product_manual_v3. Please try rephrasing your query.`,
+              source: "product_manual_v3.pdf",
+              score: 0.30, // Lower score for generic "not found" type message
+              metadata: { section: "General" },
+            });
+          }
+          const finalChunks = chunks.slice(0, effectiveTopK);
 
-        return {
-          retrievedChunks: finalChunks,
-          summary: `Based on product_manual_v3, for your query "${query}": ${finalChunks.map(c => c.content).join(' ')}`,
-          debugInfo: {
-            configuredKbId: config.knowledgeBaseId,
-            effectiveTopK: effectiveTopK,
-            effectiveThreshold: effectiveThreshold,
-            queryEmbeddingUsed: true, // Simulation
-            searchPerformed: true, // Simulation
-          }
-        };
-      } else if (config.knowledgeBaseId) {
-         // Generic simulation for any other configured KB ID
-         return {
-          retrievedChunks: [{
-            id: 'generic_sim_chunk',
-            content: `Simulated content for query "${query}" from knowledge base "${config.knowledgeBaseId}". TopK: ${effectiveTopK}.`,
-            source: 'generic_simulation.txt',
-            score: 0.80
-          }],
-          summary: `Information retrieved from KB: ${config.knowledgeBaseId}.`,
-          debugInfo: {
-            configuredKbId: config.knowledgeBaseId,
-            effectiveTopK: effectiveTopK,
-            effectiveThreshold: effectiveThreshold,
-            queryEmbeddingUsed: true,
-            searchPerformed: true,
-          }
-        };
+          return {
+            retrievedChunks: finalChunks,
+            summary: `Based on product_manual_v3, for your query "${query}": ${finalChunks.map(c => c.content).join(' ')}`,
+            debugInfo: {
+              configuredKbId: config.knowledgeBaseId,
+              effectiveTopK: effectiveTopK,
+              effectiveThreshold: effectiveThreshold,
+              queryEmbeddingUsed: true,
+              searchPerformed: true,
+            }
+          };
+        } else if (config.knowledgeBaseId === "internal_dev_docs_v1") {
+          // Generic simulation for another recognized KB ID
+          return {
+            retrievedChunks: [{
+              id: 'dev_docs_sim_chunk',
+              content: `Simulated developer documentation content for query "${query}" from knowledge base "${config.knowledgeBaseId}". TopK: ${effectiveTopK}.`,
+              source: 'internal_dev_docs_v1_simulation.md',
+              score: 0.85
+            }],
+            summary: `Developer information retrieved from KB: ${config.knowledgeBaseId}.`,
+            debugInfo: {
+              configuredKbId: config.knowledgeBaseId,
+              effectiveTopK: effectiveTopK,
+              effectiveThreshold: effectiveThreshold,
+              queryEmbeddingUsed: true,
+              searchPerformed: true,
+            }
+          };
+        } else {
+          // If the knowledgeBaseId is not recognized by any specific simulation logic
+          const errorMsg = `Knowledge base ID '${config.knowledgeBaseId}' is not recognized by this simulation or the RAG system is not implemented for it. Query: "${query}".`;
+          console.warn(`[${toolName}] ${errorMsg}`);
+          throw new Error(errorMsg);
+        }
+      } catch (error: any) {
+        console.error(`[${toolName}] Error during knowledge base query simulation for KB '${config.knowledgeBaseId}':`, error.message);
+        if (error instanceof Error) {
+          throw error; // Re-throw if it's already an Error instance
+        }
+        throw new Error(`Failed to query knowledge base '${config.knowledgeBaseId}': ${error.message || 'Unknown error during simulation'}`);
       }
-
-      console.warn(`[${toolName}] RAG system not fully implemented or KB ID '${config.knowledgeBaseId}' not recognized by simulation.`);
-      return {
-        retrievedChunks: [],
-        error: `Knowledge base ID '${config.knowledgeBaseId}' is not currently available or RAG system is not fully implemented. Query: "${query}".`,
-        debugInfo: {
-            configuredKbId: config.knowledgeBaseId,
-            effectiveTopK: effectiveTopK,
-            effectiveThreshold: effectiveThreshold,
-          }
-      };
     }
   );
 }

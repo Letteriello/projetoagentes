@@ -36,11 +36,10 @@ export const CalendarAccessInputSchema = z.object({
 });
 
 // 3. Define Output Schema for the tool's handler
+// Success and error fields are removed. Data is the direct output on success.
 export const CalendarAccessOutputSchema = z.object({
-  success: z.boolean().describe("Indicates whether the calendar operation was successful."),
   data: z.any().optional()
     .describe("Varies based on action: list of events, created event details, or availability status."),
-  error: z.string().optional().describe("Error message if the operation failed."),
   debugInfo: z.object({
     effectiveCalendarId: z.string(),
     action: z.string(),
@@ -52,10 +51,15 @@ export const CalendarAccessOutputSchema = z.object({
 // 4. Factory function to create the calendarAccessTool
 export function createCalendarAccessTool(
   config: CalendarAccessToolConfig
-): Tool<typeof CalendarAccessInputSchema, typeof CalendarAccessOutputSchema> {
+): ToolDefinition<typeof CalendarAccessInputSchema, typeof CalendarAccessOutputSchema> { // Corrected Tool type
   const toolName = config.name || 'calendarAccess';
   const toolDescription = config.description ||
     `Accesses and manages events for a configured calendar (Default ID: ${config.defaultCalendarId || 'primary'}).`;
+
+  // Optional: Early check for critical missing configuration if needed, though current logic defaults 'primary'
+  // if (!config.defaultCalendarId) {
+  //   console.warn(`[${toolName}] Initialized without a defaultCalendarId. Operations might fail if no calendarId is provided in input.`);
+  // }
 
   console.log(`[${toolName}] Initialized with config:`, {
     defaultCalendarId: config.defaultCalendarId,
@@ -68,10 +72,15 @@ export function createCalendarAccessTool(
       name: toolName,
       description: toolDescription,
       inputSchema: CalendarAccessInputSchema,
-      outputSchema: CalendarAccessOutputSchema,
+      outputSchema: CalendarAccessOutputSchema, // Updated schema
     },
     async (input: z.infer<typeof CalendarAccessInputSchema>) => {
       const effectiveCalendarId = input.calendarId || config.defaultCalendarId || 'primary';
+
+      // Example of an early error throw if a calendar ID is absolutely required but somehow still not resolved.
+      // if (!effectiveCalendarId) {
+      //   throw new Error(`[${toolName}] Calendar ID is required but was not provided in input and no default is configured.`);
+      // }
 
       console.log(`[${toolName}] Received action '${input.action}' for calendar '${effectiveCalendarId}'. Input:`, input);
       if(config.serviceEndpoint) {
@@ -81,12 +90,6 @@ export function createCalendarAccessTool(
         console.log(`[${toolName}] API key provided in configuration.`);
       }
 
-      // TODO: Implement actual Calendar API interaction here.
-      // This would involve:
-      // 1. Authentication (using config.apiKey, or OAuth flow not detailed here).
-      // 2. API Client Initialization (e.g., for Google Calendar, MS Graph, or custom `config.serviceEndpoint`).
-      // 3. Mapping actions to API calls using `effectiveCalendarId`.
-
       const debugInfo = {
         effectiveCalendarId,
         action: input.action,
@@ -94,61 +97,75 @@ export function createCalendarAccessTool(
         apiKeyUsed: !!config.apiKey,
       };
 
-      switch (input.action) {
-        case 'list_events':
-          console.log(`[${toolName}] Simulating 'list_events' for calendar: ${effectiveCalendarId}`);
-          return {
-            success: true,
-            data: [
-              { id: "evt1_sim", title: "Team Sync", startTime: new Date().toISOString(), endTime: new Date(Date.now() + 3600000).toISOString(), calendarId: effectiveCalendarId },
-              { id: "evt2_sim", title: "Project Review", startTime: new Date(Date.now() + 7200000).toISOString(), endTime: new Date(Date.now() + 10800000).toISOString(), calendarId: effectiveCalendarId },
-            ],
-            debugInfo,
-          };
+      try {
+        switch (input.action) {
+          case 'list_events':
+            console.log(`[${toolName}] Simulating 'list_events' for calendar: ${effectiveCalendarId}`);
+            return { // Success: directly return data and debugInfo
+              data: [
+                { id: "evt1_sim", title: "Team Sync", startTime: new Date().toISOString(), endTime: new Date(Date.now() + 3600000).toISOString(), calendarId: effectiveCalendarId },
+                { id: "evt2_sim", title: "Project Review", startTime: new Date(Date.now() + 7200000).toISOString(), endTime: new Date(Date.now() + 10800000).toISOString(), calendarId: effectiveCalendarId },
+              ],
+              debugInfo,
+            };
 
-        case 'create_event':
-          if (!input.title || !input.startTime || !input.endTime) {
-            return { success: false, error: "Missing title, startTime, or endTime for create_event action.", debugInfo };
-          }
-          console.log(`[${toolName}] Simulating 'create_event': ${input.title} at ${input.startTime} on calendar ${effectiveCalendarId}`);
-          return {
-            success: true,
-            data: {
-              eventId: "cal_evt_sim_" + Date.now(),
-              title: input.title,
-              startTime: input.startTime,
-              endTime: input.endTime,
-              attendees: input.attendees || [],
-              calendarId: effectiveCalendarId,
-              htmlLink: `https://calendar.example.com/event?id=cal_evt_sim_${Date.now()}`
-            },
-            debugInfo,
-          };
+          case 'create_event':
+            if (!input.title || !input.startTime || !input.endTime) {
+              console.error(`[${toolName}] Error: Missing title, startTime, or endTime for create_event action.`);
+              throw new Error("Missing title, startTime, or endTime for create_event action.");
+            }
+            console.log(`[${toolName}] Simulating 'create_event': ${input.title} at ${input.startTime} on calendar ${effectiveCalendarId}`);
+            return { // Success
+              data: {
+                eventId: "cal_evt_sim_" + Date.now(),
+                title: input.title,
+                startTime: input.startTime,
+                endTime: input.endTime,
+                attendees: input.attendees || [],
+                calendarId: effectiveCalendarId,
+                htmlLink: `https://calendar.example.com/event?id=cal_evt_sim_${Date.now()}`
+              },
+              debugInfo,
+            };
 
-        case 'check_availability':
-          if (!input.startTime || !input.endTime) {
-            return { success: false, error: "Missing startTime or endTime for check_availability action.", debugInfo };
-          }
-          console.log(`[${toolName}] Simulating 'check_availability' for calendar ${effectiveCalendarId}: ${input.startTime} - ${input.endTime}`);
-          return {
-            success: true,
-            data: {
-              isAvailable: true, // Simulated: always available
-              checkedRange: { startTime: input.startTime, endTime: input.endTime },
-              calendarId: effectiveCalendarId,
-            },
-            debugInfo,
-          };
+          case 'check_availability':
+            if (!input.startTime || !input.endTime) {
+              console.error(`[${toolName}] Error: Missing startTime or endTime for check_availability action.`);
+              throw new Error("Missing startTime or endTime for check_availability action.");
+            }
+            console.log(`[${toolName}] Simulating 'check_availability' for calendar ${effectiveCalendarId}: ${input.startTime} - ${input.endTime}`);
+            return { // Success
+              data: {
+                isAvailable: true, // Simulated: always available
+                checkedRange: { startTime: input.startTime, endTime: input.endTime },
+                calendarId: effectiveCalendarId,
+              },
+              debugInfo,
+            };
 
-        default:
-          console.error(`[${toolName}] Unknown action: ${input.action}`);
-          return { success: false, error: `Unknown calendar action: ${input.action}`, debugInfo };
+          default:
+            // This case handles actions that are not one of the enum values.
+            // Zod validation should catch this before it reaches here if the enum is exhaustive.
+            // However, as a fallback or if enum isn't strictly enforced at all levels:
+            const exhaustiveCheck: never = input.action; // Ensures all enum cases are handled
+            console.error(`[${toolName}] Unknown or unsupported action: ${(exhaustiveCheck as string)}`);
+            throw new Error(`Unknown or unsupported calendar action: ${(exhaustiveCheck as string)}`);
+        }
+      } catch (error: any) {
+        // Log and re-throw any errors that occurred during the process
+        console.error(`[${toolName}] Error during action '${input.action}' for calendar '${effectiveCalendarId}':`, error.message);
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(`Failed to perform calendar action '${input.action}': ${error.message || 'Unknown error'}`);
       }
     }
   );
 }
 
 // Example of how to export a pre-configured instance (optional)
+// Note: Tool type here should be ToolDefinition for consistency if imported elsewhere.
+// import { ToolDefinition } from '@genkit-ai/core';
 // export const myWorkCalendar = createCalendarAccessTool({
 //   name: "workCalendar",
 //   description: "Manages events on the work calendar.",

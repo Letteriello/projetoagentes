@@ -23,11 +23,11 @@ export const CustomFunctionInvokerInputSchema = z.object({
 });
 
 // 2. Define Output Schema
+// Success and error fields are removed. Output represents a 'successful' simulation.
+// Errors are thrown for simulation failures.
 export const CustomFunctionInvokerOutputSchema = z.object({
-  success: z.boolean().describe("Indicates whether the simulated invocation was 'successful'."),
   result: z.any().optional().describe("The simulated result from the function. May include a message about the simulation."),
-  error: z.string().optional().describe("Any errors from the simulation (e.g., if code contains 'error_trigger')."),
-  securityWarning: z.string().describe("A constant security warning about the dangers of this type of tool if implemented for real."),
+  securityWarning: z.string().describe("A constant security warning about the dangers of this type of tool if implemented for real. This warning is always present."),
 });
 
 // 3. Create customFunctionInvokerTool
@@ -35,25 +35,29 @@ export const customFunctionInvokerTool = ai.defineTool(
   {
     name: 'customPythonFunctionInvoker',
     description:
-      "SIMULATED: 'Invokes' a user-defined Python function provided as a string. CRITICAL SECURITY WARNING: Executing arbitrary code is extremely dangerous. This tool is for demonstration and simulates execution only. A real version would require a very secure sandboxed environment.",
+      "SIMULATED: 'Invokes' a user-defined Python function provided as a string. CRITICAL SECURITY WARNING: Executing arbitrary code is extremely dangerous. This tool is for demonstration and simulates execution only. A real version would require a very secure sandboxed environment. This tool will always include a security warning in its output.",
     inputSchema: CustomFunctionInvokerInputSchema,
-    outputSchema: CustomFunctionInvokerOutputSchema,
+    outputSchema: CustomFunctionInvokerOutputSchema, // Updated schema
   },
-  async (input: z.infer<typeof CustomFunctionInvokerInputSchema>) => {
+  async (input: z.infer<typeof CustomFunctionInvokerInputSchema>): Promise<z.infer<typeof CustomFunctionInvokerOutputSchema>> => {
     console.log('[CustomFunctionInvokerTool] Received input:', {
       functionName: input.functionName,
       inputArgs: input.inputArgs,
       codeSnippet: input.userDefinedPythonCode.substring(0, 100) + '...',
     });
 
+    // Always include the security warning.
+    // The primary purpose of this tool in its current state is to demonstrate the *concept*
+    // and its associated risks, rather than to be a functional executor.
+
     if (input.userDefinedPythonCode.toLowerCase().includes("error_trigger")) {
-      console.warn('[CustomFunctionInvokerTool] "error_trigger" detected in user code. Simulating failure.');
-      return {
-        success: false,
-        error: "Simulated error triggered by user code because 'error_trigger' was found.",
-        result: null,
-        securityWarning: SECURITY_WARNING_TEXT,
-      };
+      const errorMsg = "Simulated error: 'error_trigger' keyword detected in user-defined code. This indicates a simulated failure condition.";
+      console.warn(`[CustomFunctionInvokerTool] ${errorMsg}`);
+      // Even when throwing an error, it might be useful to convey the constant security risk if this were a real tool.
+      // However, standard error handling usually doesn't mix output fields with error messages.
+      // The description of the tool should carry the primary security warning.
+      // For this refactor, the error itself will be the focus.
+      throw new Error(`${errorMsg} ${SECURITY_WARNING_TEXT}`);
     }
 
     // Simulate successful invocation
@@ -67,10 +71,9 @@ export const customFunctionInvokerTool = ai.defineTool(
     };
 
     console.log('[CustomFunctionInvokerTool] Simulating successful invocation.');
-    return {
-      success: true,
+    return { // Success: directly return result and securityWarning
       result: simulatedOutput,
-      securityWarning: SECURITY_WARNING_TEXT,
+      securityWarning: SECURITY_WARNING_TEXT, // Ensure warning is always present
     };
   }
 );

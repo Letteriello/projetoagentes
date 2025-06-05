@@ -64,52 +64,55 @@ export const GcsUploadFileInputSchema = z.object({
 });
 
 // Define Output Schema for GCS Upload File
+// Success field removed as errors are thrown. Message field removed as it was primarily for error/status, now covered by error messages or direct output.
 export const GcsUploadFileOutputSchema = z.object({
-  success: z.boolean().describe("Whether the mock upload was successful."),
-  filePath: z.string().optional().describe("The simulated GCS path to the uploaded file (e.g., gs://bucketName/fileName)."),
-  message: z.string().describe("A message indicating the result of the operation."),
+  filePath: z.string().describe("The simulated GCS path to the uploaded file (e.g., gs://bucketName/fileName)."),
+  // Optionally, can include other details of a successful upload if relevant, e.g., versionId, size for simulation
 });
 
 // Create gcsUploadFileTool
 export const gcsUploadFileTool = ai.defineTool(
   {
     name: 'gcsUploadFile',
-    description: 'Simulates uploading a file to Google Cloud Storage. Takes bucket name, file name, and content.',
+    description: 'Simulates uploading a file to Google Cloud Storage. Takes bucket name, file name, and content. Throws errors for simulated failures.',
     inputSchema: GcsUploadFileInputSchema,
-    outputSchema: GcsUploadFileOutputSchema,
+    outputSchema: GcsUploadFileOutputSchema, // Updated schema
   },
-  async (input: z.infer<typeof GcsUploadFileInputSchema>) => {
+  async (input: z.infer<typeof GcsUploadFileInputSchema>): Promise<z.infer<typeof GcsUploadFileOutputSchema>> => {
     console.log('[GcsUploadFileTool] Received input:', { bucketName: input.bucketName, fileName: input.fileName, contentSnippet: input.fileContent.substring(0,50) + '...' });
 
     if (input.bucketName.toLowerCase() === "fail-bucket") {
-      console.warn(`[GcsUploadFileTool] Simulating upload failure for bucket: ${input.bucketName}`);
-      return {
-        success: false,
-        message: `Simulated failure: Bucket "${input.bucketName}" is designated to cause failures.`,
-      };
+      const errorMsg = `Simulated failure: Bucket '${input.bucketName}' is designated to cause failures.`;
+      console.warn(`[GcsUploadFileTool] ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
-    // Simulate a check if the bucket exists (using the list from the other tool for some realism)
+    // Simulate a check if the bucket exists
     const knownBuckets = [
         "my-simulated-bucket-alpha",
         "project-files-bucket-beta",
         "another-simulated-storage",
         "my-app-data"
+        // "fail-bucket" is intentionally omitted here as it's a failure case handled above.
     ];
     if (!knownBuckets.includes(input.bucketName)) {
-        console.warn(`[GcsUploadFileTool] Simulating upload failure: Bucket "${input.bucketName}" not found.`);
-        return {
-            success: false,
-            message: `Simulated failure: Bucket "${input.bucketName}" does not exist in the mock list.`,
-        };
+        const errorMsg = `Simulated failure: Bucket '${input.bucketName}' does not exist in the mock list.`;
+        console.warn(`[GcsUploadFileTool] ${errorMsg}`);
+        throw new Error(errorMsg);
     }
 
+    // If we reach here, the simulation is successful
     const simulatedFilePath = `gs://${input.bucketName}/${input.fileName}`;
-    console.log(`[GcsUploadFileTool] Simulating successful upload to: ${simulatedFilePath}`);
+    console.log(`[GcsUploadFileTool] Simulating successful upload to: ${simulatedFilePath}. Content length (simulated): ${input.fileContent.length}`);
+
+    // For a successful simulation, return the expected output.
+    // The 'message' field from the old schema is removed; success is implied by not throwing.
+    // If a success message were desired, it would be part of the defined output schema.
     return {
-      success: true,
       filePath: simulatedFilePath,
-      message: `File ${input.fileName} simulated upload to ${input.bucketName} successfully with content: ${input.fileContent.substring(0, 30)}...`,
+      // Example: could add other simulated details like:
+      // versionId: `sim-version-${Date.now()}`,
+      // size: input.fileContent.length,
     };
   }
 );

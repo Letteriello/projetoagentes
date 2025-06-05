@@ -37,8 +37,9 @@ export const textSummarizerTool = defineTool(
     winstonLogger.info(`[${flowName}] Starting summarization. Text length: ${input.textToSummarize.length}, Model: ${input.modelName || 'gemini-pro'}`, { flowName });
 
     if (!input.textToSummarize.trim()) {
-      winstonLogger.warn(`[${flowName}] Text to summarize is empty or whitespace.`, { flowName });
-      return { summary: '' }; // Or throw new Error('Text to summarize cannot be empty.');
+      const errorMsg = 'Text to summarize cannot be empty.';
+      winstonLogger.warn(`[${flowName}] ${errorMsg}`, { flowName });
+      throw new Error(errorMsg);
     }
 
     const modelToUse = input.modelName || 'gemini-pro'; // Default model
@@ -53,26 +54,30 @@ export const textSummarizerTool = defineTool(
         },
       });
 
-      const summaryText = llmResponse.text();
+      const summaryText = llmResponse.text()?.trim(); // Also trim the summary
 
-      if (!summaryText) {
-        winstonLogger.warn(`[${flowName}] LLM returned an empty summary for model ${modelToUse}.`, { flowName });
-        throw new Error('LLM returned an empty summary.');
+      if (!summaryText) { // Check if summaryText is empty after trim
+        const errorMsg = `LLM returned an empty or whitespace-only summary for model ${modelToUse}.`;
+        winstonLogger.warn(`[${flowName}] ${errorMsg}`, { flowName });
+        throw new Error(errorMsg);
       }
 
       winstonLogger.info(`[${flowName}] Summarization successful. Summary length: ${summaryText.length}`, { flowName });
       return { summary: summaryText };
 
     } catch (error: any) {
-      winstonLogger.error(`[${flowName}] Error during LLM interaction for model ${modelToUse}: ${error.message}`, {
+      const errorMessage = `Failed to generate summary using ${modelToUse}: ${error.message}`;
+      winstonLogger.error(`[${flowName}] ${errorMessage}`, {
         flowName,
         error: { message: error.message, stack: error.stack, name: error.name },
         textLength: input.textToSummarize.length,
       });
-      // It's often better to throw the error so the calling flow can handle it appropriately.
-      // However, if the tool should always return a "graceful" output, you might return an error message in the summary.
-      // For now, let's re-throw to indicate a tool failure.
-      throw new Error(`Failed to generate summary using ${modelToUse}: ${error.message}`);
+      // Re-throw the error to indicate a tool failure.
+      // If error is already an Error instance, re-throw it, otherwise wrap it.
+      if (error instanceof Error) {
+        throw error; // Or wrap with more context: new Error(errorMessage, { cause: error })
+      }
+      throw new Error(errorMessage);
     }
   }
 );
