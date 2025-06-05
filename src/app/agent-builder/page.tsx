@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams } from "next/navigation";
-// import { useRouter } from "next/navigation"; // Removido pois não está disponível nesta versão do Next.js
+import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 
@@ -55,6 +54,8 @@ import { useAchievements } from "@/hooks/useAchievements"; // Added useAchieveme
 import ContextualHelp from "@/components/shared/ContextualHelp"; // Added ContextualHelp
 import EmptyState from "@/components/shared/EmptyState"; // Added EmptyState
 import Link from "next/link"; // Added Link for ContextualHelp
+import AgentBuilderDialog from "@/components/features/agent-builder/agent-builder-dialog";
+import AgentCard from "@/components/features/agent-builder/agent-card";
 
 // Importações de tipos
 import { 
@@ -75,12 +76,8 @@ import {
 // Importações de utilitários
 import { toAgentFormData, toSavedAgentConfiguration } from "@/lib/agent-type-utils";
 
-// Componentes dinâmicos com correção de imports
-const AgentBuilderDialog = React.lazy(() => 
-  import("@/components/features/agent-builder/agent-builder-dialog").then(m => ({
-    default: m.default
-  }))
-); // Ajustado para compatibilidade com export default
+// Componentes dinâmicos com lazy loading
+// Removida duplicação: AgentBuilderDialog já foi importado diretamente acima
 
 // Componentes de modal
 const ToolConfigModal = React.lazy(() => 
@@ -203,13 +200,12 @@ export default function AgentBuilderPage() {
   const [isConfirmDeleteAgentOpen, setIsConfirmDeleteAgentOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState(false);
-  
-  // Estado para edição
-  const [editingAgent, setEditingAgent] = useState<AdaptedAgentFormData | null>(null);
-  const [agentToDelete, setAgentToDelete] = useState<AdaptedSavedAgentConfiguration | null>(null);
   const [agentToSaveAsTemplate, setAgentToSaveAsTemplate] = useState<AdaptedSavedAgentConfiguration | null>(null);
-  const [templateName, setTemplateName] = useState("");
-  const [configuringTool, setConfiguringTool] = useState<AvailableTool | null>(null);
+const [templateName, setTemplateName] = useState<string>("");
+const [configuringTool, setConfiguringTool] = useState<AvailableTool | null>(null);
+// Estado para edição
+const [editingAgent, setEditingAgent] = useState<AdaptedAgentFormData | null>(null);
+const [agentToDelete, setAgentToDelete] = useState<AdaptedSavedAgentConfiguration | null>(null);
   const [currentSelectedApiKeyId, setCurrentSelectedApiKeyId] = useState<string | undefined>();
   
   // States for Task 8.2: Quality Report Modal
@@ -350,11 +346,11 @@ export default function AgentBuilderPage() {
         const currentPath = window.location.pathname;
         const newSearchParams = new URLSearchParams(window.location.search);
         newSearchParams.delete('data');
-        router.replace(`${currentPath}?${newSearchParams.toString()}`, undefined);
+        window.history.replaceState({}, '', `${currentPath}?${newSearchParams.toString()}`);
 
       }
     }
-  }, [searchParams, router, toast]); // Added router and toast to dependencies
+  }, [searchParams, toast]); // Added router and toast to dependencies
 
   // Filtrar agentes com base na busca
   const filteredAgents = agents.filter((agent) => 
@@ -608,7 +604,7 @@ export default function AgentBuilderPage() {
         }
       } else {
         // Criação de novo agente
-        const newAgent = await addAgent({
+        const createdAgent = await addAgent({
           agentName: formData.agentName,
           description: formData.description || "",
           config: {
@@ -631,10 +627,10 @@ export default function AgentBuilderPage() {
           // Removido isPublic para compatibilidade com o tipo
         });
 
-        if (newAgent) {
+        if (formData) {
           toast({
             title: "Agente criado",
-            description: `O agente ${newAgent.agentName} foi criado com sucesso!`
+            description: `O agente ${formData.agentName} foi criado com sucesso!`
           });
         } else {
           toast({
@@ -659,7 +655,7 @@ export default function AgentBuilderPage() {
           isSelectedForMonitoring={selectedAgentForMonitoring?.id === agent.id}
           onGenerateQualityReport={onGenerateQualityReport} // Pass down the handler
           availableTools={builderAvailableTools}
-          agentTypeOptions={agentTypeOptions}
+          agentTypeOptions={[]}
           onToggleFavorite={() => {}}
         />
       </div>
@@ -670,7 +666,7 @@ export default function AgentBuilderPage() {
     if (!agentToImportData) return;
 
     let agentName = agentToImportData.agentName || "Agente Importado";
-    // Check for name conflicts
+    // Checa conflitos de nome
     let nameConflictCount = 0;
     let newName = agentName;
     while (agents.some(a => a.agentName === newName)) {
@@ -679,42 +675,24 @@ export default function AgentBuilderPage() {
     }
     agentName = newName;
 
-    const newAgent: SavedAgentConfiguration = {
-      id: uuidv4(), // Generate new unique ID
-      originalAgentId: agentToImportData.id, // Store original ID if present
-      agentName: agentName,
+    const importedAgent: SavedAgentConfiguration = {
+      id: uuidv4(),
+      agentName,
       description: agentToImportData.description || "",
-      config: agentToImportData.config!, // Assert config is present due to earlier check
-      tools: agentToImportData.tools || [],
+      config: agentToImportData.config!,
       createdAt: new Date(),
       updatedAt: new Date(),
       userId: agentToImportData.userId || "",
       isTemplate: false
-      // Removido: agentVersion, icon, toolsDetails pois não existem no tipo
-    };
-        // label: td.label || td.name || td.id, // Example
-      })) || [],
-      toolConfigsApplied: /* Removido: propriedade inexistente no tipo */ || {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      // Ensure all other required fields from SavedAgentConfiguration are present with defaults
-      templateId: agentToImportData.templateId,
-      isTemplate: false, // Imported agents are typically not templates themselves
-      isFavorite: false,
-      tags: /* Removido: propriedade inexistente no tipo */ || [],
-      userId: '', // Or get from current user context if available
-      // Default other complex objects if not in importData or if they need re-initialization
-      deploymentConfig: /* Removido: propriedade inexistente no tipo */ || { environmentVariables: [], resourceRequirements: { cpu: '', memory: ''} },
-      internalVersion: 1,
-      isLatest: true,
     };
 
     try {
-      await addAgent(newAgent); // Assuming addAgent now directly takes SavedAgentConfiguration
+      await addAgent(importedAgent);
       toast({
         title: "Agente Importado",
-        description: `O agente "${newAgent.agentName}" foi importado com sucesso.`,
+        description: `O agente "${importedAgent.agentName}" foi importado com sucesso.`,
       });
+      setIsImportConfirmationOpen(false);
     } catch (error) {
       console.error("Erro ao importar agente:", error);
       toast({
@@ -728,18 +706,8 @@ export default function AgentBuilderPage() {
     setAgentToImportData(null);
     // URL should have already been cleaned by the useEffect that detected 'data'
   };
+  
   // Renderização do componente principal
-    // Fechar modal e resetar estado
-    setEditingAgent(null);
-  } catch (error) {
-      console.error("Erro ao salvar agente:", error);
-      toast({
-        title: "Erro ao salvar agente",
-        description: "Houve um problema ao processar sua solicitação. Tente novamente.",
-        variant: "destructive"
-      });
-    }
-  };  // Renderização do componente
   return (
     <>
       <div className="container mx-auto py-6 space-y-6">
@@ -899,32 +867,32 @@ export default function AgentBuilderPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAgents.map((agent: AdaptedSavedAgentConfiguration, index: number) => (
                 <RenderAgentRow
-                  key={agent.id}
-                  agent={agent}
-                  index={index}
-                  style={{}}
-                  onEdit={handleEditAgent}
-                  onDelete={handleDeleteAgent}
-                  onDuplicate={handleDuplicateAgent}
-                  onSaveTemplate={handleSaveAsTemplate}
-                  onGenerateQualityReport={handleGenerateQualityReport} // Pass handler
-                />
+  key={agent.id}
+  agent={agent}
+  index={index}
+  style={{}}
+  onEdit={() => handleEditAgent(agent)}
+  onDelete={() => handleDeleteAgent(agent)}
+  onDuplicate={() => handleDuplicateAgent(agent)}
+  onSaveTemplate={() => handleSaveAsTemplate(agent)}
+  onGenerateQualityReport={() => handleGenerateQualityReport(agent)}
+/>
               ))}
             </div>
           ) : (
             <div className="space-y-3">
               {filteredAgents.map((agent: AdaptedSavedAgentConfiguration, index: number) => (
                 <RenderAgentRow
-                  key={agent.id}
-                  agent={agent}
-                  index={index}
-                  style={{}}
-                  onEdit={handleEditAgent}
-                  onDelete={handleDeleteAgent}
-                  onDuplicate={handleDuplicateAgent}
-                  onSaveTemplate={handleSaveAsTemplate}
-                  onGenerateQualityReport={handleGenerateQualityReport} // Pass handler
-                />
+  key={agent.id}
+  agent={agent}
+  index={index}
+  style={{}}
+  onEdit={() => handleEditAgent(agent)}
+  onDelete={() => handleDeleteAgent(agent)}
+  onDuplicate={() => handleDuplicateAgent(agent)}
+  onSaveTemplate={() => handleSaveAsTemplate(agent)}
+  onGenerateQualityReport={() => handleGenerateQualityReport(agent)}
+/>
               ))}
             </div>
           )
@@ -938,7 +906,7 @@ export default function AgentBuilderPage() {
           content={
             <>
               Parece que você ainda não criou nenhum agente. Precisa de ajuda para começar? Confira nossos{" "}
-              <Link href="/tutorials" className="underline hover:text-primary" onClick={handleUserInteraction}>
+              <Link href="/tutorials" className="underline hover:text-primary">
                 tutoriais
               </Link>{" "}
               ou clique em &quot;Novo Agente&quot; para iniciar.
@@ -957,7 +925,7 @@ export default function AgentBuilderPage() {
               if (open) handleUserInteraction(); // Interaction when modal opens
             }}
             initialData={editingAgent}
-            onSave={(data) => {
+            onSave={(data: AdaptedAgentFormData) => {
               handleSaveAgent(data);
               handleUserInteraction(); // Interaction on save
             }}
@@ -978,7 +946,7 @@ export default function AgentBuilderPage() {
               if (open) handleUserInteraction(); // Interaction when modal opens
             }}
             initialData={editingAgent}
-            onSave={(data) => {
+            onSave={(data: AdaptedAgentFormData) => {
               handleSaveAgent(data);
               handleUserInteraction(); // Interaction on save
             }}
