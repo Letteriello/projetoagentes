@@ -15,6 +15,12 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { EnvironmentProvider } from '@/contexts/EnvironmentContext';
 import { LoggerProvider } from '@/components/logger-provider';
 import Joyride, { Step, CallBackProps, STATUS, EVENTS, ACTIONS } from "react-joyride";
+import OnboardingModal from '@/components/ui/OnboardingModal'; // Added OnboardingModal import
+import Link from 'next/link'; // Added for Help Widget
+import { Button } from '@/components/ui/button'; // Added for Help Widget
+import { HelpCircle, Lightbulb } from 'lucide-react'; // Added for Help Widget & Tips
+// Dialog components (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription)
+// are already imported via CommandDialog or OnboardingModal, or will be implicitly available.
 
 // Network Status Hook
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -125,12 +131,48 @@ export default function RootLayout({
 }>) {
   const [runTour, setRunTour] = React.useState(false);
   const [tourSteps] = React.useState<Step[]>(initialSteps);
+  const [showOnboardingModal, setShowOnboardingModal] = React.useState(false);
+  const [isHelpWidgetOpen, setIsHelpWidgetOpen] = React.useState(false); // State for Help Widget
+
+  // Tips / Featured Resources
+  const featuredTips = [
+    { id: 'tip1', title: 'Dica do Dia', message: 'Você sabia que pode usar o Command Palette (Cmd/Ctrl+K) para navegação rápida?' },
+    { id: 'tip2', title: 'Recurso Destacado', message: 'Explore o construtor de agentes para criar IAs personalizadas para suas tarefas!' },
+    { id: 'tip3', title: 'Dica do Dia', message: 'Mantenha suas chaves de API seguras no Vault.' },
+    { id: 'tip4', title: 'Recurso Destacado', message: 'Visite a página de Tutoriais para aprender mais sobre a plataforma.'}
+  ];
+  const TIP_FREQUENCY = 24 * 60 * 60 * 1000; // 24 hours
+  // const TIP_FREQUENCY = 60 * 1000; // For testing: 1 minute
+
+  React.useEffect(() => {
+    const lastTipShownTimestamp = localStorage.getItem('lastTipShownTimestamp');
+    const now = Date.now();
+
+    if (!lastTipShownTimestamp || (now - parseInt(lastTipShownTimestamp, 10) > TIP_FREQUENCY)) {
+      const randomTip = featuredTips[Math.floor(Math.random() * featuredTips.length)];
+      toast({
+        title: (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Lightbulb className="mr-2 h-5 w-5 text-yellow-400" />
+            {randomTip.title}
+          </div>
+        ),
+        description: randomTip.message,
+        duration: 8000, // Show tip for 8 seconds
+      });
+      localStorage.setItem('lastTipShownTimestamp', now.toString());
+    }
+  }, [toast]); // Added toast to dependency array
 
   React.useEffect(() => {
     const hasCompletedTour = localStorage.getItem('hasCompletedTour');
+    const hasCompletedOnboardingModal = localStorage.getItem('hasCompletedOnboardingModal');
+
     if (!hasCompletedTour) {
       // setTimeout to ensure the DOM is ready, especially for portal-based elements or dynamic content
       setTimeout(() => setRunTour(true), 500);
+    } else if (!hasCompletedOnboardingModal) { // Check if onboarding modal was completed
+      setShowOnboardingModal(true);
     }
   }, []);
 
@@ -298,6 +340,13 @@ export default function RootLayout({
                 ))}
               </CommandList>
             </CommandDialog>
+            <OnboardingModal
+              isOpen={showOnboardingModal}
+              onClose={() => {
+                setShowOnboardingModal(false);
+                localStorage.setItem('hasCompletedOnboardingModal', 'true');
+              }}
+            />
             <Joyride
               steps={tourSteps}
               run={runTour}
@@ -338,6 +387,36 @@ export default function RootLayout({
                 }
               }}
             />
+            {/* Help Widget Dialog */}
+            <Dialog open={isHelpWidgetOpen} onOpenChange={setIsHelpWidgetOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50 bg-primary text-primary-foreground hover:bg-primary/90"
+                  aria-label="Ajuda e Suporte"
+                >
+                  <HelpCircle className="h-7 w-7" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Ajuda & Suporte</DialogTitle>
+                  <DialogDescription>
+                    Widget de ajuda simulado. Em uma versão futura, aqui você encontraria FAQs,
+                    links para documentação ou um chat de suporte. Por enquanto, você pode consultar nossos{" "}
+                    <Link
+                      href="/tutorials"
+                      className="font-medium text-primary underline hover:text-primary/90"
+                      onClick={() => setIsHelpWidgetOpen(false)} // Close dialog on link click
+                    >
+                      Tutoriais
+                    </Link>.
+                  </DialogDescription>
+                </DialogHeader>
+                {/* Add footer actions if needed, e.g., <DialogFooter><Button>...</Button></DialogFooter> */}
+              </DialogContent>
+            </Dialog>
           </LoggerProvider>
         </ThemeProvider>
       </body>
