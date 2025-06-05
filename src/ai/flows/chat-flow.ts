@@ -43,7 +43,8 @@ import { z } from 'zod';
 import { ActionContext } from 'genkit';
 import { LRUCache } from 'lru-cache';
 import { GenerateResponse } from '@genkit-ai/ai';
-import { AgentConfig, KnowledgeSource, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
+// LLMModelDetails might be imported from llm-models.ts or directly if used explicitly
+import { AgentConfig, KnowledgeSource, RagMemoryConfig } from '../../types/unified-agent-types'; // Adjust path as needed
 import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
 
 // Import new flows and their schemas

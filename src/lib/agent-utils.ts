@@ -1,4 +1,4 @@
-import { SavedAgentConfiguration, AgentConfig, LLMAgentConfig, WorkflowAgentConfig, AgentFramework } from '@/types/agent-types'; // Updated imports
+import { SavedAgentConfiguration, AgentConfig, LLMAgentConfig, WorkflowAgentConfig, AgentFramework } from '@/types/unified-agent-types'; // Updated imports
 import * as yaml from 'js-yaml';
 
 // Define a more comprehensive structure for the manifest

@@ -1,5 +1,5 @@
 // src/hooks/use-agent-storage.ts
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { SavedAgentConfiguration } from '@/types/unified-agent-types';
 import {
   addAgent as addAgentToDB,
   getAllAgents as getAllAgentsFromDB,

@@ -59,15 +59,17 @@ import Link from "next/link"; // Added Link for ContextualHelp
 // Importações de tipos
 import { 
   SavedAgentConfiguration,
-  Tool
-} from "@/types/agent-configs-fixed";
+  // Tool, // If 'Tool' was the simple interface from agent-configs-fixed, it's likely replaced by AvailableTool or another specific type.
+           // unified-agent-types re-exports AvailableTool from tool-types.
+  AvailableTool // Assuming the 'Tool' previously imported was meant to be AvailableTool or similar.
+} from '@/types/unified-agent-types';
 import {
-  AdaptedSavedAgentConfiguration,
-  AdaptedAgentFormData,
-  ToolConfigData
-} from "@/types/agent-types-unified";
+  SavedAgentConfiguration as AdaptedSavedAgentConfiguration, // Alias to maintain usage if structure is compatible
+  AgentFormData as AdaptedAgentFormData, // Alias to maintain usage if structure is compatible
+  ToolConfigData // This is re-exported by unified-agent-types from tool-types
+} from '@/types/unified-agent-types';
 import {
-  AvailableTool,
+  // AvailableTool, // Already imported above from unified-agent-types
   MCPServerConfig,
   ApiKeyEntry
 } from "@/types/tool-types";

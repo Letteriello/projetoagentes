@@ -11,7 +11,7 @@ import {
   LLMAgentConfig, 
   WorkflowAgentConfig,
   WorkflowDetailedType 
-} from '@/types/agent-configs-fixed';
+} from '@/types/unified-agent-types';
 
 // 1. Define Input Schema
 /**

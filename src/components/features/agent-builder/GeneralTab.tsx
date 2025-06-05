@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { TabsContent } from "@/components/ui/tabs";
-import type { AgentFramework, AvailableTool, AgentType, SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // MODIFIED: Added AgentType and SavedAgentConfiguration
+import type { AgentFramework, AvailableTool, AgentType, SavedAgentConfiguration } from '@/types/unified-agent-types'; // MODIFIED: Added AgentType and SavedAgentConfiguration
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Loader2, Wand2 } from "lucide-react";

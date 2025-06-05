@@ -5,7 +5,7 @@ import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
 import { allTools } from '@/data/agent-builder/available-tools';
 import { AvailableTool } from '@/types/tool-types';
-import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/agent-configs-fixed'; // Simplified imports
+import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/unified-agent-types'; // Simplified imports
 
 // 1. Define Input Schema
 /**

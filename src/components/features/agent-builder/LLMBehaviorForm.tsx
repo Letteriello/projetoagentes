@@ -17,7 +17,7 @@ import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions
 import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow'; // For typing suggestions
 import AISuggestionIcon from './AISuggestionIcon'; // Added
 import { useToast } from "@/hooks/use-toast";
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // MODIFIED
+import { SavedAgentConfiguration } from '@/types/unified-agent-types'; // MODIFIED
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"; // MODIFIED
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card components
 // import { Separator } from "@/components/ui/separator"; // Separator might not be needed if using Cards for all sections

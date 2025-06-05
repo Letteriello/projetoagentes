@@ -2,7 +2,7 @@
 
 import { basicChatFlow } from '@/ai/flows/chat-flow';
 import { ChatInput, ChatOutput, ChatFormState, ChatToolDetail } from '@/types/chat-types';
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import type { SavedAgentConfiguration } from '@/types/unified-agent-types';
 import { z } from 'zod';
 import { winstonLogger } from '@/lib/winston-logger'; // Import winstonLogger
 

@@ -124,17 +124,11 @@ import type {
   agentToneOptions as pageAgentToneOptions, // Import value for agentToneOptions
 } from '@/app/agent-builder/page';
 
-import type {
-  AvailableTool, // This should come from agent-types now, which re-exports from tool-types
-  A2AAgentConfig, // This is a specific config type, ensure it matches or is properly used
-  SavedAgentConfiguration, // Import from agent-types for mapToPageAgentConfig parameter
-  AgentConfig, // Keep AgentConfig from agent-types.ts for internal use if needed
-  LLMAgentConfig, // Keep LLMAgentConfig from agent-types.ts
-  WorkflowAgentConfig, // Keep WorkflowAgentConfig from agent-types.ts
-  CustomAgentConfig, // Keep CustomAgentConfig from agent-types.ts
-  ToolConfigData, // Keep ToolConfigData from agent-types.ts
-  AgentConfigBase, // Keep AgentConfigBase from agent-types.ts
+// Types like AvailableTool, SavedAgentConfiguration, AgentConfig etc. are now imported from '@/types/unified-agent-types'
+// in the main import block for types.
+// A2AAgentConfig specific type is covered by A2AAgentSpecialistConfig from unified types.
 
+import type {
   FormField,
   FormItem,
   FormLabel,
@@ -201,7 +195,7 @@ import useApiKeyVault from '../../../hooks/use-api-key-vault'; // Import default
 
 import type {
   SavedAgentConfiguration,
-  AgentConfig as AgentConfigUnion, // Keep alias
+  AgentConfig as AgentConfigUnion,
   LLMAgentConfig,
   WorkflowAgentConfig,
   CustomAgentConfig,
@@ -209,21 +203,20 @@ import type {
   ToolConfigData,
   StatePersistenceConfig,
   RagMemoryConfig,
-  ArtifactsConfig, // Existing import
-  ArtifactStorageType, // Import for DEFAULT_ARTIFACTS_CONFIG
-  A2AConfig as AgentA2AConfig, // Keep alias
-  AvailableTool, // Now from agent-types
-  AgentType, // Added as per subtask example
-  EvaluationGuardrails, // Added for Task 9.4
-  AgentFramework, // Added as per subtask example
-  // WorkflowStep // Removed from here if it was, will be specifically imported
-  // Add any other specific config types that were imported from agent-configs-fixed if they were missed
-  // For example, if WorkflowDetailedType, TerminationConditionType etc. were used here, they would be added.
-  // For now, sticking to the explicitly mentioned ones and those directly replacing the old imports.
-  MCPServerConfig, // Added for MCP Server mock data
-} from '@/types/agent-types';
-// Import WorkflowStep directly from agent-configs-new
-import { WorkflowStep } from '@/types/agent-configs-new';
+  ArtifactsConfig,
+  ArtifactStorageType,
+  A2AConfig as AgentA2AConfig, // This is ActualA2AConfig from a2a-types, re-exported or direct
+  AvailableTool,
+  AgentType,
+  EvaluationGuardrails,
+  AgentFramework,
+  WorkflowStep, // Now from unified-agent-types
+  MCPServerConfig, // Ensure this is correctly re-exported or defined in unified
+  StateScope, // Added based on usage below
+  TerminationConditionType as UnifiedTerminationConditionType, // Added based on usage below
+  // Add other specific types like ModelSafetySettingItem, DeploymentConfig etc. if they are directly used in this file
+} from '@/types/unified-agent-types';
+// WorkflowStep import from agent-configs-new is removed as it's now part of the above unified import.
 
 
 import { type A2AConfig as SharedA2AConfigType, type CommunicationChannel as SharedCommunicationChannel } from "@/types/a2a-types";
@@ -270,15 +263,15 @@ interface AgentBuilderDialogProps {
   editingAgent: PageSavedAgentConfiguration | null; // Use aliased type from page.tsx
   onSave: (agentConfig: PageSavedAgentConfiguration) => void; // Use aliased type from page.tsx
   availableTools: AvailableTool[]; // Use AvailableTool from agent-types.ts
-  agentTypeOptions: Array<{ id: "llm" | "workflow" | "custom" | "a2a"; label: string; icon?: React.ReactNode; description: string; }>;
+  agentTypeOptions: Array<{ id: AgentType; label: string; icon?: React.ReactNode; description: string; }>; // Use unified AgentType
   agentToneOptions: Array<{ id: string; label: string; }>; // Prop type for agentToneOptions
   iconComponents: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>;
 }
 
-type BaseAgentType = "llm" | "workflow" | "custom";
+type BaseAgentType = Extract<AgentType, "llm" | "workflow" | "custom">; // More type-safe with unified AgentType
 // Extended AgentType to include more specific workflow/task types if dialog needs to handle them
-type DialogAgentType = PageAgentConfig['agentType'] | "a2a" | "task" | "sequential" | "parallel" | "loop" ; // PageAgentConfig['agentType'] already includes most of these
-type TerminationConditionType = "none" | "subagent_signal" | "tool" | "state";
+type DialogAgentType = PageAgentConfig['agentType'] | "a2a" | "task" | "sequential" | "parallel" | "loop" ; // PageAgentConfig['agentType'] already includes most of these. Consider aligning with unified AgentType.
+type TerminationConditionType = UnifiedTerminationConditionType | "subagent_signal"; // Align with unified, extend if needed
 
 
 function safeToReactNode(value: unknown): React.ReactNode {
@@ -361,8 +354,8 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
 
   // These state persistence fields are part of RHF (config.statePersistence)
   // const [enableStatePersistence, setEnableStatePersistence] = React.useState<boolean>(editingAgent?.config?.statePersistence?.enabled || false);
-  // const [statePersistenceType, setStatePersistenceType] = React.useState<'session' | 'memory' | 'database'>(editingAgent?.config?.statePersistence?.type || 'memory');
-  // const [initialStateValues, setInitialStateValues] = React.useState<Array<{key: string; value: string; scope: 'global' | 'agent' | 'temporary'; description: string;}>>(editingAgent?.config?.statePersistence?.initialStateValues || []);
+  // const [statePersistenceType, setStatePersistenceType] = React.useState<StatePersistenceType>(editingAgent?.config?.statePersistence?.type || 'memory'); // Use unified StatePersistenceType
+  // const [initialStateValues, setInitialStateValues] = React.useState<Array<{key: string; value: string; scope: StateScope; description: string;}>>(editingAgent?.config?.statePersistence?.initialStateValues || []); // Use unified StateScope
   // const [enableStateSharing, setEnableStateSharing] = React.useState<boolean>(editingAgent?.config?.statePersistence?.enableStateSharing || false); // Assuming enableStateSharing is part of statePersistence
   // const [stateSharingStrategy, setStateSharingStrategy] = React.useState<'all' | 'explicit' | 'none'>(editingAgent?.config?.statePersistence?.stateSharingStrategy || 'explicit'); // Assuming stateSharingStrategy is part of statePersistence
 
@@ -389,7 +382,7 @@ const generateToolSnippet = (toolName: string, jsonSchemaString: string | undefi
 
   // Artifacts config is part of RHF (config.artifacts)
   // const [enableArtifacts, setEnableArtifacts] = React.useState<boolean>(editingAgent?.config?.artifacts?.enabled || false);
-  // const [artifactStorageType, setArtifactStorageType] = React.useState<'memory' | 'filesystem' | 'cloud'>(editingAgent?.config?.artifacts?.storageType || 'memory');
+  // const [artifactStorageType, setArtifactStorageType] = React.useState<ArtifactStorageType>(editingAgent?.config?.artifacts?.storageType || 'memory'); // Use unified ArtifactStorageType
   // const [artifacts, setArtifacts] = React.useState<SharedArtifactDefinition[]>(editingAgent?.config?.artifacts?.definitions || []);
   // const [cloudStorageBucket, setCloudStorageBucket] = React.useState<string>(editingAgent?.config?.artifacts?.cloudStorageBucket || '');
   // const [localStoragePath, setLocalStoragePath] = React.useState<string>(editingAgent?.config?.artifacts?.localStoragePath || '');
@@ -641,9 +634,9 @@ const handleInternalSave = () => {
 const LoadingFallback = () => <div>Loading tab...</div>;
 
 // Define a default for ArtifactsConfig to ensure it's always present
-const DEFAULT_ARTIFACTS_CONFIG: ArtifactsConfig = {
+const DEFAULT_ARTIFACTS_CONFIG: ArtifactsConfig = { // ArtifactsConfig from unified
   enabled: false,
-  storageType: 'memory' as ArtifactStorageType, // Default to 'memory'
+  storageType: 'memory' as ArtifactStorageType, // ArtifactStorageType from unified
   cloudStorageBucket: '',
   localStoragePath: '',
   definitions: [],

@@ -8,7 +8,7 @@ import type {
   AgentFramework,
   WorkflowDetailedType,
   // Import other nested types if a more complete Zod schema is built
-} from '@/types/agent-configs-new'; // Adjusted path
+} from '@/types/unified-agent-types'; // Adjusted path
 
 // Helper function to resolve a path string (e.g., "$step1_output.data.text") from the state object
 function resolveValuePath(path: string, state: Record<string, any>): any {
