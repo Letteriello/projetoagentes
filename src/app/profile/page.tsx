@@ -24,11 +24,18 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import { profileFormSchema, ProfileFormData } from "@/lib/zod-schemas";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Added Select components
+import { profileFormSchema, ProfileFormData, USER_ROLES } from "@/lib/zod-schemas"; // Added USER_ROLES
 import withAuth from '@/components/auth/withAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
-function ProfilePage() { // Renamed to start with uppercase for HOC convention
+function ProfilePage() {
   const { toast } = useToast();
   const { saveProfile, loadProfile } = useUserProfile();
 
@@ -41,6 +48,7 @@ function ProfilePage() { // Renamed to start with uppercase for HOC convention
       agentInstructions: "",
       globalMemory: "",
       allowMemoryAccess: true,
+      simulatedRole: "Usuário Padrão", // Default from schema but good to be explicit
     },
   });
 
@@ -124,6 +132,45 @@ function ProfilePage() { // Renamed to start with uppercase for HOC convention
                     )}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {/* Consider a different icon for roles, e.g., Users, ShieldCheck, etc. */}
+                  <User size={20} className="text-primary/80" />
+                  Função de Usuário (Simulada)
+                </CardTitle>
+                <CardDescription>
+                  Selecione uma função para simular diferentes níveis de acesso ou personas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={methods.control}
+                  name="simulatedRole"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="simulatedRole">Função Simulada</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger id="simulatedRole">
+                            <SelectValue placeholder="Selecione uma função" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {USER_ROLES.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {role}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
 

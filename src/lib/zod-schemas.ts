@@ -391,6 +391,10 @@ export const apiKeyFormSchema = z.object({
 
 export type ApiKeyFormData = z.infer<typeof apiKeyFormSchema>;
 
+// Define available user roles
+export const USER_ROLES = ["Usuário Padrão", "Administrador", "Desenvolvedor"] as const;
+const UserRoleEnum = z.enum(USER_ROLES);
+
 // Profile Page Form Schema
 export const profileFormSchema = z.object({
   fullName: z.string().min(1, "Full name is required."),
@@ -402,6 +406,7 @@ export const profileFormSchema = z.object({
   agentInstructions: z.string().optional(),
   globalMemory: z.string().optional(),
   allowMemoryAccess: z.boolean().default(true),
+  simulatedRole: UserRoleEnum.optional().default("Usuário Padrão"), // Added simulatedRole
 });
 
 export type ProfileFormData = z.infer<typeof profileFormSchema>;

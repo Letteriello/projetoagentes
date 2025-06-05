@@ -115,20 +115,41 @@ export async function submitChatMessage(
   try {
     const result: ChatOutput = await basicChatFlow(input);
     return {
-      message: "Resposta recebida.",
+      message: "Resposta recebida.", // User-friendly success message
       agentResponse: result.outputMessage,
       errors: null,
     };
   } catch (error) {
-    console.error("Erro ao chamar o fluxo de chat:", error);
-    let errorMessage = "Ocorreu um erro ao processar sua mensagem. Tente novamente.";
+    console.error("Erro ao chamar o fluxo de chat:", error); // Keep detailed log for developers
+    let userFriendlyMessage = "Não foi possível processar sua mensagem. Verifique sua conexão ou tente novamente mais tarde.";
+    let specificErrorField: { [key: string]: string[] } | null = null;
+
     if (error instanceof Error) {
-      errorMessage = error.message;
+      const lowerCaseError = error.message.toLowerCase();
+      if (lowerCaseError.includes("auth") || lowerCaseError.includes("token") || lowerCaseError.includes("unauthorized")) {
+        userFriendlyMessage = "Sua sessão expirou ou a autenticação falhou. Por favor, faça login novamente.";
+        // Optionally, you could have a specific error field for auth if the form handles it
+        // specificErrorField = { auth: [userFriendlyMessage] };
+      } else if (lowerCaseError.includes("permission") || lowerCaseError.includes("denied")) {
+        userFriendlyMessage = "Você não tem permissão para realizar esta ação ou acessar este recurso.";
+      } else if (lowerCaseError.includes("not found") && lowerCaseError.includes("agent")) {
+        userFriendlyMessage = "O agente configurado não foi encontrado. Por favor, verifique a configuração.";
+      } else {
+        // For other errors from basicChatFlow that are not caught above,
+        // provide a slightly more specific generic error.
+        userFriendlyMessage = "Falha ao comunicar com o agente. Se o problema persistir, contate o suporte.";
+        // We can still pass the original error message for debugging if needed, but not directly to the user
+        // unless it's deemed safe or helpful. For now, just a generic message.
+        // specificErrorField = { flow: ["Erro interno do agente: " + error.message] }; // Example
+      }
     }
+
+    // The 'message' field in ChatFormState is the primary user-facing message.
+    // 'errors' can provide more detailed (but still safe) field-specific issues.
     return {
-      message: errorMessage,
+      message: userFriendlyMessage,
       agentResponse: null,
-      errors: { userInput: ["Falha ao comunicar com o agente: " + errorMessage] },
+      errors: specificErrorField || { general: [userFriendlyMessage] }, // Use general if no specific field
     };
   }
 }
