@@ -126,47 +126,91 @@ function generateMockEvent(): MonitorEvent {
 
 
 export async function GET(request: NextRequest) {
-  const stream = new ReadableStream({
-    start(controller) {
-      // Send an event every 1 to 3 seconds
-      const sendEvent = () => {
-        const event = generateMockEvent();
-        const data = `data: ${JSON.stringify(event)}
+  try {
+    const stream = new ReadableStream({
+      start(controller) {
+        let timer: NodeJS.Timeout | undefined;
 
-`;
-        controller.enqueue(new TextEncoder().encode(data));
+        const sendEvent = () => {
+          try {
+            const event = generateMockEvent();
+            // SSE format: data: <json_string>\n\n
+            // Ensure event is stringified, then prefixed.
+            const eventPayload = JSON.stringify(event);
+            const data = `data: ${eventPayload}\n\n`;
+            controller.enqueue(new TextEncoder().encode(data));
 
-        const interval = Math.random() * 2000 + 1000; // 1 to 3 seconds
-        timer = setTimeout(sendEvent, interval);
-      };
+            const interval = Math.random() * 2000 + 1000; // 1 to 3 seconds
+            timer = setTimeout(sendEvent, interval);
+          } catch (e: any) {
+            // Log error during event generation or enqueueing
+            console.error('[API monitor-stream SSE] Error sending event:', e);
+            // Attempt to send an error event to the client before closing
+            try {
+              const errorData = JSON.stringify({
+                success: false,
+                error: "Error generating or sending monitor event.",
+                code: "STREAM_EVENT_ERROR",
+                details: e.message || String(e)
+              });
+              controller.enqueue(new TextEncoder().encode(`event: stream_error\ndata: ${errorData}\n\n`));
+            } catch (enqueueError: any) {
+              console.error('[API monitor-stream SSE] Failed to enqueue stream_error event:', enqueueError);
+            }
+            // Stop further events and close the stream
+            if (timer) clearTimeout(timer);
+            controller.close();
+          }
+        };
 
-      let timer = setTimeout(sendEvent, 1000); // Start sending events
+        // Start sending events
+        timer = setTimeout(sendEvent, 1000);
 
-      // Cleanup function when the stream is cancelled or closed
-      return () => {
-        if (timer) {
-          clearTimeout(timer);
-        }
-        console.log('SSE stream closed for /api/monitor-stream');
-      };
-    },
-    cancel() {
-      // This is called if the client closes the connection
-      console.log('SSE stream cancelled by client for /api/monitor-stream');
-    }
-  });
+        // Cleanup function when the stream is cancelled or closed by the server/client
+        return () => {
+          if (timer) {
+            clearTimeout(timer);
+          }
+          // Consider using a structured logger if available project-wide
+          console.log('[API monitor-stream SSE] Stream closed.');
+        };
+      },
+      cancel(reason) {
+        // This is called if the client closes the connection (e.g., browser tab closed)
+        // Or if controller.error() is called.
+        console.log('[API monitor-stream SSE] Stream cancelled by client or due to error:', reason);
+      }
+    });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      // Optional: CORS headers if your frontend is on a different domain during development
-      // 'Access-Control-Allow-Origin': '*',
-    },
-  });
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform', // Important for SSE
+        'Connection': 'keep-alive', // Important for SSE
+        // Optional: CORS headers if your frontend is on a different domain
+        // 'Access-Control-Allow-Origin': '*',
+      },
+    });
+
+  } catch (error: any) {
+    // This catch block handles errors during the initial setup of the stream.
+    // Once the stream starts, errors within it are handled by the stream's own logic.
+    console.error('[API monitor-stream GET] Error setting up SSE stream:', error);
+    // Standardized JSON error response for setup failures
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to initialize monitor event stream.",
+        code: "STREAM_SETUP_ERROR",
+        details: error.message || String(error)
+      },
+      { status: 500 }
+    );
+  }
 }
 
 // Ensure the Edge runtime is not used if there are Node.js specific APIs,
+// but for this simple SSE, it should be fine. If issues arise, remove this.
+// export const runtime = 'edge'; // or 'nodejs'
 // but for this simple SSE, it should be fine. If issues arise, remove this.
 // export const runtime = 'edge'; // or 'nodejs'
