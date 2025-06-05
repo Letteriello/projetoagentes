@@ -1,231 +1,189 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebaseAdmin"; // Assuming firebaseAdmin.ts initializes and exports 'db'
-import { FieldValue } from "firebase-admin/firestore";
-import { ApiKeyMetadata } from "@/types/apiKeyVaultTypes"; // Assuming this type is defined and suitable
+// src/app/api/apikeys/[id]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
+import {
+  ApiKeyMetadata,
+  UpdateApiKeyMetadataPayload,
+} from '@/types/apiKeyVaultTypes';
+// Note: decryptApiKey is not used in these handlers as keys are not returned to client.
 
-const API_KEYS_COLLECTION = "api_keys";
+const API_KEYS_COLLECTION = 'api_key_metadata'; // Updated collection name
 
-interface UpdateApiKeyRequest {
-  name?: string;
-  keyReference?: string;
-  serviceType?: string;
-  description?: string;
-  permissions?: string[];
-  associatedAgents?: string[];
-  isActive?: boolean;
-  // lastUsed is typically updated by usage, not direct PUT, unless specified.
-}
-
-export async function DELETE(
+export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }, // id is the Firestore document ID
+  { params }: { params: { id: string } }
 ) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const userId = request.headers.get('x-user-id');
     if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "User ID is missing in request headers.", code: "MISSING_USER_ID" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'User authentication required.' }, { status: 401 });
     }
 
     const keyId = params.id;
     if (!keyId) {
-      // This should ideally be caught by Next.js routing if id is missing in path
-      return NextResponse.json({ success: false, error: "API Key ID is required in path.", code: "MISSING_KEY_ID" }, { status: 400 });
+      return NextResponse.json({ error: 'API Key ID is required.' }, { status: 400 });
     }
 
     const docRef = db.collection(API_KEYS_COLLECTION).doc(keyId);
+    const docSnap = await docRef.get();
 
-    await db.runTransaction(async (transaction) => {
-      const docSnap = await transaction.get(docRef);
+    if (!docSnap.exists) {
+      return NextResponse.json({ error: 'API key metadata not found.' }, { status: 404 });
+    }
 
-      if (!docSnap.exists) {
-        // Throw an error to be caught by the outer catch, then return 404
-        throw new Error("NOT_FOUND");
-      }
+    const data = docSnap.data()!;
+    if (data.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+    }
 
-      const data = docSnap.data();
-      if (data?.userId !== userId) {
-        // Throw an error for forbidden access
-        throw new Error("FORBIDDEN");
-      }
+    const createdAtTimestamp = data.createdAt as FirebaseFirestore.Timestamp;
+    const updatedAtTimestamp = data.updatedAt as FirebaseFirestore.Timestamp;
 
-      transaction.delete(docRef);
-    });
+    const apiKeyMeta: ApiKeyMetadata = {
+      id: docSnap.id,
+      serviceName: data.serviceName,
+      serviceType: data.serviceType,
+      displayFragment: data.displayFragment,
+      associatedAgents: data.associatedAgents || [],
+      createdAt: createdAtTimestamp ? createdAtTimestamp.toDate().toISOString() : new Date(0).toISOString(),
+      updatedAt: updatedAtTimestamp ? updatedAtTimestamp.toDate().toISOString() : new Date(0).toISOString(),
+      // IMPORTANT: Do NOT return encryptedApiKey or the actual key
+    };
 
-    return NextResponse.json(
-      { success: true, message: "API key metadata deleted successfully." },
-      { status: 200 } // Can also be 204 No Content, but 200 with message is often clearer
-    );
+    return NextResponse.json(apiKeyMeta, { status: 200 });
 
   } catch (error: any) {
-    console.error(`[APIKEYS DELETE /api/apikeys/${params.id}]`, error);
-    if (error.message === "NOT_FOUND") {
-      return NextResponse.json(
-        { success: false, error: "API key metadata not found.", code: "NOT_FOUND" },
-        { status: 404 }
-      );
-    }
-    if (error.message === "FORBIDDEN") {
-      return NextResponse.json(
-        { success: false, error: "User is not authorized to delete this API key metadata.", code: "FORBIDDEN" },
-        { status: 403 }
-      );
-    }
-    return NextResponse.json(
-      { success: false, error: "Failed to delete API key metadata.", code: "INTERNAL_SERVER_ERROR" },
-      { status: 500 }
-    );
+    console.error(`[APIKEYS GET /api/apikeys/${params.id}]`, error);
+    return NextResponse.json({ error: 'Failed to retrieve API key metadata.' }, { status: 500 });
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }, // id is the Firestore document ID
+  { params }: { params: { id: string } }
 ) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const userId = request.headers.get('x-user-id');
     if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "User ID is missing in request headers.", code: "MISSING_USER_ID" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'User authentication required.' }, { status: 401 });
     }
 
     const keyId = params.id;
     if (!keyId) {
-      return NextResponse.json({ success: false, error: "API Key ID is required in path.", code: "MISSING_KEY_ID" }, { status: 400 });
+      return NextResponse.json({ error: 'API Key ID is required.' }, { status: 400 });
     }
 
-    let body: UpdateApiKeyRequest;
-    try {
-      body = await request.json();
-    } catch (e) {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON payload.", code: "BAD_REQUEST" },
-        { status: 400 }
-      );
+    const payload: UpdateApiKeyMetadataPayload = await request.json();
+
+    // Basic validation for payload: ensure it's not empty
+    if (Object.keys(payload).length === 0) {
+      return NextResponse.json({ error: 'Request body cannot be empty. Provide at least one field to update.' }, { status: 400 });
     }
 
-    // Validate that the body is not empty and contains at least one updatable field
-    if (Object.keys(body).length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Request body is empty. Provide at least one field to update.", code: "VALIDATION_ERROR" },
-        { status: 400 }
-      );
-    }
-
-    const updateData: { [key: string]: any } = {}; // Build a dynamic update object
-
-    // Validate and add fields to updateData
-    if (body.name !== undefined) {
-      if (typeof body.name !== "string" || body.name.trim() === "") {
-        return NextResponse.json({ success: false, error: "API key name must be a non-empty string.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.name = body.name.trim();
-    }
-    if (body.keyReference !== undefined) {
-      if (typeof body.keyReference !== "string" || body.keyReference.trim() === "") {
-        return NextResponse.json({ success: false, error: "API key reference must be a non-empty string.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.keyReference = body.keyReference.trim();
-    }
-    if (body.serviceType !== undefined) {
-      if (typeof body.serviceType !== "string" || body.serviceType.trim() === "") {
-        return NextResponse.json({ success: false, error: "Service type must be a non-empty string.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.serviceType = body.serviceType.trim();
-    }
-    if (body.description !== undefined) {
-      if (typeof body.description !== "string") {
-        return NextResponse.json({ success: false, error: "Description must be a string.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.description = body.description;
-    }
-    if (body.permissions !== undefined) {
-      if (!Array.isArray(body.permissions) || !body.permissions.every(p => typeof p === 'string')) {
-        return NextResponse.json({ success: false, error: "Permissions must be an array of strings.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.permissions = body.permissions;
-    }
-    if (body.associatedAgents !== undefined) {
-      if (!Array.isArray(body.associatedAgents) || !body.associatedAgents.every(a => typeof a === 'string')) {
-        return NextResponse.json({ success: false, error: "Associated agents must be an array of strings.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.associatedAgents = body.associatedAgents;
-    }
-    if (body.isActive !== undefined) {
-      if (typeof body.isActive !== "boolean") {
-        return NextResponse.json({ success: false, error: "isActive must be a boolean.", code: "VALIDATION_ERROR" }, { status: 400 });
-      }
-      updateData.isActive = body.isActive;
-    }
-     // Ensure there's something to update if specific checks passed but object is still empty
-    if (Object.keys(updateData).length === 0 && Object.keys(body).length > 0) {
-        // This case might happen if body contained only fields not matching UpdateApiKeyRequest, e.g. "id"
-        return NextResponse.json(
-            { success: false, error: "No valid fields provided for update.", code: "VALIDATION_ERROR" },
-            { status: 400 }
-        );
-    } else if (Object.keys(updateData).length === 0) { // if body was empty, it's caught above
-         return NextResponse.json(
-            { success: false, error: "No updatable fields provided.", code: "VALIDATION_ERROR" },
-            { status: 400 }
-        );
-    }
-
-
-    updateData.updatedAt = FieldValue.serverTimestamp();
     const docRef = db.collection(API_KEYS_COLLECTION).doc(keyId);
-    let updatedApiKey: ApiKeyMetadata | null = null;
+
+    // Transaction to ensure atomicity and check ownership before update
+    const updatedApiKeyMeta = await db.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      if (!docSnap.exists) {
+        throw new Error('NOT_FOUND');
+      }
+
+      const currentData = docSnap.data()!;
+      if (currentData.userId !== userId) {
+        throw new Error('FORBIDDEN');
+      }
+
+      const updateData: Partial<ApiKeyMetadata> & { updatedAt: FieldValue } = {
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      // Populate updateData with allowed fields from payload
+      if (payload.serviceName !== undefined) updateData.serviceName = payload.serviceName;
+      if (payload.serviceType !== undefined) updateData.serviceType = payload.serviceType;
+      if (payload.displayFragment !== undefined) updateData.displayFragment = payload.displayFragment;
+      if (payload.associatedAgents !== undefined) updateData.associatedAgents = payload.associatedAgents;
+
+      // Prevent modification of other fields like id, userId, encryptedApiKey, createdAt
+      const allowedUpdates = ['serviceName', 'serviceType', 'displayFragment', 'associatedAgents'];
+      for (const key in payload) {
+          if (!allowedUpdates.includes(key)) {
+              // This check is more for explicit error handling if unexpected fields are sent
+              console.warn(`Attempted to update unallowed field: ${key}`);
+              // Depending on strictness, you could throw an error here
+          }
+      }
+
+
+      transaction.update(docRef, updateData);
+
+      // Construct the response object based on current data + updates
+      // Timestamps will be updated by server, so we use current time for optimistic response
+      const responseTimestamp = new Date().toISOString();
+      return {
+        id: docSnap.id,
+        serviceName: payload.serviceName ?? currentData.serviceName,
+        serviceType: payload.serviceType ?? currentData.serviceType,
+        displayFragment: payload.displayFragment ?? currentData.displayFragment,
+        associatedAgents: payload.associatedAgents ?? currentData.associatedAgents,
+        createdAt: (currentData.createdAt as FirebaseFirestore.Timestamp).toDate().toISOString(),
+        updatedAt: responseTimestamp, // Optimistic update
+      };
+    });
+
+    return NextResponse.json(updatedApiKeyMeta, { status: 200 });
+
+  } catch (error: any) {
+    console.error(`[APIKEYS PUT /api/apikeys/${params.id}]`, error);
+    if (error.message === 'NOT_FOUND') {
+      return NextResponse.json({ error: 'API key metadata not found.' }, { status: 404 });
+    }
+    if (error.message === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+    }
+    return NextResponse.json({ error: 'Failed to update API key metadata.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = request.headers.get('x-user-id');
+    if (!userId) {
+      return NextResponse.json({ error: 'User authentication required.' }, { status: 401 });
+    }
+
+    const keyId = params.id;
+    if (!keyId) {
+      return NextResponse.json({ error: 'API Key ID is required.' }, { status: 400 });
+    }
+
+    const docRef = db.collection(API_KEYS_COLLECTION).doc(keyId);
 
     await db.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(docRef);
       if (!docSnap.exists) {
-        throw new Error("NOT_FOUND");
+        throw new Error('NOT_FOUND');
       }
-      const currentData = docSnap.data() as ApiKeyMetadata; // Cast to ensure type
-      if (currentData.userId !== userId) {
-        throw new Error("FORBIDDEN");
+      if (docSnap.data()!.userId !== userId) {
+        throw new Error('FORBIDDEN');
       }
-      transaction.update(docRef, updateData);
-      // For the response, merge updateData with currentData and simulate timestamp update
-      updatedApiKey = {
-        ...currentData,
-        ...updateData,
-        id: keyId,
-        updatedAt: new Date().toISOString() // Placeholder, actual is server-generated
-      };
+      transaction.delete(docRef);
     });
 
-    if (!updatedApiKey) { // Should not happen if transaction was successful
-        throw new Error("Update failed to return data.");
-    }
-
-    return NextResponse.json({ success: true, data: updatedApiKey }, { status: 200 });
+    return NextResponse.json({ message: "API key metadata deleted successfully." }, { status: 200 }); // Or 204 No Content
 
   } catch (error: any) {
-    console.error(`[APIKEYS PUT /api/apikeys/${params.id}]`, error);
-    if (error.message === "NOT_FOUND") {
-      return NextResponse.json(
-        { success: false, error: "API key metadata not found.", code: "NOT_FOUND" },
-        { status: 404 }
-      );
+    console.error(`[APIKEYS DELETE /api/apikeys/${params.id}]`, error);
+    if (error.message === 'NOT_FOUND') {
+      return NextResponse.json({ error: 'API key metadata not found.' }, { status: 404 });
     }
-    if (error.message === "FORBIDDEN") {
-      return NextResponse.json(
-        { success: false, error: "User is not authorized to update this API key metadata.", code: "FORBIDDEN" },
-        { status: 403 }
-      );
+    if (error.message === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
     }
-    // Handle SyntaxError from request.json() if not caught earlier (though it is)
-    if (error instanceof SyntaxError) {
-        return NextResponse.json( { success: false, error: "Invalid JSON payload.", code: "BAD_REQUEST" }, { status: 400 });
-    }
-    return NextResponse.json(
-      { success: false, error: "Failed to update API key metadata.", code: "INTERNAL_SERVER_ERROR" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to delete API key metadata.' }, { status: 500 });
   }
 }
