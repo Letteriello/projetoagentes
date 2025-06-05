@@ -151,6 +151,17 @@ export const evaluationGuardrailsSchema = z.object({
   checkForToxicity: z.boolean().optional().describe("Habilita uma verificação simulada de toxicidade na resposta."),
 }).optional();
 
+export const speechConfigSchema = z.object({
+  voice: z.string().optional(),
+  speed: z.number().min(0.25).max(4.0).optional(), // Assuming speed is a multiplier
+}).optional();
+
+export const chatRunConfigSchema = z.object({
+  max_llm_calls: z.number().int().min(0).optional().describe("Maximum number of LLM calls allowed. 0 for unlimited."),
+  stream_response: z.boolean().optional().describe("Whether to stream the response from the LLM."),
+  speech_config: speechConfigSchema, // Use the schema defined above
+}).optional();
+
 export const agentConfigBaseSharedSchema = z.object({
   framework: AgentFrameworkEnum,
   agentGoal: z.string().min(1, "Agent goal is required."),
@@ -178,6 +189,7 @@ export const agentConfigBaseSharedSchema = z.object({
     timestamp: z.string().datetime(),
   })).optional(),
   evaluationGuardrails: evaluationGuardrailsSchema, // Added for Task 9.4
+  runConfig: chatRunConfigSchema,
 });
 
 export const llmAgentConfigSchema = agentConfigBaseSharedSchema.extend({

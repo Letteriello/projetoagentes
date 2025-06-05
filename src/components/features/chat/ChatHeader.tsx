@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch"; // Added Switch import
 import { Label } from "@/components/ui/label";   // Added Label import
+import { Input } from "@/components/ui/input"; // Added Input import
 import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -316,14 +317,23 @@ export default function ChatHeader({
                   <Switch
                     id="streaming-enabled"
                     checked={userChatConfig.streamingEnabled}
-                    onCheckedChange={(checked) => onUserChatConfigChange({ streamingEnabled: checked })}
+                    onCheckedChange={(checked) => onUserChatConfigChange({ streamingEnabled: checked, stream_response: checked })}
                   />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="voice-select">Voz Simulada</Label>
                   <Select
                     value={userChatConfig.simulatedVoiceConfig?.voice || 'alloy'}
-                    onValueChange={(value) => onUserChatConfigChange({ simulatedVoiceConfig: { voice: value, speed: userChatConfig.simulatedVoiceConfig?.speed || 1.0 } })}
+                    onValueChange={(value) => {
+                      const newSimulatedVoiceConfig = {
+                        voice: value,
+                        speed: userChatConfig.simulatedVoiceConfig?.speed || 1.0
+                      };
+                      onUserChatConfigChange({
+                        simulatedVoiceConfig: newSimulatedVoiceConfig,
+                        speech_config: newSimulatedVoiceConfig
+                      });
+                    }}
                   >
                     <SelectTrigger id="voice-select">
                       <SelectValue placeholder="Selecione uma voz" />
@@ -345,7 +355,32 @@ export default function ChatHeader({
                     max={2}
                     step={0.1}
                     value={[userChatConfig.simulatedVoiceConfig?.speed || 1.0]}
-                    onValueChange={(value) => onUserChatConfigChange({ simulatedVoiceConfig: { voice: userChatConfig.simulatedVoiceConfig?.voice || 'alloy', speed: value[0] } })}
+                    onValueChange={(value) => {
+                      const newSimulatedVoiceConfig = {
+                        voice: userChatConfig.simulatedVoiceConfig?.voice || 'alloy',
+                        speed: value[0]
+                      };
+                      onUserChatConfigChange({
+                        simulatedVoiceConfig: newSimulatedVoiceConfig,
+                        speech_config: newSimulatedVoiceConfig
+                      });
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="max-llm-calls">Max LLM Calls (0 for unlimited)</Label>
+                  <Input
+                    id="max-llm-calls"
+                    type="number"
+                    min="0"
+                    placeholder="e.g., 10"
+                    value={userChatConfig.max_llm_calls === undefined ? '' : String(userChatConfig.max_llm_calls)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      onUserChatConfigChange({
+                        max_llm_calls: value === '' ? undefined : parseInt(value, 10)
+                      });
+                    }}
                   />
                 </div>
               </div>

@@ -31,6 +31,7 @@ import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
 import { GenerateRequest, Part, ToolRequest, ToolResponse, Tool } from '@genkit-ai/ai';
 import type { MessageData } from '@/types/chat-types';
+import type { ChatRunConfig } from '@/types/chat';
 import { createLoggableFlow } from '@/lib/logger'; // Import the wrapper
 import { enhancedLogger } from '@/lib/logger'; // For manual logging if needed within
 import { winstonLogger } from '../../lib/winston-logger';
@@ -197,6 +198,7 @@ export interface BasicChatInput extends ChatFlowParams {
   agentId?: string; // Optional agentId for logging/context
   userMessage: string;
   callbacks?: Record<string, string>; // Added for callback configuration
+  runConfig?: ChatRunConfig;
 }
 
 /**
@@ -236,6 +238,7 @@ async function basicChatFlowInternal(
   input: BasicChatInput,
   flowContext: ActionContext
 ): Promise<BasicChatOutput> {
+  const { runConfig = {} } = input; // Destructure with default
   const flowName = 'basicChatFlowInternal';
   const agentId = input.agentId || 'unknown_agent';
   const callbacks = input.callbacks || {};
@@ -257,6 +260,33 @@ async function basicChatFlowInternal(
   const chatEvents: BasicChatOutput['chatEvents'] = [];
 
   try {
+    // Log RunConfig settings
+    winstonLogger.info(`[RunConfig] Received runConfig: max_llm_calls=${runConfig.max_llm_calls}, stream_response=${runConfig.stream_response}, speech_config=${JSON.stringify(runConfig.speech_config)}`, { agentId, flowName, runConfig });
+
+    if (runConfig.stream_response === false) {
+      winstonLogger.info(`[RunConfig] stream_response is false. Ideally, response would be buffered and sent at once. Current flow primarily streams.`, { agentId, flowName });
+      chatEvents.push({
+        id: `evt-stream-cfg-${Date.now()}`,
+        timestamp: new Date(),
+        eventType: 'AGENT_CONTROL',
+        eventTitle: 'Streaming Configuration',
+        eventDetails: 'stream_response is false. Standard flow behavior is streaming; full buffering would require structural changes to response handling.',
+      });
+    } else {
+      winstonLogger.info(`[RunConfig] stream_response is true or undefined. Default streaming behavior will apply.`, { agentId, flowName });
+    }
+
+    if (runConfig.speech_config) {
+      winstonLogger.info(`[RunConfig] speech_config found: ${JSON.stringify(runConfig.speech_config)}. This would be passed to a TTS service if integrated.`, { agentId, flowName });
+      chatEvents.push({
+        id: `evt-speech-cfg-${Date.now()}`,
+        timestamp: new Date(),
+        eventType: 'AGENT_CONTROL',
+        eventTitle: 'Speech Configuration Received',
+        eventDetails: `Speech config: ${JSON.stringify(runConfig.speech_config)}. Would be used by TTS.`,
+      });
+    }
+
     const messages: ChatMessage[] = [];
     if (input.systemPrompt) {
       messages.push({ role: 'system', content: [{ text: input.systemPrompt }] });
@@ -420,6 +450,7 @@ async function basicChatFlowInternal(
     let currentMessagesForLLM = [...messages, { role: 'user', content: userMessageContent }]; // Initial messages for the first LLM call
 
     const MAX_TOOL_ITERATIONS = 5;
+    let llmCallCount = 0; // Initialize before the tool processing loop
 
     let fullPromptTextForGuardrailCheck = "";
     currentMessagesForLLM.forEach(msg => { // Use currentMessagesForLLM for guardrail check
@@ -446,6 +477,22 @@ async function basicChatFlowInternal(
     }
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      llmCallCount++; // Increment for each potential LLM call in the loop
+      if (runConfig.max_llm_calls !== undefined && runConfig.max_llm_calls > 0 && llmCallCount > runConfig.max_llm_calls) {
+        const errorMessage = `LLM call limit (${runConfig.max_llm_calls}) reached. Aborting further LLM calls for this turn.`;
+        winstonLogger.warn(errorMessage, { agentId, flowName, llmCallCount, maxLlmCalls: runConfig.max_llm_calls });
+        chatEvents.push({
+          id: `evt-llm-limit-${Date.now()}`,
+          timestamp: new Date(),
+          eventType: 'AGENT_CONTROL',
+          eventTitle: 'LLM Call Limit Reached',
+          eventDetails: errorMessage,
+        });
+        finalOutputText += (finalOutputText ? "\n" : "") + "[LLM Call Limit Reached]"; // Append to any existing text
+        break; // Exit the tool processing loop
+      }
+      winstonLogger.info(`[RunConfig] LLM call ${llmCallCount} of ${runConfig.max_llm_calls === undefined || runConfig.max_llm_calls === 0 ? 'unlimited' : runConfig.max_llm_calls}`, { agentId, flowName });
+
       let llmResponse: GenerateResponse;
       const currentRequestCacheKeyPayload = {
         messages: currentMessagesForLLM, // Use currentMessagesForLLM

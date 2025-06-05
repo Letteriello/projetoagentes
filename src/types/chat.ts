@@ -1,3 +1,5 @@
+import { ChatRunConfig as BaseChatRunConfig, SpeechConfig as BaseSpeechConfig } from './run-config-types';
+
 export interface Message {
   id: string;
   isUser: boolean;
@@ -86,11 +88,16 @@ export interface ChatState {
   // other global chat settings
 }
 
-export interface ChatRunConfig {
-  streamingEnabled: boolean;
-  simulatedVoiceConfig?: {
-    voice: string;
-    speed: number;
-  };
-  // Add other chat-specific run configurations here
+export interface SpeechConfig extends BaseSpeechConfig {
+  // Inherits voice and speed from BaseSpeechConfig
+  // Add any UI-specific speech config fields if necessary in the future
+}
+
+export interface ChatRunConfig extends BaseChatRunConfig {
+  streamingEnabled: boolean; // UI currently uses this
+  simulatedVoiceConfig?: SpeechConfig; // UI currently uses this, maps to speech_config
+
+  // max_llm_calls is inherited from BaseChatRunConfig
+  // stream_response is inherited from BaseChatRunConfig (ADK version of streamingEnabled)
+  // speech_config is inherited from BaseChatRunConfig (ADK version of simulatedVoiceConfig)
 }

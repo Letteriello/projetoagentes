@@ -1,6 +1,10 @@
-export interface TestRunConfig {
-  temperature?: number;
-  streamingEnabled?: boolean;
-  // Add other RAG-related fields here in the future
-  // temporaryDocumentUrl?: string;
+export interface SpeechConfig {
+  voice?: string;
+  speed?: number;
+}
+
+export interface ChatRunConfig {
+  max_llm_calls?: number;
+  stream_response?: boolean;
+  speech_config?: SpeechConfig | string; // string for potential future complex configs
 }
