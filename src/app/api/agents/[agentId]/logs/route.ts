@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 // Adjust import paths to be relative
 import admin, { firestore } from '../../../../lib/firebaseAdmin';
-import { LogEntryV2 } from '../../../../lib/logger'; // Assuming LogEntryV2 is exported
+import { LogEntry } from '../../../../lib/logger'; // Assuming LogEntry is exported
 
 // Define a more specific type for the logs we expect to retrieve if needed
-// LogEntryV2 already includes most fields. We add 'id' for the document ID.
-interface RetrievedLog extends LogEntryV2 {
+// LogEntry already includes most fields. We add 'id' for the document ID.
+interface RetrievedLog extends LogEntry {
   id: string;
 }
 

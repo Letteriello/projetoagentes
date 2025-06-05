@@ -15,7 +15,7 @@ if (typeof window === 'undefined') {
   firestore = firebaseAdmin.firestore;
 }
 
-const LOGS_COLLECTION = 'agent_logs_v3'; // Nome da coleção incrementado
+const LOGS_COLLECTION = 'agent_flow_logs'; // Nome da coleção incrementado
 
 interface LogEntry {
   timestamp: any; // Alterado para any para evitar erros no cliente
