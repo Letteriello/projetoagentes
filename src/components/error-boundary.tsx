@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, ErrorInfo, ReactNode } from "react";
+import { logger } from '@/lib/logger'; // MODIFIED: Import new client logger
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -27,14 +28,23 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error to an error reporting service
-    console.error("Error caught by error boundary:", error, errorInfo);
+    // MODIFIED: Use new logger
+    logger.error("Error caught by ErrorBoundary componentDidCatch:", {
+      error: {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      },
+      errorInfo
+    });
 
     // Handle chunk loading errors specifically
     if (error.name === "ChunkLoadError") {
-      console.warn("Chunk load error detected. Attempting to recover...");
+      logger.warn("Chunk load error detected in ErrorBoundary. Attempting to recover..."); // MODIFIED: Use new logger
       // Force reload the page
-      window.location.reload();
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
     }
   }
 
@@ -47,7 +57,7 @@ export class ErrorBoundary extends Component<
             <h2>Something went wrong</h2>
             <p>An error occurred while loading the page.</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => typeof window !== "undefined" && window.location.reload()}
               style={{
                 padding: "8px 16px",
                 fontSize: "16px",
@@ -87,25 +97,35 @@ export class ErrorBoundary extends Component<
 
 // Global error handler for uncaught errors
 if (typeof window !== "undefined") {
-  window.addEventListener("error", (event) => {
+  window.addEventListener("error", (event: ErrorEvent) => { // Added type for event
+    // Check if it's a ChunkLoadError, which is already handled by the new client logger's global error handler
+    // However, the specific reload logic is here.
+    // The new client logger (src/lib/logger/index.ts) already logs these errors.
+    // We might want to avoid double logging if the message is identical.
+    // For now, keeping the specific reload for chunk load errors here,
+    // but the logger in src/lib/logger/index.ts will also fire.
     if (event.error && event.error.name === "ChunkLoadError") {
-      console.warn("Chunk load error detected. Reloading page...");
+      logger.warn("Chunk load error detected by global error listener in ErrorBoundary.tsx. Reloading page..."); // MODIFIED: Use new logger
       window.location.reload();
     }
+    // Other errors are logged by the global handler in src/lib/logger/index.ts
   });
 
   // Handle unhandled promise rejections
-  window.addEventListener("unhandledrejection", (event) => {
+  window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => { // Added type for event
     const error = event.reason;
+    // Similar to above, the new client logger also handles unhandled rejections.
+    // Keeping the specific reload logic for chunk load errors here.
     if (
       error &&
       error.message &&
-      error.message.includes("Loading chunk") &&
-      error.name === "ChunkLoadError"
+      error.message.includes("Loading chunk") && // error.name might not be 'ChunkLoadError' for promise rejections
+      (error.name === "ChunkLoadError" || error.message.includes("ChunkLoadError")) // Be more flexible
     ) {
-      console.warn("Chunk load error in promise. Reloading page...");
+      logger.warn("Chunk load error in promise detected by global unhandledrejection listener in ErrorBoundary.tsx. Reloading page..."); // MODIFIED: Use new logger
       window.location.reload();
     }
+    // Other unhandled rejections are logged by the global handler in src/lib/logger/index.ts
   });
 }
 

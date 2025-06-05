@@ -9,7 +9,8 @@ import {
   GetAverageResponseTimesFilters,
   getRawLogs, // For traceDetails
   RawLogFilters,
-  DateRangeFilter
+  DateRangeFilter,
+  writeLogEntry // MODIFIED: Ensure writeLogEntry is imported
 } from '@/lib/logService'; // Assuming @ points to src
 
 // Helper function to parse date range filters
@@ -107,23 +108,35 @@ export async function GET(request: Request) {
     return NextResponse.json(data, { status: 200 });
 
   } catch (error: unknown) { // Catch unknown for better type safety
-    // Consider using a structured logger (e.g., Winston) if available
-    console.error(`[API agent-monitor/stats GET] Error fetching stats for type "${type}":`, error);
+    // MODIFIED: Use writeLogEntry for internal logging
+    const errorDetailsForLogging = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) };
+    await writeLogEntry({
+      type: 'API_ERROR',
+      severity: 'ERROR',
+      flowName: 'agent-monitor/stats', // Identifies the API route
+      message: `Error fetching stats for type "${type}" via API.`,
+      details: {
+        requestedType: type,
+        errorMessage: errorDetailsForLogging.message,
+        errorStack: errorDetailsForLogging.stack,
+        errorName: errorDetailsForLogging.name,
+        // originalError: error, // Could be verbose
+      }
+    });
 
     let errorMessage = 'An unexpected error occurred while fetching statistics.';
-    let errorDetails; // Undefined by default
-
+    // Client-facing error details should be generic or carefully chosen
+    let clientErrorDetails;
     if (error instanceof Error) {
-        // Potentially map known errors from service functions to specific client messages/codes
-        errorDetails = error.message; // Capture original message for details
+      // if (error.name === 'SpecificClientSafeError') clientErrorDetails = error.message;
     }
-    // Standardized error response
+
     return NextResponse.json(
       {
         success: false,
         error: errorMessage,
         code: 'INTERNAL_SERVER_ERROR',
-        details: errorDetails // Only include details if considered safe and useful
+        details: clientErrorDetails // Only send if specifically intended for client
       },
       { status: 500 }
     );

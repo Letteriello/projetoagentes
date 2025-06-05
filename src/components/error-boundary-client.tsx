@@ -1,7 +1,7 @@
 "use client";
 
 import { ErrorBoundary as ReactErrorBoundary } from "react-error-boundary";
-import { winstonLogger } from '../lib/winston-logger';
+import { logger } from '@/lib/logger'; // MODIFIED: Import new client logger
 
 function ErrorFallback({
   error,
@@ -12,16 +12,15 @@ function ErrorFallback({
 }) {
   // Handle chunk loading errors specifically
   if (typeof window !== "undefined" && error.name === "ChunkLoadError") {
-    winstonLogger.warn("Chunk load error detected. Attempting to recover...");
+    logger.warn("Chunk load error detected. Attempting to recover..."); // MODIFIED: Use new logger
     // Force reload the page
     window.location.reload();
     return null;
   }
 
-
   // Log the error
   React.useEffect(() => {
-    winstonLogger.error('Error boundary caught an error', {
+    logger.error('Error boundary caught an error in ErrorFallback useEffect', { // MODIFIED: Use new logger
       error: error.message,
       stack: error.stack,
       name: error.name,
@@ -58,7 +57,7 @@ export function ErrorBoundaryClient({
     <ReactErrorBoundary
       FallbackComponent={ErrorFallback}
       onError={(error, info) => {
-        winstonLogger.error('Error boundary caught an error', {
+        logger.error('Error boundary caught an error in onError callback', { // MODIFIED: Use new logger
           error: error.message,
           stack: error.stack,
           componentStack: info.componentStack,

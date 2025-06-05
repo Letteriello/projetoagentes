@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRawLogs, RawLogFilters } from '@/lib/logService'; // Assuming @ points to src
+import { getRawLogs, RawLogFilters, writeLogEntry } from '@/lib/logService'; // MODIFIED: Ensure writeLogEntry is imported
 import { DocumentSnapshot } from 'firebase-admin/firestore'; // Only for type if needed, not for runtime
 
 export async function GET(request: Request) {
@@ -71,27 +71,41 @@ export async function GET(request: Request) {
     return NextResponse.json(logs, { status: 200 });
 
   } catch (error: unknown) { // Catch unknown for better type safety before instanceof check
-    // Consider using a structured logger (e.g., Winston) if available throughout the project
-    console.error('[API agent-monitor/logs GET] Error fetching raw logs:', error);
+    // MODIFIED: Use writeLogEntry for internal logging
+    const errorDetailsForLogging = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) };
+    await writeLogEntry({
+      type: 'API_ERROR',
+      severity: 'ERROR',
+      flowName: 'agent-monitor/logs', // Identifies the API route
+      message: 'Error fetching raw logs via API.',
+      details: {
+        errorMessage: errorDetailsForLogging.message,
+        errorStack: errorDetailsForLogging.stack,
+        errorName: errorDetailsForLogging.name,
+        // Consider including stringified request query or relevant parts if helpful and not sensitive
+        // originalError: error, // Could be verbose, log essentials
+      }
+    });
 
     let errorMessage = 'An unexpected error occurred while fetching logs.';
-    // It's good practice to not expose raw internal error messages to the client in production.
-    // However, providing some detail can be helpful for debugging if the error is deemed safe to share.
-    let errorDetails; // Undefined by default, only populate if needed
+    // It's good practice to not expose raw internal error messages or detailed stack traces to the client.
+    // The actual error has been logged internally via writeLogEntry.
+    // Provide a generic error message to the client.
+    // If specific user-facing error messages are needed, they can be determined based on error type.
 
+    // For client-facing error, only send generic message or specific safe-to-display details
+    let clientErrorDetails;
     if (error instanceof Error) {
-        // Potentially map known errors from getRawLogs to specific client messages/codes here
-        // For now, we'll use a generic message for 500s from getRawLogs
-        errorDetails = error.message; // Capture original message for details
+      // Example: if it was a known type of error you want to communicate specifically
+      // if (error.name === 'SpecificClientSafeError') clientErrorDetails = error.message;
     }
 
-    // Standardized error response
     return NextResponse.json(
       {
         success: false,
         error: errorMessage,
         code: 'INTERNAL_SERVER_ERROR',
-        details: errorDetails // Only include details if it's considered safe and useful for the client
+        details: clientErrorDetails // Only send if specifically intended for client
       },
       { status: 500 }
     );
