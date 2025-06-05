@@ -1,8 +1,8 @@
-import { configureGenkit } from '@genkit-ai/core'; // Changed import
+import { configureGenkit } from '@genkit-ai/core';
 import { googleAI } from '@genkit-ai/googleai';
 import { openAI } from 'genkitx-openai';
-import { firestoreSessionStore } from 'genkit-plugin-firestore'; // Assuming this plugin
-import { VertexAiRagMemoryService } from 'genkit-plugin-vertexai'; // Assuming this plugin
+import { firestoreSessionStore } from 'genkit-plugin-firestore';
+import { VertexAiRagMemoryService } from 'genkit-plugin-vertexai';
 import { ollama } from 'genkitx-ollama';
 import process from 'node:process';
 

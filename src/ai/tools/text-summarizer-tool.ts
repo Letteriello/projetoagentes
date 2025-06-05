@@ -7,8 +7,8 @@ import { winstonLogger } from '../../lib/winston-logger'; // Assuming logger is 
  * Requires textToSummarize and an optional modelName.
  */
 const TextSummarizerInputSchema = z.object({
-  textToSummarize: z.string(),
-  modelName: z.string().optional(),
+  textToSummarize: z.string().describe("The full text content that needs to be summarized. Ensure it's not empty."),
+  modelName: z.string().optional().describe("Optional. The specific language model to use for summarization (e.g., 'gemini-pro'). Defaults to a pre-configured model if not provided."),
 });
 
 /**
@@ -28,7 +28,7 @@ const TextSummarizerOutputSchema = z.object({
 export const textSummarizerTool = defineTool(
   {
     name: 'textSummarizer',
-    description: 'Summarizes a given text using a Genkit-configured Language Model.',
+    description: 'Efficiently summarizes long texts into concise overviews using an AI model. Ideal for quickly understanding the main points of a document.',
     inputSchema: TextSummarizerInputSchema,
     outputSchema: TextSummarizerOutputSchema,
   },
