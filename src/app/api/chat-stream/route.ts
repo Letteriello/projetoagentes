@@ -148,117 +148,140 @@ export async function POST(req: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
-        // Enqueue chat events first
-        if (flowOutput.chatEvents && flowOutput.chatEvents.length > 0) {
-          for (const event of flowOutput.chatEvents) {
-            // Ensure events have proper id and timestamp if they were partial
-            const fullEvent = {
-              id: event.id || `evt-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
-              timestamp: event.timestamp || new Date(),
-              ...event
+        try {
+          // Enqueue chat events first
+          if (flowOutput.chatEvents && flowOutput.chatEvents.length > 0) {
+            for (const event of flowOutput.chatEvents) {
+              const fullEvent = {
+                id: event.id || `evt-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+                timestamp: event.timestamp || new Date(),
+                ...event
+              };
+              controller.enqueue(JSON.stringify({ type: 'event', data: fullEvent }) + '\n');
+            }
+          }
+
+          // Handle potential errors from the flow
+          if (flowOutput.error) {
+            let userFriendlyErrorDetail = "Erro interno no fluxo do agente.";
+            const lowerCaseFlowError = String(flowOutput.error).toLowerCase();
+            if (lowerCaseFlowError.includes("auth") || lowerCaseFlowError.includes("token")) {
+              userFriendlyErrorDetail = "Erro de autenticação no fluxo do agente.";
+            } else if (lowerCaseFlowError.includes("permission") || lowerCaseFlowError.includes("denied")) {
+              userFriendlyErrorDetail = "Permissão negada no fluxo do agente.";
+            } else if (lowerCaseFlowError.includes("not found")) {
+              userFriendlyErrorDetail = "Recurso necessário para o agente não encontrado.";
+            } else if (lowerCaseFlowError.includes("fetch failed") || lowerCaseFlowError.includes("networkerror")) {
+              userFriendlyErrorDetail = "Erro de rede interno ao contatar serviços para o agente.";
+            } else { // Keep original error string if it's not too revealing or use a generic one
+              userFriendlyErrorDetail = "Ocorreu um erro inesperado durante a execução do agente.";
+            }
+            // It's often better to provide a less specific error message to the user for security.
+            // The original error is logged for developers.
+
+            const errorEvent = {
+              id: `err-${Date.now()}`,
+              timestamp: new Date(),
+              eventType: 'AGENT_ERROR',
+              eventTitle: 'Erro no Agente',
+              eventDetails: userFriendlyErrorDetail,
             };
-            controller.enqueue(JSON.stringify({ type: 'event', data: fullEvent }) + '\n');
-          }
-        }
-
-        // Handle potential errors from the flow
-        if (flowOutput.error) {
-          let userFriendlyErrorDetail = "Erro interno no fluxo do agente.";
-          const lowerCaseFlowError = String(flowOutput.error).toLowerCase();
-          if (lowerCaseFlowError.includes("auth") || lowerCaseFlowError.includes("token")) {
-            userFriendlyErrorDetail = "Erro de autenticação no fluxo do agente.";
-          } else if (lowerCaseFlowError.includes("permission") || lowerCaseFlowError.includes("denied")) {
-            userFriendlyErrorDetail = "Permissão negada no fluxo do agente.";
-          } else if (flowOutput.error) { // Keep original error if it's not sensitive and more specific
-            userFriendlyErrorDetail = String(flowOutput.error);
+            controller.enqueue(JSON.stringify({ type: 'event', data: errorEvent }) + '\n');
+            winstonLogger.error('Error reported by basicChatFlow in stream', {
+              api: 'chat-stream',
+              agentId: chatInput.agentId,
+              originalError: String(flowOutput.error), // Log original error string
+              reportedError: userFriendlyErrorDetail
+            });
+            controller.close(); // Close stream after reporting a flow error.
+            return; // Do not process outputMessage if there was a flow error.
           }
 
-          const errorEvent = {
-            id: `err-${Date.now()}`,
-            timestamp: new Date(),
-            eventType: 'AGENT_ERROR', // More specific eventType
-            eventTitle: 'Erro no Agente',
-            eventDetails: userFriendlyErrorDetail, // User-friendly detail
-          };
-          controller.enqueue(JSON.stringify({ type: 'event', data: errorEvent }) + '\n');
-          winstonLogger.error('Error reported by basicChatFlow', {
+          // Enqueue the final output message (as text)
+          if (flowOutput.outputMessage) {
+            // Actual text streaming from LLM would be handled here if flowOutput.stream was available
+            controller.enqueue(JSON.stringify({ type: 'text', data: flowOutput.outputMessage }) + '\n');
+          }
+
+          // If there was no message, no error, and no events, send a control message
+          if (!flowOutput.outputMessage && !flowOutput.error && (!flowOutput.chatEvents || flowOutput.chatEvents.length === 0)) {
+              controller.enqueue(JSON.stringify({ type: 'event', data: {
+                  id: `ctrl-${Date.now()}`,
+                  timestamp: new Date(),
+                  eventType: 'AGENT_CONTROL',
+                  eventTitle: 'No output',
+                  eventDetails: 'The flow completed without generating a message or events.'
+              }}) + '\n');
+          }
+
+          controller.close();
+        } catch (e) {
+          // Handle errors that occur within the stream's start/enqueue logic
+          winstonLogger.error('Error directly within chat-stream ReadableStream start method', {
             api: 'chat-stream',
-            agentId: chatInput.agentId,
-            originalError: flowOutput.error, // Log original error
-            reportedError: userFriendlyErrorDetail
+            agentId: chatInput?.agentId || 'unknown',
+            error: e instanceof Error ? { message: e.message, stack: e.stack, name: e.name } : String(e),
           });
+          // Send a final error event through the stream if possible, then error out the controller
+          try {
+            const errorEvent = {
+              id: `err-stream-${Date.now()}`,
+              timestamp: new Date(),
+              eventType: 'STREAM_ERROR',
+              eventTitle: 'Erro Crítico no Stream',
+              eventDetails: 'Um erro crítico ocorreu durante a geração da resposta do stream.',
+            };
+            controller.enqueue(JSON.stringify({ type: 'event', data: errorEvent }) + '\n');
+          } catch (enqueueError) {
+            // Ignore if enqueuing the error itself fails, as we'll call controller.error() next.
+          }
+          controller.error(e instanceof Error ? e : new Error('Stream generation failed'));
         }
-
-        // Enqueue the final output message (as text)
-        // TODO: Integrate actual text streaming from LLM if flowOutput.stream is available
-        if (flowOutput.outputMessage) {
-          // If LLM response streaming is implemented in basicChatFlow and populates flowOutput.stream:
-          // For example:
-          // if (flowOutput.stream) {
-          //   const reader = flowOutput.stream.getReader();
-          //   while (true) {
-          //     const { done, value } = await reader.read();
-          //     if (done) break;
-          //     // Assuming value is a text chunk
-          //     controller.enqueue(JSON.stringify({ type: 'text', data: value }) + '\n');
-          //   }
-          // } else if (flowOutput.outputMessage) { ... }
-          // For now, sending the whole message as one chunk:
-          controller.enqueue(JSON.stringify({ type: 'text', data: flowOutput.outputMessage }) + '\n');
-        }
-
-        // If there was no message and no error, maybe send a control message
-        if (!flowOutput.outputMessage && !flowOutput.error && (!flowOutput.chatEvents || flowOutput.chatEvents.length === 0)) {
-            controller.enqueue(JSON.stringify({ type: 'event', data: {
-                id: `ctrl-${Date.now()}`,
-                timestamp: new Date(),
-                eventType: 'AGENT_CONTROL',
-                eventTitle: 'No output',
-                eventDetails: 'The flow completed without generating a message or events.'
-            }}) + '\n');
-        }
-
-        controller.close();
       },
     });
-    
-    // Convert the stream to a Vercel AI SDK compatible stream
-    // The Vercel AI SDK's `StreamingTextResponse` can handle a stream of strings,
-    // where each string is a JSON object. The client then parses each line.
-    // Ensure the Content-Type is appropriate for ndjson or that the client handles text/plain.
+
     return new StreamingTextResponse(stream, {
       headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
     });
 
   } catch (error: any) {
-    // console.error('[Chat API Error]', error); // Removed redundant console.error
-    winstonLogger.error('Error in chat-stream API', {
+    // console.error('[Chat API Error]', error); // This was correctly removed
+    winstonLogger.error('Critical error in chat-stream API POST handler', {
       api: 'chat-stream',
-      agentId: (req as any).agentId || chatInput?.agentId || 'unknown',
-      error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error)
+      // Safely access chatInput only if it's defined, otherwise it might be an error during req.json()
+      agentId: typeof chatInput !== 'undefined' && chatInput?.agentId ? chatInput.agentId : 'unknown',
+      error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error),
     });
 
-    // Refine HTTP error response based on error type, if possible
-    if (error instanceof Error) {
+    let userFriendlyMessage = 'Ocorreu um erro inesperado no servidor de chat. Por favor, tente novamente mais tarde.';
+    let status = 500;
+
+    if (error instanceof SyntaxError && error.message.toLowerCase().includes('json')) {
+      userFriendlyMessage = "Requisição malformada. Verifique o formato JSON enviado.";
+      status = 400; // Bad Request for malformed JSON
+    } else if (error instanceof Error) {
       const lowerCaseError = error.message.toLowerCase();
       if (lowerCaseError.includes("auth") || lowerCaseError.includes("token") || lowerCaseError.includes("unauthorized")) {
-        return NextResponse.json({ error: "Autenticação falhou ou sua sessão expirou." }, { status: 401 });
+        userFriendlyMessage = "Autenticação falhou ou sua sessão expirou.";
+        status = 401;
       } else if (lowerCaseError.includes("permission") || lowerCaseError.includes("denied")) {
-        return NextResponse.json({ error: "Permissão negada para este recurso ou agente." }, { status: 403 });
+        userFriendlyMessage = "Permissão negada para este recurso ou agente.";
+        status = 403;
       } else if (lowerCaseError.includes("not found")) {
-        // Generic not found, could be agent or other resource
-        return NextResponse.json({ error: "Recurso não encontrado." }, { status: 404 });
+        userFriendlyMessage = "Recurso não encontrado ou o agente especificado não existe.";
+        status = 404;
+      } else if (lowerCaseError.includes("fetch failed") || lowerCaseError.includes("networkerror")) {
+        userFriendlyMessage = "Erro de rede ao comunicar com serviços internos. Tente novamente mais tarde.";
+        status = 503; // Service Unavailable or 504 Gateway Timeout might be appropriate
       }
+      // Other specific errors could be mapped to 502, 503, 504 if distinguishable
     }
-    // Default to 500 for other errors
-    return NextResponse.json(
-      { error: 'Ocorreu um erro inesperado no servidor de chat. Por favor, tente novamente mais tarde.' },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: userFriendlyMessage }, { status });
   }
 }
 
-export const runtime = 'edge';
+export const runtime = 'edge'; // Keep edge runtime
 export const dynamic = 'force-dynamic';
 // This is required to enable streaming
 export const dynamicParams = true;
