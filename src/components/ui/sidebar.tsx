@@ -244,7 +244,7 @@ export const Sidebar = React.forwardRef<
     if (!isHoveringLocal) setIsHoveringLocal(true);
 if (!open) setOpen(true);
   }
-}, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen]);
+}, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen, setIsHoveringLocal]);
     
     const handleMouseLeave = React.useCallback(() => {
   if (
@@ -259,7 +259,7 @@ if (!open) setOpen(true);
     });
     if (open) setOpen(false);
   }
-}, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen]);
+}, [isMobile, collapsible, isPinnedOpen, isHoveringLocal, setOpen, setIsHoveringLocal]);
 
     if (!mounted) {
       return null; // Defer rendering until client-mounted to avoid hydration issues
