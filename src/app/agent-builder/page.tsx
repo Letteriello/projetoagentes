@@ -8,6 +8,23 @@ import { v4 as uuidv4 } from "uuid";
 
 // Importação de componentes UI
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription, // Added for modal
+  CardFooter, // Added for modal
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription as DialogDesc, // Renamed to avoid conflict with CardDescription if used in same scope
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -155,6 +172,7 @@ interface AgentRowProps {
   onDelete: (agent: AdaptedSavedAgentConfiguration) => void;
   onDuplicate: (agent: AdaptedSavedAgentConfiguration) => void;
   onSaveTemplate: (agent: AdaptedSavedAgentConfiguration) => void;
+  onGenerateQualityReport: (agent: AdaptedSavedAgentConfiguration) => void; // Added for Task 8.2
 }
 
 // Função utilitária para salvar templates
@@ -281,6 +299,15 @@ export default function AgentBuilderPage() {
   const [configuringTool, setConfiguringTool] = useState<AvailableTool | null>(null);
   const [currentSelectedApiKeyId, setCurrentSelectedApiKeyId] = useState<string | undefined>();
   
+  // States for Task 8.2: Quality Report Modal
+  const [isQualityReportModalOpen, setIsQualityReportModalOpen] = useState(false);
+  const [qualityReportData, setQualityReportData] = useState<{
+    agentName: string;
+    metrics: Array<{ name: string; value: string | number; description?: string }>;
+    suggestions: string[];
+  } | null>(null);
+
+  // Estados para tutorial
   // Estado para tutoriais
   const [activeTutorial, setActiveTutorial] = useState<any>(null);
   const [currentTutorialStep, setCurrentTutorialStep] = useState(0);
@@ -486,6 +513,56 @@ export default function AgentBuilderPage() {
     router.replace(newRelativePathQuery);
   };
 
+  // Handler para selecionar agente para monitoramento
+  const handleSelectAgentForMonitoring = (agent: AdaptedSavedAgentConfiguration) => {
+    setSelectedAgentForMonitoring(prev => 
+      prev?.id === agent.id ? null : agent
+    );
+  };
+
+  // Filtragem de agentes com base na pesquisa
+  const filteredAgents = agents.filter(agent => 
+    agent.agentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Cálculo de estatísticas
+  const totalAgents = agents.length;
+  const agentsWithTools = agents.filter(agent => 
+    agent.config.tools && agent.config.tools.length > 0
+  ).length;
+
+  // Handler for Task 8.2: Generate Quality Report
+  const handleGenerateQualityReport = (agent: AdaptedSavedAgentConfiguration) => {
+    // Simulate report generation
+    const mockMetrics = [
+      { name: "Exact Match (EM)", value: `${(Math.random() * 30 + 60).toFixed(1)}%`, description: "Percentual de respostas idênticas às esperadas." },
+      { name: "ROUGE-L (F1)", value: (Math.random() * 0.2 + 0.7).toFixed(2), description: "Similaridade baseada na maior subsequência comum." },
+      { name: "Consistência da Resposta", value: `${(Math.random() * 20 + 75).toFixed(1)}%` },
+      { name: "Utilização de Ferramentas (Sucesso)", value: `${(Math.random() * 15 + 80).toFixed(1)}%` },
+      { name: "Latência Média (ms)", value: Math.floor(Math.random() * 800 + 200) },
+    ];
+    const mockSuggestions = [
+      "Considere refinar o prompt para cenários de ambiguidade.",
+      `Para o agente "${agent.agentName}", adicione a ferramenta 'DatabaseAccess' para consultas diretas.`,
+      "Revise os logs de erro para identificar padrões de falha.",
+      "Aumente a diversidade do evalset para cobrir mais casos de uso.",
+      // Placeholder for AI Configuration Assistant
+      "Integrar com 'AI Configuration Assistant' para sugestões de otimização de prompt e configuração de modelo (feature futura)."
+    ];
+
+    setQualityReportData({
+      agentName: agent.agentName,
+      metrics: mockMetrics,
+      suggestions: mockSuggestions,
+    });
+    setIsQualityReportModalOpen(true);
+  };
+
+  // Renderização conditional com base no estado de carregamento
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
+  }
   // Handler para salvar agente (criação ou edição)
   const handleSaveAgent = async (formData: AdaptedAgentFormData) => {
     setIsCreateModalOpen(false);
@@ -569,6 +646,27 @@ export default function AgentBuilderPage() {
         }
       }
 
+  // Componente de renderização para cada linha/card de agente
+  const RenderAgentRow = ({ agent, index, style, onGenerateQualityReport }: AgentRowProps) => {
+    return (
+      <div style={style} className="px-1 py-2">
+        <AgentCard
+          agent={agent}
+          onEdit={() => handleEditAgent(agent)}
+          onDelete={() => handleDeleteAgent(agent)}
+          onDuplicate={() => handleDuplicateAgent(agent)}
+          onSaveTemplate={() => handleSaveAsTemplate(agent)}
+          onSelectForMonitoring={() => handleSelectAgentForMonitoring(agent)}
+          isSelectedForMonitoring={selectedAgentForMonitoring?.id === agent.id}
+          onGenerateQualityReport={onGenerateQualityReport} // Pass down the handler
+          // Dummy props for AgentCard that might be expected from its definition
+          availableTools={builderAvailableTools} // Assuming builderAvailableTools is in scope
+          agentTypeOptions={[]} // Provide a default or actual options
+          onToggleFavorite={() => {}} // Dummy function
+        />
+      </div>
+    );
+  };  // Renderização do componente principal
       // Fechar modal e resetar estado
       setEditingAgent(null);
     } catch (error) {
@@ -735,6 +833,7 @@ export default function AgentBuilderPage() {
                   onDelete={handleDeleteAgent}
                   onDuplicate={handleDuplicateAgent}
                   onSaveTemplate={handleSaveAsTemplate}
+                  onGenerateQualityReport={handleGenerateQualityReport} // Pass handler
                 />
               ))}
             </div>
@@ -750,6 +849,7 @@ export default function AgentBuilderPage() {
                   onDelete={handleDeleteAgent}
                   onDuplicate={handleDuplicateAgent}
                   onSaveTemplate={handleSaveAsTemplate}
+                  onGenerateQualityReport={handleGenerateQualityReport} // Pass handler
                 />
               ))}
             </div>
@@ -845,6 +945,49 @@ export default function AgentBuilderPage() {
             isOpen={isFeedbackModalOpen}
             onOpenChange={(open: boolean) => setIsFeedbackModalOpen(open)}
           />
+        )}
+
+        {/* Quality Report Modal (Task 8.2) */}
+        {isQualityReportModalOpen && qualityReportData && (
+          <Dialog open={isQualityReportModalOpen} onOpenChange={setIsQualityReportModalOpen}>
+            <DialogContent className="sm:max-w-2xl"> {/* Wider modal */}
+              <DialogHeader>
+                <DialogTitle>Relatório de Qualidade do Agente: {qualityReportData.agentName}</DialogTitle>
+                <DialogDesc> {/* Using DialogDesc to avoid conflict */}
+                  Uma análise simulada da performance e sugestões de melhoria para o agente.
+                </DialogDesc>
+              </DialogHeader>
+              <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto pr-2"> {/* Scrollable content */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-foreground">Métricas de Avaliação (Simuladas)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {qualityReportData.metrics.map(metric => (
+                      <Card key={metric.name} className="bg-muted/30">
+                        <CardHeader className="pb-2 pt-3 px-4">
+                          <CardTitle className="text-sm font-medium">{metric.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pb-3 px-4">
+                          <p className="text-2xl font-bold text-primary">{String(metric.value)}</p>
+                          {metric.description && <p className="text-xs text-muted-foreground mt-1">{metric.description}</p>}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-foreground">Sugestões de Melhoria</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    {qualityReportData.suggestions.map((suggestion, index) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setIsQualityReportModalOpen(false)}>Fechar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </Suspense>
     </>
