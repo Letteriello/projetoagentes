@@ -4,7 +4,7 @@ import { useFormContext, Controller, FormField } from 'react-hook-form'; // Adde
 import { z } from 'zod';
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
 import { llmModels } from '@/data/llm-models'; // Import llmModels
-import type { LLMModelDetails } from '@/types/agent-configs-new'; // Import LLMModelDetails for type safety
+import type { LLMModelDetails } from '@/types/agent-core'; // Updated path
 // Importação de tipos removida para evitar duplicação
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -27,8 +27,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
-import type { AvailableTool } from '@/types/tool-types';
+import type { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
+import type { AvailableTool } from '@/types/tool-core'; // Updated path
 // import CustomToolDialog, { CustomToolData } from '../custom-tool-dialog'; // Lazy loaded
 import { cn } from "@/lib/utils"; // Ensure cn is imported
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
@@ -47,7 +47,7 @@ import { FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "
 // Assuming InfoIcon is a standard component, if it's conflicting, it might need aliasing or checking usage.
 // For now, assuming InfoIconComponent prop handles the specific InfoIcon from props.
 // import ToolConfigModal from '../ToolConfigModal'; // Lazy loaded
-import type { ToolConfigData } from '@/types/agent-types'; // Added import
+import type { ToolConfigData } from '@/types/tool-core'; // Updated path
 import { ApiKeyEntry } from '../../../../services/api-key-service';
 
 interface ToolsTabProps {

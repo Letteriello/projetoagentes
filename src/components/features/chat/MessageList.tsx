@@ -5,7 +5,7 @@ import AutoSizer from 'react-virtualized-auto-sizer';
 import { Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChatMessageUI, MessageListItem } from '@/types/chat'; // Updated import
+import { CoreChatMessage, MessageListItem } from '@/types/chat-core'; // Updated import and type name
 import ChatMessageDisplay from './ChatMessageDisplay';
 import ChatEventDisplay from './ChatEventDisplay'; // Added import
 

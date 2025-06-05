@@ -2,7 +2,7 @@
 import { ai } from '@/ai/genkit';
 import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
-import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/unified-agent-types';
+import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/agent-core'; // Updated path
 import { winstonLogger } from '../../lib/winston-logger';
 
 const AgentCreatorChatInputSchema = z.object({

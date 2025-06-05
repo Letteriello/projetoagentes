@@ -1,7 +1,7 @@
 // src/contexts/AgentsContext.tsx
 "use client";
 
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
 import * as React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAgentStorage } from '@/hooks/use-agent-storage'; // Import the new hook

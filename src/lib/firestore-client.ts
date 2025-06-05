@@ -3,7 +3,7 @@
 // Este arquivo é uma versão client-safe para Firestore
 // Usa API fetch para comunicar com endpoints de servidor
 
-import type { SavedAgentConfiguration } from '@/app/agent-builder/page';
+import type { SavedAgentConfiguration, AgentConfig } from '@/types/agent-core'; // Updated path
 
 // Placeholder para o userId
 const PLACEHOLDER_USER_ID = "defaultUser";
@@ -27,21 +27,26 @@ export async function addAgent(
   try {
     // Em produção, isso chamaria um endpoint de API
     // Criamos um novo objeto com os dados do agente
-    // Adicionamos apenas as propriedades que fazem parte do tipo SavedAgentConfiguration
-    const timestamp = new Date();
+    const timestamp = new Date().toISOString(); // Core type uses string for dates
     
+    // agentData is Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>
+    // It should already have agentName, agentDescription, config, tools, etc.
     const newAgent: SavedAgentConfiguration = {
-      ...agentData,
-      id: `mock-${Date.now()}`,
-      // Propriedades obrigatórias com valores padrão
-      templateId: agentData.agentType === 'llm' ? 'custom_llm' : 
-                 agentData.agentType === 'workflow' ? 'workflow_template' : 'custom_template',
-      toolsDetails: agentData.agentTools?.map(toolId => ({
-        id: toolId,
-        label: toolId,
-        iconName: 'default'
-      })) || [],
-      agentType: agentData.agentType || 'llm'
+      id: `mock-${Date.now()}`, // Mock ID
+      userId: PLACEHOLDER_USER_ID, // Mock userId
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      agentName: agentData.agentName,
+      agentDescription: agentData.agentDescription,
+      agentVersion: agentData.agentVersion || '1.0.0',
+      config: agentData.config as AgentConfig, // Ensure agentData has a valid AgentConfig
+      tools: agentData.tools || [],
+      toolConfigsApplied: agentData.toolConfigsApplied || {},
+      toolsDetails: agentData.toolsDetails || [], // This should be AvailableTool[]
+      isTemplate: agentData.isTemplate || false,
+      // Fill in other required fields from SavedAgentConfiguration if not in Omit
+      isFavorite: false,
+      // templateId: agentData.templateId, // If templateId is part of the Omit type
     };
     
     // Na implementação real, o userId, createdAt e updatedAt seriam armazenados no Firestore

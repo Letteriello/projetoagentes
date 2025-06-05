@@ -3,15 +3,15 @@ import { ai } from '@/ai/genkit';
 import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
 import { ActionContext } from 'genkit';
-import { allTools } from '@/data/agent-builder/available-tools';
-import { AvailableTool } from '@/types/tool-types';
+import { allTools } from '@/data/available-tools'; // Updated path
+import { AvailableTool } from '@/types/tool-core'; // Updated path
 import { 
   SavedAgentConfiguration, 
   AgentConfig, 
   LLMAgentConfig, 
   WorkflowAgentConfig,
   WorkflowDetailedType 
-} from '@/types/unified-agent-types';
+} from '@/types/agent-core'; // Updated path
 
 // 1. Define Input Schema
 /**

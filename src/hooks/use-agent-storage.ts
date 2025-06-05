@@ -1,5 +1,5 @@
 // src/hooks/use-agent-storage.ts
-import { SavedAgentConfiguration } from '@/types/unified-agent-types';
+import { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
 import {
   addAgent as addAgentToDB,
   getAllAgents as getAllAgentsFromDB,
@@ -30,9 +30,18 @@ export function useAgentStorage() {
     const newAgent: SavedAgentConfiguration = {
       ...agentConfigData,
       id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ...(userId && { userId }),
+      createdAt: new Date().toISOString(), // Core type uses string
+      updatedAt: new Date().toISOString(), // Core type uses string
+      userId: userId || "", // Ensure userId is always string, core type requires it
+      // Ensure all other required fields from SavedAgentConfiguration are present
+      // For example, if agentConfigData doesn't guarantee them:
+      agentName: agentConfigData.agentName || "Unnamed Agent",
+      agentDescription: agentConfigData.agentDescription || "",
+      agentVersion: agentConfigData.agentVersion || "1.0.0",
+      config: agentConfigData.config || { type: 'custom', framework: 'custom', agentGoal: '', agentTasks: [] }, // Minimal valid config
+      tools: agentConfigData.tools || [],
+      toolConfigsApplied: agentConfigData.toolConfigsApplied || {},
+      isTemplate: agentConfigData.isTemplate || false,
     };
     try {
       // The service's addAgentToDB handles internal date conversions.

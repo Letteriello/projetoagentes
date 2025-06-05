@@ -1,49 +1,43 @@
-import { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+// src/services/indexed-db-agent-service.ts
+import { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
 import { openDatabase } from '@/lib/indexed-db-manager';
 import { retryWithBackoff, isRetryableIDBError, RetryConfig } from '@/lib/utils';
 
 // Interface para o agente armazenável no IndexedDB
+// StorableAgent uses string dates, matching SavedAgentConfiguration from agent-core
 interface StorableAgent extends Omit<SavedAgentConfiguration, 'createdAt' | 'updatedAt'> {
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
 }
 
-// Store names are defined locally but must match those in indexed-db-manager.ts
 export const AGENT_STORE_NAME = 'agents';
 export const AGENT_ORDER_STORE_NAME = 'agentOrder';
 
-// Default retry configuration for IndexedDB operations
 const idbRetryConfig: RetryConfig = {
-  maxRetries: 2, // Fewer retries for local DB operations
+  maxRetries: 2,
   initialDelayMs: 100,
   shouldRetry: isRetryableIDBError,
   logRetries: true,
 };
 
-// Função auxiliar para converter para Date se for string
-const toDate = (date: Date | string): Date => {
-  return date instanceof Date ? date : new Date(date);
-};
-
+// SavedAgentConfiguration from agent-core uses string for dates.
+// StorableAgent also uses string for dates.
 const toStorableAgent = (agent: SavedAgentConfiguration): StorableAgent => {
-  const createdAt = toDate(agent.createdAt);
-  const updatedAt = toDate(agent.updatedAt);
-  
-  const { createdAt: _, updatedAt: __, ...rest } = agent;
-  
+  // Ensure dates are in ISO string format.
+  // SavedAgentConfiguration from agent-core already defines them as string.
   return {
-    ...rest,
-    createdAt: createdAt.toISOString(),
-    updatedAt: updatedAt.toISOString(),
+    ...agent,
+    createdAt: agent.createdAt, // Should already be string
+    updatedAt: agent.updatedAt, // Should already be string
   };
 };
 
 const fromStorableAgent = (storable: StorableAgent | null | undefined): SavedAgentConfiguration | null => {
   if (!storable) return null;
+  // StorableAgent already has dates as strings, which matches SavedAgentConfiguration from agent-core.
   return {
     ...storable,
-    createdAt: new Date(storable.createdAt),
-    updatedAt: new Date(storable.updatedAt),
+    // No date conversion needed if SavedAgentConfiguration expects strings.
   };
 };
 
@@ -52,6 +46,7 @@ export async function addAgent(agent: SavedAgentConfiguration): Promise<SavedAge
     const db = await openDatabase();
     const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
     const store = tx.objectStore(AGENT_STORE_NAME);
+    // Agent already has string dates from SavedAgentConfiguration type
     const storableAgent = toStorableAgent(agent);
     try {
       await store.add(storableAgent);
@@ -65,17 +60,15 @@ export async function addAgent(agent: SavedAgentConfiguration): Promise<SavedAge
 }
 
 export async function getAgentById(id: string): Promise<SavedAgentConfiguration | null> {
-  // Read operations typically don't need retries unless specific transient read errors are common
   try {
     const db = await openDatabase();
     const tx = db.transaction(AGENT_STORE_NAME, 'readonly');
     const store = tx.objectStore(AGENT_STORE_NAME);
-    const storableAgent = await store.get(id);
+    const storableAgent = await store.get(id) as StorableAgent | undefined;
     
     if (!storableAgent) return null;
     
-    const typedAgent = storableAgent as StorableAgent;
-    return fromStorableAgent(typedAgent);
+    return fromStorableAgent(storableAgent);
   } catch (error) {
     console.error('Erro ao buscar agente por ID:', error);
     return null;
@@ -83,7 +76,6 @@ export async function getAgentById(id: string): Promise<SavedAgentConfiguration 
 }
 
 export async function getAllAgents(userId?: string): Promise<SavedAgentConfiguration[]> {
-  // Read operations typically don't need retries
   try {
     const db = await openDatabase();
     const tx = db.transaction(AGENT_STORE_NAME, 'readonly');
@@ -97,20 +89,27 @@ export async function getAllAgents(userId?: string): Promise<SavedAgentConfigura
       request = store.getAll();
     }
 
-    const storableAgents = await request;
-
-    if (!Array.isArray(storableAgents)) return [];
-  
-    return storableAgents
-      .filter((agent): agent is StorableAgent => {
-        return agent && 
-               typeof agent === 'object' && 
-               'id' in agent && 
-               'createdAt' in agent && 
-               'updatedAt' in agent;
-      })
-      .map(agent => fromStorableAgent(agent))
-      .filter((agent): agent is SavedAgentConfiguration => agent !== null);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        const storableAgents = request.result;
+        if (!Array.isArray(storableAgents)) {
+          resolve([]);
+          return;
+        }
+        const result = storableAgents
+          .filter((agent): agent is StorableAgent =>
+            agent && typeof agent === 'object' && 'id' in agent &&
+            'createdAt' in agent && 'updatedAt' in agent // Basic check
+          )
+          .map(agent => fromStorableAgent(agent))
+          .filter((agent): agent is SavedAgentConfiguration => agent !== null);
+        resolve(result);
+      };
+      request.onerror = () => {
+        console.error('Error fetching agents from IDBRequest:', request.error);
+        reject(request.error);
+      };
+    });
   } catch (error) {
     console.error('Erro ao buscar agentes do IndexedDB:', error);
     return [];
@@ -123,16 +122,16 @@ export async function updateAgent(agent: SavedAgentConfiguration): Promise<Saved
     const tx = db.transaction(AGENT_STORE_NAME, 'readwrite');
     const store = tx.objectStore(AGENT_STORE_NAME);
     
-    const updatedAgentData = {
+    const updatedAgentData: SavedAgentConfiguration = {
       ...agent,
-      updatedAt: new Date()
+      updatedAt: new Date().toISOString() // Core type uses string
     };
     const agentToStore = toStorableAgent(updatedAgentData);
 
     try {
       await store.put(agentToStore);
       await tx.done;
-      return updatedAgentData;
+      return fromStorableAgent(agentToStore) as SavedAgentConfiguration;
     } catch (error) {
       console.error('Erro ao atualizar agente (attempt):', error);
       throw error;
@@ -171,7 +170,6 @@ export async function saveAgentOrder(order: string[], agentOrderKey: string = 'c
 }
 
 export async function loadAgentOrder(agentOrderKey: string = 'currentOrder'): Promise<string[]> {
-  // Read operation
   try {
     const db = await openDatabase();
     const tx = db.transaction(AGENT_ORDER_STORE_NAME, 'readonly');

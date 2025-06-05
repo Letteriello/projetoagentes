@@ -26,7 +26,7 @@ import {
   Maximize, // Added Maximize for Focus Mode
   Minimize, // Added Minimize for Focus Mode
 } from "lucide-react"; // Added LogIn, LogOut
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Keep if still used for some parts
+import type { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
 import { llmModels } from '../../../data/llm-models'; // Import llmModels
 import { Badge } from "@/components/ui/badge"; // Import Badge
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Added Popover
@@ -34,7 +34,7 @@ import { Slider } from "@/components/ui/slider"; // Added Slider
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ActiveChatTarget } from "@/hooks/use-chat-store"; // Import ActiveChatTarget
-import { ChatRunConfig } from "@/types/chat"; // Import ChatRunConfig
+import { ChatRunConfig } from "@/types/chat-core"; // Updated path
 import { capitalizeFirstLetter } from "@/lib/utils"; // Import capitalizeFirstLetter
 
 interface Gem {

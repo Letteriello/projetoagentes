@@ -1,6 +1,6 @@
 // test-utils.ts
 // Utilitários e mocks reutilizáveis para testes de flows Genkit
-import { LLMAgentConfig, WorkflowAgentConfig, SavedAgentConfiguration } from '@/types/agent-configs-fixed';
+import { LLMAgentConfig, WorkflowAgentConfig, SavedAgentConfiguration, AgentConfig } from '@/types/agent-core'; // Updated path
 
 export const baseLLMConfig: LLMAgentConfig = {
   model: 'gpt-4',
@@ -14,10 +14,10 @@ export const baseLLMConfig: LLMAgentConfig = {
 export const baseAgentConfig: SavedAgentConfiguration = {
   id: 'agent-test-id',
   agentName: 'Test Agent',
-  description: 'Test description',
-  config: { ...baseLLMConfig },
+  agentDescription: 'Test description', // Renamed from 'description' to match SavedAgentConfiguration
+  config: { ...baseLLMConfig } as AgentConfig, // Assert as AgentConfig union
   tools: [],
-  toolsDetails: [],
+  // toolsDetails is optional in SavedAgentConfiguration from agent-core.ts
   toolConfigsApplied: {},
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -25,11 +25,12 @@ export const baseAgentConfig: SavedAgentConfiguration = {
   userId: 'user-test-user',
 };
 
-// ATENÇÃO: Certifique-se de que o tipo WorkflowAgentConfig realmente permite workflowSteps. Se não, ajuste o tipo em '@/types/agent-configs-fixed'.
-// TODO: Ajustar o tipo de baseWorkflowConfig para WorkflowAgentConfig assim que o tipo permitir 'workflowSteps' corretamente.
-export const baseWorkflowConfig: any = {
+// WorkflowAgentConfig in agent-core.ts does allow workflowSteps.
+export const baseWorkflowConfig: WorkflowAgentConfig = { // Now typed with WorkflowAgentConfig
   type: 'workflow',
   framework: 'genkit',
+  agentGoal: 'Default workflow goal', // Added required field from AgentConfigBase
+  agentTasks: ['Execute workflow steps'], // Added required field from AgentConfigBase
   workflowType: 'sequential',
   workflowSteps: [
     {

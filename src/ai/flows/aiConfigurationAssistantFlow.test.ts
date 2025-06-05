@@ -7,7 +7,7 @@ import {
 import { ai } from '@/ai/genkit';
 import * as z from 'zod';
 import { createMockSavedAgentConfig as createMockAgent, baseLLMConfig, baseAgentConfig, mockActionContext } from './test-utils';
-import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/unified-agent-types';
+import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/agent-core'; // Updated path
 
 // ===== MOCKS CENTRAIS =====
 // Se precisar de mocks de tools, defina-os localmente ou centralize no test-utils.ts
@@ -24,7 +24,7 @@ jest.mock('@/ai/genkit', () => ({
   },
 }));
 
-jest.mock('@/data/agent-builder/available-tools', () => ({
+jest.mock('@/data/available-tools', () => ({ // Updated path
   allTools: simplifiedMockTools,
 }));
 

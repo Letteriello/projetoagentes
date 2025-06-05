@@ -16,7 +16,7 @@ import {
   StateScope,
   // InitialStateValue, // Type for items in useFieldArray will be inferred or use Controller's render prop
   // StateValidationRule // Same as above
-} from '@/types/agent-configs-new'; // Updated import
+} from '@/types/agent-core'; // Updated path
 import {
   FormField,
   FormItem,

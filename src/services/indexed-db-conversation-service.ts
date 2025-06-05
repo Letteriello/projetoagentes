@@ -1,13 +1,12 @@
+// src/services/indexed-db-conversation-service.ts
 import { v4 as uuidv4 } from 'uuid';
-import { Conversation, Message } from '@/types/chat';
+import { Conversation, CoreChatMessage } from '@/types/chat-core'; // Updated path and Message to CoreChatMessage
 import { openDatabase } from '@/lib/indexed-db-manager';
 import { retryWithBackoff, isRetryableIDBError, RetryConfig } from '@/lib/utils';
 
-// Store names are defined locally but must match those in indexed-db-manager.ts
 export const CONVERSATIONS_STORE_NAME = 'conversations';
 export const MESSAGES_STORE_NAME = 'messages';
 
-// Default retry configuration for IndexedDB operations (can be shared or customized)
 const idbRetryConfig: RetryConfig = {
   maxRetries: 2,
   initialDelayMs: 100,
@@ -15,103 +14,107 @@ const idbRetryConfig: RetryConfig = {
   logRetries: true,
 };
 
-type Transaction = IDBTransaction;
+// Types for Storable objects, ensuring dates are strings for IndexedDB
+interface StorableConversation extends Omit<Conversation, 'createdAt' | 'updatedAt' | 'messages'> {
+  createdAt: string;
+  updatedAt: string;
+}
 
-// Helper functions for Date conversion (omitted for brevity, assume they are the same)
-// For Conversation
-const toStorableConversation = (conversation: Conversation): any => {
+interface StorableMessage extends Omit<CoreChatMessage, 'timestamp'> {
+  timestamp: string;
+  // Add conversationId here because CoreChatMessage might not have it directly,
+  // but it's essential for indexing messages.
+  conversationId: string;
+}
+
+// Conversion functions
+const toStorableConversation = (conversation: Conversation): StorableConversation => {
   return {
     ...conversation,
-    createdAt: conversation.createdAt instanceof Date ? conversation.createdAt.toISOString() : conversation.createdAt,
-    updatedAt: conversation.updatedAt instanceof Date ? conversation.updatedAt.toISOString() : conversation.updatedAt,
-    messages: [], // Messages are stored separately
+    createdAt: (conversation.createdAt instanceof Date ? conversation.createdAt.toISOString() : conversation.createdAt) as string,
+    updatedAt: (conversation.updatedAt instanceof Date ? conversation.updatedAt.toISOString() : conversation.updatedAt) as string,
+    // messages are not stored directly in the conversation object in DB
   };
 };
 
-const fromStorableConversation = (storable: any): Conversation => {
-  if (!storable) return storable;
+const fromStorableConversation = (storable: StorableConversation | undefined): Conversation | undefined => {
+  if (!storable) return undefined;
   return {
     ...storable,
     createdAt: new Date(storable.createdAt),
     updatedAt: new Date(storable.updatedAt),
-    messages: storable.messages || [],
-  } as Conversation;
-};
-
-// For Message
-const toStorableMessage = (message: Message | Omit<Message, 'id' | 'timestamp'>): any => {
-  const timestamp = (message as Message).timestamp || new Date();
-  return {
-    ...message,
-    timestamp: timestamp instanceof Date ? timestamp.toISOString() : timestamp,
+    messages: [], // Messages will be loaded separately
   };
 };
 
-const fromStorableMessage = (storable: any): Message => {
-  if (!storable) return storable;
+const toStorableMessage = (message: CoreChatMessage, conversationId: string): StorableMessage => {
+  return {
+    ...message,
+    timestamp: (message.timestamp instanceof Date ? message.timestamp.toISOString() : message.timestamp) as string,
+    conversationId: message.conversationId || conversationId, // Ensure conversationId is set
+  };
+};
+
+const fromStorableMessage = (storable: StorableMessage | undefined): CoreChatMessage | undefined => {
+  if (!storable) return undefined;
   return {
     ...storable,
     timestamp: new Date(storable.timestamp),
-  } as Message;
+  };
 };
 
-
-async function updateConversationTimestampInternal(transaction: Transaction, conversationId: string): Promise<void> {
+async function updateConversationTimestampInternal(transaction: IDBTransaction, conversationId: string): Promise<void> {
   const store = transaction.objectStore(CONVERSATIONS_STORE_NAME);
-  const storableConvo = await store.get(conversationId); // This is a request, not a direct result
+  const storableConvo = await store.get(conversationId) as StorableConversation | undefined; // Add await and type
   if (storableConvo) {
-    const conversation = fromStorableConversation(storableConvo);
+    const conversation = fromStorableConversation(storableConvo)!; // Non-null assertion
     conversation.updatedAt = new Date();
-    await store.put(toStorableConversation(conversation)); // This is also a request
+    await store.put(toStorableConversation(conversation));
   }
 }
 
 export async function getAllConversations(userId: string): Promise<Conversation[]> {
-  // Read operation - no retry
   const db = await openDatabase();
   const tx = db.transaction(CONVERSATIONS_STORE_NAME, 'readonly');
   const store = tx.objectStore(CONVERSATIONS_STORE_NAME);
   const index = store.index('userId');
-  const storableConversations = await index.getAll(userId);
+  const storableConversations = await index.getAll(userId) as StorableConversation[];
 
-  const conversations = storableConversations.map(fromStorableConversation);
+  const conversations = storableConversations.map(s => fromStorableConversation(s)!); // Non-null assertion
   conversations.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   return conversations;
 }
 
 export async function getConversationById(conversationId: string): Promise<Conversation | undefined> {
-  // Read operation - no retry
   const db = await openDatabase();
-
   const convoTx = db.transaction(CONVERSATIONS_STORE_NAME, 'readonly');
   const convoStore = convoTx.objectStore(CONVERSATIONS_STORE_NAME);
-  const storableConvo = await convoStore.get(conversationId);
+  const storableConvo = await convoStore.get(conversationId) as StorableConversation | undefined;
 
-  if (!storableConvo) {
-    return undefined;
-  }
-  const conversation = fromStorableConversation(storableConvo);
+  if (!storableConvo) return undefined;
+  const conversation = fromStorableConversation(storableConvo)!;
 
   const msgTx = db.transaction(MESSAGES_STORE_NAME, 'readonly');
   const msgStore = msgTx.objectStore(MESSAGES_STORE_NAME);
   const msgIndex = msgStore.index('conversationId');
-  const storableMessages = await msgIndex.getAll(conversationId);
+  const storableMessages = await msgIndex.getAll(conversationId) as StorableMessage[];
 
-  conversation.messages = storableMessages.map(fromStorableMessage);
+  conversation.messages = storableMessages.map(s => fromStorableMessage(s)!) // Non-null assertion
+                                       .filter((msg): msg is CoreChatMessage => msg !== undefined);
   conversation.messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
   return conversation;
 }
 
 export async function createNewConversation(userId: string, title?: string, agentId?: string): Promise<Conversation> {
   return retryWithBackoff(async () => {
     const db = await openDatabase();
+    const now = new Date();
     const newConversation: Conversation = {
       id: uuidv4(),
       userId,
       title: title || 'New Conversation',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       messages: [],
       ...(agentId && { agentId }),
     };
@@ -129,20 +132,23 @@ export async function createNewConversation(userId: string, title?: string, agen
   }, idbRetryConfig);
 }
 
-export async function addMessageToConversation(conversationId: string, messageData: Message | Omit<Message, 'id' | 'timestamp'>): Promise<Message> {
+export async function addMessageToConversation(
+  conversationId: string,
+  messageData: Omit<CoreChatMessage, 'id' | 'timestamp'> // Parameter uses CoreChatMessage now
+): Promise<CoreChatMessage> {
   return retryWithBackoff(async () => {
     const db = await openDatabase();
-    const fullMessageData = messageData as Message;
-    const newMessage: Message = {
+    const newMessage: CoreChatMessage = {
       ...messageData,
-      id: fullMessageData.id || uuidv4(),
-      timestamp: fullMessageData.timestamp || new Date(),
+      id: uuidv4(), // Generate ID here if not present
+      timestamp: new Date(), // Set timestamp here
+      conversationId: conversationId, // Ensure conversationId is part of the message
     };
 
     const tx = db.transaction([MESSAGES_STORE_NAME, CONVERSATIONS_STORE_NAME], 'readwrite');
     const msgStore = tx.objectStore(MESSAGES_STORE_NAME);
     try {
-      await msgStore.add(toStorableMessage(newMessage));
+      await msgStore.add(toStorableMessage(newMessage, conversationId));
       await updateConversationTimestampInternal(tx, conversationId);
       await tx.done;
       return newMessage;
@@ -159,9 +165,9 @@ export async function renameConversationInStorage(conversationId: string, newTit
     const tx = db.transaction(CONVERSATIONS_STORE_NAME, 'readwrite');
     const store = tx.objectStore(CONVERSATIONS_STORE_NAME);
     try {
-      const storableConvo = await store.get(conversationId);
+      const storableConvo = await store.get(conversationId) as StorableConversation | undefined;
       if (storableConvo) {
-        const conversation = fromStorableConversation(storableConvo);
+        const conversation = fromStorableConversation(storableConvo)!;
         conversation.title = newTitle;
         conversation.updatedAt = new Date();
         await store.put(toStorableConversation(conversation));
@@ -203,14 +209,14 @@ export async function finalizeMessageInConversation(conversationId: string, mess
     const tx = db.transaction([MESSAGES_STORE_NAME, CONVERSATIONS_STORE_NAME], 'readwrite');
     const msgStore = tx.objectStore(MESSAGES_STORE_NAME);
     try {
-      const storableMsg = await msgStore.get(messageId);
+      const storableMsg = await msgStore.get(messageId) as StorableMessage | undefined;
       if (storableMsg) {
-        const message = fromStorableMessage(storableMsg);
-        message.text = fullContent;
-        message.content = [{ type: 'text', text: fullContent }];
+        const message = fromStorableMessage(storableMsg)!;
+        message.content = fullContent; // Use content field
         message.isError = isError;
-        message.isLoading = false;
-        await msgStore.put(toStorableMessage({ ...message, timestamp: new Date() }));
+        message.isLoading = false; // Assuming streaming/loading is finished
+        message.timestamp = new Date(); // Update timestamp on finalization
+        await msgStore.put(toStorableMessage(message, conversationId));
         await updateConversationTimestampInternal(tx, conversationId);
       } else {
         throw new Error(`Message with ID ${messageId} not found for finalization.`);
@@ -245,11 +251,11 @@ export async function updateMessageFeedback(conversationId: string, messageId: s
     const tx = db.transaction([MESSAGES_STORE_NAME, CONVERSATIONS_STORE_NAME], 'readwrite');
     const msgStore = tx.objectStore(MESSAGES_STORE_NAME);
     try {
-      const storableMsg = await msgStore.get(messageId);
+      const storableMsg = await msgStore.get(messageId) as StorableMessage | undefined;
       if (storableMsg) {
-        const message = fromStorableMessage(storableMsg);
+        const message = fromStorableMessage(storableMsg)!;
         message.feedback = feedback;
-        await msgStore.put(toStorableMessage(message));
+        await msgStore.put(toStorableMessage(message, conversationId));
         await updateConversationTimestampInternal(tx, conversationId);
       } else {
         throw new Error(`Message with ID ${messageId} not found for feedback update.`);
@@ -261,3 +267,5 @@ export async function updateMessageFeedback(conversationId: string, messageId: s
     }
   }, idbRetryConfig);
 }
+
+[end of src/services/indexed-db-conversation-service.ts]

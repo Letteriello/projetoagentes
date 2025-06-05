@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Conversation, MessageData } from "@/types/chat"; // Import MessageData
+import { Conversation, CoreChatMessage } from "@/types/chat-core"; // Updated path, CoreChatMessage replaces MessageData
 import { useToast } from "@/hooks/use-toast"; // Added useToast import
 import { cn } from "@/lib/utils";
-import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
+import type { SavedAgentConfiguration as SavedAgentConfigType } from "@/types/agent-core"; // Updated path
+// Gem type is assumed to be local or passed via props if its definition was in agentBuilderConfig.tsx
+// For now, removing the direct import of Gem from the data file.
+// import type { Gem } from "@/data/agent-builder-config"; // This data file doesn't export Gem type
 import { MessageSquarePlus } from "lucide-react"; // Import the icon
 import EmptyState from '@/components/shared/EmptyState'; // Import EmptyState
 
@@ -113,42 +116,41 @@ export interface ConversationSidebarProps {
   // Props from the original diff that were missing in the read_files output
   activeAgentConfig?: SavedAgentConfigType | Gem | null; // Assuming this is the correct type
   onAgentConfigChange?: (agentConfig: SavedAgentConfigType | Gem) => void; // Assuming this is the correct type
-  availableGems?: Gem[];
+  availableGems?: Gem[]; // Gem type would need to be defined locally or imported from where it's defined
   availableAgents?: AgentSelectItem[];
 }
+
+// Assuming Gem type is defined locally or passed if not from a shared type file
+interface Gem { id: string; name: string; [key: string]: any; }
+
 
 const handleGenerateEvalset = (conversation: Conversation) => {
   if (!conversation.messages || conversation.messages.length === 0) {
     console.warn("Nenhuma mensagem na conversa para gerar Evalset.");
-    // Poderia usar um toast para notificar o usuário
     return;
   }
 
   const evalset: EvalsetTurn[] = [];
   let currentUserInputs: Array<{ role: 'user'; content: string }> = [];
 
-  conversation.messages.forEach((msg: MessageData) => {
-    // Assume que msg.content é sempre string para simplificar este mock.
-    // Em um cenário real, msg.content pode ser Part[] e precisaria ser tratado.
-    const messageContent = (Array.isArray(msg.content) ?
-                            (msg.content[0] as any)?.text || '' :
-                            String(msg.content)) || '';
+  conversation.messages.forEach((msg: CoreChatMessage) => { // Use CoreChatMessage
+    // msg.content is already expected to be string from CoreChatMessage
+    const messageContent = msg.content || '';
 
     if (msg.role === "user") {
       currentUserInputs.push({ role: "user", content: messageContent });
-    } else if (msg.role === "assistant") {
+    } else if (msg.role === "assistant") { // Use 'assistant' role
       if (currentUserInputs.length > 0) {
         evalset.push({
           input: [...currentUserInputs],
           output: { role: "assistant", content: messageContent },
         });
-        currentUserInputs = []; // Reset para o próximo turno
+        currentUserInputs = [];
       } else {
-        // Isso pode acontecer se a conversa começar com o assistente ou houver respostas consecutivas do assistente.
-        // Para este formato de evalset (input -> output), vamos ignorar respostas do assistente sem input do usuário precedente.
         console.warn("Resposta do assistente encontrada sem input do usuário precedente. Será ignorada no Evalset:", msg);
       }
     }
+    // Other roles like 'system' or 'tool' are ignored for this evalset format
   });
 
   // Caso a conversa termine com mensagens do usuário sem resposta do assistente

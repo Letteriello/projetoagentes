@@ -40,8 +40,15 @@ interface AgentData {
   capabilities?: string[];
 }
 
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed';
-import type { Gem } from "@/data/agentBuilderConfig"; // Added Gem import
+import type { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
+
+// Gem type definition based on usage in this file and structure of initialGems in agent-builder-config.ts
+interface Gem {
+  id: string; // Corresponds to gemId in agent-builder-config.ts
+  name: string;
+  agentDescription?: string; // from agent-builder-config.ts
+  // Add other fields if used by this component from the Gem structure
+}
 
 // TODO: Move AgentSelectItem to a shared types file
 interface AgentSelectItem {

@@ -16,12 +16,16 @@ import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-types'; // Changed import
+import type {
+  SavedAgentConfiguration,
+  LLMAgentConfig,
+  WorkflowDetailedType, // Now from agent-core
+  LLMModelDetails      // Now from agent-core
+} from '@/types/agent-core'; // Updated paths
 // Remove aiModels and AIModel, will be replaced by llmModels
 // import { aiModels, AIModel } from '@/data/ai-models';
 import { llmModels } from '@/data/llm-models'; // Import the new llmModels
-import type { LLMModelDetails } from '@/types/agent-configs-new'; // Import LLMModelDetails for type safety
-import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for now, verify if needed
+// LLMModelDetails and WorkflowDetailedType imports from agent-configs-new are removed
 import { InfoIcon } from '@/components/ui/InfoIcon'; // Keep for other uses if any
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import { Button } from '@/components/ui/button';

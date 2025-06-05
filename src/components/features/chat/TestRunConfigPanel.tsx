@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import type { TestRunConfig } from "@/types/chat-types"; // Verify path once types are settled
+import type { TestRunConfig } from "@/types/chat-core"; // Updated path
 
 interface TestRunConfigPanelProps {
   isOpen: boolean;

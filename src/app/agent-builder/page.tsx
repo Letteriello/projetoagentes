@@ -60,20 +60,20 @@ import AgentCard from "@/components/features/agent-builder/agent-card";
 // Importações de tipos
 import { 
   SavedAgentConfiguration,
-  // Tool, // If 'Tool' was the simple interface from agent-configs-fixed, it's likely replaced by AvailableTool or another specific type.
-           // unified-agent-types re-exports AvailableTool from tool-types.
-  AvailableTool // Assuming the 'Tool' previously imported was meant to be AvailableTool or similar.
-} from '@/types/unified-agent-types';
+  AgentFormData,
+  // AvailableTool, // Will be imported from tool-core
+  // ToolConfigData // Will be imported from tool-core
+} from '@/types/agent-core'; // Updated path
 import {
-  SavedAgentConfiguration as AdaptedSavedAgentConfiguration, // Alias to maintain usage if structure is compatible
-  AgentFormData as AdaptedAgentFormData, // Alias to maintain usage if structure is compatible
-  ToolConfigData // This is re-exported by unified-agent-types from tool-types
-} from '@/types/unified-agent-types';
-import {
-  // AvailableTool, // Already imported above from unified-agent-types
+  AvailableTool, // Now from tool-core
+  ToolConfigData, // Now from tool-core
   MCPServerConfig,
   ApiKeyEntry
-} from "@/types/tool-types";
+} from "@/types/tool-core"; // Updated path for tool-specific types
+
+// Aliases for convenience if needed, though direct usage of core types is preferred
+type AdaptedSavedAgentConfiguration = SavedAgentConfiguration;
+type AdaptedAgentFormData = AgentFormData;
 
 // Importações de utilitários
 import { toAgentFormData, toSavedAgentConfiguration } from "@/lib/agent-type-utils";

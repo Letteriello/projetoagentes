@@ -24,7 +24,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from 'rehype-raw';
 import { CodeBlock } from "./CodeBlock"; // Componente para realce de sintaxe em blocos de código.
-import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensagens de chat.
+import { CoreChatMessage } from "@/types/chat-core"; // Updated import and type name
 import { useToast } from "@/hooks/use-toast"; // Added import for toast
 import {
   Accordion,
@@ -36,7 +36,7 @@ import {
 // Interface para as props do componente ChatMessageDisplay.
 // Define a estrutura esperada para uma mensagem de chat.
 interface ChatMessageDisplayProps {
-  message: ChatMessageUI; // Objeto da mensagem, que inclui appliedUserChatConfig and appliedTestRunConfig.
+  message: CoreChatMessage; // Updated to use CoreChatMessage
   onRegenerate?: (messageId: string) => void; // Função para tentar novamente o envio da mensagem.
   isVerboseMode?: boolean; // Added isVerboseMode prop
   // appliedUserChatConfig and appliedTestRunConfig are now part of message prop
@@ -54,32 +54,7 @@ import { Skeleton } from "@/components/ui/skeleton"; // Added import for Skeleto
 import { useTypewriter } from "@/hooks/useTypewriter"; // Import the useTypewriter hook
 
 // Helper function to get the appropriate attachment icon
-const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
-  // Check by fileType first
-  if (fileType) {
-    // PDF
-    if (fileType === "application/pdf") return FileText;
-    // DOC/DOCX
-    if (fileType === "application/msword" || fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return FileText;
-    // JSON
-    if (fileType === "application/json") return FileJson;
-    // Code files
-    if (
-      fileType === "text/javascript" ||
-      fileType === "text/x-python" ||
-      fileType === "application/xml" ||
-      fileType === "text/css" ||
-      fileType === "text/html" ||
-      fileType === "text/markdown"
-    ) return FileCode2;
-    // CSV/Spreadsheet
-    if (fileType === "text/csv" || fileType === "application/vnd.ms-excel" || fileType.includes("spreadsheet")) return FileBadge;
-    // Plain text
-    if (fileType === "text/plain") return FileText;
-    // Generic text/code catch-all
-    if (fileType.startsWith("text/") || fileType.includes("script") || fileType.includes("code")) return FileCode2;
-  }
-
+const getAttachmentIcon = (fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => { // fileType removed
   // Fallback based on extension if fileType is generic, missing, or not specific enough
   if (fileName) {
     const lowerFileName = fileName.toLowerCase();
@@ -111,13 +86,13 @@ export default function ChatMessageDisplay({
   message,
   isVerboseMode, // Destructure isVerboseMode
 }: ChatMessageDisplayProps) {
-  const isUser = message.sender === "user"; // Verifica se o remetente é o usuário.
-  const isAgent = message.sender === "agent"; // Verifica se o remetente é o agente.
+  const isUser = message.role === "user"; // Use role
+  const isAgent = message.role === "assistant"; // Use role, 'agent' typically maps to 'assistant'
   const { toast } = useToast(); // Initialize toast
 
   // Use the typewriter hook for agent's streaming messages
   const displayedMessageText = useTypewriter({
-    text: message.text || "", // Ensure text is not undefined
+    text: message.content || "", // Use content
     isStreaming: !!message.isStreaming, // Ensure isStreaming is boolean
     isAgent: isAgent,
     speed: 30, // Optional: adjust speed
@@ -178,7 +153,7 @@ export default function ChatMessageDisplay({
               <XCircle className="h-4 w-4 mr-2 self-center text-red-500 flex-shrink-0" />
             )}
             {/* Seção para exibir a mensagem de texto usando ReactMarkdown. */}
-            {message.text && (
+            {message.content && ( // Use content
               <div className="flex-grow min-w-0"> {/* Ensure text content can shrink and wrap */}
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]} // Plugin para suporte a GitHub Flavored Markdown.
@@ -205,7 +180,7 @@ export default function ChatMessageDisplay({
                     p: ({ children }) => {
                       // The BlinkingCursor should only appear at the very end of the streaming message.
                       // We check if the displayed text is still shorter than the full text.
-                      const showCursor = isAgent && message.isStreaming && displayedMessageText.length < (message.text || "").length;
+                      const showCursor = isAgent && message.isStreaming && displayedMessageText.length < (message.content || "").length; // Use content
                       return (
                         <p>
                           {children}
@@ -296,7 +271,7 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
               isUser ? "bg-primary/80" : "bg-muted/50 border border-border/30",
             )}
           >
-            {React.createElement(getAttachmentIcon(message.fileType, message.fileName), {
+            {React.createElement(getAttachmentIcon(message.fileName), { // fileType removed
               className: cn(
                 "h-5 w-5 flex-shrink-0", // Slightly larger icon for better visibility
                 isUser ? "text-primary-foreground/80" : "text-muted-foreground",
@@ -368,14 +343,14 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
         )}
 
         {/* Quick Actions for Agent Messages */}
-        {!isUser && message.text && ( // Also check if message.text is not empty
+        {!isUser && message.content && ( // Use content, also check if message.content is not empty
           <div className="mt-2 flex gap-2">
             <Button
               variant="outline"
               size="sm" // Using sm as xs might not be standard, with custom class for smaller size
               className="h-auto px-2 py-1 text-xs"
               onClick={() => {
-                navigator.clipboard.writeText(message.text);
+                navigator.clipboard.writeText(message.content); // Use content
                 toast({
                   title: "Resposta Copiada!",
                   description: "O conteúdo da mensagem foi copiado para a área de transferência.",

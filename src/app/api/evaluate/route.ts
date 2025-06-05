@@ -1,9 +1,5 @@
 // src/app/api/evaluate/route.ts
 import { NextResponse } from 'next/server';
-import type { EvaluationReport, EvaluationMetric } from '@/types/evaluation-report';
-
-// src/app/api/evaluate/route.ts
-import { NextResponse } from 'next/server';
 import type { EvaluationReport, EvaluationMetric } from '@/types/evaluation-report'; // Assuming types are defined
 
 export async function POST(request: Request) {

@@ -15,7 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
-import { SavedAgentConfiguration } from '@/types/agent-configs-new'; // Updated to use agent-configs-new
+import { SavedAgentConfiguration } from '@/types/agent-core'; // Updated path
 import { getAiConfigurationSuggestionsAction } from '@/app/agent-builder/actions';
 import { AiConfigurationAssistantOutputSchema } from '@/ai/flows/aiConfigurationAssistantFlow';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

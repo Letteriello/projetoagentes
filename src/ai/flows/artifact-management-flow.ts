@@ -2,7 +2,7 @@ import { defineFlow } from '@genkit-ai/flow';
 import { promises as fs } from 'fs';
 import { z } from 'zod';
 import path from 'path';
-import { ArtifactStorageType } from '../../types/unified-agent-types';
+import { ArtifactStorageType } from '@/types/agent-core'; // Updated path
 
 // Definir tipo local para storageType
 const storageType = z.enum(['local', 's3', 'gcs', 'memory', 'filesystem', 'cloud']);

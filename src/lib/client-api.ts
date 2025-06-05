@@ -3,7 +3,7 @@
  * No Node.js dependencies should be imported in this file
  */
 
-import { ChatInput, ChatOutput } from '@/types/chat-types';
+import { ChatInput, ChatOutput } from '@/types/chat-core'; // Updated path
 
 /**
  * Send a message to the AI via the API route

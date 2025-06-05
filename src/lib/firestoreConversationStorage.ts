@@ -1,5 +1,7 @@
-import { Conversation, Message } from '@/types/chat';
-import { firestore } from '@/lib/firebaseClient';
+// src/lib/firestoreConversationStorage.ts
+import { v4 as uuidv4 } from 'uuid';
+import { Conversation, CoreChatMessage } from '@/types/chat-core'; // Updated path and Message to CoreChatMessage
+import { firestore } from '@/lib/firebaseClient'; // Assuming firebaseClient is the correct path for client-side Firestore
 import {
   collection,
   doc,
@@ -8,288 +10,223 @@ import {
   getDocs,
   updateDoc,
   deleteDoc,
-  serverTimestamp,
+  serverTimestamp, // This is fine for server-side usage, but this is a client-side service.
+                  // For client-side, Timestamp.now() or new Date() which gets converted by Firestore is typical.
+                  // Using new Date() for client consistency, Firestore handles conversion.
   query,
   where,
   orderBy,
-  Timestamp,
+  Timestamp, // Firestore Timestamp for type checking
   writeBatch,
 } from 'firebase/firestore';
 import { retryWithBackoff, isRetryableFirestoreError, RetryConfig } from '@/lib/utils';
 
-// Firestore collection names
 const CONVERSATIONS_COLLECTION = 'conversations';
 const MESSAGES_SUBCOLLECTION = 'messages';
 
-// Default retry configuration for Firestore operations
 const firestoreRetryConfig: RetryConfig = {
-  maxRetries: 3, // Standard number of retries for network operations
-  initialDelayMs: 500, // Longer initial delay for network issues
+  maxRetries: 3,
+  initialDelayMs: 500,
   shouldRetry: isRetryableFirestoreError,
   logRetries: true,
 };
 
-// Helper functions for data conversion (assumed to be the same, omitted for brevity)
-// toDate, toStorableConversation, fromStorableConversation etc. from previous versions
-
-export const getAllConversations = async (userId: string): Promise<Conversation[]> => {
-  return retryWithBackoff(async () => {
-    if (!userId) {
-      console.error("getAllConversations: userId is required.");
-      return [];
-    }
-    try {
-      const conversationsRef = collection(firestore, CONVERSATIONS_COLLECTION);
-      const q = query(conversationsRef, where("userId", "==", userId), orderBy("updatedAt", "desc"));
-
-      const querySnapshot = await getDocs(q);
-      const conversations: Conversation[] = [];
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        conversations.push({
-          id: docSnap.id,
-          title: data.title,
-          createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-          updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
-          messages: [],
-          agentId: data.agentId,
-          userId: data.userId,
-          summary: data.summary,
-        });
-      });
-      return conversations;
-    } catch (error) {
-      console.error("Error fetching all conversations from Firestore (attempt):", error);
-      throw error;
-    }
-  }, firestoreRetryConfig);
+// Helper to convert Firestore Timestamp to Date, then to ISO string if needed by CoreChatMessage
+// CoreChatMessage timestamp is Date, so direct toDate() is fine.
+const fromTimestamp = (timestamp: Timestamp | Date | string | undefined): Date => {
+  if (timestamp instanceof Timestamp) return timestamp.toDate();
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof timestamp === 'string') return new Date(timestamp);
+  return new Date(); // Fallback
 };
 
-export const getConversationById = async (conversationId: string): Promise<Conversation | undefined> => {
-  return retryWithBackoff(async () => {
-    if (!conversationId) {
-      console.error("getConversationById: conversationId is required.");
-      return undefined;
-    }
-    try {
-      const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-      const conversationSnap = await getDoc(conversationDocRef);
-
-      if (!conversationSnap.exists()) {
-        console.warn(`Conversation with ID ${conversationId} not found.`);
-        return undefined;
-      }
-
-      const conversationData = conversationSnap.data();
-      const messagesRef = collection(conversationDocRef, MESSAGES_SUBCOLLECTION);
-      const messagesQuery = query(messagesRef, orderBy("timestamp", "asc"));
-      const messagesSnapshot = await getDocs(messagesQuery);
-
-      const messages: Message[] = [];
-      messagesSnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        messages.push({
-          id: docSnap.id,
-          sender: data.sender,
-          text: data.text,
-          content: data.text || '',
-          imageUrl: data.imageUrl,
-          fileName: data.fileName,
-          timestamp: (data.timestamp as Timestamp)?.toDate() || new Date(),
-          isError: data.isError || false,
-          isUser: data.sender === 'user',
-          isLoading: data.isLoading || false,
-        });
-      });
-
-      return {
-        id: conversationSnap.id,
-        title: conversationData.title,
-        createdAt: (conversationData.createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (conversationData.updatedAt as Timestamp)?.toDate() || new Date(),
-        messages,
-        agentId: conversationData.agentId,
-        userId: conversationData.userId,
-        summary: conversationData.summary,
-      };
-    } catch (error) {
-      console.error(`Error fetching conversation ${conversationId} from Firestore (attempt):`, error);
-      throw error;
-    }
-  }, firestoreRetryConfig);
+// Conversion for Conversation (dates to Date objects)
+const fromDbConversation = (docSnap: firebase.firestore.DocumentSnapshot<firebase.firestore.DocumentData>): Conversation => {
+  const data = docSnap.data()!;
+  return {
+    id: docSnap.id,
+    title: data.title,
+    createdAt: fromTimestamp(data.createdAt),
+    updatedAt: fromTimestamp(data.updatedAt),
+    messages: [], // Messages loaded separately
+    agentId: data.agentId,
+    userId: data.userId,
+    summary: data.summary,
+  };
 };
 
-export const createNewConversation = async (userId: string, title?: string, agentId?: string): Promise<Conversation> => {
-  return retryWithBackoff(async () => {
-    if (!userId) {
-      console.error("createNewConversation: userId is required.");
-      throw new Error("createNewConversation: userId is required.");
-    }
-    try {
-      const newConversationData = {
-        userId: userId,
-        agentId: agentId || null,
-        title: title || `Chat ${new Date().toLocaleString()}`,
-        summary: `Chat summary for conversation started on ${new Date().toLocaleDateString()}`,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      const docRef = await addDoc(collection(firestore, CONVERSATIONS_COLLECTION), newConversationData);
-
-      const now = new Date();
-      return {
-        id: docRef.id,
-        title: newConversationData.title,
-        summary: newConversationData.summary,
-        createdAt: now,
-        updatedAt: now,
-        messages: [],
-        agentId: newConversationData.agentId,
-        userId: newConversationData.userId,
-      };
-    } catch (error) {
-      console.error("Error creating new conversation in Firestore (attempt):", error);
-      throw error;
-    }
-  }, firestoreRetryConfig);
+// Conversion for Messages (Firestore data to CoreChatMessage)
+const fromDbMessage = (docSnap: firebase.firestore.DocumentSnapshot<firebase.firestore.DocumentData>): CoreChatMessage => {
+  const data = docSnap.data()!;
+  return {
+    id: docSnap.id,
+    role: data.role || (data.isUser ? 'user' : 'assistant'), // Handle old isUser field
+    content: data.content || data.text || '', // Handle old text field
+    timestamp: fromTimestamp(data.timestamp),
+    // Optional fields from CoreChatMessage
+    name: data.name,
+    isLoading: data.isLoading,
+    isError: data.isError,
+    retrievedContext: data.retrievedContext,
+    imageUrl: data.imageUrl,
+    fileName: data.fileName,
+    fileDataUri: data.fileDataUri,
+    isStreaming: data.isStreaming,
+    status: data.status,
+    toolCall: data.toolCall,
+    toolResponse: data.toolResponse,
+    feedback: data.feedback,
+    appliedUserChatConfig: data.appliedUserChatConfig,
+    appliedTestRunConfig: data.appliedTestRunConfig,
+    conversationId: data.conversationId,
+  };
 };
 
-export const addMessageToConversation = async (
-  conversationId: string, 
-  message: Omit<Message, 'id' | 'timestamp'>
-): Promise<Message> => {
-  return retryWithBackoff(async () => {
-    if (!conversationId) {
-      console.error("addMessageToConversation: conversationId is required.");
-      throw new Error("addMessageToConversation: conversationId is required.");
-    }
-    try {
-      const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-      // First, check if conversation exists to avoid orphaned messages if that's a concern.
-      // const convoSnap = await getDoc(conversationDocRef);
-      // if (!convoSnap.exists()) {
-      //   throw new Error(`Conversation ${conversationId} not found. Cannot add message.`);
-      // }
-
-      const messagesRef = collection(conversationDocRef, MESSAGES_SUBCOLLECTION);
-
-      const messageData = { ...message, timestamp: serverTimestamp() };
-      const messageDocRef = await addDoc(messagesRef, messageData);
-
-      await updateDoc(conversationDocRef, { updatedAt: serverTimestamp() });
-
-      return {
-          id: messageDocRef.id,
-          ...message,
-          timestamp: new Date()
-      } as Message;
-    } catch (error) {
-      console.error(`Error adding message to conversation ${conversationId} in Firestore (attempt):`, error);
-      throw error;
-    }
-  }, firestoreRetryConfig);
+// Data to be stored for a message, aligning with CoreChatMessage but using serverTimestamp
+const toDbMessageData = (message: Omit<CoreChatMessage, 'id' | 'timestamp' | 'conversationId'>, conversationId: string) => {
+  return {
+    ...message,
+    timestamp: serverTimestamp(), // Use serverTimestamp for writing
+    conversationId, // Ensure this is part of the message data for querying
+  };
 };
 
-export const renameConversationInStorage = async (conversationId: string, newTitle: string): Promise<void> => {
+
+async function updateConversationTimestampInternal(transaction: firebase.firestore.Transaction, conversationId: string): Promise<void> {
+  const conversationRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+  // In Firestore transactions, reads must come before writes.
+  // We don't need to read the convo just to update timestamp if using serverTimestamp().
+  transaction.update(conversationRef, { updatedAt: serverTimestamp() });
+}
+
+
+export async function getAllConversations(userId: string): Promise<Conversation[]> {
   return retryWithBackoff(async () => {
-    if (!conversationId || !newTitle) {
-      console.error("renameConversationInStorage: conversationId and newTitle are required.");
-      throw new Error("Conversation ID and new title are required.");
-    }
+    if (!userId) throw new Error("getAllConversations: userId is required.");
+    const conversationsRef = collection(firestore, CONVERSATIONS_COLLECTION);
+    const q = query(conversationsRef, where("userId", "==", userId), orderBy("updatedAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(fromDbConversation);
+  }, firestoreRetryConfig);
+}
+
+export async function getConversationById(conversationId: string): Promise<Conversation | undefined> {
+  return retryWithBackoff(async () => {
+    if (!conversationId) throw new Error("getConversationById: conversationId is required.");
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    const conversationSnap = await getDoc(conversationDocRef);
+    if (!conversationSnap.exists()) return undefined;
+
+    const conversation = fromDbConversation(conversationSnap);
+    const messagesRef = collection(conversationDocRef, MESSAGES_SUBCOLLECTION);
+    const messagesQuery = query(messagesRef, orderBy("timestamp", "asc"));
+    const messagesSnapshot = await getDocs(messagesQuery);
+    conversation.messages = messagesSnapshot.docs.map(fromDbMessage);
+    return conversation;
+  }, firestoreRetryConfig);
+}
+
+export async function createNewConversation(userId: string, title?: string, agentId?: string): Promise<Conversation> {
+  return retryWithBackoff(async () => {
+    if (!userId) throw new Error("createNewConversation: userId is required.");
+    const now = new Date(); // For immediate local object, serverTimestamp for DB write
+    const newConversationData = {
+      userId,
+      agentId: agentId || null,
+      title: title || `Chat ${now.toLocaleString()}`,
+      summary: `Chat summary for conversation started on ${now.toLocaleDateString()}`,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    const docRef = await addDoc(collection(firestore, CONVERSATIONS_COLLECTION), newConversationData);
+    return {
+      id: docRef.id,
+      title: newConversationData.title,
+      summary: newConversationData.summary,
+      createdAt: now, // Use local Date for immediate return
+      updatedAt: now, // Use local Date
+      messages: [],
+      agentId: newConversationData.agentId,
+      userId: newConversationData.userId,
+    };
+  }, firestoreRetryConfig);
+}
+
+export async function addMessageToConversation(
+  conversationId: string,
+  message: Omit<CoreChatMessage, 'id' | 'timestamp' | 'conversationId'> // Param uses CoreChatMessage
+): Promise<CoreChatMessage> {
+  return retryWithBackoff(async () => {
+    if (!conversationId) throw new Error("addMessageToConversation: conversationId is required.");
+
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    const messagesRef = collection(conversationDocRef, MESSAGES_SUBCOLLECTION);
+
+    const messageDataForDb = toDbMessageData(message, conversationId);
+    const messageDocRef = await addDoc(messagesRef, messageDataForDb);
+    await updateDoc(conversationDocRef, { updatedAt: serverTimestamp() });
+
+    return {
+      ...message,
+      id: messageDocRef.id,
+      timestamp: new Date(), // Return with local Date for immediate use
+      conversationId: conversationId,
+    };
+  }, firestoreRetryConfig);
+}
+
+export async function renameConversationInStorage(conversationId: string, newTitle: string): Promise<void> {
+  return retryWithBackoff(async () => {
+    if (!conversationId || !newTitle) throw new Error("Conversation ID and new title are required.");
     const conversationRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-    try {
-      await updateDoc(conversationRef, {
-        title: newTitle,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error(`Error renaming conversation ${conversationId} in Firestore (attempt):`, error);
-      throw error;
-    }
+    await updateDoc(conversationRef, { title: newTitle, updatedAt: serverTimestamp() });
   }, firestoreRetryConfig);
-};
+}
 
-export const deleteConversationFromStorage = async (conversationId: string): Promise<void> => {
+export async function deleteConversationFromStorage(conversationId: string): Promise<void> {
   return retryWithBackoff(async () => {
-    if (!conversationId) {
-      console.error("deleteConversationFromStorage: conversationId is required.");
-      throw new Error("Conversation ID is required.");
-    }
+    if (!conversationId) throw new Error("Conversation ID is required.");
     const conversationRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-    try {
-      const messagesRef = collection(conversationRef, MESSAGES_SUBCOLLECTION);
-      const messagesSnapshot = await getDocs(messagesRef);
+    const messagesRef = collection(conversationRef, MESSAGES_SUBCOLLECTION);
+    const messagesSnapshot = await getDocs(messagesRef);
 
-      if (!messagesSnapshot.empty) {
-        const batch = writeBatch(firestore);
-        messagesSnapshot.forEach(docSnap => {
-          batch.delete(docSnap.ref);
-        });
-        await batch.commit();
-        console.log(`Deleted ${messagesSnapshot.size} messages from conversation ${conversationId}.`);
-      }
-
-      await deleteDoc(conversationRef);
-      console.log(`Conversation ${conversationId} deleted successfully.`);
-    } catch (error) {
-      console.error(`Error deleting conversation ${conversationId} from Firestore (attempt):`, error);
-      throw error;
-    }
+    const batch = writeBatch(firestore);
+    messagesSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
+    batch.delete(conversationRef);
+    await batch.commit();
   }, firestoreRetryConfig);
-};
+}
 
-export const finalizeMessageInConversation = async (
+export async function finalizeMessageInConversation(
   conversationId: string,
   messageId: string,
   fullContent: string,
   isError: boolean = false
-): Promise<void> => {
+): Promise<void> {
   return retryWithBackoff(async () => {
-    if (!conversationId || !messageId) {
-      console.error("finalizeMessageInConversation: conversationId and messageId are required.");
-      throw new Error("Conversation ID and Message ID are required.");
-    }
-    try {
-      const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
-      await updateDoc(messageRef, {
-        text: fullContent,
-        content: fullContent,
-        isError: isError,
-        isLoading: false,
-        timestamp: serverTimestamp(),
-      });
-
-      const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-      await updateDoc(conversationDocRef, {
-          updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error(`Error finalizing message ${messageId} in conversation ${conversationId} (attempt):`, error);
-      throw error;
-    }
+    if (!conversationId || !messageId) throw new Error("Conversation ID and Message ID are required.");
+    const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
+    await updateDoc(messageRef, {
+      content: fullContent, // Use content
+      isError: isError,
+      isLoading: false, // Assuming finalization means loading is done
+      timestamp: serverTimestamp(), // Update timestamp on finalization
+    });
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    await updateDoc(conversationDocRef, { updatedAt: serverTimestamp() });
   }, firestoreRetryConfig);
-};
+}
 
 export async function deleteMessageFromConversation(
   conversationId: string,
   messageId: string
 ): Promise<void> {
   return retryWithBackoff(async () => {
-    if (!conversationId || !messageId) {
-      console.error("deleteMessageFromConversation: conversationId and messageId are required.");
-      throw new Error("Conversation ID and Message ID are required.");
-    }
-    try {
-      const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
-      await deleteDoc(messageRef);
-      const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-      await updateDoc(conversationDocRef, {
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error(`Error deleting message ${messageId} from conversation ${conversationId} (attempt):`, error);
-      throw error;
-    }
+    if (!conversationId || !messageId) throw new Error("Conversation ID and Message ID are required.");
+    const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
+    await deleteDoc(messageRef);
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    await updateDoc(conversationDocRef, { updatedAt: serverTimestamp() });
   }, firestoreRetryConfig);
 }
 
@@ -299,22 +236,10 @@ export async function updateMessageFeedback(
   feedback: 'liked' | 'disliked' | null
 ): Promise<void> {
   return retryWithBackoff(async () => {
-    if (!conversationId || !messageId) {
-      console.error("updateMessageFeedback: conversationId and messageId are required.");
-      throw new Error("Conversation ID and Message ID are required.");
-    }
-    try {
-      const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
-      await updateDoc(messageRef, {
-        feedback: feedback,
-      });
-      const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
-      await updateDoc(conversationDocRef, {
-          updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error(`Error updating feedback for message ${messageId} in conversation ${conversationId} (attempt):`, error);
-      throw error;
-    }
+    if (!conversationId || !messageId) throw new Error("Conversation ID and Message ID are required.");
+    const messageRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION, messageId);
+    await updateDoc(messageRef, { feedback: feedback });
+    const conversationDocRef = doc(firestore, CONVERSATIONS_COLLECTION, conversationId);
+    await updateDoc(conversationDocRef, { updatedAt: serverTimestamp() });
   }, firestoreRetryConfig);
 }

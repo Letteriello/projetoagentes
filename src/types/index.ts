@@ -1,38 +1,38 @@
-// Export types individually to avoid duplicate exports
-// Export from agent-configs-fixed as the source of truth
+// Export types individually from their new core locations
 export type {
   AgentFramework,
   AgentType,
-  WorkflowDetailedType,
+  WorkflowDetailedType, // This is re-exported by agent-core
   TerminationConditionType,
   StatePersistenceType,
   ArtifactStorageType,
   StateScope,
-  ToolConfigField,
-  ToolConfigData,
-  ArtifactDefinition,
-  ArtifactsConfig,
-  CommunicationChannel,
-  AgentTerminationCondition,
-  KnowledgeSource,
-  StatePersistenceConfig,
-  RagMemoryConfig,
-  AgentConfigBase,
-  LLMAgentConfig,
-  WorkflowStep,
-  WorkflowAgentConfig,
-  CustomAgentConfig,
-  A2AAgentSpecialistConfig,
-  AgentConfig,
-  EnvironmentVariable,
-  ResourceRequirements,
-  DeploymentConfig,
-  ToolDetail,
-  SavedAgentConfiguration
-} from './agent-configs-fixed';
+  // ToolConfigField is in tool-core
+  // ToolConfigData is in tool-core
+  ArtifactDefinition, // Part of agent-core
+  ArtifactsConfig,    // Part of agent-core
+  CommunicationChannel, // Generic one in agent-core
+  AgentTerminationCondition, // Part of agent-core
+  KnowledgeSource,    // Part of agent-core
+  StatePersistenceConfig, // Part of agent-core
+  RagMemoryConfig,    // Part of agent-core
+  AgentConfigBase,    // Part of agent-core
+  LLMAgentConfig,     // Part of agent-core
+  WorkflowStep,       // Part of agent-core (related to WorkflowAgentConfig)
+  WorkflowAgentConfig, // Part of agent-core
+  CustomAgentConfig,  // Part of agent-core
+  A2AAgentSpecialistConfig, // Part of agent-core
+  AgentConfig,        // Union type in agent-core
+  EnvironmentVariable, // Part of agent-core (related to DeploymentConfig)
+  ResourceRequirements, // Part of agent-core (related to DeploymentConfig)
+  DeploymentConfig,   // Part of agent-core
+  SavedAgentConfiguration // Part of agent-core
+  // ToolDetail from agent-configs-fixed is removed to avoid confusion.
+  // Consumers should use AvailableTool from tool-core or specific ToolDetail from chat-core.
+} from './agent-core'; // Updated path
 
-// Re-export tool types
-export type { AvailableTool } from './tool-types';
+// Re-export tool types from tool-core
+export type { AvailableTool, ToolConfigField, ToolConfigData, ToolReference } from './tool-core';
 
 // Re-export workflow types if needed
 export type {
