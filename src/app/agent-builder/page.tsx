@@ -42,7 +42,8 @@ import {
   Book, 
   MessageSquareText,
   Settings,
-  Trash2
+  Trash2,
+  Info // Added for ContextualHelp
 } from "lucide-react";
 import { Gauge, RefreshCw } from "lucide-react";
 import { TbBuildingStore, TbBarbell } from "react-icons/tb";
@@ -52,6 +53,10 @@ import { RiArrowGoBackFill } from "react-icons/ri";
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import { useAgentStorage } from "@/hooks/use-agent-storage";
+import { useAchievements } from "@/hooks/useAchievements"; // Added useAchievements
+import ContextualHelp from "@/components/shared/ContextualHelp"; // Added ContextualHelp
+import EmptyState from "@/components/shared/EmptyState"; // Added EmptyState
+import Link from "next/link"; // Added Link for ContextualHelp
 
 // Importações de tipos
 import { 
@@ -311,6 +316,11 @@ export default function AgentBuilderPage() {
   // Estado para tutoriais
   const [activeTutorial, setActiveTutorial] = useState<any>(null);
   const [currentTutorialStep, setCurrentTutorialStep] = useState(0);
+
+  // State for ContextualHelp (Inactivity)
+  const [showInactivityHelp, setShowInactivityHelp] = React.useState(false);
+  const [userHasInteracted, setUserHasInteracted] = React.useState(false);
+  const inactivityTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // Hooks
   const router = useRouter();
@@ -323,6 +333,8 @@ export default function AgentBuilderPage() {
     deleteAgent, 
     isLoadingAgents 
   } = useAgents();
+  const { unlockAchievement } = useAchievements(); // Initialize achievements hook
+  const prevAgentCountRef = React.useRef(0); // Ref to store previous agent count
   
   // Efeito para carregar agentes do contexto
   useEffect(() => {
@@ -334,8 +346,55 @@ export default function AgentBuilderPage() {
         config: agent.config || {},
       }));
       setAgents(adaptedAgents);
+
+      // Achievement logic based on agent count changes
+      const currentAgentCount = adaptedAgents.length;
+      if (prevAgentCountRef.current !== currentAgentCount) {
+        if (currentAgentCount === 1 && prevAgentCountRef.current === 0) {
+          unlockAchievement('agent-created');
+        }
+        if (currentAgentCount === 5 && prevAgentCountRef.current === 4) {
+          unlockAchievement('five-agents');
+        }
+        prevAgentCountRef.current = currentAgentCount;
+      }
+    } else { // If savedAgents is null or undefined (e.g. initial load or error)
+      prevAgentCountRef.current = 0; // Reset if agent list is not available
     }
-  }, [savedAgents]);
+  }, [savedAgents, unlockAchievement]);
+
+  // Effect to initialize prevAgentCountRef on mount if savedAgents is already populated
+  useEffect(() => {
+    if (savedAgents) {
+      prevAgentCountRef.current = savedAgents.length;
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Effect for inactivity contextual help
+  useEffect(() => {
+    // Set a timer only if user hasn't interacted yet
+    if (!userHasInteracted) {
+      inactivityTimerRef.current = setTimeout(() => {
+        if (!userHasInteracted) { // Check again before showing
+          setShowInactivityHelp(true);
+        }
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [userHasInteracted]);
+
+  const handleUserInteraction = () => {
+    setUserHasInteracted(true);
+    setShowInactivityHelp(false); // Hide help once user interacts
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+  };
 
   // Efeito para verificar parâmetros URL
   useEffect(() => {
@@ -358,6 +417,7 @@ export default function AgentBuilderPage() {
     (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );  // Handlers para ações
   const handleCreateNewAgent = () => {
+    handleUserInteraction(); // User interacted
     setEditingAgent({
       agentName: "",
       description: "",
@@ -771,7 +831,11 @@ export default function AgentBuilderPage() {
                 placeholder="Pesquisar agentes..."
                 className="pl-8"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  handleUserInteraction(); // User interacted
+                }}
+                onFocus={handleUserInteraction} // User interacted
               />
             </div>
           </div>
@@ -806,21 +870,29 @@ export default function AgentBuilderPage() {
             </Suspense>
           </div>
         ) : (
+          // Check if there are no agents at all
+          agents.length === 0 ? (
+            <EmptyState
+              title="Nenhum Agente Criado Ainda"
+              description="Parece que você não tem nenhum agente. Comece criando seu primeiro agente para automatizar tarefas e interagir com IA."
+              icon={<Ghost className="h-16 w-16" />} // Using Ghost as per original, Cpu or Plus could also work
+              actionButton={{
+                text: "Criar Novo Agente",
+                onClick: handleCreateNewAgent,
+                icon: <Plus className="mr-2 h-4 w-4" />,
+                variant: "default"
+              }}
+              className="my-12" // Add some margin for better spacing
+            />
+          ) : // Check if there are agents, but none match the filter
           filteredAgents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <Ghost className="h-16 w-16 text-gray-400 mb-4" />
-              <h3 className="text-2xl font-bold">Nenhum agente encontrado</h3>
-              <p className="text-gray-500 mt-2 max-w-md">
-                {agents.length === 0 
-                  ? "Você ainda não tem nenhum agente. Clique em 'Novo Agente' para criar seu primeiro agente IA."
-                  : "Nenhum agente corresponde à sua pesquisa. Tente outro termo ou limpe a pesquisa."}
-              </p>
-              {agents.length === 0 && (
-                <Button onClick={handleCreateNewAgent} className="mt-4">
-                  <Plus className="mr-2" /> Criar Agente
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              title="Nenhum Agente Encontrado"
+              description="Nenhum agente corresponde à sua pesquisa. Tente um termo diferente ou limpe a pesquisa."
+              icon={<Search className="h-16 w-16" />}
+              className="my-12"
+              // No action button for "no search results" or a different one like "Clear Search"
+            />
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAgents.map((agent: AdaptedSavedAgentConfiguration, index: number) => (
@@ -855,18 +927,43 @@ export default function AgentBuilderPage() {
             </div>
           )
         )}
-      </div>      {/* Modais - Carregamento lazy com Suspense */}
+
+        <ContextualHelp
+          type="alert"
+          show={showInactivityHelp && !userHasInteracted && agents.length === 0} // Show only if no agents and no interaction
+          icon={<Info className="h-4 w-4" />}
+          alertTitle="Precisa de Ajuda?"
+          content={
+            <>
+              Parece que você ainda não criou nenhum agente. Precisa de ajuda para começar? Confira nossos{" "}
+              <Link href="/tutorials" className="underline hover:text-primary" onClick={handleUserInteraction}>
+                tutoriais
+              </Link>{" "}
+              ou clique em &quot;Novo Agente&quot; para iniciar.
+            </>
+          }
+        />
+      </div> {/* Modais - Carregamento lazy com Suspense */}
       <Suspense fallback={<div>Carregando...</div>}>
         {/* Modal de Criação/Edição */}
         {isCreateModalOpen && editingAgent && (
           <AgentBuilderDialog
             name="Criar Agente"
             isOpen={isCreateModalOpen}
-            onOpenChange={(open: boolean) => setIsCreateModalOpen(open)}
+            onOpenChange={(open: boolean) => {
+              setIsCreateModalOpen(open);
+              if (open) handleUserInteraction(); // Interaction when modal opens
+            }}
             initialData={editingAgent}
-            onSave={handleSaveAgent}
+            onSave={(data) => {
+              handleSaveAgent(data);
+              handleUserInteraction(); // Interaction on save
+            }}
             availableTools={builderAvailableTools}
-            onConfigureTool={handleConfigureTool}
+            onConfigureTool={(tool) => {
+              handleConfigureTool(tool);
+              handleUserInteraction(); // Interaction on tool config
+            }}
           />
         )}
         
@@ -874,11 +971,20 @@ export default function AgentBuilderPage() {
           <AgentBuilderDialog
             name="Editar Agente"
             isOpen={isEditModalOpen}
-            onOpenChange={(open: boolean) => setIsEditModalOpen(open)}
+            onOpenChange={(open: boolean) => {
+              setIsEditModalOpen(open);
+              if (open) handleUserInteraction(); // Interaction when modal opens
+            }}
             initialData={editingAgent}
-            onSave={handleSaveAgent}
+            onSave={(data) => {
+              handleSaveAgent(data);
+              handleUserInteraction(); // Interaction on save
+            }}
             availableTools={builderAvailableTools}
-            onConfigureTool={handleConfigureTool}
+            onConfigureTool={(tool) => {
+              handleConfigureTool(tool);
+              handleUserInteraction(); // Interaction on tool config
+            }}
           />
         )}
         

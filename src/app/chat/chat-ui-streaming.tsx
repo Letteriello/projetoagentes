@@ -1,14 +1,17 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, Suspense, lazy } from "react"; // Added Suspense, lazy
+import React, { useState, useRef, useEffect, useCallback, Suspense, lazy } from "react";
+import Link from "next/link"; // Added Link for ContextualHelp
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, Plus, Bug, Settings2 } from "lucide-react"; // Added Settings2
+import { Menu, Plus, Bug, Settings2, AlertTriangle } from "lucide-react"; // Added Settings2, AlertTriangle
 import { useAgents } from "@/contexts/AgentsContext";
 import { v4 as uuidv4 } from "uuid";
 import { useGenkitSession, UseGenkitSessionOptions } from "@/hooks/useGenkitSession";
 import { toast } from "@/hooks/use-toast";
+import { useAchievements } from "@/hooks/useAchievements"; // Added useAchievements
+import ContextualHelp from "@/components/shared/ContextualHelp"; // Added ContextualHelp
 // import { GenkitSessionService } from "@/services/GenkitSessionService"; // Not directly used
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -40,8 +43,10 @@ export function ChatUIStreaming() {
     streamingEnabled: true, // Default to true for streaming UI
   });
   const [isTestConfigPanelOpen, setIsTestConfigPanelOpen] = useState(false);
+  const [showChatErrorHelp, setShowChatErrorHelp] = useState(false); // State for chat error help
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { unlockAchievement } = useAchievements(); // Initialize achievements hook
 
   const selectedAgent = React.useMemo<SavedAgentConfiguration | undefined>(() => {
     return savedAgents?.find(agent => agent.id === selectedAgentId);
@@ -140,30 +145,24 @@ export function ChatUIStreaming() {
   
   const handleSendMessage = async (messageText: string, fileDataUri?: string) => {
     if (!messageText.trim() && !fileDataUri) return;
+
+    // --- Achievement: First Chat ---
+    const hasSentFirstMessage = localStorage.getItem('hasSentFirstChatMessage');
+    if (!hasSentFirstMessage) {
+      unlockAchievement('first-chat');
+      localStorage.setItem('hasSentFirstChatMessage', 'true');
+    }
+    // --- End Achievement ---
+
     try {
       setEvents((prev) => [
         ...prev,
         { type: "user-message", content: messageText, timestamp: new Date().toISOString() },
       ]);
 
-      let modelId = "googleai/gemini-1.5-flash-latest";
-      // let systemPrompt = "Você é um assistente útil.";
-      // let temperature = 0.7;
-      // const currentAgentTools = getConfiguredTools();
-
-      // if (selectedAgent?.config?.type === "llm") {
-      //   const llmConfig = selectedAgent.config as Extract<AgentConfig, {type: 'llm'}>; // Type assertion
-      //   modelId = llmConfig.agentModel || modelId;
-      //   systemPrompt = llmConfig.systemPromptGenerated || systemPrompt;
-      //   temperature = llmConfig.agentTemperature !== undefined ? llmConfig.agentTemperature : temperature;
-      // }
       const agentConfigForMessage = getAgentConfigForMessage(); // Call it once
       
       await sendMessage(messageText, {
-        // modelId, // from agentConfigForMessage
-        // systemPrompt, // from agentConfigForMessage
-        // tools, // from agentConfigForMessage
-        // temperature, // from agentConfigForMessage
         ...agentConfigForMessage, // Spread the config object
         fileDataUri: fileDataUri || undefined,
       });
@@ -379,13 +378,22 @@ export function ChatUIStreaming() {
                 >
                     <Plus className="w-4 h-4 mr-2" /> Nova conversa
                 </Button>
+                 <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowChatErrorHelp(true)}
+                    title="Simular Erro"
+                    className="ml-2" // Add some margin if needed
+                >
+                    <AlertTriangle className="w-4 h-4 mr-2" /> Simular Erro
+                </Button>
             </div>
         </div>
         
         <div className="flex-1 overflow-hidden">
           <ScrollArea ref={scrollAreaRef} className="h-full" id="message-scroll-area">
-            <div className={cn("flex flex-col gap-4 p-4 pb-20", messages.length === 0 && "h-full")}>
-              {messages.length === 0 ? (
+            <div className={cn("flex flex-col gap-4 p-4", messages.length === 0 && "h-full")}> {/* Removed pb-20 for contextual help */}
+              {messages.length === 0 && !showChatErrorHelp ? ( // Hide welcome if error help is shown
                 <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
               ) : (
                 <StreamingMessageList
@@ -398,7 +406,37 @@ export function ChatUIStreaming() {
             </div>
           </ScrollArea>
         </div>
-
+        <ContextualHelp
+          type="alert"
+          variant="destructive"
+          show={showChatErrorHelp}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          alertTitle="Erro ao Enviar Mensagem"
+          content={
+            <>
+              Ocorreu um erro simulado ao enviar a mensagem. Verifique sua conexão ou{" "}
+              <Link
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowChatErrorHelp(false);
+                  toast({ title: "Ação 'Tentar Novamente' clicada (simulado)"});
+                }}
+                className="underline hover:text-destructive-foreground font-semibold"
+              >
+                tente novamente
+              </Link>.
+              Se o problema persistir, consulte a{" "}
+              <Link
+                href="/docs/errors#chat"
+                onClick={() => setShowChatErrorHelp(false)}
+                className="underline hover:text-destructive-foreground font-semibold"
+              >
+                documentação de erros comuns
+              </Link>.
+            </>
+          }
+        />
         <StreamingInputArea
           onSubmit={handleSendMessage}
           isProcessing={isProcessing}

@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { User, Brain, StickyNote, Save, MessageSquare, DatabaseZap, Users as UsersIcon, Activity } from "lucide-react"; // Added icons
+import { User, Brain, StickyNote, Save, MessageSquare, DatabaseZap, Users as UsersIcon, Activity, Trophy } from "lucide-react"; // Added icons
 import {
   FormField,
   FormItem,
@@ -36,6 +36,7 @@ import { ChartContainer, ChartTooltipContent, type ChartConfig } from '@/compone
 import { profileFormSchema, ProfileFormData, USER_ROLES } from "@/lib/zod-schemas"; // Added USER_ROLES
 import withAuth from '@/components/auth/withAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAchievements, Achievement } from '@/hooks/useAchievements'; // Added useAchievements
 
 // Chart Config for Personal Agent Usage
 const agentUsageChartConfig: ChartConfig = {
@@ -46,6 +47,7 @@ const agentUsageChartConfig: ChartConfig = {
 function ProfilePage() {
   const { toast } = useToast();
   const { saveProfile, loadProfile } = useUserProfile();
+  const { achievements, unlockAchievement, resetAchievements } = useAchievements();
 
   const [personalUsageStats, setPersonalUsageStats] = React.useState<{
     totalMessagesSent: number;
@@ -362,6 +364,43 @@ function ProfilePage() {
             </div>
           ) : (
             <p>Carregando estatísticas...</p>
+          )}
+        </section>
+
+        {/* Achievements Section */}
+        <section className="p-4 md:p-6 lg:p-8 space-y-6 mt-8 border-t border-border">
+          <div className="flex items-center justify-between mb-4 pt-6">
+            <h2 className="text-2xl font-bold text-foreground">Minhas Conquistas</h2>
+            <div>
+              <Button variant="outline" size="sm" onClick={() => unlockAchievement('tool-used')} className="mr-2">
+                Simular Uso de Ferramenta
+              </Button>
+              <Button variant="destructive" size="sm" onClick={resetAchievements}>
+                Resetar Conquistas
+              </Button>
+            </div>
+          </div>
+          {achievements.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {achievements.map((achievement: Achievement) => (
+                <Card key={achievement.id} className={`transition-all ${achievement.unlocked ? 'border-primary/50 shadow-lg' : 'opacity-60'}`}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      <span className={`mr-2 ${achievement.unlocked ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+                        {achievement.icon || <Trophy className="h-4 w-4" />}
+                      </span>
+                      {achievement.name}
+                    </CardTitle>
+                    {achievement.unlocked && <Trophy className="h-5 w-5 text-yellow-500" />}
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p>Nenhuma conquista definida ainda.</p>
           )}
         </section>
       </>

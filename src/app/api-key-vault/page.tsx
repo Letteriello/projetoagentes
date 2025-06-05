@@ -492,24 +492,20 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
             </Table>
           ) : apiKeys.length === 0 ? (
             <EmptyState
-              title="Comece a Configurar suas Chaves API"
-              description={
-                <>
-                  Para que seus agentes possam utilizar serviços de IA poderosos como Google AI Studio ou OpenAI,
-                  você precisa adicionar as respectivas chaves API.
-                  <br />
-                  Veja nossos guias para obter suas chaves e configurá-las aqui.
-                </>
-              }
-              icon={<KeyRound className="h-12 w-12 text-muted-foreground" />}
+              title="Nenhuma Chave API Configurada"
+              description="Adicione suas chaves de API para conectar seus agentes a serviços externos e liberar todo o potencial da plataforma."
+              icon={<KeyRound className="h-16 w-16 text-muted-foreground" />} // Slightly larger icon
               actionButton={{
-                text: "Guias: Obter Chaves API",
-                onClick: () => window.open('https://developers.google.com/studio/docs/get-api-key', '_blank'), // Example real link
-                icon: <ExternalLink className="mr-2 h-4 w-4" />,
-                variant: 'default',
-                className: 'mt-4 bg-blue-600 hover:bg-blue-700 text-white',
+                text: "Adicionar Nova Chave API",
+                onClick: () => {
+                  addKeyMethods.reset(); // Ensure form is reset
+                  setIsAddKeyDialogOpen(true);
+                },
+                icon: <PlusCircle className="mr-2 h-4 w-4" />,
+                variant: 'default', // Standard primary button
+                // className: 'mt-4', // Default spacing should be fine
               }}
-              className="py-10 md:py-16"
+              className="my-12" // Add some margin for better spacing
             />
           ) : (
             <Table>
