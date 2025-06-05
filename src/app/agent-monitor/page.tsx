@@ -20,7 +20,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2, MessageSquare, Send, AlertTriangle, Loader2, Brain, Waypoints, AlertCircle as AlertCircleIcon, Info as InfoIconLucide, CheckCircle2, Users as UsersIcon, Package, Workflow, ListChecks, Clock, AlertTriangle as AlertTriangleIcon // Added new icons
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"; // Import Accordion components
+import {
+  Activity, BarChartBig, FileQuestion, Inbox, LineChart, ListX, PieChart, ScrollText, SearchX, ShieldAlert, Table2, WifiOff, ChevronDown, ChevronRight, Settings2, MessageSquare, Send, AlertTriangle, Loader2, Brain, Waypoints, AlertCircle as AlertCircleIcon, Info as InfoIconLucide, CheckCircle2, Users as UsersIcon, Package, Workflow, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, RefreshCw, DollarSign // Added new icons
 } from "lucide-react"; // Added icons
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 import { cn } from "@/lib/utils";
@@ -43,6 +49,19 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"; // Import Card components
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"; // Import Alert components
 import { type MonitorEvent, ToolCallEvent, ErrorEvent, InfoEvent, TaskCompletionEvent, AgentStateEvent, PerformanceMetricsEvent, A2AMessageEvent } from '@/types/monitor-events'; // Added A2AMessageEvent
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { EvaluationReport } from '@/types/evaluation-report'; // Added for Task 9.1
@@ -202,6 +221,11 @@ export default function AgentMonitorPage() {
   const [toolUsageMetricsLoading, setToolUsageMetricsLoading] = useState<boolean>(false);
   const [toolUsageMetricsError, setToolUsageMetricsError] = useState<string | null>(null);
 
+  // State for Error Frequency by Agent Chart
+  const [errorFrequencyByAgentData, setErrorFrequencyByAgentData] = useState<{ agentId: string; errorCount: number }[]>([]);
+  const [errorFrequencyByAgentLoading, setErrorFrequencyByAgentLoading] = useState<boolean>(false);
+  const [errorFrequencyByAgentError, setErrorFrequencyByAgentError] = useState<string | null>(null);
+
   // State for Trace Details
   const [traceData, setTraceData] = useState<ClientLogEntry[]>([]);
   const [traceLoading, setTraceLoading] = useState<boolean>(false);
@@ -223,9 +247,10 @@ export default function AgentMonitorPage() {
 
   const [feedSearchQuery, setFeedSearchQuery] = useState<string>('');
   const [feedFilterAgentId, setFeedFilterAgentId] = useState<string>('');
+  const [feedFilterToolName, setFeedFilterToolName] = useState<string>(''); // New filter state for tool name
   const [feedFilterEventType, setFeedFilterEventType] = useState<string>('all');
   const [feedFilterStatus, setFeedFilterStatus] = useState<string>('all');
-  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+  // const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null); // No longer needed, replaced by Accordion
 
   const [verboseMode, setVerboseMode] = useState<boolean>(false);
   const [selectedTraceIdForTrajectory, setSelectedTraceIdForTrajectory] = useState<string | null>(null);
@@ -265,6 +290,36 @@ interface SimulatedToolPerformance {
 }
 const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<SimulatedToolPerformance[]>([]);
 
+// State for Agent Activity Heatmap
+interface HeatmapDay {
+  date: string; // YYYY-MM-DD
+  dayOfWeek: string; // 'Sun', 'Mon', ...
+  activity: number; // 0-10, for example
+}
+const [agentActivityHeatmapData, setAgentActivityHeatmapData] = useState<HeatmapDay[]>([]);
+
+// State for Key Metrics
+const [totalExecutions, setTotalExecutions] = useState<number | null>(null);
+const [successRate, setSuccessRate] = useState<number | null>(null);
+const [estimatedCostToday, setEstimatedCostToday] = useState<number | null>(null);
+const [keyMetricsLoading, setKeyMetricsLoading] = useState<boolean>(true);
+
+// Agent Type Definitions
+const AGENT_TYPES = ["All Types", "LLM", "Workflow", "Customizado"] as const;
+type AgentType = typeof AGENT_TYPES[number];
+
+const getAgentType = (agentId: string): Exclude<AgentType, "All Types"> => {
+  if (agentId.toLowerCase().includes('llm')) return "LLM";
+  if (agentId.toLowerCase().includes('workflow') || agentId.toLowerCase().includes('wf')) return "Workflow";
+  return "Customizado";
+};
+
+// State for Agent Type Filter
+const [feedFilterAgentType, setFeedFilterAgentType] = useState<AgentType>("All Types");
+
+// State for Anomaly Alerts
+const [anomalyAlerts, setAnomalyAlerts] = useState<string[]>([]);
+
   const agentUsageChartConfig = {
     count: {
       label: "Usage Count",
@@ -283,6 +338,11 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
   const toolUsageChartConfig = {
     count: { label: "Usage Count", color: "hsl(var(--chart-3))" },
     toolName: { label: "Tool Name" }
+  } satisfies ChartConfig;
+
+  const errorFrequencyByAgentChartConfig = {
+    errorCount: { label: "Error Count", color: "hsl(var(--chart-error))" }, // Assuming --chart-error is defined or use another color
+    agentId: { label: "Agent ID" },
   } satisfies ChartConfig;
 
   const errorRatesChartConfig = {
@@ -527,11 +587,13 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
     setExecutionHistoryError(null);
     setAverageResponseTimeError(null);
     setToolUsageMetricsError(null);
+    setFeedFilterToolName(''); // Clear tool name filter
+    setFeedFilterAgentType("All Types"); // Clear agent type filter
   };
 
   // useEffect for mock data generation on component mount
-  useEffect(() => {
-    // Mock A2A Messages
+
+  const loadMockA2AMessages = () => {
     setA2aMessagesLoading(true);
     try {
       const mockMessages: A2AMessageEvent[] = [
@@ -577,31 +639,29 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
     } finally {
       setA2aMessagesLoading(false);
     }
+  };
 
-
+  const loadMockAgentStatusAndAvgResponseData = () => {
     setAgentStatusLoading(true);
-    setAverageResponseTimeLoading(true); // Combined for efficiency with agentIds
+    setAverageResponseTimeLoading(true);
     try {
-      // Generate 5 agent IDs for mock data consistency
       const mockAgentIds = Array.from({ length: 5 }, (_, i) => `agent-${i}`);
-
       const initialAgentStatusData = generateAgentStatusData(mockAgentIds.length);
       setAgentStatusData(initialAgentStatusData);
 
-      // Initialize displayAgents from agentStatusData and sseAgentIds
       const initialDisplayAgents: Record<string, DisplayAgent> = {};
       initialAgentStatusData.forEach(agent => {
         initialDisplayAgents[agent.id] = {
           id: agent.id,
-          name: agent.id, // Assuming name is same as ID for mock
+          name: agent.id,
           currentStatus: agent.isActive ? 'online' : 'offline',
           lastSeen: new Date().toISOString(),
         };
       });
 
+      // Use a2aMessages state directly here as it would have been loaded
       const sseAgentIds = ['agent-001', 'agent-002', 'agent-003', 'agent-004', 'corp-workflow-agent'];
-      // Add agent IDs from mock A2A messages to ensure they appear in status list if not already present
-      a2aMessages.forEach(msg => {
+       a2aMessages.forEach(msg => { // ensure a2aMessages is populated before this runs if it's a dependency
         if (!sseAgentIds.includes(msg.fromAgentId)) sseAgentIds.push(msg.fromAgentId);
         if (!sseAgentIds.includes(msg.toAgentId)) sseAgentIds.push(msg.toAgentId);
       });
@@ -612,8 +672,6 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
         }
       });
       setDisplayAgents(initialDisplayAgents);
-
-      // Pass the generated agent IDs to the response time generator
       setAverageResponseTimeData(generateAverageResponseTimeData(mockAgentIds));
     } catch (err) {
       setAgentStatusError('Failed to load agent status data.');
@@ -623,29 +681,34 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
       setAgentStatusLoading(false);
       setAverageResponseTimeLoading(false);
     }
+  };
 
+  const loadMockExecutionHistoryData = () => {
     setExecutionHistoryLoading(true);
     try {
-      setExecutionHistoryData(generateExecutionHistoryData(50)); // Example count
+      setExecutionHistoryData(generateExecutionHistoryData(50));
     } catch (err) {
       setExecutionHistoryError('Failed to load execution history data.');
       console.error("Error in execution history data generation:", err);
     } finally {
       setExecutionHistoryLoading(false);
     }
+  };
 
+  const loadMockToolUsageMetricsData = () => {
     setToolUsageMetricsLoading(true);
     try {
-      const tools = ['ToolReader', 'ToolWriter', 'ToolAPI', 'ToolDB', 'ToolAnalysis']; // Example tool names
-      setToolUsageMetricsData(generateToolUsageData(tools, 100)); // Example max usage
+      const tools = ['ToolReader', 'ToolWriter', 'ToolAPI', 'ToolDB', 'ToolAnalysis'];
+      setToolUsageMetricsData(generateToolUsageData(tools, 100));
     } catch (err) {
       setToolUsageMetricsError('Failed to load tool usage metrics data.');
       console.error("Error in tool usage metrics data generation:", err);
     } finally {
       setToolUsageMetricsLoading(false);
     }
+  };
 
-    // Populate simulated tool performance data (Task 9.5)
+  const loadMockSimulatedToolPerformanceData = () => {
     const mockToolPerformanceData: SimulatedToolPerformance[] = [
       { toolName: "Web Search", successRate: 0.90, averageLatencyMs: 520, errorCount: 5, totalRuns: 50 },
       { toolName: "Calculator", successRate: 0.99, averageLatencyMs: 45, errorCount: 1, totalRuns: 100 },
@@ -654,7 +717,125 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
       { toolName: "CustomAPIIntegration", successRate: 0.75, averageLatencyMs: 800, errorCount: 25, totalRuns: 100 },
     ];
     setSimulatedToolPerformance(mockToolPerformanceData);
+  };
+
+  const generateMockHeatmapData = (days: number): HeatmapDay[] => {
+    const data: HeatmapDay[] = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      data.push({
+        date: format(date, "yyyy-MM-dd"),
+        dayOfWeek: dayNames[date.getDay()],
+        activity: Math.floor(Math.random() * 11), // Random activity between 0 and 10
+      });
+    }
+    return data;
+  };
+
+  const loadMockHeatmapData = () => {
+    setAgentActivityHeatmapData(generateMockHeatmapData(7));
+  };
+
+  const loadMockKeyMetrics = () => {
+    setKeyMetricsLoading(true);
+    // Simulate a slight delay for loading effect
+    setTimeout(() => {
+      setTotalExecutions(Math.floor(Math.random() * 1000) + 500); // Random number between 500 and 1500
+      setSuccessRate(Math.random() * (0.99 - 0.70) + 0.70); // Random rate between 70% and 99%
+      setEstimatedCostToday(Math.random() * 50 + 10); // Random cost between $10 and $60
+      setKeyMetricsLoading(false);
+    }, 300); // Simulate small fetch time
+  };
+
+  useEffect(() => {
+    loadMockA2AMessages();
+    loadMockAgentStatusAndAvgResponseData(); // Depends on a2aMessages being available if used for agent IDs
+    loadMockExecutionHistoryData();
+    loadMockToolUsageMetricsData();
+    loadMockSimulatedToolPerformanceData();
+    loadMockHeatmapData();
+    loadMockKeyMetrics();
   }, []); // Empty dependency array ensures this runs only once on mount
+
+  const handleReloadAllData = async () => {
+    console.log("Reloading all data...");
+    // Call API fetch functions
+    fetchAgentUsage(filters);
+    fetchFlowUsage(filters);
+    fetchToolUsage(filters);
+    fetchErrorRates(filters);
+    fetchAverageResponseTimes(filters);
+
+    // Call mock data reload functions
+    loadMockA2AMessages();
+    loadMockAgentStatusAndAvgResponseData();
+    loadMockExecutionHistoryData();
+    loadMockToolUsageMetricsData();
+    loadMockSimulatedToolPerformanceData();
+    loadMockHeatmapData();
+    loadMockKeyMetrics();
+    // Note: liveEvents and errorFrequencyByAgentData (derived from liveEvents) are not reloaded here
+    // as SSE handles live updates.
+  };
+
+  // useEffect to calculate error frequency by agent whenever liveEvents changes
+  useEffect(() => {
+    setErrorFrequencyByAgentLoading(true);
+    try {
+      const errorsByAgent: Record<string, number> = {};
+      liveEvents.forEach(event => {
+        // Apply agent type filter HERE before counting
+        if (feedFilterAgentType !== "All Types" && event.agentId) {
+          if (getAgentType(event.agentId) !== feedFilterAgentType) {
+            return; // Skip this event
+          }
+        }
+        if (event.eventType === 'error' || (event.eventType === 'tool_call' && (event as ToolCallEvent).status === 'error')) {
+          const agentId = event.agentId; // Assuming agentId is always present
+          errorsByAgent[agentId] = (errorsByAgent[agentId] || 0) + 1;
+        }
+      });
+      const calculatedData = Object.entries(errorsByAgent).map(([agentId, errorCount]) => ({ agentId, errorCount }));
+      setErrorFrequencyByAgentData(calculatedData);
+      setErrorFrequencyByAgentError(null);
+    } catch (error) {
+      console.error("Error calculating error frequency by agent:", error);
+      setErrorFrequencyByAgentError("Failed to calculate error frequency data.");
+      setErrorFrequencyByAgentData([]);
+    } finally {
+      setErrorFrequencyByAgentLoading(false);
+    }
+  }, [liveEvents, feedFilterAgentType]); // Added feedFilterAgentType dependency
+
+  // useEffect for Anomaly Detection
+  useEffect(() => {
+    const newAlerts: string[] = [];
+    const HIGH_ERROR_THRESHOLD_COUNT = 3;
+    const HIGH_LATENCY_THRESHOLD_MS = 2000;
+
+    errorFrequencyByAgentData.forEach(agentError => {
+      if (agentError.errorCount > HIGH_ERROR_THRESHOLD_COUNT) {
+        newAlerts.push(
+          `Agente '${agentError.agentId}' registrou ${agentError.errorCount} erros. Limite: ${HIGH_ERROR_THRESHOLD_COUNT}.`
+        );
+      }
+    });
+
+    latencyMetrics.forEach(metric => {
+      if (metric.value > HIGH_LATENCY_THRESHOLD_MS) {
+        newAlerts.push(
+          `Agente '${metric.name}' apresenta alta latência (${metric.value.toFixed(0)}ms). Limite: ${HIGH_LATENCY_THRESHOLD_MS}ms.`
+        );
+      }
+    });
+
+    // To prevent spamming alerts or keeping old alerts indefinitely, one might add logic here
+    // to only add new, unique alerts, or to clear alerts after a while.
+    // For this task, we'll just set the new alerts found in this check.
+    setAnomalyAlerts(newAlerts);
+  }, [errorFrequencyByAgentData, latencyMetrics]);
 
   useEffect(() => {
     const eventSource = new EventSource('/api/monitor-stream');
@@ -932,9 +1113,23 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
           return false;
         }
       }
+
+      // Tool Name Filter (new)
+      if (feedFilterToolName && event.eventType === 'tool_call') {
+        if ((event as ToolCallEvent).toolName !== feedFilterToolName) {
+          return false;
+        }
+      }
+
+      // Agent Type Filter for Live Feed
+      if (feedFilterAgentType !== "All Types" && event.agentId) {
+        if (getAgentType(event.agentId) !== feedFilterAgentType) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [liveEvents, feedSearchQuery, feedFilterAgentId, feedFilterEventType, feedFilterStatus]);
+  }, [liveEvents, feedSearchQuery, feedFilterAgentId, feedFilterEventType, feedFilterStatus, feedFilterToolName, feedFilterAgentType]); // Added feedFilterAgentType dependency
 
   const feedEventTypeOptions = [
     { value: 'all', label: 'All Event Types' },
@@ -1107,10 +1302,271 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
     return <span className={styleClass}><strong className="font-medium">{details}</strong> - {content}</span>;
   };
 
+  const renderFullEventDetails = (event: MonitorEvent): React.ReactNode => {
+    const commonDetails = (
+      <>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-2">
+          <p><strong className="font-semibold text-muted-foreground">ID:</strong> {event.id}</p>
+          <p><strong className="font-semibold text-muted-foreground">Timestamp:</strong> {format(new Date(event.timestamp), "PPP HH:mm:ss.SSS")}</p>
+          <p><strong className="font-semibold text-muted-foreground">Agent ID:</strong> {event.agentId}</p>
+          <p><strong className="font-semibold text-muted-foreground">Event Type:</strong> <span className="font-mono bg-muted/50 px-1 py-0.5 rounded text-primary">{event.eventType}</span></p>
+          {event.traceId && <p><strong className="font-semibold text-muted-foreground">Trace ID:</strong> {event.traceId}</p>}
+        </div>
+        <hr className="my-2 border-border/50" />
+      </>
+    );
+
+    let specificDetails: React.ReactNode = null;
+
+    switch (event.eventType) {
+      case 'tool_call':
+        const tcEvent = event as ToolCallEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">Tool Name:</strong> {tcEvent.toolName}</p>
+            <p><strong className="font-semibold text-muted-foreground">Status:</strong> {tcEvent.status}</p>
+            {tcEvent.input && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Input:</strong>
+                <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(tcEvent.input, null, 2)}
+                </pre>
+              </div>
+            )}
+            {tcEvent.output && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Output:</strong>
+                <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(tcEvent.output, null, 2)}
+                </pre>
+              </div>
+            )}
+            {tcEvent.errorDetails && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Error Details:</strong>
+                <pre className="p-2 mt-0.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(tcEvent.errorDetails, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+        break;
+      case 'error':
+        const errEvent = event as ErrorEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">Error Message:</strong> <span className="text-red-600 dark:text-red-400">{errEvent.errorMessage}</span></p>
+            <p><strong className="font-semibold text-muted-foreground">Error Source:</strong> {errEvent.errorSource || 'N/A'}</p>
+            {errEvent.stackTrace && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Stack Trace:</strong>
+                <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {errEvent.stackTrace}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+        break;
+      case 'task_completion':
+        const tcompEvent = event as TaskCompletionEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">Status:</strong> {tcompEvent.status}</p>
+            <p><strong className="font-semibold text-muted-foreground">Message:</strong> {tcompEvent.message || 'N/A'}</p>
+            {tcompEvent.result && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Result:</strong>
+                <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(tcompEvent.result, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+        break;
+      case 'info':
+        const infoEvent = event as InfoEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">Message:</strong> {infoEvent.message}</p>
+            {infoEvent.data && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Data:</strong>
+                <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(infoEvent.data, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+        break;
+      case 'agent_state':
+        const asEvent = event as AgentStateEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">Status:</strong> {asEvent.status}</p>
+            <p><strong className="font-semibold text-muted-foreground">Message:</strong> {asEvent.message || 'N/A'}</p>
+          </div>
+        );
+        break;
+      case 'performance_metrics':
+        const pmEvent = event as PerformanceMetricsEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">Metric Name:</strong> {pmEvent.metricName}</p>
+            <p><strong className="font-semibold text-muted-foreground">Value:</strong> {pmEvent.value}</p>
+            <p><strong className="font-semibold text-muted-foreground">Unit:</strong> {pmEvent.unit || 'N/A'}</p>
+            {pmEvent.details && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Details:</strong>
+                <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(pmEvent.details, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+        break;
+      case 'a2a_message':
+        const a2aEvent = event as A2AMessageEvent;
+        specificDetails = (
+          <div className="space-y-1.5 text-xs">
+            <p><strong className="font-semibold text-muted-foreground">From Agent ID:</strong> {a2aEvent.fromAgentId}</p>
+            <p><strong className="font-semibold text-muted-foreground">To Agent ID:</strong> {a2aEvent.toAgentId}</p>
+            <p><strong className="font-semibold text-muted-foreground">Status:</strong> {a2aEvent.status}</p>
+            <p><strong className="font-semibold text-muted-foreground">Channel ID:</strong> {a2aEvent.channelId || 'N/A'}</p>
+            <div>
+              <strong className="font-semibold text-muted-foreground">Message Content:</strong>
+              <pre className="p-2 mt-0.5 bg-muted/30 dark:bg-muted/10 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                {typeof a2aEvent.messageContent === 'string' ? a2aEvent.messageContent : JSON.stringify(a2aEvent.messageContent, null, 2)}
+              </pre>
+            </div>
+            {a2aEvent.errorDetails && (
+              <div>
+                <strong className="font-semibold text-muted-foreground">Error Details:</strong>
+                <pre className="p-2 mt-0.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md overflow-x-auto text-[11px] whitespace-pre-wrap break-all">
+                  {JSON.stringify(a2aEvent.errorDetails, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+        break;
+      default:
+        specificDetails = <p className="text-xs text-muted-foreground">No specific details available for this event type.</p>;
+    }
+
+    return (
+      <div className="p-2">
+        {commonDetails}
+        {specificDetails}
+      </div>
+    );
+  };
+
+  const getActivityColor = (activity: number): string => {
+    if (activity === 0) return 'bg-gray-100 dark:bg-gray-700 hover:border-gray-400';
+    if (activity <= 2) return 'bg-green-200 dark:bg-green-800 hover:border-green-500';
+    if (activity <= 4) return 'bg-green-300 dark:bg-green-700 hover:border-green-600';
+    if (activity <= 6) return 'bg-green-400 dark:bg-green-600 hover:border-green-700';
+    if (activity <= 8) return 'bg-green-500 dark:bg-green-500 hover:border-green-700';
+    return 'bg-green-600 dark:bg-green-400 hover:border-green-700'; // Max activity
+  };
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Agent Monitor</h1>
+      <h1 className="text-2xl font-bold mb-6">Visão Geral do Monitor de Agentes</h1>
+
+      {/* START OF ANOMALY ALERTS DISPLAY SECTION */}
+      {anomalyAlerts.length > 0 && (
+        <div className="space-y-3 mb-8">
+          {anomalyAlerts.map((alertMsg, index) => (
+            <Alert key={index} variant="destructive" className="bg-yellow-50 border-yellow-400 text-yellow-700 dark:bg-yellow-900/40 dark:border-yellow-700/60 dark:text-yellow-300 shadow-md">
+              <AlertTriangle className="h-5 w-5 !text-yellow-600 dark:!text-yellow-400" />
+              <AlertTitle className="font-semibold text-yellow-800 dark:text-yellow-200">Alerta de Anomalia Detectada!</AlertTitle>
+              <AlertDescription className="text-yellow-700 dark:text-yellow-300/90">
+                {alertMsg}
+              </AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
+      {/* END OF ANOMALY ALERTS DISPLAY SECTION */}
+
+      {/* START OF KEY METRICS CARDS SECTION */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Execuções</CardTitle>
+            <ListChecks className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {keyMetricsLoading ? (
+              <Skeleton className="h-8 w-3/4 my-1" />
+            ) : (
+              <div className="text-2xl font-bold">{totalExecutions?.toLocaleString() || 'N/A'}</div>
+            )}
+            <p className="text-xs text-muted-foreground">Execuções totais nas últimas 24h (simulado)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taxa de Sucesso</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" /> {/* Changed to CheckCircle2 for consistency */}
+          </CardHeader>
+          <CardContent>
+            {keyMetricsLoading ? (
+              <Skeleton className="h-8 w-1/2 my-1" />
+            ) : (
+              <div className="text-2xl font-bold">
+                {successRate !== null ? `${(successRate * 100).toFixed(1)}%` : 'N/A'}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Percentual de execuções bem-sucedidas (simulado)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Custo Estimado (Hoje)</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {keyMetricsLoading ? (
+              <Skeleton className="h-8 w-1/2 my-1" />
+            ) : (
+              <div className="text-2xl font-bold">
+                {estimatedCostToday !== null ? `$${estimatedCostToday.toFixed(2)}` : 'N/A'}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Custo operacional estimado de hoje (simulado)</p>
+          </CardContent>
+        </Card>
+      </div>
+      {/* END OF KEY METRICS CARDS SECTION */}
+
+
+      {/* START OF AGENT ACTIVITY HEATMAP SECTION */}
+      <div className="bg-card p-6 rounded-lg shadow mb-8">
+        <h2 className="text-xl font-semibold mb-4">Agent Activity Heatmap (Last 7 Days)</h2>
+        {agentActivityHeatmapData.length > 0 ? (
+          <div className="flex space-x-1 overflow-x-auto py-2">
+            {agentActivityHeatmapData.map((dayData, index) => (
+              <div key={index} className="flex flex-col items-center space-y-1 min-w-[3rem]"> {/* min-w to prevent squishing */}
+                <div
+                  className={`w-10 h-10 rounded border border-transparent transition-all ${getActivityColor(dayData.activity)}`}
+                  title={`Date: ${dayData.date}\nActivity: ${dayData.activity}`}
+                ></div>
+                <span className="text-xs text-muted-foreground">{dayData.dayOfWeek}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+           <Skeleton className="h-[70px] w-full rounded-md" /> // Placeholder for heatmap
+        )}
+      </div>
+      {/* END OF AGENT ACTIVITY HEATMAP SECTION */}
       
       {/* START OF AGENT EVALUATION SECTION (Task 9.1) */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
@@ -1238,6 +1694,10 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
           </div>
           <Button variant="outline" onClick={handleClearFilters}>Clear Filters</Button>
           <Button onClick={handleApplyFilters}>Apply Filters</Button>
+          <Button onClick={handleReloadAllData} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Recarregar Dados
+          </Button>
         </div>
       </div>
       {/* END OF FILTERS SECTION */}
@@ -1301,6 +1761,19 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label htmlFor="feedFilterAgentType" className="text-xs text-muted-foreground">Agent Type</Label>
+            <Select value={feedFilterAgentType} onValueChange={(value: AgentType) => setFeedFilterAgentType(value)}>
+              <SelectTrigger id="feedFilterAgentType" className="h-9 text-sm">
+                <SelectValue placeholder="Filter by Agent Type" />
+              </SelectTrigger>
+              <SelectContent>
+                {AGENT_TYPES.map(type => (
+                  <SelectItem key={type} value={type} className="text-sm">{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <ScrollArea className="h-[400px] w-full border rounded-md p-0 bg-muted/20 dark:bg-muted/10">
           <div className="p-4"> {/* Inner div for padding */}
@@ -1320,37 +1793,36 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
                 }
               />
             ) : (
-              <ul className="space-y-2.5">
+              <Accordion type="multiple" collapsible className="w-full space-y-2">
                 {filteredLiveEvents.map((event) => (
-                  <li key={event.id} className="text-xs p-2.5 rounded-lg bg-background dark:bg-black/20 shadow-sm border border-border/50 hover:border-primary/30 transition-all">
-                    <div className="flex justify-between items-start mb-0.5">
-                      <span className="font-mono text-muted-foreground text-[11px]">{format(new Date(event.timestamp), "HH:mm:ss.SSS")}</span>
-                      <div className="flex items-center space-x-2">
-                        {event.traceId && <span className="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors">Trace: {event.traceId}</span>}
-                        {event.eventType === 'error' && (event as ErrorEvent).stackTrace && (
-                          <Button
-                            variant="link"
-                            size="xs" // Assuming you have or can create a small size for buttons, or use text styling
-                            className="text-xs h-auto p-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                            onClick={() => setExpandedErrorId(expandedErrorId === event.id ? null : event.id)}
-                          >
-                            {expandedErrorId === event.id ? 'Hide Details' : 'Show Details'}
-                          </Button>
+                  <AccordionItem
+                    key={event.id}
+                    value={event.id}
+                    className="bg-background dark:bg-black/20 shadow-sm border border-border/50 hover:border-primary/30 transition-all rounded-lg data-[state=open]:border-primary/50"
+                  >
+                    <AccordionTrigger className="p-2.5 text-xs hover:no-underline group">
+                      <div className="flex justify-between items-center w-full">
+                        <div className="flex-grow text-left">
+                          <span className="font-mono text-muted-foreground text-[11px] mr-3 group-hover:text-foreground transition-colors">
+                            {format(new Date(event.timestamp), "HH:mm:ss.SSS")}
+                          </span>
+                          {renderEventDetails(event)}
+                        </div>
+                        {event.traceId && (
+                          <span className="text-[10px] text-muted-foreground/70 group-hover:text-muted-foreground transition-colors ml-2 mr-1 hidden md:inline">
+                            Trace: {event.traceId}
+                          </span>
                         )}
+                         {/* Accordion adds its own chevron, so manual one is removed.
+                             The button for stack trace is also removed as it's now in AccordionContent */}
                       </div>
-                    </div>
-                    <div className="mt-0.5">{renderEventDetails(event)}</div>
-                    {event.eventType === 'error' && expandedErrorId === event.id && (event as ErrorEvent).stackTrace && (
-                      <div className="mt-2 pt-2 border-t border-dashed border-border/70">
-                        <h4 className="text-xs font-semibold mb-1 text-muted-foreground">Stack Trace:</h4>
-                        <pre className="text-[10px] p-2 bg-muted/50 dark:bg-muted/20 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
-                          {(event as ErrorEvent).stackTrace}
-                        </pre>
-                      </div>
-                    )}
-                  </li>
+                    </AccordionTrigger>
+                    <AccordionContent className="p-0 text-xs border-t border-border/50 data-[state=open]:bg-muted/20 dark:data-[state=open]:bg-muted/10 rounded-b-lg">
+                      {renderFullEventDetails(event)}
+                    </AccordionContent>
+                  </AccordionItem>
                 ))}
-              </ul>
+              </Accordion>
             )}
           </div>
         </ScrollArea>
@@ -1776,6 +2248,89 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
         )}
       </div>
 
+      {/* Interactive Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Tool Usage Distribution Chart (Clickable) */}
+        <div className="bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Tool Usage Distribution (Click to Filter Feed)</h2>
+          {toolUsageLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-md" />
+          ) : toolUsageError ? (
+            <p className="text-red-500 text-center py-10">Error: {toolUsageError}</p>
+          ) : toolUsageData.length > 0 ? (
+            <ChartContainer config={toolUsageChartConfig} className="min-h-[200px] w-full">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={toolUsageData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="toolName" tickLine={false} axisLine={false} fontSize={10} />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} allowDecimals={false} />
+                  <ChartTooltip cursor={true} content={<ChartTooltipContent indicator="dashed" />} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--color-count)"
+                    radius={4}
+                    onClick={(data) => {
+                      if (data && data.toolName) {
+                        setFeedFilterToolName(data.toolName);
+                        // Consider scrolling to activity feed or other visual feedback
+                      }
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay
+              icon={BarChartBig}
+              title="No Tool Usage Data"
+              message="Tool usage data will appear here. Apply filters or wait for new data if none is visible."
+            />
+          )}
+        </div>
+
+        {/* Error Frequency by Agent Chart (Clickable) */}
+        <div className="bg-card p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Error Frequency by Agent (Click to Filter Feed)</h2>
+          {errorFrequencyByAgentLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-md" />
+          ) : errorFrequencyByAgentError ? (
+            <p className="text-red-500 text-center py-10">Error: {errorFrequencyByAgentError}</p>
+          ) : errorFrequencyByAgentData.length > 0 ? (
+            <ChartContainer config={errorFrequencyByAgentChartConfig} className="min-h-[200px] w-full">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={errorFrequencyByAgentData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="agentId" tickLine={false} axisLine={false} fontSize={10} />
+                  <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} allowDecimals={false} />
+                  <ChartTooltip cursor={true} content={<ChartTooltipContent indicator="dashed" />} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Bar
+                    dataKey="errorCount"
+                    fill="var(--color-errorCount)" // Ensure this color is defined in your CSS variables
+                    radius={4}
+                    onClick={(data) => {
+                      if (data && data.agentId) {
+                        setFeedFilterAgentId(data.agentId);
+                        // Consider scrolling to activity feed or other visual feedback
+                      }
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <EmptyStateDisplay
+              icon={ShieldAlert} // Or AlertTriangleIcon
+              title="No Error Frequency Data"
+              message="Error frequency by agent will appear here as errors are detected."
+            />
+          )}
+        </div>
+      </div>
+      {/* End of Interactive Charts Section */}
+
+
       {/* Existing charts below - these are driven by API and filters */}
       <div className="bg-card p-6 rounded-lg shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Agent Usage Frequency</h2>
@@ -1826,7 +2381,16 @@ const [simulatedToolPerformance, setSimulatedToolPerformance] = useState<Simulat
                 <YAxis strokeDasharray="3 3" tickLine={false} axisLine={false} />
                 <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dashed" />} />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="count" fill="var(--color-count)" radius={4} />
+                <Bar
+                  dataKey="count"
+                  fill="var(--color-count)"
+                  radius={4}
+                  // onClick={(data) => { // This is now handled by the new interactive chart above
+                  //   if (data && data.toolName) {
+                  //     setFeedFilterToolName(data.toolName);
+                  //   }
+                  // }}
+                 />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
