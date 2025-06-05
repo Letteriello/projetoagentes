@@ -348,7 +348,7 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
             >
               <SelectTrigger id="defaultResponseFormat" className="h-8">
                 <SelectValue />
-              </Trigger>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="json">JSON</SelectItem>
                 <SelectItem value="text">Texto</SelectItem>

@@ -1,4 +1,4 @@
-import { defineFlow, Flow, runFlow, prompt } from 'genkit';
+import { defineFlow, Flow } from 'genkit'; // runFlow e prompt removidos, pois não existem
 import { z } from 'zod';
 import type {
   AgentConfigBase, // Assuming this might be needed for a fuller schema eventually
@@ -59,28 +59,33 @@ const workflowStepSchema: z.ZodType<WorkflowStep> = z.object({
 });
 
 // Zod Schema for WorkflowAgentConfig
-// This is a simplified version focusing on relevant fields for this flow.
-// A complete schema would require defining Zod counterparts for all nested types in AgentConfigBase.
-const workflowAgentConfigSchema: z.ZodType<WorkflowAgentConfig> = z.object({
+// This é uma versão simplificada focando nos campos relevantes para este fluxo.
+// Adicionada loopExitToolName e garantido que workflowSteps é array.
+const workflowAgentConfigSchema = z.object({
+  // ... outros campos ...
+  loopExitToolName: z.string().optional(),
   // Fields from AgentConfigBase (simplified)
   type: z.literal('workflow'),
-  framework: z.custom<AgentFramework>(), // Using z.custom for enum-like types from TS
+  framework: z.enum(['genkit', 'langchain', 'crewai', 'other']),
   agentGoal: z.string(),
-  agentTasks: z.array(z.string()).optional(), // Assuming AgentConfigBase has this
-  systemPromptGenerated: z.string().optional(), // Added in a previous step
+  workflowType: z.enum(['sequential', 'parallel', 'conditional', 'loop']),
+  agentModel: z.string(),
+  agentTemperature: z.number().optional(),
   // Optional fields from AgentConfigBase can be added here if needed by the flow
   // For now, keeping it focused on what workflowAgentRunnerFlow directly uses beyond workflow specific fields.
 
   // Fields specific to WorkflowAgentConfig
-  workflowType: z.custom<WorkflowDetailedType>(),
+  workflowSteps: z.array(workflowStepSchema),
+  agentTasks: z.array(z.string()).optional(),
   subAgents: z.array(z.string()).optional(),
-  workflowConfig: z.record(z.any()).optional(),
-  workflowSteps: z.array(workflowStepSchema).optional(),
-  // Add new optional fields for loop termination to the Zod schema
-  loopExitToolName: z.string().optional(),
-  loopExitStateKey: z.string().optional(),
-  loopExitStateValue: z.string().optional(), // Assuming string for now, adjust if complex types needed
-}) as z.ZodType<WorkflowAgentConfig>; // Cast to ensure it matches the TS type for defineFlow
+  terminationConditions: z.object({
+    maxIterations: z.number().optional(),
+    successCondition: z.string().optional(),
+    failureCondition: z.string().optional()
+  }).optional(),
+  loopStateKey: z.string().optional(),
+  loopExitStateValue: z.string().optional()
+}); // Não usar cast para ZodType<WorkflowAgentConfig>
 
 export const workflowAgentRunnerFlow: Flow<WorkflowAgentConfig, { status: string; message: string; simulatedOutputs?: any, iterations?: number }> = defineFlow(
   {
@@ -106,12 +111,12 @@ export const workflowAgentRunnerFlow: Flow<WorkflowAgentConfig, { status: string
 
     if (config.workflowType === 'loop') {
       let currentIteration = 0;
-      const maxIterationsFromConfig = config.terminationConditions?.find(c => c.type === 'max_iterations')?.value as number | undefined;
+      const maxIterationsFromConfig = config.terminationConditions?.maxIterations as number | undefined;
       const maxIterations = maxIterationsFromConfig ?? 10; // Default to 10 if not specified
 
       console.log(`[Workflow Flow] Starting LOOP. Max iterations: ${maxIterations}`);
       if(config.loopExitToolName) console.log(`  Exit on tool: ${config.loopExitToolName}`);
-      if(config.loopExitStateKey) console.log(`  Exit on state: ${config.loopExitStateKey} = ${config.loopExitStateValue}`);
+      if(config.loopStateKey) console.log(`  Exit on state: ${config.loopStateKey} = ${config.loopExitStateValue}`);
 
 
       while (currentIteration < maxIterations) {
@@ -159,11 +164,11 @@ export const workflowAgentRunnerFlow: Flow<WorkflowAgentConfig, { status: string
         if (terminated) break;
 
         // 2. loopExitStateKey / loopExitStateValue
-        if (config.loopExitStateKey && config.loopExitStateValue !== undefined) {
-          const stateValue = resolveValuePath(`$${config.loopExitStateKey}`, iterationOutputs); // Resolve from current iteration's state
-          console.log(`  [Iter ${currentIteration}] Checking state termination: Key '${config.loopExitStateKey}', Value: '${stateValue}', Expected: '${config.loopExitStateValue}'`);
+        if (config.loopStateKey && config.loopExitStateValue !== undefined) {
+          const stateValue = resolveValuePath(`$${config.loopStateKey}`, iterationOutputs); // Resolve from current iteration's state
+          console.log(`  [Iter ${currentIteration}] Checking state termination: Key '${config.loopStateKey}', Value: '${stateValue}', Expected: '${config.loopExitStateValue}'`);
           if (stateValue !== undefined && String(stateValue) === String(config.loopExitStateValue)) {
-            console.log(`[Workflow Flow] Terminating loop: State condition met (${config.loopExitStateKey} = ${config.loopExitStateValue}).`);
+            console.log(`[Workflow Flow] Terminating loop: State condition met (${config.loopStateKey} = ${config.loopExitStateValue}).`);
             terminated = true;
           }
         }
@@ -182,6 +187,31 @@ export const workflowAgentRunnerFlow: Flow<WorkflowAgentConfig, { status: string
         simulatedOutputs: globalSimulatedOutputs,
         iterations: currentIteration,
       };
+
+    } else if (config.workflowType === 'conditional') {
+      // Lógica para workflow condicional
+      console.log("[Workflow Flow] Executing Conditional Workflow");
+      for (let i = 0; i < config.workflowSteps.length; i++) {
+        const step = config.workflowSteps[i];
+        const stepIdentifier = step.name || step.agentId || `Step ${i + 1}`;
+        console.log(`\n[Workflow Flow] Executing Step ${i + 1}: ${stepIdentifier}`);
+
+        const actualInput = resolveInputMapping(step.inputMapping, globalSimulatedOutputs);
+        console.log(`  Actual Input: ${JSON.stringify(actualInput)}`);
+
+        const simulatedStepOutput = {
+          result: `Simulated output for ${step.agentId} (step: ${stepIdentifier})`,
+          received_input: actualInput,
+          timestamp: new Date().toISOString(),
+        };
+
+        if (step.outputKey) {
+          globalSimulatedOutputs[step.outputKey] = simulatedStepOutput;
+          console.log(`  Output stored to key "${step.outputKey}"`);
+        }
+      }
+      console.log("\n[Workflow Flow] Conditional workflow execution simulated successfully.");
+      return { status: "SUCCESS", message: "Conditional workflow execution simulated successfully.", simulatedOutputs: globalSimulatedOutputs };
 
     } else { // Sequential, Parallel, Graph, StateMachine (currently treated as sequential)
       for (let i = 0; i < config.workflowSteps.length; i++) {

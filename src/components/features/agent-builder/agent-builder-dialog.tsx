@@ -2,15 +2,13 @@
 "use client";
 
 import * as React from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { A2AConfig as A2AConfigType, CommunicationChannel } from "@/types/a2a-types"; // Renamed A2AConfig to A2AConfigType
+import { A2AConfig as A2AConfigType, CommunicationChannel } from "@/types/a2a-types";
 import { CommunicationChannelItem } from "./a2a-communication-channel";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -51,7 +49,6 @@ import {
   Binary,
   Palette
 } from "lucide-react";
-
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import { Slider } from "@/components/ui/slider";
@@ -61,23 +58,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
-// import { MultiAgentTab } from "@/components/features/agent-builder/multi-agent-tab"; // Assuming this was for the removed tab or integrated elsewhere
 import { ArtifactManagementTab, ArtifactDefinition } from "@/components/features/agent-builder/artifact-management-tab";
 import { RagMemoryTab } from "@/components/features/agent-builder/rag-memory-tab";
-import { RagMemoryConfig, KnowledgeSource, MemoryServiceType } from "@/components/features/agent-builder/memory-knowledge-tab.tsx"; // Changed to .tsx
+import { RagMemoryConfig, KnowledgeSource, MemoryServiceType } from "@/components/features/agent-builder/memory-knowledge-tab.tsx";
 import { A2AConfig as A2AConfigComponent } from "@/components/features/agent-builder/a2a-config";
 import { ToolsTab } from "@/components/features/agent-builder/tools-tab";
-// import type { A2AConfig as A2AConfigType } from "@/types/a2a-types"; // Already imported and aliased
-import { convertToGoogleADKConfig } from "@/lib/google-adk-utils"; // Assuming this is used or will be
-
-import * as React from 'react';
+import { convertToGoogleADKConfig } from "@/lib/google-adk-utils";
 import { lazy, Suspense } from 'react';
 import { useForm, FormProvider, useFormContext, Controller, SubmitHandler, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-// import { z } from 'zod'; // z is imported via savedAgentConfigurationSchema
 
-import {
-  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -86,7 +76,7 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge'; // Import Badge
-import { Button } from '@/components/ui/button';
+// import { Button } (removido duplicado) from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -98,7 +88,7 @@ import { Switch } from "@/components/ui/switch"; // Added Switch
 import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
 import JsonEditorField from '@/components/ui/JsonEditorField'; // Added JsonEditorField
 // Label replaced by FormLabel where appropriate
-import { Label } from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
+// import { Label } (removido duplicado) from '@/components/ui/label'; // Keep for direct use if any, or remove if all are FormLabel
 import { toast } from '@/hooks/use-toast';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {

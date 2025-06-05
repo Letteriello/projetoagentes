@@ -1,7 +1,8 @@
 import { langchainAgentFlow, LangchainAgentFlowInputSchema } from './langchain-agent-flow';
 import { runFlow } from '@genkit-ai/flow';
+import { createMockSavedAgentConfig } from './test-utils';
 import { z } from 'zod';
-import { initPlugin } from '@genkit-ai/core';
+
 import * as winstonLogger from '@/lib/winston-logger'; // Mock winstonLogger
 
 // Mock winstonLogger
@@ -15,9 +16,7 @@ jest.mock('@/lib/winston-logger', () => ({
 }));
 
 // Initialize Genkit core before running tests if needed by flows
-beforeAll(() => {
-  initPlugin();
-});
+
 
 describe('langchainAgentFlow', () => {
   afterEach(() => {
@@ -26,11 +25,12 @@ describe('langchainAgentFlow', () => {
   });
 
   it('should simulate Langchain agent execution and return a response', async () => {
-    const mockAgentConfig = {
+
+    const mockAgentConfig = createMockSavedAgentConfig({
       agentName: 'Test Langchain Agent',
-      toolsDetails: [], // No tools for this basic test
-      config: { framework: 'langchain' } // Ensure framework is set
-    };
+      toolsDetails: [],
+      config: { framework: 'langchain' }
+    });
     const input: z.infer<typeof LangchainAgentFlowInputSchema> = {
       agentConfig: mockAgentConfig,
       userMessage: 'Hello Langchain!',
@@ -54,11 +54,11 @@ describe('langchainAgentFlow', () => {
   });
 
   it('should simulate tool usage if toolsDetails are provided', async () => {
-    const mockAgentConfig = {
+    const mockAgentConfig = createMockSavedAgentConfig({
       agentName: 'Langchain Tool Agent',
       toolsDetails: [{ id: 'searchTool', name: 'SearchTool', description: 'A mock search tool' }],
       config: { framework: 'langchain' }
-    };
+    });
     const input: z.infer<typeof LangchainAgentFlowInputSchema> = {
       agentConfig: mockAgentConfig,
       userMessage: 'Search for something.',
@@ -81,11 +81,11 @@ describe('langchainAgentFlow', () => {
   });
 
   it('should handle agents with no tools', async () => {
-    const mockAgentConfig = {
+    const mockAgentConfig = createMockSavedAgentConfig({
       agentName: 'Langchain NoTool Agent',
       toolsDetails: [],
       config: { framework: 'langchain' }
-    };
+    });
     const input: z.infer<typeof LangchainAgentFlowInputSchema> = {
       agentConfig: mockAgentConfig,
       userMessage: 'Just chat.',

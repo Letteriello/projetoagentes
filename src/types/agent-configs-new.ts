@@ -1,5 +1,5 @@
 // Tipos atualizados para agentes (nova versão)
-export type AgentType = 'llm' | 'scriptable' | 'reactive' | 'other';
+export type AgentType = 'llm' | 'scriptable' | 'workflow' | 'reactive' | 'other';
 
 export interface KnowledgeSource {
   id: string;
@@ -12,25 +12,44 @@ export interface KnowledgeSource {
 
 export type KnowledgeSourceType = 'url' | 'file' | 'text' | 'other';
 
-export interface LLMAgentConfig {
-  type: 'llm';
-  agentModel: string;
-  agentTemperature: number;
-  framework: string;
+export interface AgentConfigBase {
+  type: AgentType;
+  framework: AgentFramework;
   agentGoal: string;
-  agentTasks: string[];
+  agentTasks?: string[];
   tools?: string[];
   knowledgeSources?: KnowledgeSource[];
 }
 
-export interface ScriptableAgentConfig {
+export interface LLMAgentConfig extends AgentConfigBase {
+  type: 'llm';
+  agentModel: string;
+  agentTemperature?: number;
+}
+
+export interface ScriptableAgentConfig extends AgentConfigBase {
   type: 'scriptable';
   scriptPath: string;
   scriptLanguage: string;
-  tools?: string[];
 }
 
-export type AgentConfig = LLMAgentConfig | ScriptableAgentConfig;
+export type AgentConfig = LLMAgentConfig | ScriptableAgentConfig | WorkflowAgentConfig;
+
+export interface WorkflowAgentConfig extends AgentConfigBase {
+  type: 'workflow';
+  workflowSteps: WorkflowStep[];
+  workflowType: WorkflowDetailedType;
+  agentModel: string;
+  agentTemperature?: number;
+  subAgents?: string[];
+  terminationConditions?: {
+    maxIterations?: number;
+    successCondition?: string;
+    failureCondition?: string;
+  };
+  loopStateKey?: string;
+  loopExitStateValue?: string;
+}
 
 export interface ToolConfigData {
   selectedApiKeyId?: string;
@@ -54,3 +73,27 @@ export interface SavedAgentConfiguration {
   category?: string;
   version?: string;
 }
+
+export interface RagMemoryConfig {
+  knowledgeBaseId: string;
+  embeddingModel?: string;
+}
+
+export interface LLMModelDetails {
+  modelId: string;
+  provider: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface WorkflowStep {
+  name: string;
+  description: string;
+  agentId: string;
+  inputMapping: Record<string, string>;
+  outputKey?: string;
+}
+
+export type AgentFramework = 'genkit' | 'langchain' | 'crewai' | 'other';
+
+export type WorkflowDetailedType = 'sequential' | 'parallel' | 'conditional';

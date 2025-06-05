@@ -7,19 +7,19 @@ import { availableTools as allTools } from "@/data/available-tools";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AvailableTool, ToolConfigData } from '@/types/agent-configs-fixed'; // Import AvailableTool and ToolConfigData
-import { Cpu } from "lucide-react";
+import { Cpu, Wand2, Settings, CheckCircle, AlertTriangle } from "lucide-react"; // Importando ícones necessários
 import { toast } from "@/hooks/use-toast";
 
 /**
  * Página de teste para o componente ToolsTab
  */
 export default function ToolsTabTestPage() {
-  const [selectedToolIds, setSelectedToolIds] = useState<string[]>([
+  const [selectedTools, setSelectedTools] = useState<string[]>([
     "calculator",
     "webSearch",
   ]);
 
-  const [toolConfigs, setToolConfigs] = useState<Record<string, ToolConfigData>>({ // Use ToolConfigData
+  const [toolConfigurations, setToolConfigurations] = useState<Record<string, ToolConfigData>>({ // Use ToolConfigData
     webSearch: { // This structure should be compatible with ToolConfigData for webSearch
       googleApiKey: "DEMO_KEY",
       googleCseId: "DEMO_CSE",
@@ -27,19 +27,19 @@ export default function ToolsTabTestPage() {
     // If other tools were in toolConfigs, their structure should also match ToolConfigData
   });
 
-  const handleToolSelectionChange = (toolId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedToolIds((prev) => [...prev, toolId]);
-    } else {
-      setSelectedToolIds((prev) => prev.filter((id) => id !== toolId));
-    }
-  };
-
-  const handleConfigureTool = (tool: AvailableTool) => { // Use AvailableTool type
+  // Adaptador de função para compatibilidade com a interface do componente
+  const handleToolConfigure = (tool: AvailableTool) => { // Use AvailableTool type
     toast({
       title: `Configurando ferramenta: ${tool.name}`, // tool.name is valid for AvailableTool
       description: "Esta é uma demonstração da funcionalidade de configuração.",
     });
+  };
+  
+  // Criando mock dos componentes de ícones necessários
+  const iconComponents = {
+    Wand2: (props: React.SVGProps<SVGSVGElement>) => <Wand2 {...props} />,
+    Settings: (props: React.SVGProps<SVGSVGElement>) => <Settings {...props} />,
+    CheckCircle: (props: React.SVGProps<SVGSVGElement>) => <CheckCircle {...props} />,
   };
 
   return (
@@ -58,10 +58,15 @@ export default function ToolsTabTestPage() {
             <CardContent>
               <ToolsTab
                 availableTools={allTools}
-                selectedToolIds={selectedToolIds}
-                onToolSelectionChange={handleToolSelectionChange}
-                onConfigureTool={handleConfigureTool}
-                toolConfigsApplied={toolConfigs}
+                selectedTools={selectedTools}
+                setSelectedTools={setSelectedTools}
+                toolConfigurations={toolConfigurations}
+                handleToolConfigure={handleToolConfigure}
+                iconComponents={iconComponents}
+                Wand2Icon={Wand2}
+                SettingsIcon={Settings}
+                CheckIcon={CheckCircle}
+                AlertIcon={AlertTriangle}
               />
             </CardContent>
           </Card>
@@ -70,12 +75,12 @@ export default function ToolsTabTestPage() {
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>Ferramentas Selecionadas</CardTitle>
+              <CardTitle>Ferramentas Selecionadas ({selectedTools.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              {selectedToolIds.length > 0 ? (
+              {selectedTools.length > 0 ? (
                 <div className="space-y-2">
-                  {selectedToolIds.map((toolId) => {
+                  {selectedTools.map((toolId) => {
                     const tool = allTools.find((t) => t.id === toolId);
                     return (
                       <div
@@ -90,7 +95,7 @@ export default function ToolsTabTestPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            handleToolSelectionChange(toolId, false)
+                            setSelectedTools((prev) => prev.filter((id) => id !== toolId))
                           }
                         >
                           Remover

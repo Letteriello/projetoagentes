@@ -18,6 +18,18 @@ export const DocumentIndexResponseSchema = z.object({
   message: z.string().optional(),
 });
 
+interface IndexingRequest {
+  fileName: string;
+  fileContent: string;
+  embeddingModel?: string;
+  knowledgeBaseId?: string;
+}
+
+interface DocumentChunk {
+  chunkText: string;
+  embedding: string;
+}
+
 // Define the document indexing flow
 export const indexDocumentFlow = defineFlow(
   {
@@ -25,7 +37,7 @@ export const indexDocumentFlow = defineFlow(
     inputSchema: DocumentIndexRequestSchema,
     outputSchema: DocumentIndexResponseSchema,
   },
-  async (request) => {
+  async (request: IndexingRequest) => {
     const { fileName, fileContent, embeddingModel, knowledgeBaseId } = request;
     let decodedContent = fileContent;
 
@@ -76,7 +88,7 @@ export const indexDocumentFlow = defineFlow(
 
     try {
       // 4. Embedding
-      const embeddings = await Promise.all(
+      const embeddings: DocumentChunk[] = await Promise.all(
         chunks.map(async (chunk, index) => {
           console.log(`Generating embedding for chunk ${index + 1}/${chunks.length}...`);
           // Using the generic embed function.

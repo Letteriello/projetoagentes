@@ -125,5 +125,5 @@ function parseLlmJsonResponse<T = Record<string, unknown>>(responseText: string,
 async function getWorkflowDetailedType(query: string): Promise<WorkflowDetailedType> {
   // Implementation would analyze the query and determine the appropriate workflow type
   // For now, we return a default value that matches the WorkflowDetailedType
-  return "sequential" as const; // Default value with const assertion to ensure type safety
+  return "conversational" as const; // Default value with const assertion to ensure type safety
 }

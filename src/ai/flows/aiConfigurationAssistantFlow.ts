@@ -232,7 +232,7 @@ Example JSON output:
           prompt += "Suggest a concise and informative description for this agent.";
           break;
         case "goal":
-          if (llmConfig) { // Assumes LLM agent type for goal/tasks/personality/restrictions
+          if (llmConfig && 'agentGoal' in llmConfig && llmConfig.agentGoal) {
             prompt += `The agent's current goal is: '${llmConfig.agentGoal}'. Suggest refinements or alternative goals.`;
           } else if (goal) { // Fallback if llmConfig not present but goal provided from input
              prompt += `The user is defining an agent with the goal: '${goal}'. Suggest refinements or alternative goals if appropriate, or confirm if it's well-defined.`;
@@ -241,9 +241,9 @@ Example JSON output:
           }
           break;
         case "tasks":
-          if (llmConfig) {
-            prompt += `Current tasks: ${llmConfig.agentTasks?.join(', ') || 'None'}. Suggest additional relevant tasks or improvements.`;
-          } else if (tasks && tasks.length > 0) { // Fallback
+          if (llmConfig && 'agentTasks' in llmConfig && llmConfig.agentTasks) {
+            prompt += `Current tasks: ${Array.isArray(llmConfig.agentTasks) ? llmConfig.agentTasks.join(', ') : 'None'}. Suggest additional relevant tasks or improvements.`;
+          } else if (tasks && Array.isArray(tasks) && tasks.length > 0) { // Fallback
             prompt += `The user has defined these tasks: ${tasks.join(', ')}. Suggest additional relevant tasks or improvements based on the current configuration.`;
           } else {
             prompt += "Suggest a list of tasks for an AI agent, based on its current configuration and goal.";
@@ -252,9 +252,9 @@ Example JSON output:
         // --- 'tools' Context ---
         // This context focuses on suggesting tools to add or modify, including their configuration.
         case "tools":
-          const currentToolNames = currentConfig.tools?.join(', ') || 'None';
+          const currentToolNames = (currentConfig as any).tools?.map((tool: any) => tool.name).join(', ') || 'None';
           // Provide details of all available tools, including their configFields, to the LLM.
-          const allAvailableToolsDesc = availableToolsList?.map(t =>
+          const allAvailableToolsDesc = availableToolsList?.map((t: any) =>
             `${t.name} (ID: ${t.id}, Description: ${t.description}, ConfigFields: ${t.configFields ? JSON.stringify(t.configFields) : 'None'})`
           ).join('\n');
           prompt += `Available tools (with ID, Name, Description, and ConfigFields):\n${allAvailableToolsDesc || 'No tools available.'}\n`;
@@ -379,10 +379,6 @@ async function testFlow() {
 
   } catch (error) {
     console.error('Flow Test Error:', error);
-  }
-}
-// testFlow(); // Uncomment to run the test if this file is executable
-*/
 
 /**
  * Determines the workflow type based on a user query using an LLM call.
@@ -391,32 +387,40 @@ async function testFlow() {
  */
 export const getWorkflowDetailedType = async (query: string): Promise<WorkflowDetailedType> => {
   const workflowDetailedTypePrompt = `Analyze the following user query to determine the most appropriate workflow type.
-The goal is to categorize the workflow based on how tasks should be orchestrated.
+The goal is to categorize the workflow based on the main purpose of the agent.
 
 User Query: "${query}"
 
 Consider the following workflow types:
-1.  sequential: Tasks must be completed in a strict, predefined order. One task finishes before the next begins.
-2.  parallel: Multiple tasks can be executed simultaneously. Useful when tasks are independent.
-3.  conditional: The execution of tasks depends on the outcome of previous tasks or specific conditions. This often involves branching logic.
-    (Note: For this function, if the query implies complex branching or state transitions beyond simple if/else, 'graph' or 'stateMachine' might be more appropriate if those were options. Since they are not primary distinct options here, lean towards 'conditional' for simpler cases or 'sequential' if the conditionality is minimal within a larger sequence.)
-// TODO: The original list included "loop", "graph", "stateMachine". If these are still valid and distinct categories
-// the LLM should choose from, they should be clearly defined here. For now, focusing on the main three.
+1. conversational: For chatbots and conversation-based interactions
+2. data_processing: For transforming or analyzing data
+3. decision_making: For making decisions based on input data
+4. information_retrieval: For searching and retrieving information
+5. content_generation: For creating new content
+6. task_automation: For automating repetitive tasks
+7. analytical: For data analysis and insights
+8. creative: For creative tasks like writing or art
+9. educational: For teaching or explaining concepts
+10. entertainment: For games or entertainment purposes
+11. customer_support: For assisting customers
+12. research_assistant: For helping with research
+13. code_assistant: For helping with programming tasks
+14. personal_assistant: For personal organization and assistance
 
 Based on the query, respond ONLY with a valid JSON object containing a single key "suggestedWorkflowType".
-The value for this key must be one of the following strings: "sequential", "parallel", "conditional".
+The value for this key must be one of the valid workflow types mentioned above.
 
-Example for a sequential process:
-User Query: "I need to first validate user input, then process payment, and finally send a confirmation email."
-{"suggestedWorkflowType": "sequential"}
+Example for a conversational agent:
+User Query: "I need a chatbot to answer customer questions"
+{"suggestedWorkflowType": "conversational"}
 
-Example for a parallel process:
-User Query: "Fetch data from three different APIs at the same time and then combine the results."
-{"suggestedWorkflowType": "parallel"}
+Example for a data processing agent:
+User Query: "Process and analyze sales data from multiple sources"
+{"suggestedWorkflowType": "data_processing"}
 
-Example for a conditional process:
-User Query: "If the user is a new customer, send a welcome email; otherwise, send a promotional offer."
-{"suggestedWorkflowType": "conditional"}
+Example for a content generation agent:
+User Query: "Create blog posts about technology trends"
+{"suggestedWorkflowType": "content_generation"}
 `;
 
   try {
@@ -432,16 +436,21 @@ User Query: "If the user is a new customer, send a welcome email; otherwise, sen
     const workflowType = parsedWorkflowJson.suggestedWorkflowType;
 
     // Validate against the allowed types
-    const allowedTypes: WorkflowDetailedType[] = ["sequential", "parallel", "conditional", "loop", "graph", "stateMachine"];
+    const allowedTypes: WorkflowDetailedType[] = [
+      'conversational', 'data_processing', 'decision_making', 'information_retrieval',
+      'content_generation', 'task_automation', 'analytical', 'creative', 'educational',
+      'entertainment', 'customer_support', 'research_assistant', 'code_assistant', 'personal_assistant'
+    ];
+    
     if (allowedTypes.includes(workflowType)) {
-         return workflowType as WorkflowDetailedType;
+      return workflowType as WorkflowDetailedType;
     } else {
-        console.warn(`[getWorkflowDetailedType] LLM returned an unexpected workflow type: '${workflowType}'. Defaulting to 'sequential'. Query was: "${query}"`);
-        return "sequential"; // Default to 'sequential' if the response is not one of the allowed types
+      console.warn(`[getWorkflowDetailedType] LLM returned an unexpected workflow type: '${workflowType}'. Defaulting to 'conversational'. Query was: "${query}"`);
+      return 'conversational'; // Default to 'conversational' if the response is not one of the allowed types
     }
 
   } catch (error) {
     console.error(`[getWorkflowDetailedType] Error determining workflow type for query "${query}":`, error);
-    return "sequential"; // Default to 'sequential' on error
+    return 'conversational'; // Default to 'conversational' on error
   }
 };

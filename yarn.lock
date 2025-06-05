@@ -929,12 +929,48 @@
     zod "^3.23.8"
     zod-to-json-schema "^3.22.4"
 
+"@genkit-ai/core@0.5.17":
+  version "0.5.17"
+  resolved "https://registry.npmjs.org/@genkit-ai/core/-/core-0.5.17.tgz"
+  integrity sha512-o8aEIFjQ4FugS5w5XK1c6hmiX6bqx7u+UuikARJPMhqOek7aovcXXdYj2zbVmX2/4c94aXerSokB0vD59Pj3GQ==
+  dependencies:
+    "@opentelemetry/api" "^1.9.0"
+    "@opentelemetry/context-async-hooks" "^1.25.0"
+    "@opentelemetry/core" "^1.25.0"
+    "@opentelemetry/sdk-metrics" "^1.25.0"
+    "@opentelemetry/sdk-node" "^0.52.0"
+    "@opentelemetry/sdk-trace-base" "^1.25.0"
+    ajv "^8.12.0"
+    ajv-formats "^3.0.1"
+    async-mutex "^0.5.0"
+    express "^4.21.0"
+    json-schema "^0.4.0"
+    zod "^3.22.4"
+    zod-to-json-schema "^3.22.4"
+
 "@genkit-ai/firebase@^1.11.0":
   version "1.11.1"
   resolved "https://registry.npmjs.org/@genkit-ai/firebase/-/firebase-1.11.1.tgz"
   integrity sha512-s5+OqsKdL0gGSYgmE2ZMJbtmkGn+7IQw56E9+jzpndQ8ypYALM4pmDUtEqrT8gOdKPwaPjevXp5zW7GnAh8znw==
   dependencies:
     "@genkit-ai/google-cloud" "^1.11.1"
+
+"@genkit-ai/flow@^0.5.17":
+  version "0.5.17"
+  resolved "https://registry.npmjs.org/@genkit-ai/flow/-/flow-0.5.17.tgz"
+  integrity sha512-+P2VGfa5z2e9VzjAJysLAw0oHuPv02UEj/z4Csxuurv2xgL3CQCZ9DV81i+14/ybp5LJ8waPSFsrJ29ffQCPwg==
+  dependencies:
+    "@genkit-ai/core" "0.5.17"
+    "@google-cloud/firestore" "^7.6.0"
+    "@opentelemetry/api" "^1.9.0"
+    "@types/cors" "^2.8.17"
+    body-parser "^1.20.3"
+    cors "^2.8.5"
+    express "^4.21.0"
+    firebase-admin ">=12.2"
+    firebase-functions ">=4.8"
+    uuid "^9.0.1"
+    zod "^3.22.4"
 
 "@genkit-ai/google-cloud@^1.11.1":
   version "1.11.1"
@@ -959,7 +995,7 @@
     node-fetch "^3.3.2"
     winston "^3.12.0"
 
-"@genkit-ai/googleai@^1.11.0":
+"@genkit-ai/googleai@^1.11.1":
   version "1.11.1"
   resolved "https://registry.npmjs.org/@genkit-ai/googleai/-/googleai-1.11.1.tgz"
   integrity sha512-qRvOlcn3pRXl3V6qlH1+jQTNtd2r2fKpanC+mfwUfrEB1vI257I9GHH7tIxb8y7+5sJQ5lETr+T2WWf6vDznmQ==
@@ -1036,7 +1072,7 @@
     retry-request "^7.0.0"
     teeny-request "^9.0.0"
 
-"@google-cloud/firestore@^7.11.0":
+"@google-cloud/firestore@^7.11.0", "@google-cloud/firestore@^7.6.0":
   version "7.11.1"
   resolved "https://registry.npmjs.org/@google-cloud/firestore/-/firestore-7.11.1.tgz"
   integrity sha512-ZxOdH8Wr01hBDvKCQfMWqwUcfNcN3JY19k1LtS1fTFhEyorYPLsbWN+VxIRL46pOYGHTPkU3Or5HbT/SLQM5nA==
@@ -3191,6 +3227,13 @@
   dependencies:
     "@types/node" "*"
 
+"@types/cors@^2.8.17", "@types/cors@^2.8.5":
+  version "2.8.18"
+  resolved "https://registry.npmjs.org/@types/cors/-/cors-2.8.18.tgz"
+  integrity sha512-nX3d0sxJW41CqQvfOzVG1NCTXfFDrDWIghCZncpHeWlVFd81zxB/DLhg7avFg6eHLCRX7ckBmoIIcqa++upvJA==
+  dependencies:
+    "@types/node" "*"
+
 "@types/d3-array@*", "@types/d3-array@^3.0.3":
   version "3.2.1"
   resolved "https://registry.npmjs.org/@types/d3-array/-/d3-array-3.2.1.tgz"
@@ -3430,7 +3473,7 @@
     "@types/range-parser" "*"
     "@types/send" "*"
 
-"@types/express@^4.17.20":
+"@types/express@^4.17.20", "@types/express@^4.17.21":
   version "4.17.22"
   resolved "https://registry.npmjs.org/@types/express/-/express-4.17.22.tgz"
   integrity sha512-eZUmSnhRX9YRSkplpz0N+k6NljUUn5l3EWZIKZvYzhvMphEuNiyyy1viH/ejgt66JWgALwC/gtSUAeQKtSwW/w==
@@ -3502,6 +3545,13 @@
   dependencies:
     expect "^29.0.0"
     pretty-format "^29.0.0"
+
+"@types/jquery@^3.5.32":
+  version "3.5.32"
+  resolved "https://registry.npmjs.org/@types/jquery/-/jquery-3.5.32.tgz"
+  integrity sha512-b9Xbf4CkMqS02YH8zACqN1xzdxc3cO735Qe5AbSUFmyOiaWAbcpqh9Wna+Uk0vgACvoQHpWDg2rGdHkYPLmCiQ==
+  dependencies:
+    "@types/sizzle" "*"
 
 "@types/js-yaml@^4.0.9":
   version "4.0.9"
@@ -3704,6 +3754,11 @@
   version "1.2.0"
   resolved "https://registry.npmjs.org/@types/shimmer/-/shimmer-1.2.0.tgz"
   integrity sha512-UE7oxhQLLd9gub6JKIAhDq06T0F6FnztwMNRvYgjeQSBeMc1ZG/tA47EwfduvkuQS8apbkM/lpLpWsaCeYsXVg==
+
+"@types/sizzle@*":
+  version "2.3.9"
+  resolved "https://registry.npmjs.org/@types/sizzle/-/sizzle-2.3.9.tgz"
+  integrity sha512-xzLEyKB50yqCUPUJkIsrVvoWNfFUbIZI+RspLWt8u+tIW/BetMBZtgV2LY/2o+tYH8dRvQ+eoPf3NdhQCcLE2w==
 
 "@types/stack-utils@^2.0.0":
   version "2.0.3"
@@ -6377,7 +6432,7 @@ find-up@4.0.0:
   dependencies:
     locate-path "^5.0.0"
 
-firebase-admin@^13.4.0, firebase-admin@>=12.2:
+"firebase-admin@^11.10.0 || ^12.0.0 || ^13.0.0", firebase-admin@^13.4.0, firebase-admin@>=12.2:
   version "13.4.0"
   resolved "https://registry.npmjs.org/firebase-admin/-/firebase-admin-13.4.0.tgz"
   integrity sha512-Y8DcyKK+4pl4B93ooiy1G8qvdyRMkcNFfBSh+8rbVcw4cW8dgG0VXCCTp5NUwub8sn9vSPsOwpb9tE2OuFmcfQ==
@@ -6395,6 +6450,17 @@ firebase-admin@^13.4.0, firebase-admin@>=12.2:
   optionalDependencies:
     "@google-cloud/firestore" "^7.11.0"
     "@google-cloud/storage" "^7.14.0"
+
+firebase-functions@>=4.8:
+  version "6.3.2"
+  resolved "https://registry.npmjs.org/firebase-functions/-/firebase-functions-6.3.2.tgz"
+  integrity sha512-FC3A1/nhqt1ZzxRnj5HZLScQaozAcFSD/vSR8khqSoFNOfxuXgwJS6ZABTB7+v+iMD5z6Mmxw6OfqITUBuI7OQ==
+  dependencies:
+    "@types/cors" "^2.8.5"
+    "@types/express" "^4.17.21"
+    cors "^2.8.5"
+    express "^4.21.0"
+    protobufjs "^7.2.2"
 
 firebase@^11.8.1, firebase@>=11.5.0:
   version "11.8.1"
@@ -6585,7 +6651,7 @@ gcp-metadata@^6.0.0, gcp-metadata@^6.1.0:
     google-logging-utils "^0.0.2"
     json-bigint "^1.0.0"
 
-"genkit@^0.9.0 || ^1.0.0", genkit@^1.11.0, genkit@^1.11.1:
+"genkit@^0.9.0 || ^1.0.0", genkit@^1.11.1:
   version "1.11.1"
   resolved "https://registry.npmjs.org/genkit/-/genkit-1.11.1.tgz"
   integrity sha512-yexdH+MXO3W+Ne1G3HnsO5o1D4dz4PxKZOiaIuWdoxZe57ZV6w5rFB3zqHwP3CqqSYXMmjmkwYhZ4hoYIPDDag==
@@ -9771,7 +9837,7 @@ protobuf.js@^1.1.2:
   dependencies:
     long "~1.1.2"
 
-protobufjs@^7.2.5, protobufjs@^7.2.6, protobufjs@^7.3.0, protobufjs@^7.3.2:
+protobufjs@^7.2.2, protobufjs@^7.2.5, protobufjs@^7.2.6, protobufjs@^7.3.0, protobufjs@^7.3.2:
   version "7.5.3"
   resolved "https://registry.npmjs.org/protobufjs/-/protobufjs-7.5.3.tgz"
   integrity sha512-sildjKwVqOI2kmFDiXQ6aEB0fjYTafpEvIBs8tOR8qI4spuL9OPROLVu2qZqi/xgCfsHIwVqlaF8JBjWFHnKbw==
@@ -11868,7 +11934,7 @@ zod-to-json-schema@^3.22.4:
   resolved "https://registry.npmjs.org/zod-to-json-schema/-/zod-to-json-schema-3.24.5.tgz"
   integrity sha512-/AuWwMP+YqiPbsJx5D6TfgRTc4kTLjsh5SOcd4bLsfUg2RcEXrFMJl1DGgdHy2aCfsIA/cr/1JM0xcB2GZji8g==
 
-zod@^3.23.8, zod@^3.24.1, zod@^3.25.46, "zod@>= 3":
+zod@^3.22.4, zod@^3.23.8, zod@^3.24.1, zod@^3.25.46, "zod@>= 3":
   version "3.25.51"
   resolved "https://registry.npmjs.org/zod/-/zod-3.25.51.tgz"
   integrity sha512-TQSnBldh+XSGL+opiSIq0575wvDPqu09AqWe1F7JhUMKY+M91/aGlK4MhpVNO7MgYfHcVCB1ffwAUTJzllKJqg==

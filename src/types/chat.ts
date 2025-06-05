@@ -95,6 +95,8 @@ export interface SpeechConfig extends BaseSpeechConfig {
 }
 
 export interface ChatRunConfig extends BaseChatRunConfig {
+  agentId?: string; // Adicionado para compatibilidade com os fluxos e testes
+  modelName?: string; // Adicionado para compatibilidade com os fluxos e testes
   streamingEnabled: boolean; // UI currently uses this
   simulatedVoiceConfig?: SpeechConfig; // UI currently uses this, maps to speech_config
 

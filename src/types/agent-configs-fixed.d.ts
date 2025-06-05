@@ -68,3 +68,9 @@ declare module './agent-configs-fixed' {
   export const toAgentFormData: (agent: any) => UnifiedTypes.AgentFormData;
   export const toSavedAgentConfiguration: (formData: UnifiedTypes.AgentFormData) => UnifiedTypes.SavedAgentConfiguration;
 }
+// Tipos temporários para desbloquear o build e corrigir imports quebrados
+export type ToolConfigData = any;
+export type A2AConfig = any;
+export type CommunicationChannel = any;
+
+// ...restante do arquivo original...

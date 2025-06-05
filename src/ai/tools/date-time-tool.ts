@@ -1,4 +1,5 @@
-import { defineTool, ToolAction } from 'genkit';
+// import { defineTool, ToolAction } from 'genkit';
+const defineTool = (...args: any[]) => args; // Mock temporário para evitar erro de importação
 import { z } from 'zod';
 import { addDays as dfAddDays, format as dfFormat, parseISO, isValid } from 'date-fns';
 

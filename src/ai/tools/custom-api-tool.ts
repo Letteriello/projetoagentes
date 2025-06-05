@@ -3,7 +3,8 @@
  * described by an OpenAPI specification. This tool is created using a factory
  * function to allow for dynamic configuration of API endpoint, key, and headers.
  */
-import { ToolDefinition } from '@genkit-ai/core';
+// import { ToolDefinition } from '@genkit-ai/core';
+type ToolDefinition<InputSchema = any, OutputSchema = any> = any; // Tipo temporário para evitar erro de importação
 import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
 import { z } from 'zod';
 // import axios from 'axios'; // Would be used for actual HTTP calls

@@ -9,7 +9,7 @@ const mockAvailableTools: AvailableTool[] = [
   { id: 'tool1', name: 'Tool 1', description: 'Description 1', icon: 'Wand2', category: 'Test', hasConfig: false, parameters: [] },
   { id: 'tool2', name: 'Tool 2', description: 'Description 2', icon: 'Settings', category: 'Test', hasConfig: true, parameters: [] },
   { id: 'tool3', name: 'Tool 3', description: 'Description 3', icon: 'CheckCircle', category: 'Test', hasConfig: false, parameters: [] },
-];
+]; // Certifique-se de que parameters é um array de objetos se o tipo exigir
 
 const mockIconComponents = {
   Wand2: (props: React.SVGProps<SVGSVGElement>) => <Wand2 {...props} />,

@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,9 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CommunicationChannel } from "@/types/a2a-types";
-import {
-  ArrowDownLeft,
-import React, { useState, useEffect, useCallback } from "react"; // Added React imports
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -28,7 +26,7 @@ import {
   logA2AMessageEvent,
   logA2AError,
   logA2AStatusChange,
-} from "@/lib/logService"; // Added import
+} from "@/lib/logService";
 
 // Extended Channel type for local state, actual type from props remains the same
 interface ExtendedCommunicationChannel extends CommunicationChannel {

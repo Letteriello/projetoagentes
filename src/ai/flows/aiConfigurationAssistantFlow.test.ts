@@ -1,58 +1,49 @@
-import {
-  aiConfigurationAssistantFlow,
-  AiConfigurationAssistantInputSchema, // Will be used for constructing input
-  AiConfigurationAssistantOutputSchema,
-  getWorkflowDetailedType
+// ===== IMPORTS =====
+import { 
+  aiConfigurationAssistantFlow, 
+  AiConfigurationAssistantOutputSchema, 
+  getWorkflowDetailedType 
 } from './aiConfigurationAssistantFlow';
 import { ai } from '@/ai/genkit';
-// gemini10Pro is used within the flow, but we mock ai.generate, so direct import might not be needed for mocking.
-// import { gemini10Pro } from '@genkit-ai/googleai';
-// allTools might be large, so using a simplified mock as requested.
-// import { allTools as mockAvailableTools } from '@/data/agent-builder/available-tools';
 import * as z from 'zod';
-import { SavedAgentConfiguration, LLMAgentConfig, WorkflowDetailedType } from '@/types/agent-configs-fixed';
+import { createMockSavedAgentConfig as createMockAgent, baseLLMConfig, baseAgentConfig, mockActionContext } from './test-utils';
+import type { LLMAgentConfig, SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 
-// Mock @/ai/genkit and specifically the generate function
-// We need to mock the ai object and its generate method.
-const mockedAiGenerate = jest.fn();
-jest.mock('@/ai/genkit', () => ({
-  ai: {
-    generate: mockedAiGenerate, // Use the mock function here
-    defineFlow: jest.requireActual('@/ai/genkit').ai.defineFlow, // Keep actual defineFlow
-  },
-}));
-
-// Simplified mock for available tools as the actual one might be large/complex.
+// ===== MOCKS CENTRAIS =====
+// Se precisar de mocks de tools, defina-os localmente ou centralize no test-utils.ts
 const simplifiedMockTools = [
   { id: 'tool1', name: 'Search Tool', description: 'Searches things.', configFields: [{ id: 'apiKey', label: 'API Key', type: 'text' }], genkitToolName: 'searchToolGenkit' },
   { id: 'tool2', name: 'Calculator', description: 'Calculates math.', configFields: [], genkitToolName: 'calculatorGenkit' },
   { id: 'tool3', name: 'Custom API Tool', description: 'Connects to API.', configFields: [{id: 'endpoint', label: 'API Endpoint', type: 'text'}, {id: 'spec', label: 'API Spec (JSON)', type: 'json'}], genkitToolName: 'customApiToolGenkit' },
 ];
 
-// Mock the allTools import from '@/data/agent-builder/available-tools'
-// This is important because the flow itself imports `allTools` directly.
+jest.mock('@/ai/genkit', () => ({
+  ai: {
+    generate: jest.fn(), 
+    defineFlow: jest.requireActual('@/ai/genkit').ai.defineFlow, 
+  },
+}));
+
 jest.mock('@/data/agent-builder/available-tools', () => ({
   allTools: simplifiedMockTools,
 }));
 
-
+// ===== TESTES =====
 describe('aiConfigurationAssistantFlow', () => {
   beforeEach(() => {
     // Clears mock usage data between tests (e.g., number of calls)
-    mockedAiGenerate.mockClear();
-    // Reset any implementations to default if they were changed in a test
-    mockedAiGenerate.mockReset();
+    jest.clearAllMocks();
   });
 
   it('should successfully suggest fullConfig with tools and configData', async () => {
-    const mockInput = {
+    const mockInput: any = {
       agentGoal: 'Test goal',
       agentTasks: ['Test task 1', 'Test task 2'],
-      suggestionContext: 'fullConfig' as const,
-      currentTools: [
-        { id: 'tool2', name: 'Calculator', description: 'Calculates math.' },
-        { id: 'existingToolWithConfig', name: 'Existing Tool', description: 'Has config.', configData: { setting: 'value' } }
-      ],
+      suggestionContext: 'fullConfig',
+      configData: {
+        model: 'gpt-4',
+        framework: 'openai'
+      }
     };
 
     const mockLLMResponse = {
@@ -65,21 +56,20 @@ describe('aiConfigurationAssistantFlow', () => {
         { id: "tool3", name: "Custom API Tool", description: "Connects to API.", suggestedConfigData: {"endpoint": "https://api.example.com/data", "spec": {"openapi": "3.0.0"}} }
       ]
     };
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => JSON.stringify(mockLLMResponse),
     });
 
     const result = await aiConfigurationAssistantFlow(mockInput);
 
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    const promptArg = mockedAiGenerate.mock.calls[0][0].prompt;
+    expect(ai.generate).toHaveBeenCalledTimes(1);
+    const promptArg = (ai.generate as jest.Mock).mock.calls[0][0].prompt;
     expect(promptArg).toContain(mockInput.agentGoal);
     expect(promptArg).toContain(mockInput.agentTasks[0]);
-    expect(promptArg).toContain("ConfigFields: " + JSON.stringify(simplifiedMockTools[0].configFields)); // Check if config fields are in prompt
-    expect(promptArg).toContain("Current Configuration: " + JSON.stringify(mockInput.currentTools[1].configData)); // Check currentTools info
-    expect(promptArg).toContain("provide a `suggestedConfigData` object"); // Check instruction for configData
+    expect(promptArg).toContain("ConfigFields: " + JSON.stringify(simplifiedMockTools[0].configFields)); 
+    expect(promptArg).toContain("Current Configuration: " + JSON.stringify(mockInput.configData)); 
+    expect(promptArg).toContain("provide a `suggestedConfigData` object"); 
 
-    // Validate the structure and content of the result
     const parsedResult = AiConfigurationAssistantOutputSchema.parse(result);
     expect(parsedResult.suggestedPersonality).toBe(mockLLMResponse.suggestedPersonality);
     expect(parsedResult.suggestedTools).toEqual(mockLLMResponse.suggestedTools);
@@ -88,40 +78,29 @@ describe('aiConfigurationAssistantFlow', () => {
 
   it('should successfully suggest tools with configData for "tools" context', async () => {
     const mockFullAgentConfig: SavedAgentConfiguration = {
-      id: 'agent1',
-      agentName: 'Test Agent',
-      agentDescription: 'An agent for testing.',
-      agentVersion: '1.0',
-      config: {
-        type: 'llm',
-        framework: 'genkit',
-        agentGoal: 'To be tested',
-        agentTasks: ['get tested'],
-      } as LLMAgentConfig,
-      tools: ['tool2'],
-      toolsDetails: [{ id: 'tool2', name: 'Calculator', description: 'Calculates math.' }],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      ...createMockAgent(),
+      id: 'agent1'
     };
+
     const mockInput = {
       fullAgentConfig: mockFullAgentConfig,
       suggestionContext: 'tools' as const,
-      currentTools: [{ id: 'tool2', name: 'Calculator', description: 'Calculates math.' }],
     };
+
     const mockLLMResponse = {
       suggestedTools: [
         { id: "tool1", name: "Search Tool", description: "Searches things.", suggestedConfigData: {"apiKey": "YOUR_TOOL1_KEY"} },
       ]
     };
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => JSON.stringify(mockLLMResponse),
     });
 
     const result = await aiConfigurationAssistantFlow(mockInput);
 
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    const promptArg = mockedAiGenerate.mock.calls[0][0].prompt;
-    expect(promptArg).toContain(JSON.stringify(mockFullAgentConfig)); // Check that current config is in prompt
+    expect(ai.generate).toHaveBeenCalledTimes(1);
+    const promptArg = (ai.generate as jest.Mock).mock.calls[0][0].prompt;
+    expect(promptArg).toContain(JSON.stringify(mockFullAgentConfig)); 
     expect(promptArg).toContain("ConfigFields: " + JSON.stringify(simplifiedMockTools[0].configFields));
     expect(promptArg).toContain("provide a `suggestedConfigData` object");
 
@@ -131,17 +110,14 @@ describe('aiConfigurationAssistantFlow', () => {
 
   it('should return empty object for "fullConfig" if agentGoal is missing', async () => {
     const mockInput = {
-      agentGoal: '', // Empty goal
+      agentGoal: '', 
       agentTasks: ['Test task 1'],
       suggestionContext: 'fullConfig' as const,
     };
-    // No mock for ai.generate needed as it might not be called or its result ignored.
-
     const result = await aiConfigurationAssistantFlow(mockInput);
 
-    // It should return a valid empty object according to the schema
     expect(result).toEqual(AiConfigurationAssistantOutputSchema.parse({}));
-    expect(mockedAiGenerate).not.toHaveBeenCalled();
+    expect(ai.generate).not.toHaveBeenCalled();
   });
 
   it('should handle malformed JSON response from LLM and return empty object', async () => {
@@ -150,19 +126,18 @@ describe('aiConfigurationAssistantFlow', () => {
       agentTasks: ['Test task 1'],
       suggestionContext: 'fullConfig' as const,
     };
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => "this is not json",
     });
-    // Spy on console.error
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await aiConfigurationAssistantFlow(mockInput);
 
     expect(result).toEqual(AiConfigurationAssistantOutputSchema.parse({}));
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalled(); // Check if error was logged
+    expect(ai.generate).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalled(); 
 
-    consoleErrorSpy.mockRestore(); // Restore console.error
+    consoleErrorSpy.mockRestore(); 
   });
 
   it('should handle empty response text from LLM and return empty object', async () => {
@@ -171,58 +146,56 @@ describe('aiConfigurationAssistantFlow', () => {
       agentTasks: ['Test task 1'],
       suggestionContext: 'fullConfig' as const,
     };
-    mockedAiGenerate.mockResolvedValue({
-      text: () => "", // Empty response text
+    (ai.generate as jest.Mock).mockResolvedValue({
+      text: () => "", 
     });
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
 
     const result = await aiConfigurationAssistantFlow(mockInput);
 
     expect(result).toEqual(AiConfigurationAssistantOutputSchema.parse({}));
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    // Check if a warning about empty response was logged (implementation specific)
+    expect(ai.generate).toHaveBeenCalledTimes(1);
     expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining("LLM returned an empty response"));
     consoleWarnSpy.mockRestore();
   });
 
   it('should handle LLM response without text() method and return empty object', async () => {
     const mockInput = {
-        agentGoal: 'Test goal',
-        agentTasks: ['Test task 1'],
-        suggestionContext: 'fullConfig' as const,
+      agentGoal: 'Test goal',
+      agentTasks: ['Test task 1'],
+      suggestionContext: 'fullConfig' as const,
     };
-    mockedAiGenerate.mockResolvedValue({}); // No text() method
+    (ai.generate as jest.Mock).mockResolvedValue({}); 
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = await aiConfigurationAssistantFlow(mockInput);
 
     expect(result).toEqual(AiConfigurationAssistantOutputSchema.parse({}));
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
+    expect(ai.generate).toHaveBeenCalledTimes(1);
     expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining("LLM returned an empty response"));
     consoleWarnSpy.mockRestore();
   });
 
-
   it('should suggest agentName for "agentName" context', async () => {
     const mockFullAgentConfig: SavedAgentConfiguration = {
-      id: 'agent1', agentName: 'Old Name', agentDescription: '', agentVersion: '1.0',
-      config: { type: 'llm', framework: 'genkit', agentGoal: 'Goal', agentTasks: ['Task'] } as LLMAgentConfig,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      ...createMockAgent(),
+      id: 'agent1',
+      agentName: 'Old Name'
     };
+
     const mockInput = {
       fullAgentConfig: mockFullAgentConfig,
       suggestionContext: 'agentName' as const,
     };
     const mockLLMResponse = { suggestedName: "Super Agent" };
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => JSON.stringify(mockLLMResponse),
     });
 
     const result = await aiConfigurationAssistantFlow(mockInput);
 
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    const promptArg = mockedAiGenerate.mock.calls[0][0].prompt;
+    expect(ai.generate).toHaveBeenCalledTimes(1);
+    const promptArg = (ai.generate as jest.Mock).mock.calls[0][0].prompt;
     expect(promptArg).toContain("Suggest a creative and descriptive name for this agent.");
 
     const parsedResult = AiConfigurationAssistantOutputSchema.parse(result);
@@ -230,75 +203,73 @@ describe('aiConfigurationAssistantFlow', () => {
   });
 });
 
-
 describe('getWorkflowDetailedType', () => {
   beforeEach(() => {
-    mockedAiGenerate.mockClear();
-    mockedAiGenerate.mockReset();
+    jest.clearAllMocks();
   });
 
   it('should correctly suggest "sequential"', async () => {
     const query = "Tasks should be done one after another.";
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => JSON.stringify({ suggestedWorkflowType: "sequential" }),
     });
 
     const result = await getWorkflowDetailedType(query);
     expect(result).toBe("sequential");
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    expect(mockedAiGenerate.mock.calls[0][0].prompt).toContain(query);
+    expect(ai.generate).toHaveBeenCalledTimes(1);
+    expect((ai.generate as jest.Mock).mock.calls[0][0].prompt).toContain(query);
   });
 
   it('should correctly suggest "parallel"', async () => {
     const query = "These tasks can run at the same time.";
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => JSON.stringify({ suggestedWorkflowType: "parallel" }),
     });
 
     const result = await getWorkflowDetailedType(query);
     expect(result).toBe("parallel");
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
+    expect(ai.generate).toHaveBeenCalledTimes(1);
   });
 
   it('should default to "sequential" if LLM returns an unexpected type', async () => {
     const query = "Some query.";
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => JSON.stringify({ suggestedWorkflowType: "unknown_type" }),
     });
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = await getWorkflowDetailedType(query);
 
-    expect(result).toBe("sequential"); // Default value
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
+    expect(result).toBe("sequential"); 
+    expect(ai.generate).toHaveBeenCalledTimes(1);
     expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining("LLM returned an unexpected workflow type: 'unknown_type'"));
     consoleWarnSpy.mockRestore();
   });
 
   it('should default to "sequential" and log error if LLM returns malformed JSON', async () => {
     const query = "Some other query.";
-    mockedAiGenerate.mockResolvedValue({
+    (ai.generate as jest.Mock).mockResolvedValue({
       text: () => "this is not valid json",
     });
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await getWorkflowDetailedType(query);
 
-    expect(result).toBe("sequential"); // Default value
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalled(); // Check if error was logged
+    expect(result).toBe("sequential"); 
+    expect(ai.generate).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalled(); 
     consoleErrorSpy.mockRestore();
   });
 
   it('should default to "sequential" if ai.generate call fails', async () => {
     const query = "A failing query";
-    mockedAiGenerate.mockRejectedValue(new Error("LLM call failed"));
+    (ai.generate as jest.Mock).mockRejectedValue(new Error("LLM call failed"));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await getWorkflowDetailedType(query);
 
     expect(result).toBe("sequential");
-    expect(mockedAiGenerate).toHaveBeenCalledTimes(1);
+    expect(ai.generate).toHaveBeenCalledTimes(1);
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("Error determining workflow type"), expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
@@ -309,23 +280,74 @@ const createMockSavedAgentConfig = (override?: Partial<SavedAgentConfiguration>)
   const defaultConfig: SavedAgentConfiguration = {
     id: 'agent-test-123',
     agentName: 'Test Agent',
-    agentDescription: 'A test agent description.',
-    agentVersion: '1.0.0',
+    description: 'A test agent description.',
+
     config: {
-      type: 'llm',
+      model: 'gpt-4',
       framework: 'genkit',
-      agentGoal: 'Perform test operations.',
-      agentTasks: ['task1', 'task2'],
-      agentModel: 'gemini-1.0-pro',
-      agentTemperature: 0.7,
+      type: 'llm',
+      agentGoal: 'Goal',
+      agentTasks: ['Task']
     } as LLMAgentConfig,
     tools: [],
     toolsDetails: [],
     toolConfigsApplied: {},
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     isTemplate: false,
-    userId: 'user-test-id',
+    userId: 'user-test-id'
   };
   return { ...defaultConfig, ...override };
+};
+
+// USOS NO ARQUIVO
+export const testAgent: SavedAgentConfiguration = {
+  ...createMockAgent(),
+  agentName: 'Custom Name',
+  userId: 'user-test-id',
+  config: {
+    type: 'llm',
+    framework: 'genkit',
+    ...baseLLMConfig
+  }
+};
+
+export const testLLMConfig: LLMAgentConfig = {
+  ...baseLLMConfig,
+  temperature: 0.7
+};
+
+// Correção para linha ~98
+const savedConfig: SavedAgentConfiguration = {
+  ...createMockAgent(),
+  id: 'agent1',
+  userId: 'user-test-id',
+  config: {
+    type: 'llm',
+    framework: 'genkit',
+    ...baseLLMConfig
+  }
+};
+
+// Correção para linha ~101
+const llmConfig: LLMAgentConfig = {
+  ...baseLLMConfig,
+  agentGoal: 'To be tested',
+  agentTasks: ['get tested']
+};
+
+// Correção para linha ~246
+const complexConfig: LLMAgentConfig = {
+  ...baseLLMConfig
+};
+
+const validConfig: SavedAgentConfiguration = {
+  ...createMockAgent(),
+  agentName: 'Test Agent',
+  userId: 'user-test-id',
+  config: {
+    type: 'llm',
+    framework: 'genkit',
+    ...baseLLMConfig
+  }
 };

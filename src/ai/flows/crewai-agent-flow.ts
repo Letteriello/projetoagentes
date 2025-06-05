@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { winstonLogger } from '@/lib/winston-logger'; // Assuming logger path
 import type { SavedAgentConfiguration } from '@/types/agent-configs-new'; // Or relevant type for agent config
 
+interface IndexableObject {
+  [key: string]: any;
+}
+
+function safeAccess(obj: unknown, key: string): any {
+  return typeof obj === 'object' && obj !== null ? (obj as IndexableObject)[key] : undefined;
+}
+
 // Input schema for the flow
 export const CrewAIAgentFlowInputSchema = z.object({
   agentConfig: z.any(), // Using z.any() for now, can be refined with SavedAgentConfiguration or a subset
@@ -26,6 +34,11 @@ export const CrewAIAgentFlowOutputSchema = z.object({
   })).optional(),
 });
 
+interface CrewAISimulationResult {
+  simulatedResponse: any;
+  simulatedTasks: any[];
+}
+
 export const crewAIAgentFlow = defineFlow(
   {
     name: 'crewAIAgentFlow',
@@ -34,7 +47,7 @@ export const crewAIAgentFlow = defineFlow(
   },
   async (input) => {
     const { agentConfig, userMessage } = input;
-    const crewName = agentConfig?.agentName || 'Unknown Crew';
+    const crewName = safeAccess(agentConfig, 'agentName') || 'Unknown Crew';
     const flowName = 'crewAIAgentFlow';
 
     winstonLogger.info(`[${flowName}] Initializing CrewAI simulation for: ${crewName}`, { crewName, flowName });
@@ -45,7 +58,7 @@ export const crewAIAgentFlow = defineFlow(
 
     // Simulate creating a main task based on the user message
     const mainTaskName = `Process user request: ${userMessage.substring(0, 30)}...`;
-    const leadAgentName = agentConfig?.config?.subAgents?.[0] || 'Lead Agent Alpha'; // Example: use first subAgent or a default
+    const leadAgentName = safeAccess(safeAccess(agentConfig, 'config'), 'subAgents')?.[0] || 'Lead Agent Alpha'; // Example: use first subAgent or a default
 
     winstonLogger.info(`[${flowName}] Simulating creation of a Crew for '${crewName}' with a lead agent '${leadAgentName}'.`, { crewName, leadAgentName, flowName });
 
@@ -58,12 +71,12 @@ export const crewAIAgentFlow = defineFlow(
     simulatedTasks.push(mainCrewTask);
     winstonLogger.info(`[${flowName}] Created and assigned main task '${mainTaskName}' to '${leadAgentName}'.`, { crewName, taskName: mainTaskName, assignedTo: leadAgentName, flowName });
 
-    const toolsToSimulate = agentConfig?.toolsDetails || [];
+    const toolsToSimulate = safeAccess(agentConfig, 'toolsDetails') || [];
     if (toolsToSimulate.length > 0) {
       winstonLogger.info(`[${flowName}] '${leadAgentName}' will simulate using ${toolsToSimulate.length} tool(s) for task '${mainTaskName}'.`, { crewName, leadAgentName, taskName: mainTaskName, toolCount: toolsToSimulate.length, flowName });
 
       for (const tool of toolsToSimulate) {
-        const toolName = tool.name || tool.id || 'unknown_tool';
+        const toolName = safeAccess(tool, 'name') || safeAccess(tool, 'id') || 'unknown_tool';
         winstonLogger.info(`[${flowName}] '${leadAgentName}' simulating call to tool: '${toolName}' for task '${mainTaskName}'.`, { crewName, leadAgentName, toolName, taskName: mainTaskName, flowName });
 
         const mockInput = { detail: `Input for ${toolName} during ${mainTaskName}` };
@@ -83,13 +96,13 @@ export const crewAIAgentFlow = defineFlow(
     }
 
     mainCrewTask.status = 'simulated_complete';
-    winstonLogger.info(`[${flowName}] Task '${mainTaskName}' marked as complete.\`, { crewName, taskName: mainTaskName, flowName });
+    winstonLogger.info(`[${flowName}] Task '${mainTaskName}' marked as complete.`, { crewName, taskName: mainTaskName, flowName });
 
     winstonLogger.info(`[${flowName}] CrewAI simulation complete for: ${crewName}`, { crewName, flowName });
 
     return {
       simulatedResponse,
       simulatedTasks,
-    };
+    } satisfies CrewAISimulationResult;
   }
 );

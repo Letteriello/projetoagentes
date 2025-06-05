@@ -66,12 +66,9 @@ const mockAvailableAgentsForSubSelector = [{ id: 'agent1', agentName: 'Agent One
 const mockDefaultLLMAgentConfig: LLMAgentConfig = {
     type: 'llm',
     framework: 'genkit',
-    agentGoal: '',
     agentTasks: [],
     agentPersonality: 'neutral',
     agentModel: 'gemini-1.5-flash-latest',
-    agentTemperature: 0.7,
-    safetySettings: [],
     statePersistence: { enabled: false, type: 'session', defaultScope: 'AGENT', initialStateValues: [], validationRules: [] },
     rag: { enabled: false, serviceType: 'in-memory', knowledgeSources: [], retrievalParameters: {}, persistentMemory: { enabled: false } },
     artifacts: { enabled: false, storageType: 'memory', definitions: [] },
@@ -111,7 +108,7 @@ const mockEditingAgent: SavedAgentConfiguration = {
   createdAt: new Date('2023-01-01T00:00:00.000Z').toISOString(),
   updatedAt: new Date('2023-01-01T00:00:00.000Z').toISOString(),
   userId: 'test-user',
-  tools: ['webSearch'],
+  // tools: ['webSearch'], // Corrija para array de Tool se necessário
   toolsDetails: [{id: 'webSearch', label: 'Web Search', iconName: 'Search', genkitToolName: 'performWebSearch'}],
   templateId: '', isTemplate: false, isFavorite: false, tags: [], icon: '',
   internalVersion: 1, isLatest: true, originalAgentId: 'edit-agent-id-1',

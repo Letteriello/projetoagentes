@@ -2,7 +2,12 @@
 import { ai } from '@/ai/genkit';
 import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
-import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/agent-configs-fixed';
+import { 
+  SavedAgentConfiguration,
+  AgentConfig,
+  LLMAgentConfig,
+  WorkflowAgentConfig
+} from '@/types/agent-configs-fixed';
 import { winstonLogger } from '../../lib/winston-logger';
 
 const AgentCreatorChatInputSchema = z.object({
@@ -22,8 +27,8 @@ const AgentCreatorChatOutputSchema = z.object({
 
 function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<SavedAgentConfiguration> {
     config.agentName = config.agentName || "";
-    config.agentDescription = config.agentDescription || "";
-    config.agentVersion = config.agentVersion || "1.0.0";
+    config.description = config.description || "";
+    config.version = config.version || "1.0.0";
     config.tools = config.tools || [];
     config.toolConfigsApplied = config.toolConfigsApplied || {};
     config.toolsDetails = config.toolsDetails || [];
@@ -42,13 +47,11 @@ function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<Sav
         llmConfig.agentPersonality = "";
         llmConfig.agentRestrictions = [];
         llmConfig.agentModel = "gemini10Pro"; // Default model
-        llmConfig.agentTemperature = 0.7;
+        llmConfig.temperature = 0.7;
     } else if (config.config?.type === 'workflow' && typeof (config.config as WorkflowAgentConfig).workflowDescription === 'undefined') {
         const workflowConfig = config.config as Partial<WorkflowAgentConfig>;
         workflowConfig.detailedWorkflowType = "sequential";
         workflowConfig.workflowDescription = "";
-    } else if (config.config?.type === 'custom' && typeof (config.config as CustomAgentConfig).customLogicDescription === 'undefined') {
-        (config.config as Partial<CustomAgentConfig>).customLogicDescription = "";
     }
     // A2A has no specific fields beyond base by default in this structure
     return config;
@@ -77,7 +80,7 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
     const systemPrompt = `
       Você é um assistente especialista em configurar agentes de IA. Sua tarefa é ajudar um usuário a construir a configuração de um agente passo a passo, interpretando as instruções em linguagem natural e atualizando um objeto JSON que representa a configuração do agente.
 
-      A estrutura principal da configuração do agente é \`SavedAgentConfiguration\`. Dentro dela, existe um campo \`config\` do tipo \`AgentConfig\` que varia conforme o \`config.type\` ("llm", "workflow", "custom", "a2a").
+      A estrutura principal da configuração do agente é \`SavedAgentConfiguration\`. Dentro dela, existe um campo \`config\` do tipo \`AgentConfig\` que varia conforme o \`config.type\` ("llm", "workflow", "a2a").
 
       Configuração JSON ATUAL do agente (pode estar vazia ou parcial):
       \`\`\`json
@@ -93,11 +96,11 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
       1.  INTERPRETAR a instrução do usuário à luz da configuração atual e do histórico.
       2.  PRIORIDADES DE COLETA DE DADOS:
           - Se a configuração atual NÃO tiver um 'agentName' definido ou estiver vazio, SUA PRIMEIRA PRIORIDADE é perguntar ao usuário: "Qual nome você gostaria de dar a este agente?". Não modifique o JSON ainda, apenas faça esta pergunta.
-          - Se a configuração atual tem um 'agentName' mas NÃO tem 'config.type' definido (ou seja, \`config.type\` é \`undefined\` ou nulo), SUA PRÓXIMA PRIORIDADE é perguntar: "Qual será o tipo deste agente? As opções são: LLM, Workflow, Customizado, ou A2A." Não modifique o JSON ainda, apenas faça esta pergunta.
+          - Se a configuração atual tem um 'agentName' mas NÃO tem 'config.type' definido (ou seja, \`config.type\` é \`undefined\` ou nulo), SUA PRÓXIMA PRIORIDADE é perguntar: "Qual será o tipo deste agente? As opções são: LLM, Workflow, ou A2A." Não modifique o JSON ainda, apenas faça esta pergunta.
       3.  ATUALIZAR o JSON da configuração do agente (fornecido acima) para refletir a instrução do usuário, SE as prioridades acima estiverem satisfeitas e a instrução for clara.
           - Se o usuário fornecer um nome, atualize \`agentName\`.
           - Se o usuário definir um tipo, atualize \`config.type\`. Certifique-se que o objeto \`config\` exista. Se \`config.type\` mudar, reinicie as propriedades específicas do tipo antigo para evitar inconsistências.
-          - Para agentes "llm", campos importantes são \`config.agentGoal\`, \`config.agentTasks\` (array de strings), \`config.agentPersonality\`, \`config.agentModel\`, \`config.agentTemperature\`.
+          - Para agentes "llm", campos importantes são \`config.agentGoal\`, \`config.agentTasks\` (array de strings), \`config.agentPersonality\`, \`config.agentModel\`, \`config.temperature\`.
           - Para adicionar ferramentas, modifique o array \`tools\` (adicione o ID da ferramenta, ex: "webSearch", "calculator").
       4.  GERAR uma mensagem de conversação para o usuário (\`assistantMessage\`).
           - Se você fez uma pergunta (prioridade de coleta ou esclarecimento), \`assistantMessage\` deve ser APENAS a pergunta.
@@ -131,7 +134,7 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
         "assistantMessage": "Adicionei a ferramenta de busca na web. Algo mais?"
       }
 
-      SEMPRE retorne o JSON completo e atualizado em \`updatedConfig\`. Certifique-se que todos os campos da estrutura base (agentName, agentDescription, agentVersion, tools, toolConfigsApplied, toolsDetails, config.type, config.framework) estejam presentes no \`updatedConfig\`.
+      SEMPRE retorne o JSON completo e atualizado em \`updatedConfig\`. Certifique-se que todos os campos da estrutura base (agentName, description, version, tools, toolConfigsApplied, toolsDetails, config.type, config.framework) estejam presentes no \`updatedConfig\`.
     `;
 
     try {
@@ -172,7 +175,7 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
       if (!finalConfig.agentName) {
         finalAssistantMessage = "Qual nome você gostaria de dar a este agente?";
       } else if (!finalConfig.config?.type) {
-        finalAssistantMessage = `O agente se chama "${finalConfig.agentName}". Qual será o tipo deste agente? As opções são: LLM, Workflow, Customizado, ou A2A.`;
+        finalAssistantMessage = `O agente se chama "${finalConfig.agentName}". Qual será o tipo deste agente? As opções são: LLM, Workflow, ou A2A.`;
       }
 
 

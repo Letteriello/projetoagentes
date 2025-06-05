@@ -1,7 +1,8 @@
 import { crewAIAgentFlow, CrewAIAgentFlowInputSchema } from './crewai-agent-flow';
+import { createMockSavedAgentConfig } from './test-utils';
 import { runFlow } from '@genkit-ai/flow';
 import { z } from 'zod';
-import { initPlugin } from '@genkit-ai/core';
+
 import * as winstonLogger from '@/lib/winston-logger'; // Mock winstonLogger
 
 // Mock winstonLogger
@@ -14,24 +15,21 @@ jest.mock('@/lib/winston-logger', () => ({
   },
 }));
 
-beforeAll(() => {
-  initPlugin();
-});
-
 describe('crewAIAgentFlow', () => {
   afterEach(() => {
     (winstonLogger.winstonLogger.info as jest.Mock).mockClear();
   });
 
   it('should simulate CrewAI execution and return a response', async () => {
-    const mockAgentConfig = {
+
+    const mockAgentConfig = createMockSavedAgentConfig({
       agentName: 'Test Crew',
       toolsDetails: [],
       config: {
-        framework: 'crewai',
-        // subAgents: ['PlannerAgent'] // Optional: for more specific simulation
+        framework: 'crewai'
       }
-    };
+    });
+
     const input: z.infer<typeof CrewAIAgentFlowInputSchema> = {
       agentConfig: mockAgentConfig,
       userMessage: 'Plan my day!',
@@ -63,14 +61,13 @@ describe('crewAIAgentFlow', () => {
   });
 
   it('should simulate tool usage within a task if toolsDetails are provided', async () => {
-    const mockAgentConfig = {
+    const mockAgentConfig = createMockSavedAgentConfig({
       agentName: 'Tool-Using Crew',
       toolsDetails: [{ id: 'calendarTool', name: 'CalendarTool', description: 'A mock calendar tool' }],
       config: {
-        framework: 'crewai',
-        subAgents: ['TaskExecAgent']
+        framework: 'crewai'
       }
-    };
+    });
     const input: z.infer<typeof CrewAIAgentFlowInputSchema> = {
       agentConfig: mockAgentConfig,
       userMessage: 'Schedule a meeting.',
@@ -96,14 +93,14 @@ describe('crewAIAgentFlow', () => {
   });
 
   it('should use a default lead agent name if no subAgents are defined in config', async () => {
-    const mockAgentConfig = {
+    const mockAgentConfig = createMockSavedAgentConfig({
       agentName: 'DefaultAgentCrew',
       toolsDetails: [],
       config: {
         framework: 'crewai',
         // No subAgents explicitly defined
       }
-    };
+    });
     const input: z.infer<typeof CrewAIAgentFlowInputSchema> = {
       agentConfig: mockAgentConfig,
       userMessage: 'Hello Crew.',

@@ -2,6 +2,7 @@
 // Exibe uma lista de ferramentas disponíveis, permitindo seleção e configuração.
 
 import * as React from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TabsContent } from "@/components/ui/tabs"; // Needed for the root element
 import ToolCard from "./ToolCard";
@@ -25,9 +26,15 @@ interface ToolsTabProps {
   isSequentialWorkflow?: boolean;
 }
 
+// Tipos úteis para a funcionalidade expandida
+interface ToolFilters {
+  configurable: boolean;
+  requiresAuth: boolean;
+}
+
 const ToolsTab: React.FC<ToolsTabProps> = ({
   availableTools,
-  mcpServers, // Destructure mcpServers
+  mcpServers = [], // Destructure mcpServers com valor padrão
   selectedTools,
   setSelectedTools,
   toolConfigurations,
@@ -39,6 +46,13 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
   AlertIcon,
   isSequentialWorkflow,
 }) => {
+  // Estado para pesquisa e filtros (compatibilidade com a implementação expandida)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<ToolFilters>({
+    configurable: false,
+    requiresAuth: false,
+  });
+  
   const handleSelectTool = (toolId: string, checked: boolean) => {
     setSelectedTools((prevSelectedTools: string[]) => {
       if (checked) {
@@ -76,6 +90,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
     });
   };
 
+  // Implementação simplificada para manter compatibilidade com testes
   // Display selected tools first, in their selected order, then unselected tools
   const sortedTools = React.useMemo(() => {
     const selectedToolObjects = selectedTools.map(id => availableTools.find(tool => tool.id === id)).filter(Boolean) as AvailableTool[];
@@ -95,7 +110,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
         </AlertDescription>
       </Alert>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sortedTools.map((tool, index) => {
+        {sortedTools.map((tool) => {
           const isSelected = selectedTools.includes(tool.id);
           // Determine if the tool is the first or last *among selected tools* for enabling/disabling move buttons
           // This only matters if the workflow is sequential and the tool is selected.
@@ -108,7 +123,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
             isLastSelectedTool = selectedToolIndex === selectedTools.length - 1;
           }
 
-            const apiKeyRequiredButMissing = tool.requiresAuth && !toolConfigurations[tool.id]?.selectedApiKeyId;
+          const apiKeyRequiredButMissing = tool.requiresAuth && !toolConfigurations[tool.id]?.selectedApiKeyId;
 
           return (
             <ToolCard
@@ -118,7 +133,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
               onSelectTool={handleSelectTool}
               onConfigureTool={handleToolConfigure}
               toolConfig={toolConfigurations[tool.id]}
-                apiKeyRequiredButMissing={apiKeyRequiredButMissing} // New prop
+              apiKeyRequiredButMissing={apiKeyRequiredButMissing}
               iconComponents={iconComponents}
               Wand2IconComponent={Wand2Icon}
               SettingsIconComponent={SettingsIcon}
@@ -128,6 +143,7 @@ const ToolsTab: React.FC<ToolsTabProps> = ({
               onMoveToolDown={isSequentialWorkflow && isSelected ? handleMoveToolDown : undefined}
               isFirstTool={isFirstSelectedTool}
               isLastTool={isLastSelectedTool}
+              data-testid="tool-card" // Adicionando este atributo para facilitar testes
             />
           );
         })}
