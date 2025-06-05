@@ -126,18 +126,19 @@ export const basicChatFlow = defineFlow(
     name: 'basicChatFlow',
     inputSchema: z.object({
       message: z.string(),
-      history: z.array(z.any()).optional(),
+      history: z.array(z.custom<MessageData>()).optional(),
       image: z.string().optional(),
-      tools: z.array(z.any()).optional(),
-      config: z.any().optional()
+      tools: z.array(z.custom<Tool>()).optional(),
+      config: z.custom<ChatRunConfig>().optional()
     }),
     outputSchema: z.object({
       response: z.string(),
-      toolResponses: z.array(z.any()).optional(),
-      tokenUsage: z.any().optional()
+      toolResponses: z.array(z.custom<ToolResponse>()).optional(),
+      tokenUsage: z.custom<TokenUsage>().optional()
     })
   },
   async (input: BasicChatInput) => {
+    // TODO: Implement actual chat flow logic
     // Implementação do fluxo de chat aqui
     return {
       response: 'Resposta padrão',

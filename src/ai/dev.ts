@@ -5,7 +5,6 @@ config();
 import { agentCreatorChatFlow } from './flows/agent-creator-flow'; // Adicionar import
 import { basicChatFlow } from './flows/chat-flow'; // Assuming basicChatFlow is exported from here
 import { aiConfigurationAssistantFlow } from './flows/aiConfigurationAssistantFlow';
-import { workflowAgentRunnerFlow } from './flows/workflow-agent-flow'; // Import the new flow
 // Import other tools or plugins if needed for the dev server
 import './tools/web-search-tool.ts'; // Example if this registers a tool globally for dev
 
@@ -19,7 +18,6 @@ console.log('Registered flows (ensure they are exported or globally registered):
 console.log('- agentCreatorChatFlow:', !!agentCreatorChatFlow);
 console.log('- basicChatFlow:', !!basicChatFlow);
 console.log('- aiConfigurationAssistantFlow:', !!aiConfigurationAssistantFlow);
-console.log('- workflowAgentRunnerFlow:', !!workflowAgentRunnerFlow); // Log the new flow
 
 // To make flows available to the Genkit dev server/UI, ensure they are either:
 // 1. Exported from your main `genkit.ts` (if you have one that `configureGenkit` uses)
@@ -35,7 +33,6 @@ export default {
     agentCreatorChatFlow,
     basicChatFlow,
     aiConfigurationAssistantFlow,
-    workflowAgentRunnerFlow,
     langchainAgentFlow,
     crewAIAgentFlow,
   ],
