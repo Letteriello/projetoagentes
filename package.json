@@ -55,11 +55,9 @@
     "firebase": "^11.8.1",
     "firebase-admin": "^13.4.0",
     "framer-motion": "^12.15.0",
-<<<<<<< HEAD
-=======
+    "date-fns": "2.30.0",
     "genkit": "^1.11.0",
     "genkitx-openai": "^0.20.1",
->>>>>>> c3cb85f62b63523e287fb718841efe94898d9263
     "https-browserify": "^1.0.0",
     "https-proxy-agent": "^7.0.6",
     "js-yaml": "^4.1.0",
@@ -123,11 +121,7 @@
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^1.8.11",
     "tailwindcss": "^3.4.1",
-<<<<<<< HEAD
-    "typescript": "5.8.3"
-=======
     "ts-jest": "^29.3.4",
-    "typescript": "^5.8.3"
->>>>>>> c3cb85f62b63523e287fb718841efe94898d9263
+    "typescript": "5.8.3"
   }
 }
