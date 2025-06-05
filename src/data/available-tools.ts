@@ -1,23 +1,24 @@
-import type { AvailableTool } from '@/types/agent-configs-fixed'; // Corrected import path
-import { Search, Database, CloudCog, Code2, MessageSquare } from 'lucide-react';
+import { AvailableTool, ToolConfigField } from '@/types/tool-types'; // Corrected import
+import { Search, Database, CloudCog, Code2, MessageSquare, LucideIcon } from 'lucide-react'; // Added LucideIcon
 
 export const availableTools: AvailableTool[] = [
   {
     id: 'google-search',
-    label: 'Google Search',
-    name: 'google-search',
-    description: 'Real-time search results from Google. Requires API key.',
-    type: 'mcp', // Assuming MCP or a specific type for Genkit native/custom
-    icon: Search,
+    // label: 'Google Search', // Mapped to name
+    name: 'Google Search', // Consolidated from label
+    description: 'Real-time search results from Google. Requires API key. Service Type: Google Search', // Integrated serviceTypeRequired
+    configType: 'mcp', // type mapped to configType
+    icon: Search as LucideIcon, // Ensure icon is LucideIcon
     category: 'Search & Browsing',
     hasConfig: true,
-    // genkitToolName: 'googleSearch', // Example if it's a Genkit native tool
+    genkitToolName: 'googleSearch', // Example if it's a Genkit native tool (added for completeness)
     configFields: [
-      { id: 'googleApiKey', label: 'Google API Key (Vault)', type: 'password', description: 'API Key for Google Search.', required: false }, // Will be replaced by vault select
-      { id: 'googleCseId', label: 'Programmable Search Engine ID', type: 'text', description: 'The CSE ID to use for the search.', required: true },
+      // id mapped to name, type 'password' changed to 'text' (UI handles actual input type)
+      { name: 'googleApiKey', label: 'Google API Key (Vault)', type: 'text', description: 'API Key for Google Search.', required: false, defaultValue: "" },
+      { name: 'googleCseId', label: 'Programmable Search Engine ID', type: 'text', description: 'The CSE ID to use for the search.', required: true, defaultValue: "" },
     ],
     requiresAuth: true,
-    serviceTypeRequired: "Google Search",
+    // serviceTypeRequired: "Google Search", // Removed, integrated into description or handled by config fields
     inputSchema: `{
       "type": "object",
       "properties": {
@@ -27,23 +28,25 @@ export const availableTools: AvailableTool[] = [
         }
       },
       "required": ["query"]
-    }`
+    }`,
+    outputSchema: undefined, // Added for completeness
   },
   {
     id: 'openapi-custom',
-    label: 'Custom API (OpenAPI)',
-    name: 'openapi-custom',
-    description: 'Integrate with any API using an OpenAPI specification. Can require API key.',
-    type: 'openapi',
-    icon: CloudCog,
+    // label: 'Custom API (OpenAPI)',
+    name: 'Custom API (OpenAPI)',
+    description: 'Integrate with any API using an OpenAPI specification. Can require API key. Service Type: Custom API',
+    configType: 'openapi',
+    icon: CloudCog as LucideIcon,
     category: 'Custom Integrations',
     hasConfig: true,
+    genkitToolName: undefined, // Placeholder
     configFields: [
-      { id: 'openapiSpecUrl', label: 'OpenAPI Spec URL', type: 'text', description: 'URL of the OpenAPI JSON specification.', required: true },
-      { id: 'openapiApiKey', label: 'API Key (Vault)', type: 'password', description: 'API Key for the custom service (if required).', required: false }, // Will be replaced by vault select
+      { name: 'openapiSpecUrl', label: 'OpenAPI Spec URL', type: 'text', description: 'URL of the OpenAPI JSON specification.', required: true, defaultValue: "" },
+      { name: 'openapiApiKey', label: 'API Key (Vault)', type: 'text', description: 'API Key for the custom service (if required).', required: false, defaultValue: "" },
     ],
-    requiresAuth: true, // Assuming most OpenAPI specs might need auth
-    serviceTypeRequired: "Custom API", // Or could be more specific if known
+    requiresAuth: true,
+    // serviceTypeRequired: "Custom API",
     inputSchema: `{
       "type": "object",
       "properties": {
@@ -57,28 +60,30 @@ export const availableTools: AvailableTool[] = [
         }
       },
       "required": ["endpoint"]
-    }`
+    }`,
+    outputSchema: undefined, // Added for completeness
   },
   {
     id: 'database-connector',
-    label: 'SQL Database Connector',
-    name: 'database-connector',
-    description: 'Connect to SQL databases. May require credentials from vault.',
-    type: 'custom_script', // Example type
-    icon: Database,
+    // label: 'SQL Database Connector',
+    name: 'SQL Database Connector',
+    description: 'Connect to SQL databases. May require credentials from vault. Service Type: Database',
+    configType: 'custom_script',
+    icon: Database as LucideIcon,
     category: 'Data Sources',
     hasConfig: true,
+    genkitToolName: undefined, // Placeholder
     configFields: [
-      { id: 'dbType', label: 'Database Type', type: 'select', options: [{label: "PostgreSQL", value: "postgresql"}, {label: "MySQL", value: "mysql"}], required: true },
-      { id: 'dbHost', label: 'Host', type: 'text', required: true },
-      { id: 'dbPort', label: 'Port', type: 'number', required: true, defaultValue: 5432 },
-      { id: 'dbName', label: 'Database Name', type: 'text', required: true },
-      { id: 'dbUser', label: 'User', type: 'text', required: true },
-      { id: 'dbPassword', label: 'Password (Vault)', type: 'password', required: false }, // Will be replaced by vault select
-      { id: 'dbDescription', label: 'Database Description (for Agent)', type: 'textarea', description: 'Natural language description of the database schema or purpose for the agent.', required: false },
+      { name: 'dbType', label: 'Database Type', type: 'select', options: [{label: "PostgreSQL", value: "postgresql"}, {label: "MySQL", value: "mysql"}], required: true, defaultValue: "postgresql" },
+      { name: 'dbHost', label: 'Host', type: 'text', required: true, defaultValue: "localhost" },
+      { name: 'dbPort', label: 'Port', type: 'number', required: true, defaultValue: 5432 },
+      { name: 'dbName', label: 'Database Name', type: 'text', required: true, defaultValue: "" },
+      { name: 'dbUser', label: 'User', type: 'text', required: true, defaultValue: "" },
+      { name: 'dbPassword', label: 'Password (Vault)', type: 'text', required: false, defaultValue: "" },
+      { name: 'dbDescription', label: 'Database Description (for Agent)', type: 'textarea', description: 'Natural language description of the database schema or purpose for the agent.', required: false, defaultValue: "" },
     ],
-    requiresAuth: true, // Assuming credentials might be sensitive and stored in vault
-    serviceTypeRequired: "Database",
+    requiresAuth: true,
+    // serviceTypeRequired: "Database",
     inputSchema: `{
       "type": "object",
       "properties": {
@@ -89,23 +94,26 @@ export const availableTools: AvailableTool[] = [
         "params": {
           "type": "array",
           "description": "Parameters for the SQL query.",
-          "items": { "type": "any" }
+          "items": { "type": "string" } // Changed "any" to "string" for better typing, adjust if other types needed
         }
       },
       "required": ["sql_query"]
-    }`
+    }`,
+    outputSchema: undefined, // Added for completeness
   },
   {
     id: 'simple-calculator',
-    label: 'Simple Calculator',
-    name: 'simple-calculator',
-    description: 'Performs basic arithmetic operations. Does not require API key.',
-    type: 'custom_script', // Example type
-    icon: Code2,
+    // label: 'Simple Calculator',
+    name: 'Simple Calculator',
+    description: 'Performs basic arithmetic operations. Does not require API key. Service Type: N/A',
+    configType: 'custom_script',
+    icon: Code2 as LucideIcon,
     category: 'Utilities',
     hasConfig: false,
     requiresAuth: false,
-    serviceTypeRequired: "N/A",
+    genkitToolName: undefined, // Placeholder
+    configFields: [], // Explicitly empty array
+    // serviceTypeRequired: "N/A",
     inputSchema: `{
       "type": "object",
       "properties": {

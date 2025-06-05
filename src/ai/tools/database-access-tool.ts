@@ -46,17 +46,17 @@ export const DatabaseAccessInputSchema = z.object({
 });
 
 // 3. Define Output Schema for the tool's handler
+// Success and error fields are removed. Direct output on success. Errors are thrown.
 export const DatabaseAccessOutputSchema = z.object({
-  success: z.boolean().describe("Indicates whether the query execution was successful."),
   rowCount: z.number().optional().describe("Number of rows affected or returned."),
   rows: z.array(z.any()).optional().describe("An array of objects representing the rows returned by a SELECT query. Each object's keys are column names."),
   columns: z.array(z.object({ name: z.string(), type: z.string() })).optional().describe("An array describing the columns returned, with name and type."),
-  error: z.string().optional().describe("Error message if the query execution failed."),
   executionTimeMs: z.number().optional().describe("Time taken for query execution in milliseconds."),
 });
 
 // Schema for simulated product data
-const ProductSchema = z.object({  id: z.number(),
+const ProductSchema = z.object({
+  id: z.number(),
   name: z.string(),
   category: z.string(),
   price: z.number(),
@@ -64,7 +64,6 @@ const ProductSchema = z.object({  id: z.number(),
 });
 type Product = z.infer<typeof ProductSchema>;
 
-// Simulated product data and columns, now typed
 const productTableColumns: Array<{ name: keyof Product; type: string }> = [
   { name: 'id', type: 'integer' },
   { name: 'name', type: 'varchar' },
@@ -80,7 +79,6 @@ const simulatedProducts: Product[] = [
   { id: 4, name: 'Desk Lamp', category: 'Furniture', price: 45.00, stock: 500 },
   { id: 5, name: 'Wireless Mouse', category: 'Electronics', price: 25.00, stock: 1000 },
 ];
-
 
 // 4. Factory function to create the databaseAccessTool
 export function createDatabaseAccessTool(
@@ -98,92 +96,91 @@ export function createDatabaseAccessTool(
       name: toolName,
       description: toolDescription,
       inputSchema: DatabaseAccessInputSchema,
-      outputSchema: DatabaseAccessOutputSchema,
+      outputSchema: DatabaseAccessOutputSchema, // Updated schema
     },
-    async (input: z.infer<typeof DatabaseAccessInputSchema>) => {
+    async (input: z.infer<typeof DatabaseAccessInputSchema>): Promise<z.infer<typeof DatabaseAccessOutputSchema>> => {
       const { query, parameters, flowName, agentId } = input;
       const startTime = Date.now();
 
-      // Basic logging of the tool call attempt
       console.log(`[${toolName}] Received query: '${query}' with params:`, parameters, `for flow: ${flowName}, agent: ${agentId}`);
 
-      // Simulate query execution based on config.dbType and query content
-      // IMPORTANT: This is a highly simplified and insecure simulation.
-      // Real database interaction requires proper ORMs/drivers, connection pooling,
-      // query sanitization/parameterization, and robust error handling.
-      // Permissions and access control are also critical.
-
-      if (config.dbType === 'sqlite' || config.dbType === 'postgresql' || config.dbType === 'mysql') {
-        // Simulate SQL SELECT query on a predefined "products" table
-        const lowerQuery = query.toLowerCase();
-        if (lowerQuery.startsWith('select * from products')) {
-          let filteredProducts = [...simulatedProducts];
-          if (lowerQuery.includes('where')) {
-            // Very crude WHERE clause simulation for category or ID
-            const matchCategory = lowerQuery.match(/where\s+category\s*=\s*['"](.+?)['"]/);
-            if (matchCategory && matchCategory[1]) {
-              filteredProducts = simulatedProducts.filter(p => p.category.toLowerCase() === matchCategory[1].toLowerCase());
+      try {
+        if (config.dbType === 'sqlite' || config.dbType === 'postgresql' || config.dbType === 'mysql') {
+          const lowerQuery = query.toLowerCase();
+          if (lowerQuery.startsWith('select * from products')) {
+            let filteredProducts = [...simulatedProducts];
+            if (lowerQuery.includes('where')) {
+              const matchCategory = lowerQuery.match(/where\s+category\s*=\s*['"](.+?)['"]/);
+              if (matchCategory && matchCategory[1]) {
+                filteredProducts = simulatedProducts.filter(p => p.category.toLowerCase() === matchCategory[1].toLowerCase());
+              }
+              const matchId = lowerQuery.match(/where\s+id\s*=\s*(\d+)/);
+              if (matchId && matchId[1]) {
+                const searchId = parseInt(matchId[1], 10);
+                filteredProducts = simulatedProducts.filter(p => p.id === searchId);
+                if (filteredProducts.length === 0) {
+                  throw new Error(`Simulated query: Product with ID ${searchId} not found in 'products'.`);
+                }
+              }
             }
-            const matchId = lowerQuery.match(/where\s+id\s*=\s*(\d+)/);            if (matchId && matchId[1]) {
-              filteredProducts = simulatedProducts.filter(p => p.id === parseInt(matchId[1], 10));
-            }
-          }
-          return {
-            success: true,
-            rowCount: filteredProducts.length,
-            rows: filteredProducts,
-            columns: productTableColumns,
-            executionTimeMs: Date.now() - startTime,
-          };
-        } else if (lowerQuery.startsWith('select count(*) from products')) {
-           // Simulate COUNT(*)
-           return {
-            success: true,
-            rowCount: 1, // Row count for the count result itself
-            rows: [{ 'count(*)': simulatedProducts.length }],
-            columns: [{ name: 'count(*)', type: 'integer' }],
-            executionTimeMs: Date.now() - startTime,
-           };
-        } else if (lowerQuery.startsWith('select name, price from products where id =') && parameters?.id) {
-            const product = simulatedProducts.find(p => p.id === parameters.id);
             return {
-                success: !!product,
-                rowCount: product ? 1 : 0,
-                rows: product ? [{ name: product.name, price: product.price }] : [],
-                columns: [{ name: 'name', type: 'varchar' }, { name: 'price', type: 'decimal' }],
-                error: product ? undefined : `Product with ID ${parameters.id} not found.`,
-                executionTimeMs: Date.now() - startTime,
+              rowCount: filteredProducts.length,
+              rows: filteredProducts,
+              columns: productTableColumns,
+              executionTimeMs: Date.now() - startTime,
             };
-        }
-      } else if (config.dbType === "mongodb") {
-        // Crude simulation for MongoDB
-        // Example: query might be '{"collection": "users", "filter": {"status": "active"}}'
-        // Parameters could be merged into the filter or used for other options.
-        try {
-          const mongoQuery = JSON.parse(query); // In a real scenario, ensure query is a string first
-          if (mongoQuery.collection === 'users') {
-             const filterId = parameters?.id || 1; // Example: use parameter or default
-             return {
-                success: true,
-                rowCount: 1,
-                rows: [{ _id: filterId, name: `Mongo User ${filterId}`, db: config.dbName || 'unknown_db' }], // Include dbName from config
-                executionTimeMs: Date.now() - startTime,
-             };
+          } else if (lowerQuery.startsWith('select count(*) from products')) {
+            return {
+              rowCount: 1,
+              rows: [{ 'count(*)': simulatedProducts.length }],
+              columns: [{ name: 'count(*)', type: 'integer' }],
+              executionTimeMs: Date.now() - startTime,
+            };
+          } else if (lowerQuery.startsWith('select name, price from products where id =') && parameters?.id) {
+            const productId = parameters.id as number;
+            const product = simulatedProducts.find(p => p.id === productId);
+            if (!product) {
+              throw new Error(`Simulated query: Product with ID ${productId} not found.`);
+            }
+            return {
+              rowCount: 1,
+              rows: [{ name: product.name, price: product.price }],
+              columns: [{ name: 'name', type: 'varchar' }, { name: 'price', type: 'decimal' }],
+              executionTimeMs: Date.now() - startTime,
+            };
           }
-        } catch (e: any) { // Catch parsing errors or other issues
-          return { success: false, error: `Invalid JSON query for MongoDB simulation: ${e.message}`, executionTimeMs: Date.now() - startTime };
+        } else if (config.dbType === "mongodb") {
+          try {
+            const mongoQuery = JSON.parse(query);
+            if (mongoQuery.collection === 'users') {
+              const filterId = parameters?.id as number || 1;
+              // Simulate finding a user or throwing if not found based on filterId if desired
+              // For now, assume user always found for simulation
+              return {
+                rowCount: 1,
+                rows: [{ _id: filterId, name: `Mongo User ${filterId}`, db: config.dbName || 'unknown_db' }],
+                executionTimeMs: Date.now() - startTime,
+              };
+            }
+          } catch (e: any) {
+            console.error(`[${toolName}] MongoDB query parsing error:`, e.message);
+            throw new Error(`Invalid JSON query for MongoDB simulation: ${e.message}`);
+          }
         }
-      }
 
-      // Default response if no simulation rule matched
-      return {
-        success: true, // Or false, depending on desired behavior for unknown queries
-        rowCount: 0,
-        rows: [],
-        columns: [],
-        error: `Simulated query for ${config.dbType} ('${query}') matched no predefined rules for this tool.`,
-        executionTimeMs: Date.now() - startTime,
-      };
+        // If no specific simulation rule matched
+        const noRuleErrorMsg = `Simulated query for ${config.dbType} ('${query}') matched no predefined rules for this tool.`;
+        console.warn(`[${toolName}] ${noRuleErrorMsg}`);
+        throw new Error(noRuleErrorMsg);
+
+      } catch (error: any) {
+        console.error(`[${toolName}] Error during query simulation:`, error.message);
+        // Re-throw the error to be handled by Genkit or higher-level error handlers
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(`Database operation failed: ${error.message || 'Unknown error during simulation'}`);
+      }
     }
   );
 }
