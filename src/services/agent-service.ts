@@ -1,5 +1,5 @@
-  // ----------------------------------------------------------------------
-// Nome do Arquivo: agentServices.ts
+// ----------------------------------------------------------------------
+// Nome do Arquivo: agent-service.ts
 // Autor: Cascade AI (assistido por Gabriel Letteriello)
 // Data: 2025-06-01
 // Descrição: Este módulo fornece serviços relacionados à gestão de agentes,
@@ -8,7 +8,7 @@
 /// <reference types="firebase" />
 
 import { SavedAgentConfiguration } from '@/types/unified-agent-types';
-import { firestore } from '@/lib/firebaseClient';
+import { firestore } from '@/lib/firebase/firestore'; // Updated import path
 // Adicionado importação com types completos
 import { 
   collection, 
@@ -160,6 +160,84 @@ export async function getAgentConfiguration(agentId: string): Promise<SavedAgent
         details: { agentIdQuery: agentId },
         flowName: "agentServices",
         agentId: "system_operation", // Or pass userId if this operation is user-specific
+    }));
+    throw error;
+  }
+}
+
+/**
+ * Deletes an agent configuration from Firestore.
+ *
+ * @param agentId - The ID of the agent configuration to delete.
+ * @returns A Promise that resolves when the operation is completed.
+ */
+export async function deleteAgentConfiguration(agentId: string): Promise<void> {
+  try {
+    const agentDocRef = doc(collection(firestore, 'agent-configurations'), agentId);
+    await deleteDoc(agentDocRef);
+  } catch (error: any) {
+    console.error("Erro ao excluir a configuração do agente:", error);
+    enhancedLogger.logError(JSON.stringify({
+        message: "Error deleting agent configuration from Firestore",
+        error: error instanceof Error ? error.message : String(error),
+        details: { agentId },
+        flowName: "agentServices",
+        agentId: "system_operation",
+    }));
+    throw error;
+  }
+}
+
+/**
+ * Saves the order of agents for a specific user.
+ *
+ * @param userId - The ID of the user.
+ * @param agentIds - An array of agent IDs representing the order.
+ * @returns A Promise that resolves when the operation is completed.
+ */
+export async function saveAgentOrder(userId: string, agentIds: string[]): Promise<void> {
+  try {
+    const agentOrdersCollection = collection(firestore, 'agent-orders');
+    const agentOrderDocRef = doc(agentOrdersCollection, userId);
+    await setDoc(agentOrderDocRef, { order: agentIds }, { merge: true });
+  } catch (error: any) {
+    console.error("Erro ao salvar a ordem dos agentes:", error);
+    enhancedLogger.logError(JSON.stringify({
+        message: "Error saving agent order to Firestore",
+        error: error instanceof Error ? error.message : String(error),
+        details: { userId },
+        flowName: "agentServices",
+        agentId: userId,
+    }));
+    throw error;
+  }
+}
+
+/**
+ * Loads the order of agents for a specific user.
+ *
+ * @param userId - The ID of the user.
+ * @returns A Promise that resolves to an array of agent IDs or an empty array if not found.
+ */
+export async function loadAgentOrder(userId: string): Promise<string[]> {
+  try {
+    const agentOrdersCollection = collection(firestore, 'agent-orders');
+    const agentOrderDocRef = doc(agentOrdersCollection, userId);
+    const agentOrderSnapshot = await getDoc(agentOrderDocRef);
+
+    if (agentOrderSnapshot.exists()) {
+      const data = agentOrderSnapshot.data();
+      return data?.order || [];
+    }
+    return [];
+  } catch (error: any) {
+    console.error("Erro ao carregar a ordem dos agentes:", error);
+    enhancedLogger.logError(JSON.stringify({
+        message: "Error loading agent order from Firestore",
+        error: error instanceof Error ? error.message : String(error),
+        details: { userId },
+        flowName: "agentServices",
+        agentId: userId,
     }));
     throw error;
   }

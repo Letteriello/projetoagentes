@@ -68,26 +68,6 @@ export const isRetryableIDBError = (error: any): boolean => {
          error.name === 'TransactionInactiveError'; // Transaction became inactive
   // Consider DOMException codes if error.name is 'DOMException' and error.code gives more details.
 };
-
-/**
- * Checks if a Firestore error is potentially transient and thus retryable.
- * @param error The error object, typically a FirebaseError.
- * @returns True if the error is deemed retryable, false otherwise.
- */
-export const isRetryableFirestoreError = (error: any): boolean => {
-  if (!error || !error.code) return false; // Firebase errors usually have a 'code' property
-  switch (error.code) {
-    case 'unavailable':         // The service is currently unavailable. This is a most likely transient condition.
-    case 'cancelled':           // The operation was cancelled (typically by the caller). Might be retryable depending on context.
-    case 'deadline-exceeded':   // Deadline expired before operation could complete.
-    // case 'resource-exhausted': // Quota exhausted - less likely to be fixed by immediate retry, similar to IDB's QuotaExceededError.
-    // case 'internal':             // Internal errors. Might be retryable.
-    // case 'unknown':              // Unknown error.
-      return true;
-    default:
-      return false;
-  }
-};
 // --- End of New Retry Logic ---
 
 export function cn(...inputs: ClassValue[]) {

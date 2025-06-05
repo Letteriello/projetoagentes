@@ -1,5 +1,5 @@
 import { Conversation, Message } from '@/types/chat';
-import { firestore } from '@/lib/firebaseClient';
+import { firestore } from '@/lib/firebase/firestore'; // Updated import path
 import {
   collection,
   doc,
@@ -15,7 +15,8 @@ import {
   Timestamp,
   writeBatch,
 } from 'firebase/firestore';
-import { retryWithBackoff, isRetryableFirestoreError, RetryConfig } from '@/lib/utils';
+import { retryWithBackoff, RetryConfig } from '@/lib/utils';
+import { isRetryableFirestoreError } from '@/lib/firebase/firestore-server-utils';
 
 // Firestore collection names
 const CONVERSATIONS_COLLECTION = 'conversations';
