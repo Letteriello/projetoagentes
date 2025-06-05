@@ -10,7 +10,10 @@ export interface LogEntry {
   timestamp: admin.firestore.Timestamp;
   message?: string;
   // Add other fields as necessary
-  [key: string]: any; 
+  [key: string]: any;
+  // Potential new fields for more structured logging
+  severity?: 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG'; // Optional severity field
+  details?: Record<string, any>; // For structured details
 }
 
 // Define the RawLogFilters interface
@@ -321,4 +324,118 @@ export async function getAverageResponseTimes(
     averageDurationMs: data.totalDurationMs / data.count,
     count: data.count,
   }));
+}
+
+// =============================================
+// Log Writing Functions
+// =============================================
+
+/**
+ * Writes a log entry to Firestore.
+ *
+ * @param logData The data for the log entry, timestamp will be added automatically.
+ * @returns A promise that resolves when the log entry has been written.
+ */
+export async function writeLogEntry(logData: Omit<LogEntry, 'timestamp'>): Promise<void> {
+  try {
+    const entry: LogEntry = {
+      ...logData,
+      timestamp: admin.firestore.Timestamp.now(),
+    };
+    await admin.firestore().collection(LOGS_COLLECTION).add(entry);
+  } catch (error) {
+    console.error('Failed to write log entry to Firestore:', error, 'Log data:', logData);
+    // Depending on policy, might re-throw or handle silently
+    // For now, just logging to console to avoid interrupting application flow
+  }
+}
+
+// --- A2A Specific Logging Functions ---
+
+interface A2ALogContext {
+  agentId?: string; // The agent performing the action or being affected
+  channelId?: string;
+  sourceAgentId?: string; // For received messages/pongs
+  targetAgentId?: string; // For sent messages/pings
+  messageId?: string;
+  traceId?: string; // To correlate logs for a single operation/flow
+}
+
+/**
+ * Logs an A2A message event (sent or received).
+ */
+export function logA2AMessageEvent(
+  type: 'a2a_message_sent' | 'a2a_message_received' | 'a2a_heartbeat_ping' | 'a2a_heartbeat_pong',
+  context: A2ALogContext,
+  message: string,
+  additionalDetails?: Record<string, any>
+): void {
+  writeLogEntry({
+    type,
+    agentId: context.agentId,
+    flowName: 'A2ACommunication', // Generic flow name for A2A
+    traceId: context.traceId,
+    message,
+    details: {
+      ...context,
+      ...additionalDetails,
+    },
+    severity: 'INFO',
+  });
+}
+
+/**
+ * Logs an A2A error event.
+ */
+export function logA2AError(
+  type: 'a2a_send_error' | 'a2a_receive_error' | 'a2a_processing_error' | 'a2a_connection_error',
+  context: A2ALogContext,
+  errorMessage: string,
+  errorDetails?: Record<string, any> | Error
+): void {
+  let detailsObject = { ...context };
+  if (errorDetails instanceof Error) {
+    detailsObject = {
+      ...detailsObject,
+      errorName: errorDetails.name,
+      errorMessage: errorDetails.message,
+      errorStack: errorDetails.stack,
+    };
+  } else if (errorDetails) {
+    detailsObject = { ...detailsObject, ...errorDetails };
+  }
+
+  writeLogEntry({
+    type,
+    agentId: context.agentId,
+    flowName: 'A2ACommunication',
+    traceId: context.traceId,
+    message: errorMessage,
+    details: detailsObject,
+    severity: 'ERROR',
+  });
+}
+
+/**
+ * Logs an A2A channel status change or significant event.
+ */
+export function logA2AStatusChange(
+  context: A2ALogContext,
+  status: string, // e.g., "connected", "disconnected", "unresponsive", "reconnecting"
+  message: string,
+  additionalDetails?: Record<string, any>
+): void {
+  writeLogEntry({
+    type: 'a2a_channel_status',
+    agentId: context.agentId,
+    flowName: 'A2ACommunication',
+    traceId: context.traceId,
+    message,
+    details: {
+      ...context,
+      channelStatus: status,
+      ...additionalDetails,
+    },
+    severity: 'INFO', // Could be WARNING for "unresponsive" or "disconnected" if desired
+  });
 }

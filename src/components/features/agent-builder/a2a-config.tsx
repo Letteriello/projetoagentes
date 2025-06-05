@@ -19,77 +19,38 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FormFieldWithTooltip } from "./FormFieldWithTooltip";
 import { SubAgentSelector } from "@/components/features/agent-builder/sub-agent-selector";
-import { useFormContext } from "react-hook-form"; // Added import
+import { useFormContext } from "react-hook-form";
 import {
   A2AConfig as A2AConfigType,
   CommunicationChannel,
 } from '@/types/agent-configs-fixed';
 import { SavedAgentConfiguration } from "@/types/agent-types";
+import {
+  handleAddCommunicationChannel,
+  handleDeleteChannel,
+  handleUpdateChannelName,
+  handleUpdateChannelDirection,
+  handleUpdateChannelMessageFormat,
+  handleUpdateChannelSyncMode,
+  handleUpdateChannelRetryPolicy,
+  handleUpdateChannelSchema,
+  handleUpdateChannelTargetAgentId,
+} from "./a2a-channel-handlers";
 
 interface A2AConfigProps {
   savedAgents?: SavedAgentConfiguration[];
-  // a2aConfig and setA2AConfig are removed as they come from useFormContext
 }
 
 export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
   const methods = useFormContext<SavedAgentConfiguration>();
-  const a2aConfig = methods.watch("config.a2a") || { // Watch the config.a2a path
-    enabled: false, // Provide a default structure if undefined
+  const a2aConfig = methods.watch("config.a2a") || {
+    enabled: false,
     communicationChannels: [],
     defaultResponseFormat: "json",
     maxMessageSize: 1024 * 1024,
     loggingEnabled: false,
-  };
-
-  const setA2AConfig = (newConfig: A2AConfigType | ((prev: A2AConfigType) => A2AConfigType)) => {
-    if (typeof newConfig === 'function') {
-      methods.setValue("config.a2a", newConfig(a2aConfig), { shouldValidate: true, shouldDirty: true });
-    } else {
-      methods.setValue("config.a2a", newConfig, { shouldValidate: true, shouldDirty: true });
-    }
-  };
-
-  // Função para adicionar um novo canal
-  const handleAddCommunicationChannel = () => {
-    const currentChannels = a2aConfig.communicationChannels || [];
-    const newChannel: CommunicationChannel = {
-      id: `channel-${Date.now()}`,
-      name: `Canal ${currentChannels.length + 1}`,
-      direction: "bidirectional",
-      messageFormat: "json",
-      syncMode: "async",
-    };
-
-    setA2AConfig((prev) => ({
-      ...prev,
-      communicationChannels: [...(prev.communicationChannels || []), newChannel],
-    }));
-  };
-
-  // Função para atualizar um canal existente
-  const handleUpdateChannel = (
-    index: number,
-    updated: CommunicationChannel,
-  ) => {
-    const currentChannels = a2aConfig.communicationChannels || [];
-    const newChannels = [...currentChannels];
-    newChannels[index] = updated;
-    setA2AConfig((prev) => ({
-      ...prev,
-      communicationChannels: newChannels,
-    }));
-  };
-
-  // Função para excluir um canal
-  const handleDeleteChannel = (index: number) => {
-    const currentChannels = a2aConfig.communicationChannels || [];
-    const newChannels = [...currentChannels];
-    newChannels.splice(index, 1);
-    setA2AConfig((prev) => ({
-      ...prev,
-      communicationChannels: newChannels,
-    }));
   };
 
   // Ensure a2aConfig and its nested properties are defined before rendering
@@ -132,7 +93,7 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleAddCommunicationChannel}
+            onClick={() => handleAddCommunicationChannel(methods, a2aConfig)}
           >
             Adicionar Canal
           </Button>
@@ -152,10 +113,7 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                     <Input
                       value={channel.name}
                       onChange={(e) =>
-                        handleUpdateChannel(index, {
-                          ...channel,
-                          name: e.target.value,
-                        })
+                        handleUpdateChannelName(methods, a2aConfig, index, e.target.value)
                       }
                       className="h-7 w-60 text-sm"
                       placeholder="Nome do canal"
@@ -164,39 +122,22 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteChannel(index)}
+                      onClick={() => handleDeleteChannel(methods, a2aConfig, index)}
                     >
                       <AlertCircle className="h-4 w-4" />
                     </Button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Label
-                              htmlFor={`channel-direction-${channel.id}`}
-                              className="text-xs"
-                            >
-                              Direção
-                            </Label>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Define se o canal é para receber mensagens (Inbound), enviar mensagens (Outbound), ou ambos (Bidirectional). Relevante para o fluxo de comunicação A2A.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <FormFieldWithTooltip
+                      label="Direção"
+                      tooltipText="Define se o canal é para receber mensagens (Inbound), enviar mensagens (Outbound), ou ambos (Bidirectional). Relevante para o fluxo de comunicação A2A."
+                      htmlFor={`channel-direction-${channel.id}`}
+                    >
                       <Select
                         value={channel.direction}
-                        onValueChange={(value) =>
-                          handleUpdateChannel(index, {
-                            ...channel,
-                            direction: value as
-                              | "inbound"
-                              | "outbound"
-                              | "bidirectional",
-                          })
+                        onValueChange={(direction) =>
+                          handleUpdateChannelDirection(methods, a2aConfig, index, direction as "inbound" | "outbound" | "bidirectional")
                         }
                       >
                         <SelectTrigger
@@ -217,30 +158,16 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                           </SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Label
-                              htmlFor={`channel-format-${channel.id}`}
-                              className="text-xs"
-                            >
-                              Formato da Mensagem
-                            </Label>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Formato da mensagem trocada pelo canal. JSON para dados estruturados, Text para texto simples, Binary para formatos customizados. Crucial para a serialização/deserialização no protocolo A2A.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    </FormFieldWithTooltip>
+                    <FormFieldWithTooltip
+                      label="Formato da Mensagem"
+                      tooltipText="Formato da mensagem trocada pelo canal. JSON para dados estruturados, Text para texto simples, Binary para formatos customizados. Crucial para a serialização/deserialização no protocolo A2A."
+                      htmlFor={`channel-format-${channel.id}`}
+                    >
                       <Select
                         value={channel.messageFormat}
-                        onValueChange={(value) =>
-                          handleUpdateChannel(index, {
-                            ...channel,
-                            messageFormat: value as "json" | "text" | "binary",
-                          })
+                        onValueChange={(messageFormat) =>
+                          handleUpdateChannelMessageFormat(methods, a2aConfig, index, messageFormat as "json" | "text" | "binary")
                         }
                       >
                         <SelectTrigger
@@ -255,32 +182,16 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                           <SelectItem value="binary">Binário</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Label
-                              htmlFor={`channel-syncmode-${channel.id}`}
-                              className="text-xs"
-                            >
-                              Modo de Sincronização
-                            </Label>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Modo de sincronização do canal. 'Sync' para operações bloqueantes onde uma resposta é esperada. 'Async' para operações não bloqueantes. Afeta como o agente lida com o envio/recebimento.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    </FormFieldWithTooltip>
+                    <FormFieldWithTooltip
+                      label="Modo de Sincronização"
+                      tooltipText="Modo de sincronização do canal. 'Sync' para operações bloqueantes onde uma resposta é esperada. 'Async' para operações não bloqueantes. Afeta como o agente lida com o envio/recebimento."
+                      htmlFor={`channel-syncmode-${channel.id}`}
+                    >
                       <Select
                         value={channel.syncMode}
-                        onValueChange={(value) =>
-                          handleUpdateChannel(index, {
-                            ...channel,
-                            syncMode: value as "sync" | "async",
-                            // Reset retryPolicy if switching away from sync
-                            retryPolicy: value === 'async' ? undefined : channel.retryPolicy,
-                          })
+                        onValueChange={(syncMode) =>
+                          handleUpdateChannelSyncMode(methods, a2aConfig, index, syncMode as "sync" | "async")
                         }
                       >
                         <SelectTrigger
@@ -294,27 +205,16 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                           <SelectItem value="async">Assíncrono (Async)</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
+                    </FormFieldWithTooltip>
                   </div>
 
                   {channel.syncMode === "sync" && (
                     <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3">
-                      <div>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Label
-                                htmlFor={`channel-retries-${channel.id}`}
-                                className="text-xs"
-                              >
-                                Max Retries
-                              </Label>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Configura a política de novas tentativas para canais síncronos. Define o número máximo de tentativas. Importante para a robustez da comunicação A2A.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      <FormFieldWithTooltip
+                        label="Max Retries"
+                        tooltipText="Configura a política de novas tentativas para canais síncronos. Define o número máximo de tentativas. Importante para a robustez da comunicação A2A."
+                        htmlFor={`channel-retries-${channel.id}`}
+                      >
                         <Input
                           id={`channel-retries-${channel.id}`}
                           type="number"
@@ -322,33 +222,19 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                           value={channel.retryPolicy?.maxRetries ?? ""}
                           onChange={(e) => {
                             const maxRetries = parseInt(e.target.value);
-                            handleUpdateChannel(index, {
-                              ...channel,
-                              retryPolicy: {
-                                ...(channel.retryPolicy || { delayMs: 1000 }), // Default delayMs if creating policy
-                                maxRetries: isNaN(maxRetries) ? 0 : maxRetries,
-                              },
+                            handleUpdateChannelRetryPolicy(methods, a2aConfig, index, {
+                              ...(channel.retryPolicy || { delayMs: 1000 }),
+                              maxRetries: isNaN(maxRetries) ? 0 : maxRetries,
                             });
                           }}
                           className="h-8"
                         />
-                      </div>
-                      <div>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Label
-                                htmlFor={`channel-interval-${channel.id}`}
-                                className="text-xs"
-                              >
-                                Retry Interval (ms)
-                              </Label>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Configura a política de novas tentativas para canais síncronos. Define o intervalo entre elas em milissegundos. Importante para a robustez da comunicação A2A.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      </FormFieldWithTooltip>
+                      <FormFieldWithTooltip
+                        label="Retry Interval (ms)"
+                        tooltipText="Configura a política de novas tentativas para canais síncronos. Define o intervalo entre elas em milissegundos. Importante para a robustez da comunicação A2A."
+                        htmlFor={`channel-interval-${channel.id}`}
+                      >
                         <Input
                           id={`channel-interval-${channel.id}`}
                           type="number"
@@ -356,22 +242,20 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                           value={channel.retryPolicy?.delayMs ?? ""}
                           onChange={(e) => {
                             const delayMs = parseInt(e.target.value);
-                            handleUpdateChannel(index, {
-                              ...channel,
-                              retryPolicy: {
-                                ...(channel.retryPolicy || { maxRetries: 3 }), // Default maxRetries if creating policy
-                                delayMs: isNaN(delayMs) ? 0 : delayMs,
-                              },
+                            handleUpdateChannelRetryPolicy(methods, a2aConfig, index, {
+                              ...(channel.retryPolicy || { maxRetries: 3 }),
+                              delayMs: isNaN(delayMs) ? 0 : delayMs,
                             });
                           }}
                           className="h-8"
                         />
-                      </div>
+                      </FormFieldWithTooltip>
                     </div>
                   )}
 
                   {channel.messageFormat === "json" && (
                     <div className="mt-3 border-t pt-3">
+                      {/* The "Validar JSON" button requires a custom layout not fitting simple FormFieldWithTooltip */}
                       <div className="flex justify-between items-center mb-1">
                         <TooltipProvider>
                           <Tooltip>
@@ -402,10 +286,7 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                         placeholder='{"type": "object", "properties": {...}}'
                         value={channel.schema || ""}
                         onChange={(e) =>
-                          handleUpdateChannel(index, {
-                            ...channel,
-                            schema: e.target.value,
-                          })
+                          handleUpdateChannelSchema(methods, a2aConfig, index, e.target.value)
                         }
                         className="h-8 text-xs" // Might want a Textarea for better UX with schemas
                       />
@@ -415,28 +296,21 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
                   {(channel.direction === "outbound" ||
                     channel.direction === "bidirectional") && (
                     <div className="mt-3 border-t pt-3">
-                       <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Label className="text-xs">Agente Alvo</Label>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Seleciona o agente de destino para canais de saída ou bidirecionais. Fundamental para o roteamento de mensagens no A2A.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <FormFieldWithTooltip
+                        label="Agente Alvo"
+                        tooltipText="Seleciona o agente de destino para canais de saída ou bidirecionais. Fundamental para o roteamento de mensagens no A2A."
+                        // No htmlFor as SubAgentSelector is a complex component
+                      >
                       <SubAgentSelector
                         selectedAgents={
                           channel.targetAgentId ? [channel.targetAgentId] : []
                         }
                         availableAgents={savedAgents}
                         onChange={(selectedIds) => {
-                          handleUpdateChannel(index, {
-                            ...channel,
-                            targetAgentId: selectedIds[0] || undefined,
-                          });
+                          handleUpdateChannelTargetAgentId(methods, a2aConfig, index, selectedIds[0] || undefined)
                         }}
                       />
+                      </FormFieldWithTooltip>
                     </div>
                   )}
                 </div>
@@ -450,6 +324,7 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
+              {/* This h4 might also not fit FormFieldWithTooltip, similar to the "Canais de Comunicação" label */}
               <h4 className="text-sm font-medium">Políticas de Comunicação</h4>
             </TooltipTrigger>
             <TooltipContent>
@@ -459,75 +334,57 @@ export function A2AConfig({ savedAgents = [] }: A2AConfigProps) {
         </TooltipProvider>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Label htmlFor="defaultResponseFormat" className="text-xs">
-                    Formato de Resposta Padrão
-                  </Label>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Default message format this agent uses when responding, if not specified by the channel.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <FormFieldWithTooltip
+            label="Formato de Resposta Padrão"
+            tooltipText="Default message format this agent uses when responding, if not specified by the channel."
+            htmlFor="defaultResponseFormat"
+            labelClassName="text-xs"
+          >
             <Select
-              value={a2aConfig.defaultResponseFormat || "json"} // Provide default if undefined
+              value={a2aConfig.defaultResponseFormat || "json"}
               onValueChange={(value) =>
-                setA2AConfig((prev) => ({
-                  ...prev,
-                  defaultResponseFormat: value as "json" | "text",
-                }))
+                methods.setValue("config.a2a.defaultResponseFormat", value as "json" | "text", { shouldValidate: true, shouldDirty: true })
               }
             >
               <SelectTrigger id="defaultResponseFormat" className="h-8">
                 <SelectValue />
-              </SelectTrigger>
+              </Trigger>
               <SelectContent>
                 <SelectItem value="json">JSON</SelectItem>
                 <SelectItem value="text">Texto</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </FormFieldWithTooltip>
 
-          <div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Label htmlFor="maxMessageSize" className="text-xs">
-                    Tamanho Máximo de Mensagem (bytes)
-                  </Label>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Maximum allowed size for a single message to prevent overload.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <FormFieldWithTooltip
+            label="Tamanho Máximo de Mensagem (bytes)"
+            tooltipText="Maximum allowed size for a single message to prevent overload."
+            htmlFor="maxMessageSize"
+            labelClassName="text-xs"
+          >
             <Input
               id="maxMessageSize"
               type="number"
-              value={a2aConfig.maxMessageSize ?? ""} // Use nullish coalescing for potentially undefined value
+              value={a2aConfig.maxMessageSize ?? ""}
               onChange={(e) => {
                 const val = e.target.value;
-                setA2AConfig((prev) => ({
-                  ...prev,
-                  maxMessageSize: val ? parseInt(val) : 0, // Ensure it's a number, or a defined default like 0
-                }));
+                methods.setValue("config.a2a.maxMessageSize", val ? parseInt(val) : 0, { shouldValidate: true, shouldDirty: true });
               }}
               className="h-8"
             />
-          </div>
+          </FormFieldWithTooltip>
         </div>
 
         <div className="flex items-center space-x-2">
           <Switch
             id="loggingEnabled"
-            checked={!!a2aConfig.loggingEnabled} // Ensure boolean value
+            checked={!!a2aConfig.loggingEnabled}
             onCheckedChange={(checked) =>
-              setA2AConfig((prev) => ({ ...prev, loggingEnabled: checked }))
+              methods.setValue("config.a2a.loggingEnabled", checked, { shouldValidate: true, shouldDirty: true })
             }
           />
+          {/* Tooltip for a Switch is a bit different, Label is usually after the Switch. FormFieldWithTooltip expects label first. */}
+          {/* Keeping this custom for now. */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>

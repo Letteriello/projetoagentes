@@ -1,4 +1,8 @@
 // src/types/unified-agent-types.ts
+import {
+  A2AConfig as ActualA2AConfig,
+  CommunicationChannel as A2ACommunicationChannel // This is the detailed one from a2a-types.ts
+} from './a2a-types';
 
 // =============================================
 // Tipos Básicos
@@ -54,7 +58,13 @@ export interface ArtifactsConfig {
 }
 
 export interface CommunicationChannel {
-  type: string;
+// This is the original generic channel. Keep it if it's used by non-A2A parts.
+// If it's exclusively for A2A and the detailed one is preferred, this might be removable
+// or be the one that gets the detailed properties.
+// For now, assume a2a-types.ts.CommunicationChannel is the specific one needed by a2a-config.tsx.
+// The `CommunicationChannel` named type in this file will remain generic for now.
+export interface CommunicationChannel {
+  type: string; // e.g., 'webhook', 'message_queue' - generic
   config: Record<string, any>;
 }
 
@@ -173,13 +183,16 @@ export interface A2AAgentSpecialistConfig extends AgentConfigBase {
   targetAudience?: string;
   responseFormat?: string;
   specialistExamples?: string[];
+  a2a?: ActualA2AConfig; // Embed the detailed A2A configuration
 }
 
-export type AgentConfig = 
-  | LLMAgentConfig 
-  | WorkflowAgentConfig 
-  | CustomAgentConfig 
+export type AgentConfig =
+  | LLMAgentConfig
+  | WorkflowAgentConfig
+  | CustomAgentConfig
   | A2AAgentSpecialistConfig
+  // Ensure that if type is 'a2a', it can have the a2a field from A2AAgentSpecialistConfig
+  | ({ type: "a2a" } & Partial<A2AAgentSpecialistConfig> & { a2a?: ActualA2AConfig }) // More explicit for type inference
   | (Record<string, any> & { type: string });
 
 // =============================================
@@ -233,12 +246,14 @@ export interface SavedAgentConfiguration {
   agentName: string;
   agentDescription: string;
   agentVersion: string;
-  config: AgentConfig;
+  config: AgentConfig; // This config will hold the 'a2a' field if the agent type is A2AAgentSpecialistConfig
   tools: string[];
   toolsDetails?: ToolDetail[];
   toolConfigsApplied: ToolConfigData;
-  a2aConfig?: Record<string, any>;
-  communicationChannels?: CommunicationChannel[];
+  // The following two lines might be redundant if config.a2a is the source of truth.
+  // For now, keeping them to see how they are used, but suspect they might need removal or alignment.
+  a2aConfig?: ActualA2AConfig;
+  communicationChannels?: A2ACommunicationChannel[];
   deploymentConfig?: DeploymentConfig;
   debugModeEnabled?: boolean;
   createdAt: string;
