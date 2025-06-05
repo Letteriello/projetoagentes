@@ -3,18 +3,20 @@
 import { LLMAgentConfig, WorkflowAgentConfig, SavedAgentConfiguration } from '@/types/agent-configs-fixed';
 
 export const baseLLMConfig: LLMAgentConfig = {
-  model: 'gpt-4',
-  framework: 'openai',
   type: 'llm',
+  framework: 'openai',
+  model: 'gpt-4', // From BaseAgentConfig
+  agentModel: 'gpt-4', // From LLMAgentConfig
   agentGoal: 'Goal',
   agentTasks: ['Task'],
-  temperature: 0.7,
+  agentTemperature: 0.7,
 };
 
 export const baseAgentConfig: SavedAgentConfiguration = {
   id: 'agent-test-id',
   agentName: 'Test Agent',
-  description: 'Test description',
+  agentDescription: 'Test description',
+  agentVersion: '1.0.0',
   config: { ...baseLLMConfig },
   tools: [],
   toolsDetails: [],

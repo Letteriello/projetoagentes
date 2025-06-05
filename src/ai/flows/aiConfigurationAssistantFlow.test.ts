@@ -40,6 +40,7 @@ describe('aiConfigurationAssistantFlow', () => {
       agentGoal: 'Test goal',
       agentTasks: ['Test task 1', 'Test task 2'],
       suggestionContext: 'fullConfig',
+      config: { ...baseLLMConfig, type: 'llm' as const },
       configData: {
         model: 'gpt-4',
         framework: 'openai'
@@ -79,7 +80,8 @@ describe('aiConfigurationAssistantFlow', () => {
   it('should successfully suggest tools with configData for "tools" context', async () => {
     const mockFullAgentConfig: SavedAgentConfiguration = {
       ...createMockAgent(),
-      id: 'agent1'
+      id: 'agent1',
+      tools: [simplifiedMockTools[0].id],
     };
 
     const mockInput = {
@@ -313,6 +315,7 @@ export const testAgent: SavedAgentConfiguration = {
   config: {
     type: 'llm',
     framework: 'genkit',
+    model: 'gpt-4',
     agentModel: 'gpt-4',
     agentTemperature: 0.7,
     agentGoal: '',
@@ -342,6 +345,7 @@ const savedConfig: SavedAgentConfiguration = {
   config: {
     type: 'llm',
     framework: 'genkit',
+    model: 'gpt-4',
     agentModel: 'gpt-4',
     agentTemperature: 0.7,
     agentGoal: '',
@@ -362,17 +366,6 @@ const llmConfig: LLMAgentConfig = {
   agentRestrictions: [],
 };
 
-// Correção para linha ~246
-const complexConfig: LLMAgentConfig = {
-  ...baseLLMConfig,
-  agentModel: 'gpt-4',
-  agentTemperature: 0.7,
-  agentGoal: '',
-  agentTasks: [],
-  agentPersonality: '',
-  agentRestrictions: [],
-};
-
 const validConfig: SavedAgentConfiguration = {
   ...createMockAgent(),
   agentName: 'Test Agent',
@@ -382,6 +375,7 @@ const validConfig: SavedAgentConfiguration = {
   config: {
     type: 'llm',
     framework: 'genkit',
+    model: 'gpt-4',
     agentModel: 'gpt-4',
     agentTemperature: 0.7,
     agentGoal: '',
