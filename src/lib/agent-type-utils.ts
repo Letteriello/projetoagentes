@@ -1,46 +1,61 @@
-// Utilitários para conversão entre tipos de agentes
-import type { SavedAgentConfiguration as OldSavedAgentConfiguration } from '../types/agent-configs-fixed';
-import type { SavedAgentConfiguration as NewSavedAgentConfiguration } from '../types/agent-configs-new';
-import type { AgentFormData } from '../types/agent-types-unified';
+// src/lib/agent-type-utils.ts
+import { SavedAgentConfiguration } from "@/types/agent-configs-fixed";
+import { AdaptedAgentFormData, AdaptedSavedAgentConfiguration } from "@/types/agent-types-unified";
 
 /**
- * Converte um SavedAgentConfiguration para AgentFormData
+ * Converte de SavedAgentConfiguration para AdaptedAgentFormData
+ * Formato usado na tela de edição
  */
-export function toAgentFormData(savedConfig: OldSavedAgentConfiguration | NewSavedAgentConfiguration): AgentFormData {
-  // Implementação simplificada para compilação
+export function toAgentFormData(config: AdaptedSavedAgentConfiguration): AdaptedAgentFormData {
   return {
-    id: savedConfig.id,
-    agentName: savedConfig.agentName,
-    description: savedConfig.description || '',
-    type: savedConfig.config.type,
-    tools: [],
-    toolConfigsApplied: {},
-    // Outros campos conforme necessário para AgentFormData
-  } as AgentFormData;
+    id: config.id,
+    agentName: config.agentName,
+    description: config.description || "",
+    type: config.config.scriptContent ? "scriptable" : "llm",
+    tools: (config.config.tools || []).map(tool => tool.id),
+    systemPrompt: config.config.systemPrompt,
+    model: config.config.model || "gpt-3.5-turbo",
+    temperature: config.config.temperature || 0.7,
+    maxTokens: config.config.maxTokens || 2048,
+    scriptContent: config.config.scriptContent,
+    scriptPath: config.config.scriptPath,
+    createdAt: config.createdAt,
+    updatedAt: config.updatedAt,
+    // Convertendo ferramentas para configuração aplicada
+    toolConfigsApplied: (config.config.tools || []).reduce((acc, tool) => {
+      if (tool.config) {
+        acc[tool.id] = {
+          config: tool.config
+        };
+      }
+      return acc;
+    }, {} as Record<string, { config?: Record<string, any> }>)
+  };
 }
 
 /**
- * Converte AgentFormData para SavedAgentConfiguration
+ * Converte de AdaptedAgentFormData para SavedAgentConfiguration
+ * Formato usado para salvar no banco
  */
-export function toSavedAgentConfiguration(formData: AgentFormData): NewSavedAgentConfiguration {
-  // Implementação simplificada para compilação
-  const now = new Date().toISOString();
-  
+export function toSavedAgentConfiguration(
+  formData: AdaptedAgentFormData
+): Omit<SavedAgentConfiguration, "id" | "userId" | "createdAt" | "updatedAt"> {
   return {
-    id: formData.id || '',
     agentName: formData.agentName,
     description: formData.description,
-    createdAt: now,
-    updatedAt: now,
     config: {
-      type: formData.type,
-      // Outros campos conforme tipo de agente
-      agentModel: 'default-model',
-      agentTemperature: 0.7,
-      framework: 'default',
-      agentGoal: '',
-      agentTasks: [],
-    },
-    toolConfigsApplied: formData.toolConfigsApplied || {},
-  } as NewSavedAgentConfiguration;
+      tools: formData.tools.map(toolId => ({
+        id: toolId,
+        name: toolId, // Nome básico, pode ser atualizado posteriormente
+        enabled: true,
+        config: formData.toolConfigsApplied?.[toolId]?.config || {}
+      })),
+      systemPrompt: formData.systemPrompt,
+      model: formData.model,
+      temperature: formData.temperature,
+      maxTokens: formData.maxTokens,
+      scriptContent: formData.scriptContent,
+      scriptPath: formData.scriptPath
+    }
+  };
 }

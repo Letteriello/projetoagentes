@@ -1,14 +1,10 @@
-// Definição de tipos para ferramentas e MCP servers
+// src/types/tool-types.ts
 export interface MCPServerConfig {
   id: string;
   name: string;
   description?: string;
-  url?: string;
+  url: string;
   apiKey?: string;
-  active?: boolean;
-  category?: string;
-  capabilities?: string[];
-  version?: string;
 }
 
 export interface ApiKeyEntry {
@@ -17,7 +13,26 @@ export interface ApiKeyEntry {
   key: string;
   service: string;
   createdAt: string;
-  lastUsed?: string;
-  expiresAt?: string;
-  active?: boolean;
+  updatedAt?: string;
+  serviceName?: string;
+  apiKey?: string;
+  fragment?: string;
+  serviceType?: string;
+}
+
+export interface AvailableTool {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: string;
+  needsApiKey?: boolean;
+  needsMcpServer?: boolean;
+  config?: Record<string, any>;
+}
+
+export interface ToolConfigData {
+  selectedApiKeyId?: string;
+  selectedMcpServerId?: string;
+  config?: Record<string, any>;
 }
