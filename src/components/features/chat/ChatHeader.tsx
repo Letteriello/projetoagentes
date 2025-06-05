@@ -23,6 +23,8 @@ import {
   LogOut,
   DownloadCloud, // Added DownloadCloud
   Settings, // Added Settings icon for ChatRunConfig
+  Maximize, // Added Maximize for Focus Mode
+  Minimize, // Added Minimize for Focus Mode
 } from "lucide-react"; // Added LogIn, LogOut
 import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Keep if still used for some parts
 import { llmModels } from '../../../data/llm-models'; // Import llmModels
@@ -65,6 +67,8 @@ interface ChatHeaderProps {
   handleLogout: () => void;
   isVerboseMode: boolean; // Added isVerboseMode prop
   onToggleVerboseMode: () => void; // Added onToggleVerboseMode prop
+  isFocusModeActive: boolean; // Added isFocusModeActive prop
+  onToggleFocusMode: () => void; // Added onToggleFocusMode prop
   userChatConfig: ChatRunConfig;
   onUserChatConfigChange: (newConfig: Partial<ChatRunConfig>) => void;
 }
@@ -88,6 +92,8 @@ export default function ChatHeader({
   handleLogout,
   isVerboseMode, // Added isVerboseMode
   onToggleVerboseMode, // Added onToggleVerboseMode
+  isFocusModeActive, // Added isFocusModeActive
+  onToggleFocusMode, // Added onToggleFocusMode
   userChatConfig,
   onUserChatConfigChange,
 }: ChatHeaderProps) {
@@ -271,6 +277,17 @@ export default function ChatHeader({
           title="Nova conversa"
         >
           <Plus className="h-5 w-5" />
+        </Button>
+
+        {/* Focus Mode Toggle Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleFocusMode}
+          className="text-muted-foreground hover:text-foreground"
+          title={isFocusModeActive ? "Sair do Modo Foco" : "Entrar no Modo Foco"}
+        >
+          {isFocusModeActive ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
         </Button>
         
         {/* Add Export Button */}

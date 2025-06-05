@@ -5,7 +5,6 @@
 import {
   Bot,
   User,
-  Paperclip as PaperclipIcon, // Kept for potential future use or as a fallback if needed differently
   Download,
   FileText,
   FileJson,
@@ -15,6 +14,7 @@ import {
   Settings2,      // Added for tool calls
   CheckCircle2,   // Added for tool success
   XCircle,        // Added for tool error
+  AlertTriangle,  // Added for error messages
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -25,13 +25,13 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from 'rehype-raw';
 import { CodeBlock } from "./CodeBlock"; // Componente para realce de sintaxe em blocos de código.
 import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensagens de chat.
+import { useToast } from "@/hooks/use-toast"; // Added import for toast
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"; // Added import for Accordion
-import { ChatRunConfig } from "@/types/chat"; // Import ChatRunConfig for type usage
 
 // Interface para as props do componente ChatMessageDisplay.
 // Define a estrutura esperada para uma mensagem de chat.
@@ -113,6 +113,7 @@ export default function ChatMessageDisplay({
 }: ChatMessageDisplayProps) {
   const isUser = message.sender === "user"; // Verifica se o remetente é o usuário.
   const isAgent = message.sender === "agent"; // Verifica se o remetente é o agente.
+  const { toast } = useToast(); // Initialize toast
 
   // Use the typewriter hook for agent's streaming messages
   const displayedMessageText = useTypewriter({
@@ -151,14 +152,20 @@ export default function ChatMessageDisplay({
       )}
       <div
         className={cn(
-          "p-3 rounded-lg max-w-[70%] shadow-sm", // max-w-[70%] ajuda na responsividade, evitando que o balão ocupe toda a largura.
+          "p-3 rounded-lg max-w-[70%] shadow-sm", // Base
           isUser
-            ? "bg-primary text-primary-foreground rounded-br-none"
-            : "bg-card text-card-foreground border border-border/50 rounded-bl-none",
+            ? "bg-primary text-primary-foreground rounded-br-none" // User style
+            : "bg-card text-card-foreground border border-border/50 rounded-bl-none", // Agent/default style
+          message.sender === 'system' && !message.isError && "message-bubble-system", // System specific, not error
+          message.isError && "message-bubble-error" // Error specific, overrides others if conflicting props
         )}
       >
         <div className="flex flex-col"> {/* Wrapper for icon + text and details sections */}
           <div className="flex items-start"> {/* Flex container for icon (if any) and text */}
+            {/* Icon for General Error */}
+            {message.isError && !message.toolResponse && ( // Show general error icon if not a tool error (tool errors have their own XCircle)
+              <AlertTriangle className="h-4 w-4 mr-2 self-center text-red-700 dark:text-red-300 flex-shrink-0" />
+            )}
             {/* Icon for Tool Call */}
             {message.toolCall && (
               <Settings2 className="h-4 w-4 mr-2 self-center flex-shrink-0" />
@@ -324,7 +331,7 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
               <AccordionItem value="item-1">
                 <AccordionTrigger className="text-xs hover:no-underline py-2">
                   <div className="flex items-center text-muted-foreground">
-                    <Info size={14} className="mr-2" />
+                    {/* <Info size={14} className="mr-2" /> Removed Info icon as it's not imported */}
                     Retrieved Context (Verbose Mode)
                   </div>
                 </AccordionTrigger>
@@ -359,6 +366,42 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
               </>
             )}
           </details>
+        )}
+
+        {/* Quick Actions for Agent Messages */}
+        {!isUser && message.text && ( // Also check if message.text is not empty
+          <div className="mt-2 flex gap-2">
+            <Button
+              variant="outline"
+              size="sm" // Using sm as xs might not be standard, with custom class for smaller size
+              className="h-auto px-2 py-1 text-xs"
+              onClick={() => {
+                navigator.clipboard.writeText(message.text);
+                toast({
+                  title: "Resposta Copiada!",
+                  description: "O conteúdo da mensagem foi copiado para a área de transferência.",
+                });
+              }}
+            >
+              Copiar Resposta
+            </Button>
+            <Button
+              variant="outline"
+              size="sm" // Using sm as xs might not be standard, with custom class for smaller size
+              className="h-auto px-2 py-1 text-xs"
+              onClick={() => console.log(`Gerar Nova Resposta clicked for message ID: ${message.id}`)}
+            >
+              Gerar Nova Resposta
+            </Button>
+            <Button
+              variant="outline"
+              size="sm" // Using sm as xs might not be standard, with custom class for smaller size
+              className="h-auto px-2 py-1 text-xs"
+              onClick={() => console.log(`Transferir para Humano clicked for message ID: ${message.id}`)}
+            >
+              Transferir para Humano
+            </Button>
+          </div>
         )}
       </div>
       {/* Ícone do usuário, exibido à direita se a mensagem for do usuário. */}

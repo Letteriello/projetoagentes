@@ -146,6 +146,9 @@ export function ChatUI() {
 
   const store = useChatStore(); // USE THE STORE
 
+  const [isFocusModeActive, setIsFocusModeActive] = useState(false); // Added Focus Mode state
+  const toggleFocusMode = () => setIsFocusModeActive(prev => !prev); // Added Focus Mode toggle
+
   const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
   const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
 
@@ -207,6 +210,7 @@ export function ChatUI() {
   // const [isPending, setIsPending] = useState(false); // From store
   // const [isLoadingMessages, setIsLoadingMessages] = useState(false); // From store
   const [isADKInitializing, setIsADKInitializing] = useState<boolean>(false); // Keep for ADK specific UI
+  const [isClient, setIsClient] = useState(false); // Added for client-side rendering check
 
   // Test Run Config State
   const [testRunConfig, setTestRunConfig] = useState<TestRunConfig>({
@@ -285,6 +289,7 @@ export function ChatUI() {
   // isLoadingConversations is now store.isLoadingConversations
 
   useEffect(() => {
+    setIsClient(true); // Set isClient to true after mount for client-side only components
     setPendingAgentConfig(null); // This can remain if pendingAgentConfig is UI specific for agent creator
   }, [selectedGemId, selectedAgentId, selectedADKAgentId]);
 
@@ -584,7 +589,7 @@ export function ChatUI() {
         )}
       </Suspense>
       <Suspense fallback={<div className="fixed md:relative inset-y-0 left-0 z-20 w-72 h-full bg-gray-800 text-gray-200 p-4">Carregando sidebar...</div>}>
-        {isClient && isSidebarOpen && ( // Ensure isClient and isSidebarOpen are true for Suspense
+        {isClient && isSidebarOpen && !isFocusModeActive && ( // Hide sidebar in focus mode
           <div
             className={cn(
               "fixed md:relative inset-y-0 left-0 z-20 w-72 h-full transition-transform duration-300 ease-in-out bg-gray-800",
@@ -636,6 +641,8 @@ export function ChatUI() {
             onExportChatLog={handleExportChatLog}
             isVerboseMode={isVerboseMode} // Pass verbose mode state
             onToggleVerboseMode={() => setIsVerboseMode(!isVerboseMode)} // Pass toggle function
+            isFocusModeActive={isFocusModeActive} // Pass focus mode state
+            onToggleFocusMode={toggleFocusMode} // Pass focus mode toggle function
             // User Chat Config props
             userChatConfig={userChatConfig}
             onUserChatConfigChange={handleUserChatConfigChange}

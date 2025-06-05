@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Conversation, MessageData } from "@/types/chat"; // Import MessageData
+import { useToast } from "@/hooks/use-toast"; // Added useToast import
 import { cn } from "@/lib/utils";
 import type { Gem, SavedAgentConfiguration as SavedAgentConfigType } from "@/data/agentBuilderConfig"; // Use SavedAgentConfigType alias
 import { MessageSquarePlus } from "lucide-react"; // Import the icon
@@ -191,6 +192,7 @@ export function ConversationSidebar({
   // availableGems,
   // availableAgents,
 }: ConversationSidebarProps) {
+  const { toast } = useToast(); // Initialize useToast
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -209,6 +211,11 @@ export function ConversationSidebar({
   const handleConfirmRename = () => {
     if (renamingId && renameValue.trim()) {
       onRenameConversation(renamingId, renameValue.trim());
+      toast({
+        title: "Conversa Renomeada",
+        description: `O título da conversa foi atualizado para "${renameValue.trim()}".`,
+        variant: "default"
+      });
     }
     setRenamingId(null);
     setRenameValue("");
@@ -320,7 +327,7 @@ export function ConversationSidebar({
                           />
                         ) : (
                           <span className="truncate flex-grow">
-                            {conv.title}
+                            {conv.summary || conv.title}
                           </span>
                         )}
 
@@ -351,6 +358,11 @@ export function ConversationSidebar({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onDeleteConversation(conv);
+                                toast({
+                                  title: "Conversa Excluída",
+                                  description: `A conversa "${conv.summary || conv.title}" foi removida.`, // Use summary if available
+                                  variant: "default"
+                                });
                               }}
                               className="p-1 rounded-md hover:bg-red-500 text-gray-400 hover:text-red-100"
                               aria-label="Delete chat"

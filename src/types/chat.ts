@@ -17,6 +17,7 @@ export interface Conversation {
   updatedAt?: Date; // Added updatedAt field
   messages: Message[]; // Each conversation will have its own messages
   agentId?: string; // Adiciona a propriedade agentId usada no Firestore
+  summary?: string; // Optional: for a brief overview
   // lastMessageAt?: Date; // Optional: useful for sorting
   // summary?: string; // Optional: for a brief overview
 }
