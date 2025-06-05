@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { useForm, Controller, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+// import * as z from 'zod'; // No longer needed as schema is imported
+import { customToolSchema } from '@/lib/zod-schemas'; // Import the schema
 
 import {
   Dialog,
@@ -20,35 +21,7 @@ import { useToast } from "@/hooks/use-toast"; // Import useToast
 import JsonEditorField from '@/components/ui/JsonEditorField'; // Assuming this path is correct
 import { generateGenkitToolStub } from '@/lib/agent-genkit-utils'; // Import the new utility
 
-// Define the schema for form validation using Zod
-const customToolSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().min(1, 'Description is required'),
-  inputSchema: z.string().refine(
-    (val) => {
-      if (!val) return false; // Disallow empty string
-      try {
-        JSON.parse(val);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    },
-    { message: 'Deve ser um JSON válido.' }
-  ),
-  outputSchema: z.string().refine(
-    (val) => {
-      if (!val) return false; // Disallow empty string
-      try {
-        JSON.parse(val);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    },
-    { message: 'Deve ser um JSON válido.' }
-  ),
-});
+// Zod schema is now imported from '@/lib/zod-schemas'
 
 export interface CustomToolData {
   id?: string; // Optional: only present when editing
