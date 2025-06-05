@@ -48,7 +48,7 @@ interface ADKAgent {
   displayName: string;
 }
 
-interface ChatHeaderProps {
+export interface ChatHeaderProps { // Added export keyword
   onMenuToggle?: () => void;
   activeChatTargetDetails?: ActiveChatTarget | null; // Changed from activeChatTarget: string
   usingADKAgent: boolean;
