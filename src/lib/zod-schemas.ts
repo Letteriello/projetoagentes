@@ -35,8 +35,8 @@ export const adkCallbacksConfigSchema = z.object({
 
 // Base Schemas (as per agent-configs-new.ts structures)
 export const modelSafetySettingItemSchema = z.object({
-  category: z.string(),
-  threshold: z.string(),
+  category: z.string().min(1, "Safety category is required."),
+  threshold: z.string().min(1, "Safety threshold is required."),
 });
 
 export const agentTerminationConditionSchema = z.object({
@@ -165,7 +165,7 @@ export const chatRunConfigSchema = z.object({
 export const agentConfigBaseSharedSchema = z.object({
   framework: AgentFrameworkEnum,
   agentGoal: z.string().min(1, "Agent goal is required."),
-  agentTasks: z.string().min(1, "Agent tasks are required."), // Assuming this was meant to be string array based on types, but schema had string. For now, string.
+  agentTasks: z.array(z.string().min(1, "Task description cannot be empty.")).optional(), // Assuming this was meant to be string array based on types, but schema had string. For now, string.
   terminationConditions: z.array(agentTerminationConditionSchema).optional(),
   statePersistence: statePersistenceConfigSchema.optional(),
   ragMemoryConfig: ragMemoryConfigSchema.optional(),
@@ -410,3 +410,76 @@ export const profileFormSchema = z.object({
 });
 
 export type ProfileFormData = z.infer<typeof profileFormSchema>;
+
+// Schema for CustomToolDialog (relocated and messages updated)
+export const customToolSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().min(1, 'Description is required'),
+  inputSchema: z.string().refine(
+    (val) => {
+      if (!val) return false; // Disallow empty string
+      try {
+        JSON.parse(val);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+    { message: 'Input schema must be a non-empty, valid JSON string.' }
+  ),
+  outputSchema: z.string().refine(
+    (val) => {
+      if (!val) return false; // Disallow empty string
+      try {
+        JSON.parse(val);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+    { message: 'Output schema must be a non-empty, valid JSON string.' }
+  ),
+});
+
+// Schemas for ToolConfigModal tools
+export const googleSearchToolConfigSchema = z.object({
+  googleCseId: z.string().min(1, "Google CSE ID is required."),
+  // selectedApiKeyId is typically handled by the main form or a broader context
+});
+
+export const openApiToolConfigSchema = z.object({
+  openapiSpecUrl: z.string().url({ message: "OpenAPI Spec URL must be a valid URL." }).min(1, { message: "OpenAPI Spec URL is required." }),
+});
+
+export const databaseConnectorToolConfigSchema = z.object({
+  dbType: z.enum(["postgresql", "mysql", "sqlserver", "sqlite", "other"], { errorMap: () => ({ message: "Please select a valid database type."}) }),
+  dbHost: z.string().optional(),
+  dbPort: z.number().int().positive().optional(),
+  dbName: z.string().optional(),
+  dbUser: z.string().optional(),
+  dbConnectionString: z.string().optional(),
+  dbDescription: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.dbType && data.dbType !== 'sqlite' && data.dbType !== 'other' && !data.dbConnectionString && !data.dbHost) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["dbHost"],
+      message: "Host is required for the selected database type if a connection string is not provided.",
+    });
+  }
+  // Further refinement: if connection string is provided, other fields might become optional.
+  // If not, then host, name, user might be required depending on dbType.
+  if (!data.dbConnectionString) {
+    if (data.dbType && data.dbType !== 'sqlite' && data.dbType !== 'other') {
+      if (!data.dbHost) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dbHost"], message: "Host is required if not using a connection string." });
+      }
+      if (!data.dbName) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dbName"], message: "Database name is required if not using a connection string." });
+      }
+      if (!data.dbUser) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dbUser"], message: "User is required if not using a connection string." });
+      }
+    }
+  }
+});
