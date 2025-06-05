@@ -80,10 +80,22 @@ export interface RagMemoryConfig {
 }
 
 export interface LLMModelDetails {
-  modelId: string;
-  provider: string;
-  temperature?: number;
-  maxTokens?: number;
+  id: string; // renamed from modelId
+  name: string; // new field
+  provider: string; // existing
+  capabilities?: { // new field
+    streaming?: boolean;
+    tools?: boolean;
+    vision?: boolean;
+  };
+  estimatedCost?: { // new field
+    input?: number;
+    output?: number;
+    unit?: string;
+  };
+  maxOutputTokens?: number; // renamed from maxTokens, optional
+  temperature?: number; // existing, ensure optional
+  customProperties?: Record<string, any>; // new field
 }
 
 export interface WorkflowStep {

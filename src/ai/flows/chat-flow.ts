@@ -139,6 +139,26 @@ export const basicChatFlow = defineFlow(
   },
   async (input: BasicChatInput) => {
     // TODO: Implement actual chat flow logic
+    // Example of how to use the consolidated llmModels with the updated LLMModelDetails type:
+    // const modelIdFromConfig = input.config?.model || 'default-model-id'; // Get modelId from input config
+    // const selectedModelDetails = llmModels.find(m => m.id === modelIdFromConfig);
+    //
+    // if (selectedModelDetails) {
+    //   // const genkitModel = googleAI(selectedModelDetails.id); // Or another provider based on selectedModelDetails.provider
+    //   // The line above is a placeholder. Actual model instantiation would depend on the provider.
+    //   // For example, if selectedModelDetails.provider === 'Google', then use googleAI().
+    //   // If selectedModelDetails.provider === 'OpenAI', you'd use an OpenAI equivalent.
+    //   // This often involves a lookup or a factory function based on the provider string.
+    //   winstonLogger.info(`Using model: ${selectedModelDetails.name} (ID: ${selectedModelDetails.id}) from provider ${selectedModelDetails.provider}`);
+    //   winstonLogger.info(`Max output tokens: ${selectedModelDetails.maxOutputTokens}`);
+    //   winstonLogger.info(`Capabilities: ${JSON.stringify(selectedModelDetails.capabilities)}`);
+    //   winstonLogger.info(`Estimated cost: ${JSON.stringify(selectedModelDetails.estimatedCost)}`);
+    //   // Use these details in the ai.generate() call, potentially overriding with input.config values
+    // } else {
+    //   winstonLogger.error(`Model with id ${modelIdFromConfig} not found in llmModels.`);
+    //   // Handle error: throw new Error(`Model ${modelIdFromConfig} not found`);
+    // }
+
     // Implementação do fluxo de chat aqui
     return {
       response: 'Resposta padrão',

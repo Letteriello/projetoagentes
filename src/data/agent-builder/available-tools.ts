@@ -3,7 +3,8 @@ import { mcpTools, MCPTool } from "@/types/mcp-tools"; // Assuming MCPTool is th
 import {
   LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays,
   Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock, Video,
-  Smile, ThumbsUp, TestTubeDiagonal, Mic, Volume2, Film, Cloud, FunctionSquare
+  Smile, ThumbsUp, TestTubeDiagonal, Mic, Volume2, Film, Cloud, FunctionSquare,
+  MessageSquare // Added MessageSquare import
 } from "lucide-react";
 import { dateTimeTool } from "../../ai/tools/date-time-tool";
 import { petStoreTool } from "../../ai/tools/openapi-tool";
@@ -520,6 +521,18 @@ export const standardTools: AvailableTool[] = [
     genkitTool: customFunctionInvokerTool,
     inputSchema: JSON.stringify(customFunctionInvokerTool.inputSchema?.jsonSchema || {}),
     outputSchema: JSON.stringify(customFunctionInvokerTool.outputSchema?.jsonSchema || {}),
+  },
+  {
+    id: 'chat-tool',
+    name: 'Chat Tool',
+    icon: MessageSquare,
+    description: 'A tool for enabling chat functionalities.',
+    category: 'Communication',
+    hasConfig: false,
+    configType: 'mcp',
+    requiresAuth: false,
+    genkitToolName: undefined,
+    configFields: [],
   }
 ];
 
