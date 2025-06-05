@@ -3,6 +3,7 @@ import { ai } from '@/ai/genkit';
 import { gemini10Pro } from '@genkit-ai/googleai';
 import * as z from 'zod';
 import { SavedAgentConfiguration, AgentConfig, AgentType, LLMAgentConfig, WorkflowAgentConfig, CustomAgentConfig, A2AAgentSpecialistConfig } from '@/types/agent-configs-fixed';
+import { winstonLogger } from '../../lib/winston-logger';
 
 const AgentCreatorChatInputSchema = z.object({
   userNaturalLanguageInput: z.string(),
@@ -56,14 +57,14 @@ function ensureBaseConfig(config: Partial<SavedAgentConfiguration>): Partial<Sav
 
 // Define the flow function that takes the input and processes it
 export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async (input: z.infer<typeof AgentCreatorChatInputSchema>) => {
-    console.log("[agentCreatorChatFlow] Input received:", JSON.stringify(input, null, 2));
+    winstonLogger.info("[agentCreatorChatFlow] Input received", { flowName: 'agentCreatorChatFlow', input });
 
     let currentConfig: Partial<SavedAgentConfiguration> = {};
     if (input.currentAgentConfigJson && input.currentAgentConfigJson !== "{}" && input.currentAgentConfigJson !== "null") {
       try {
         currentConfig = JSON.parse(input.currentAgentConfigJson);
       } catch (e) {
-        console.error("Error parsing currentAgentConfigJson:", e);
+        winstonLogger.error("[agentCreatorChatFlow] Error parsing currentAgentConfigJson", { flowName: 'agentCreatorChatFlow', error: e, currentAgentConfigJson: input.currentAgentConfigJson });
         currentConfig = ensureBaseConfig({}); // Start fresh if parsing fails
         // Do not return error immediately, let the LLM try to work with a fresh config or ask user.
         // The assistant message will indicate an issue if needed.
@@ -148,7 +149,7 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
           assistantMessage: assistantMessage
         };
       } catch (e) {
-        console.error("Error parsing JSON response:", e);
+        winstonLogger.error("[agentCreatorChatFlow] Error parsing LLM JSON response", { flowName: 'agentCreatorChatFlow', error: e, llmResponseText: text });
         throw new Error("Failed to parse LLM response as JSON");
       }
 
@@ -157,11 +158,11 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
       }
 
       if (typeof responseValue.updatedConfig !== 'object' || responseValue.updatedConfig === null || typeof responseValue.assistantMessage !== 'string') {
-        console.error("Resposta do LLM não tem o formato esperado:", responseValue);
+        winstonLogger.error("[agentCreatorChatFlow] LLM response does not have the expected structure", { flowName: 'agentCreatorChatFlow', responseValue });
         throw new Error("Resposta do LLM não está no formato esperado (updatedConfig objeto, assistantMessage string).");
       }
 
-      console.log("[agentCreatorChatFlow] LLM Response value:", JSON.stringify(responseValue, null, 2));
+      winstonLogger.info("[agentCreatorChatFlow] LLM Response value", { flowName: 'agentCreatorChatFlow', responseValue });
 
       // Pequena lógica para garantir que se o LLM não fornecer agentName ou config.type, e eles estiverem vazios,
       // a mensagem do assistente seja ajustada para continuar perguntando, mesmo que o LLM não tenha seguido essa instrução à risca.
@@ -181,7 +182,7 @@ export const agentCreatorChatFlow = ai.defineFlow('agentCreatorChatFlow', async 
       };
 
     } catch (e: any) {
-      console.error("[agentCreatorChatFlow] Error during LLM call or processing:", e);
+      winstonLogger.error("[agentCreatorChatFlow] Error during LLM call or processing", { flowName: 'agentCreatorChatFlow', error: e, input });
       // Tentar retornar a configuração atual se o LLM falhar completamente, para não perder o estado.
       const currentJsonOnError = input.currentAgentConfigJson && input.currentAgentConfigJson !== "{}" && input.currentAgentConfigJson !== "null"
                                  ? input.currentAgentConfigJson

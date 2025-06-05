@@ -653,12 +653,27 @@ async function basicChatFlowInternal(
         llmResponse = llmCache.get(currentRequestCacheKey)!;
       } else {
         winstonLogger.info(`[Chat Flow Cache] MISS for iteration key: ${currentRequestCacheKey.substring(0, 50)}...`, { agentId, flowName });
-        llmResponse = await ai.generate({
-          ...request,
-          messages: currentMessagesForLLM, // Use currentMessagesForLLM
-        });
-        if (llmResponse && llmResponse.candidates && llmResponse.candidates.length > 0) {
-          llmCache.set(currentRequestCacheKey, llmResponse);
+        try {
+          llmResponse = await ai.generate({
+            ...request,
+            messages: currentMessagesForLLM, // Use currentMessagesForLLM
+          });
+          if (llmResponse && llmResponse.candidates && llmResponse.candidates.length > 0) {
+            llmCache.set(currentRequestCacheKey, llmResponse);
+          }
+        } catch (error: any) {
+          winstonLogger.error(
+            `[Chat Flow] Error during ai.generate call in tool loop (iteration ${iteration})`,
+            {
+              agentId,
+              flowName,
+              iteration,
+              error, // Log the caught error object
+              currentMessagesForLLM: JSON.stringify(currentMessagesForLLM).substring(0, 500) + "..." // Log a snippet
+            }
+          );
+          finalOutputText = (finalOutputText ? finalOutputText + "\n" : "") + "An error occurred while communicating with the AI. Please try again.";
+          throw new Error(`Error in ai.generate during tool loop, iteration ${iteration}: ${error.message}`);
         }
       }
 
@@ -1193,6 +1208,16 @@ async function basicChatFlowInternal(
         } catch (e: any) {
           toolExecutionFailed = true;
           errorMessage = e.message || 'Tool crashed during execution';
+          winstonLogger.error(
+            `[Chat Flow] Error during execution of tool: ${toolRequest.name}`,
+            {
+              agentId,
+              flowName,
+              toolName: toolRequest.name,
+              toolInput: toolRequest.input,
+              error: e instanceof Error ? { message: e.message, stack: e.stack, name: e.name } : String(e)
+            }
+          );
           // ... (crash handling)
           // Tool Token Simulation for crashed tool
           const toolInputTokensCrash = JSON.stringify(toolRequest.input || {}).length / 4;
