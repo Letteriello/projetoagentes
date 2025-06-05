@@ -15,7 +15,12 @@ import {
   AiConfigurationAssistantInputSchema,
 } from "@/ai/flows/aiConfigurationAssistantFlow";
 import { SavedAgentConfiguration } from "@/types/agent-configs-fixed";
-import type { ApiResponse } from "@/types/api-types";/**
+import type { ApiResponse } from "@/types/api-types";
+
+// Temporary in-memory store for agents to simulate a backend
+let simulatedAgentsDB: SavedAgentConfiguration[] = [];
+
+/**
  * Obtém sugestões do assistente de configuração de IA com base na configuração atual do agente
  * @param currentConfig Configuração atual do agente
  * @param suggestionContext Contexto opcional para sugestões (histórico de chat, entrada do usuário)
@@ -95,17 +100,20 @@ export async function suggestAgentNameAndDescriptionAction(userDescription: stri
  */
 export async function createAgent(agentConfig: SavedAgentConfiguration): Promise<ApiResponse> {
   try {
-    // Implementação futura para criação de agentes
-    // Por enquanto, apenas retorna sucesso com ID simulado
+    const newAgent = {
+      ...agentConfig,
+      id: `agent-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      createdAt: new Date().toISOString(), // Optional: add a creation timestamp
+    };
+    simulatedAgentsDB.push(newAgent);
+    console.log(`[Actions] Agent created: ${newAgent.id}. Total agents: ${simulatedAgentsDB.length}`);
     return { 
       success: true, 
-      data: {
-        ...agentConfig,
-        id: `agent-${Date.now()}`
-      },
+      data: newAgent, // Return the full new agent
       timestamp: new Date().toISOString()
     };
-  } catch (e: any) {
+  } catch (e: any)
+ {
     console.error("[Actions] createAgent erro:", e);
     return { 
       success: false, 
@@ -122,19 +130,40 @@ export async function createAgent(agentConfig: SavedAgentConfiguration): Promise
  */
 export async function listAgents(userId?: string): Promise<ApiResponse> {
   try {
-    // Implementação futura para listar agentes
-    // Por enquanto, retorna uma lista vazia
+    // Returns a copy of the simulated database
+    // In a real scenario, you'd filter by userId
+    console.log(`[Actions] Listing agents. Total: ${simulatedAgentsDB.length}`);
     return { 
       success: true, 
-      data: [],
+      data: [...simulatedAgentsDB],
       timestamp: new Date().toISOString()
     };
-  } catch (e: any) {
+  } catch (e: any)
+ {
     console.error("[Actions] listAgents erro:", e);
     return { 
       success: false, 
       error: e.message || "Falha ao listar agentes.",
       timestamp: new Date().toISOString()
     };
+  }
+}
+
+// Helper to reset the simulated DB for testing or specific scenarios if needed from server-side
+// This is NOT directly callable from client unless exposed via another action.
+export async function resetSimulatedAgentDB(): Promise<ApiResponse> {
+  try {
+    simulatedAgentsDB = [];
+    return {
+      success: true,
+      message: "Simulated agent DB reset.",
+      timestamp: new Date().toISOString()
+    }
+  } catch (e:any) {
+    return {
+      success: false,
+      error: e.message || "Failed to reset simulated agent DB.",
+      timestamp: new Date().toISOString()
+    }
   }
 }

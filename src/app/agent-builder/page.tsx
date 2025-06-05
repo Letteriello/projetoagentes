@@ -40,7 +40,8 @@ import {
   Book, 
   MessageSquareText,
   Settings,
-  Trash2
+  Trash2,
+  Info // Added for ContextualHelp
 } from "lucide-react";
 import { Gauge, RefreshCw } from "lucide-react";
 import { TbBuildingStore, TbBarbell } from "react-icons/tb";
@@ -50,6 +51,10 @@ import { RiArrowGoBackFill } from "react-icons/ri";
 import { useToast } from "@/hooks/use-toast";
 import { useAgents } from "@/contexts/AgentsContext";
 import { useAgentStorage } from "@/hooks/use-agent-storage";
+import { useAchievements } from "@/hooks/useAchievements"; // Added useAchievements
+import ContextualHelp from "@/components/shared/ContextualHelp"; // Added ContextualHelp
+import EmptyState from "@/components/shared/EmptyState"; // Added EmptyState
+import Link from "next/link"; // Added Link for ContextualHelp
 
 // Importações de tipos
 import { 
@@ -180,101 +185,9 @@ const saveAgentTemplate = async (template: AdaptedSavedAgentConfiguration): Prom
   // Implementação temporária para compilar
   console.log("Salvando template:", template);
   return Promise.resolve();
-};// Componente AgentCard (linha de agente)
-function RenderAgentRow({
-  agent,
-  index,
-  style,
-  onEdit,
-  onDelete,
-  onDuplicate,
-  onSaveTemplate
-}: AgentRowProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const { toast } = useToast();
+};
 
-  const handleMonitor = () => {
-    // Implementação mock temporária
-    toast({
-      title: "Monitoramento de agente iniciado",
-      description: `Monitorando agente: ${agent.agentName}`
-    });
-  };
-
-  return (
-    <Card
-      className="relative hover:shadow-md transition-shadow"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <CardContent className="p-6 flex flex-col gap-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-lg font-semibold">{agent.agentName}</h3>
-            <p className="text-sm text-gray-500 mt-1">{agent.description || 'Sem descrição'}</p>
-          </div>
-          <div className="flex gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => onEdit(agent)}
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Editar</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => onDelete(agent)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Excluir</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {agent.config.tools?.length ? (
-            agent.config.tools.map((tool) => (
-              <Badge key={tool.id} variant="secondary">
-                {tool.name}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-sm text-gray-500">Sem ferramentas configuradas</span>
-          )}
-        </div>
-
-        <div className="mt-4 flex justify-between items-center">
-          <div className="text-xs text-gray-500">
-            Atualizado: {new Date(agent.updatedAt).toLocaleDateString()}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => onDuplicate(agent)}>
-              Duplicar
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onSaveTemplate(agent)}>
-              Salvar Template
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}// Componente principal da página
+// Componente principal da página
 export default function AgentBuilderPage() {
   // Estado para agentes
   const [agents, setAgents] = useState<AdaptedSavedAgentConfiguration[]>([]);
@@ -311,6 +224,11 @@ export default function AgentBuilderPage() {
   // Estado para tutoriais
   const [activeTutorial, setActiveTutorial] = useState<any>(null);
   const [currentTutorialStep, setCurrentTutorialStep] = useState(0);
+
+  // State for ContextualHelp (Inactivity)
+  const [showInactivityHelp, setShowInactivityHelp] = React.useState(false);
+  const [userHasInteracted, setUserHasInteracted] = React.useState(false);
+  const inactivityTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // Hooks
   const router = useRouter();
@@ -323,6 +241,12 @@ export default function AgentBuilderPage() {
     deleteAgent, 
     isLoadingAgents 
   } = useAgents();
+  const { unlockAchievement } = useAchievements(); // Initialize achievements hook
+  const prevAgentCountRef = React.useRef(0); // Ref to store previous agent count
+
+  // State for import confirmation
+  const [isImportConfirmationOpen, setIsImportConfirmationOpen] = React.useState(false);
+  const [agentToImportData, setAgentToImportData] = React.useState<Partial<SavedAgentConfiguration> | null>(null);
   
   // Efeito para carregar agentes do contexto
   useEffect(() => {
@@ -334,13 +258,62 @@ export default function AgentBuilderPage() {
         config: agent.config || {},
       }));
       setAgents(adaptedAgents);
-    }
-  }, [savedAgents]);
 
-  // Efeito para verificar parâmetros URL
+      // Achievement logic based on agent count changes
+      const currentAgentCount = adaptedAgents.length;
+      if (prevAgentCountRef.current !== currentAgentCount) {
+        if (currentAgentCount === 1 && prevAgentCountRef.current === 0) {
+          unlockAchievement('agent-created');
+        }
+        if (currentAgentCount === 5 && prevAgentCountRef.current === 4) {
+          unlockAchievement('five-agents');
+        }
+        prevAgentCountRef.current = currentAgentCount;
+      }
+    } else { // If savedAgents is null or undefined (e.g. initial load or error)
+      prevAgentCountRef.current = 0; // Reset if agent list is not available
+    }
+  }, [savedAgents, unlockAchievement]);
+
+  // Effect to initialize prevAgentCountRef on mount if savedAgents is already populated
+  useEffect(() => {
+    if (savedAgents) {
+      prevAgentCountRef.current = savedAgents.length;
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Effect for inactivity contextual help
+  useEffect(() => {
+    // Set a timer only if user hasn't interacted yet
+    if (!userHasInteracted) {
+      inactivityTimerRef.current = setTimeout(() => {
+        if (!userHasInteracted) { // Check again before showing
+          setShowInactivityHelp(true);
+        }
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [userHasInteracted]);
+
+  const handleUserInteraction = () => {
+    setUserHasInteracted(true);
+    setShowInactivityHelp(false); // Hide help once user interacts
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+  };
+
+  // Efeito para verificar parâmetros URL (tutorial e import de agente)
   useEffect(() => {
     if (searchParams) {
       const tutorialId = searchParams.get('tutorial');
+      const importData = searchParams.get('data');
+
       if (tutorialId) {
         const tutorial = tutorials.find((t) => t.id === tutorialId);
         if (tutorial) {
@@ -348,9 +321,39 @@ export default function AgentBuilderPage() {
           setCurrentTutorialStep(0);
           setIsTutorialModalOpen(true);
         }
+      } else if (importData) {
+        try {
+          const decodedJson = atob(importData);
+          const parsedAgentData = JSON.parse(decodedJson) as Partial<SavedAgentConfiguration>;
+
+          if (parsedAgentData && parsedAgentData.agentName && parsedAgentData.config) {
+            setAgentToImportData(parsedAgentData);
+            setIsImportConfirmationOpen(true);
+          } else {
+            toast({
+              title: "Erro na Importação",
+              description: "Os dados do agente a ser importado são inválidos ou estão incompletos.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("Falha ao decodificar ou parsear dados do agente:", error);
+          toast({
+            title: "Erro na Importação",
+            description: "Não foi possível processar os dados do agente para importação. O link pode estar corrompido.",
+            variant: "destructive",
+          });
+        }
+        // Clean the URL immediately after attempting to process to avoid re-processing on refresh / navigation issues
+        // Using router.replace to avoid adding to history stack
+        const currentPath = window.location.pathname;
+        const newSearchParams = new URLSearchParams(window.location.search);
+        newSearchParams.delete('data');
+        router.replace(`${currentPath}?${newSearchParams.toString()}`, undefined);
+
       }
     }
-  }, [searchParams, tutorials]);
+  }, [searchParams, router, toast]); // Added router and toast to dependencies
 
   // Filtrar agentes com base na busca
   const filteredAgents = agents.filter((agent) => 
@@ -358,6 +361,7 @@ export default function AgentBuilderPage() {
     (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );  // Handlers para ações
   const handleCreateNewAgent = () => {
+    handleUserInteraction(); // User interacted
     setEditingAgent({
       agentName: "",
       description: "",
@@ -520,12 +524,6 @@ export default function AgentBuilderPage() {
     );
   };
 
-  // Filtragem de agentes com base na pesquisa
-  const filteredAgents = agents.filter(agent => 
-    agent.agentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   // Cálculo de estatísticas
   const totalAgents = agents.length;
   const agentsWithTools = agents.filter(agent => 
@@ -560,7 +558,7 @@ export default function AgentBuilderPage() {
   };
 
   // Renderização conditional com base no estado de carregamento
-  if (isLoading) {
+  if (isLoadingAgents) {
     return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
   }
   // Handler para salvar agente (criação ou edição)
@@ -666,10 +664,78 @@ export default function AgentBuilderPage() {
         />
       </div>
     );
-  };  // Renderização do componente principal
-      // Fechar modal e resetar estado
-      setEditingAgent(null);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!agentToImportData) return;
+
+    let agentName = agentToImportData.agentName || "Agente Importado";
+    // Check for name conflicts
+    let nameConflictCount = 0;
+    let newName = agentName;
+    while (agents.some(a => a.agentName === newName)) {
+      nameConflictCount++;
+      newName = `${agentName} (${nameConflictCount})`;
+    }
+    agentName = newName;
+
+    const newAgent: SavedAgentConfiguration = {
+      id: uuidv4(), // Generate new unique ID
+      originalAgentId: agentToImportData.id, // Store original ID if present
+      agentName: agentName,
+      agentDescription: agentToImportData.agentDescription || "",
+      agentVersion: agentToImportData.agentVersion || "1.0.0",
+      icon: agentToImportData.icon || "", // Ensure icon is handled
+      config: agentToImportData.config!, // Assert config is present due to earlier check
+      tools: agentToImportData.tools || [],
+      toolsDetails: agentToImportData.toolsDetails?.map(td => ({ // Map tool details
+        id: td.id,
+        name: td.name || td.id, // Fallback name
+        description: td.description || "",
+        hasConfig: td.hasConfig || false,
+        genkitToolName: td.genkitToolName,
+        // Ensure all fields expected by SavedAgentConfiguration.toolsDetails are present
+        // iconName: td.iconName || 'Default', // Example if iconName is part of your type
+        // label: td.label || td.name || td.id, // Example
+      })) || [],
+      toolConfigsApplied: agentToImportData.toolConfigsApplied || {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      // Ensure all other required fields from SavedAgentConfiguration are present with defaults
+      templateId: agentToImportData.templateId,
+      isTemplate: false, // Imported agents are typically not templates themselves
+      isFavorite: false,
+      tags: agentToImportData.tags || [],
+      userId: '', // Or get from current user context if available
+      // Default other complex objects if not in importData or if they need re-initialization
+      deploymentConfig: agentToImportData.deploymentConfig || { environmentVariables: [], resourceRequirements: { cpu: '', memory: ''} },
+      internalVersion: 1,
+      isLatest: true,
+    };
+
+    try {
+      await addAgent(newAgent); // Assuming addAgent now directly takes SavedAgentConfiguration
+      toast({
+        title: "Agente Importado",
+        description: `O agente "${newAgent.agentName}" foi importado com sucesso.`,
+      });
     } catch (error) {
+      console.error("Erro ao importar agente:", error);
+      toast({
+        title: "Erro na Importação",
+        description: "Não foi possível adicionar o agente importado.",
+        variant: "destructive",
+      });
+    }
+
+    setIsImportConfirmationOpen(false);
+    setAgentToImportData(null);
+    // URL should have already been cleaned by the useEffect that detected 'data'
+  };
+  // Renderização do componente principal
+    // Fechar modal e resetar estado
+    setEditingAgent(null);
+  } catch (error) {
       console.error("Erro ao salvar agente:", error);
       toast({
         title: "Erro ao salvar agente",
@@ -771,7 +837,11 @@ export default function AgentBuilderPage() {
                 placeholder="Pesquisar agentes..."
                 className="pl-8"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  handleUserInteraction(); // User interacted
+                }}
+                onFocus={handleUserInteraction} // User interacted
               />
             </div>
           </div>
@@ -806,21 +876,29 @@ export default function AgentBuilderPage() {
             </Suspense>
           </div>
         ) : (
+          // Check if there are no agents at all
+          agents.length === 0 ? (
+            <EmptyState
+              title="Nenhum Agente Criado Ainda"
+              description="Parece que você não tem nenhum agente. Comece criando seu primeiro agente para automatizar tarefas e interagir com IA."
+              icon={<Ghost className="h-16 w-16" />} // Using Ghost as per original, Cpu or Plus could also work
+              actionButton={{
+                text: "Criar Novo Agente",
+                onClick: handleCreateNewAgent,
+                icon: <Plus className="mr-2 h-4 w-4" />,
+                variant: "default"
+              }}
+              className="my-12" // Add some margin for better spacing
+            />
+          ) : // Check if there are agents, but none match the filter
           filteredAgents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <Ghost className="h-16 w-16 text-gray-400 mb-4" />
-              <h3 className="text-2xl font-bold">Nenhum agente encontrado</h3>
-              <p className="text-gray-500 mt-2 max-w-md">
-                {agents.length === 0 
-                  ? "Você ainda não tem nenhum agente. Clique em 'Novo Agente' para criar seu primeiro agente IA."
-                  : "Nenhum agente corresponde à sua pesquisa. Tente outro termo ou limpe a pesquisa."}
-              </p>
-              {agents.length === 0 && (
-                <Button onClick={handleCreateNewAgent} className="mt-4">
-                  <Plus className="mr-2" /> Criar Agente
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              title="Nenhum Agente Encontrado"
+              description="Nenhum agente corresponde à sua pesquisa. Tente um termo diferente ou limpe a pesquisa."
+              icon={<Search className="h-16 w-16" />}
+              className="my-12"
+              // No action button for "no search results" or a different one like "Clear Search"
+            />
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAgents.map((agent: AdaptedSavedAgentConfiguration, index: number) => (
@@ -855,18 +933,43 @@ export default function AgentBuilderPage() {
             </div>
           )
         )}
-      </div>      {/* Modais - Carregamento lazy com Suspense */}
+
+        <ContextualHelp
+          type="alert"
+          show={showInactivityHelp && !userHasInteracted && agents.length === 0} // Show only if no agents and no interaction
+          icon={<Info className="h-4 w-4" />}
+          alertTitle="Precisa de Ajuda?"
+          content={
+            <>
+              Parece que você ainda não criou nenhum agente. Precisa de ajuda para começar? Confira nossos{" "}
+              <Link href="/tutorials" className="underline hover:text-primary" onClick={handleUserInteraction}>
+                tutoriais
+              </Link>{" "}
+              ou clique em &quot;Novo Agente&quot; para iniciar.
+            </>
+          }
+        />
+      </div> {/* Modais - Carregamento lazy com Suspense */}
       <Suspense fallback={<div>Carregando...</div>}>
         {/* Modal de Criação/Edição */}
         {isCreateModalOpen && editingAgent && (
           <AgentBuilderDialog
             name="Criar Agente"
             isOpen={isCreateModalOpen}
-            onOpenChange={(open: boolean) => setIsCreateModalOpen(open)}
+            onOpenChange={(open: boolean) => {
+              setIsCreateModalOpen(open);
+              if (open) handleUserInteraction(); // Interaction when modal opens
+            }}
             initialData={editingAgent}
-            onSave={handleSaveAgent}
+            onSave={(data) => {
+              handleSaveAgent(data);
+              handleUserInteraction(); // Interaction on save
+            }}
             availableTools={builderAvailableTools}
-            onConfigureTool={handleConfigureTool}
+            onConfigureTool={(tool) => {
+              handleConfigureTool(tool);
+              handleUserInteraction(); // Interaction on tool config
+            }}
           />
         )}
         
@@ -874,11 +977,20 @@ export default function AgentBuilderPage() {
           <AgentBuilderDialog
             name="Editar Agente"
             isOpen={isEditModalOpen}
-            onOpenChange={(open: boolean) => setIsEditModalOpen(open)}
+            onOpenChange={(open: boolean) => {
+              setIsEditModalOpen(open);
+              if (open) handleUserInteraction(); // Interaction when modal opens
+            }}
             initialData={editingAgent}
-            onSave={handleSaveAgent}
+            onSave={(data) => {
+              handleSaveAgent(data);
+              handleUserInteraction(); // Interaction on save
+            }}
             availableTools={builderAvailableTools}
-            onConfigureTool={handleConfigureTool}
+            onConfigureTool={(tool) => {
+              handleConfigureTool(tool);
+              handleUserInteraction(); // Interaction on tool config
+            }}
           />
         )}
         
@@ -988,6 +1100,27 @@ export default function AgentBuilderPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        )}
+
+        {/* Import Confirmation Modal */}
+        {agentToImportData && (
+          <ConfirmationModal
+            name="Confirmar Importação de Agente"
+            isOpen={isImportConfirmationOpen}
+            onOpenChange={(open: boolean) => {
+              setIsImportConfirmationOpen(open);
+              if (!open) setAgentToImportData(null); // Clear data if modal is closed without confirming
+            }}
+            title={`Importar Agente: ${agentToImportData.agentName || 'Desconhecido'}?`}
+            description={
+              `Você está prestes a importar o agente "${agentToImportData.agentName || 'Desconhecido'}".
+              Descrição: ${agentToImportData.agentDescription || 'N/A'}.
+              Uma nova cópia será criada em sua lista de agentes.`
+            }
+            confirmText="Importar"
+            cancelText="Cancelar"
+            onAction={handleConfirmImport}
+          />
         )}
       </Suspense>
     </>

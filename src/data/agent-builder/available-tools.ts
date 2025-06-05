@@ -1,7 +1,7 @@
 import { AvailableTool } from "@/types/tool-types";
 import { mcpTools } from "@/types/mcp-tools";
-// Merged lucide-react imports and added Video, Clock, Smile, ThumbsUp, TestTubeDiagonal
-import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock, Video, Smile, ThumbsUp, TestTubeDiagonal } from "lucide-react";
+// Merged lucide-react imports and added Video, Clock, Smile, ThumbsUp, TestTubeDiagonal, Mic, Volume2, Film, Cloud, FunctionSquare
+import { LucideIcon, HelpCircle, Search, Calculator, FileText, CalendarDays, Network, Database, Code2, Terminal, Cpu, Brain, Globe, Clock, Video, Smile, ThumbsUp, TestTubeDiagonal, Mic, Volume2, Film, Cloud, FunctionSquare } from "lucide-react"; // Added Mic, Volume2, Film, Cloud, FunctionSquare
 import { dateTimeTool } from "../../ai/tools/date-time-tool";
 import { petStoreTool } from "../../ai/tools/openapi-tool";
 import { fileIoTool } from "../../ai/tools/file-io-tool";
@@ -10,6 +10,10 @@ import { textSummarizerTool } from '../../ai/tools/text-summarizer-tool';
 import { sentimentAnalyzerTool } from '../../ai/tools/sentiment-analyzer-tool';
 import { aiFeedbackTool } from '../../ai/tools/ai-feedback-tool';
 import { stringReverserTool } from '@/ai/tools/example-tdd-tool'; // Task 9.7
+import { speechToTextTool, textToSpeechTool } from '../../ai/tools/speech-tools'; // Speech Tools
+import { videoSummarizerTool } from '../../ai/tools/video-summarizer-tool'; // Video Summarizer Tool
+import { gcsListBucketsTool, gcsUploadFileTool } from '../../ai/tools/gcs-tool'; // GCS Tools
+import { customFunctionInvokerTool } from '../../ai/tools/custom-function-invoker'; // Custom Function Invoker
 
 import {
   TOOL_ID_WEB_SEARCH,
@@ -65,6 +69,11 @@ function getIconComponent(name?: string): LucideIcon {
     smile: Smile,
     thumbsup: ThumbsUp,
     testtubediagonal: TestTubeDiagonal, // Added for TDD tool
+    mic: Mic, // Added Mic
+    volume2: Volume2, // Added Volume2 (as VolumeUp)
+    film: Film, // Added Film
+    cloud: Cloud, // Added Cloud
+    functionsquare: FunctionSquare, // Added FunctionSquare
   };
   if (!name) return HelpCircle;
   return iconMap[name.toLowerCase()] || HelpCircle;
@@ -392,6 +401,75 @@ export const standardTools: AvailableTool[] = [
     value: stringReverserTool, // The actual tool instance, if needed by parts of the UI
     genkitTool: stringReverserTool, // Storing the tool for consistency
     category: "Examples", // Added category
+  },
+  {
+    id: speechToTextTool.name, // Using tool name as ID
+    name: "Speech to Text (Simulated)",
+    icon: Mic, // Using imported Mic icon
+    description: "Simulates converting audio data to text. Takes an audio data URI and returns a mock transcription.",
+    hasConfig: false,
+    category: "Media",
+    genkitToolName: speechToTextTool.name,
+    value: speechToTextTool, // Storing the actual tool instance
+    genkitTool: speechToTextTool, // Storing the tool for consistency
+  },
+  {
+    id: textToSpeechTool.name, // Using tool name as ID
+    name: "Text to Speech (Simulated)",
+    icon: Volume2, // Using imported Volume2 icon (representing VolumeUp)
+    description: "Simulates converting text to audio. Takes text and returns a mock audio data URI.",
+    hasConfig: false,
+    category: "Media",
+    genkitToolName: textToSpeechTool.name,
+    value: textToSpeechTool, // Storing the actual tool instance
+    genkitTool: textToSpeechTool, // Storing the tool for consistency
+  },
+  {
+    id: videoSummarizerTool.name, // Using tool name as ID
+    name: "Video Summarizer (Simulated)",
+    icon: Film, // Using imported Film icon
+    description: "Simulates summarizing a video from a URL. Takes a video URL and returns a mock text summary.",
+    hasConfig: false,
+    category: "Media", // Or "AI"
+    genkitToolName: videoSummarizerTool.name,
+    value: videoSummarizerTool, // Storing the actual tool instance
+    genkitTool: videoSummarizerTool, // Storing the tool for consistency
+  },
+  {
+    id: gcsListBucketsTool.name,
+    name: "GCS List Buckets (Simulated)",
+    icon: Cloud, // Using imported Cloud icon
+    description: "Simulates listing Google Cloud Storage buckets. Optionally filters by prefix.",
+    hasConfig: false,
+    category: "Cloud",
+    genkitToolName: gcsListBucketsTool.name,
+    value: gcsListBucketsTool,
+    genkitTool: gcsListBucketsTool,
+  },
+  {
+    id: gcsUploadFileTool.name,
+    name: "GCS Upload File (Simulated)",
+    icon: Cloud, // Using imported Cloud icon
+    description: "Simulates uploading a file to Google Cloud Storage.",
+    hasConfig: false,
+    category: "Cloud",
+    genkitToolName: gcsUploadFileTool.name,
+    value: gcsUploadFileTool,
+    genkitTool: gcsUploadFileTool,
+  },
+  {
+    id: customFunctionInvokerTool.name, // e.g., 'customPythonFunctionInvoker'
+    name: "Custom Python Function Invoker (Simulated)",
+    icon: FunctionSquare, // Using imported FunctionSquare icon
+    description: "SIMULATED: 'Invokes' user-defined Python code. CRITICAL SECURITY WARNING: Highly dangerous if not properly sandboxed. This is a simulation ONLY. For advanced users to understand concepts.",
+    hasConfig: false, // Complex security setup means no simple UI config.
+    category: "Advanced",
+    genkitToolName: customFunctionInvokerTool.name,
+    value: customFunctionInvokerTool,
+    genkitTool: customFunctionInvokerTool,
+    // The `AvailableTool` type would need a `warning` field for this to be formally used.
+    // For now, the prominent warning in the description is the primary method.
+    // warning: "CRITICAL SECURITY RISK: Use with extreme caution. For simulation and understanding concepts only."
   }
 ];
 

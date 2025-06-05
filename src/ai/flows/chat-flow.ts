@@ -26,6 +26,10 @@ import { sentimentAnalyzerTool } from '../tools/sentiment-analyzer-tool'; // Add
 import { aiFeedbackTool } from '../tools/ai-feedback-tool'; // Added AI Feedback Tool
 import { videoStreamMonitorTool, GENKIT_TOOL_NAME_VIDEO_STREAM_MONITOR } from '@/ai/tools/video-stream-tool'; // Added videoStreamMonitorTool
 import { stringReverserTool } from '@/ai/tools/example-tdd-tool'; // Added for Task 9.7
+import { speechToTextTool, textToSpeechTool } from '../tools/speech-tools'; // Added Speech Tools
+import { videoSummarizerTool } from '../tools/video-summarizer-tool'; // Added Video Summarizer Tool
+import { gcsListBucketsTool, gcsUploadFileTool } from '../tools/gcs-tool'; // Added GCS Tools
+import { customFunctionInvokerTool } from '../tools/custom-function-invoker'; // Added Custom Function Invoker
 
 import process from 'node:process';
 import { ReadableStream } from 'node:stream/web'; 
@@ -129,6 +133,12 @@ const allAvailableTools: Record<string, AppTool> = {
   textSummarizer: textSummarizerTool, // Added Text Summarizer Tool
   sentimentAnalyzer: sentimentAnalyzerTool, // Added Sentiment Analyzer Tool
   aiFeedback: aiFeedbackTool, // Added AI Feedback Tool
+  [speechToTextTool.name]: speechToTextTool, // Added Speech-to-Text Tool
+  [textToSpeechTool.name]: textToSpeechTool, // Added Text-to-Speech Tool
+  [videoSummarizerTool.name]: videoSummarizerTool, // Added Video Summarizer Tool
+  [gcsListBucketsTool.name]: gcsListBucketsTool, // Added GCS List Buckets Tool
+  [gcsUploadFileTool.name]: gcsUploadFileTool, // Added GCS Upload File Tool
+  [customFunctionInvokerTool.name]: customFunctionInvokerTool, // Added Custom Function Invoker Tool
 };
 allAvailableTools['stringReverser'] = stringReverserTool; // Task 9.7
 

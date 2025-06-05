@@ -1,12 +1,14 @@
 /**
  * @fileOverview Defines a Genkit tool for executing code snippets.
- * This tool simulates code execution, currently supporting only Python.
- * It takes the language, code, and an optional timeout as input.
+ * This tool uses `python-shell` to execute Python code snippets.
+ * It takes the code and an optional timeout as input.
  * The output includes success status, stdout, stderr, execution time, and any system errors.
- * CRITICAL: This is a simulation. A real-world implementation requires robust sandboxing
- * for security, which is extensively commented on within the tool's logic.
+ * CRITICAL: Executing arbitrary code is inherently risky. While `python-shell` is used,
+ * it is NOT a sandbox. A real-world implementation requires robust sandboxing
+ * for security.
  */
 import { ai } from '@/ai/genkit'; // Import the configured 'ai' instance
+import { PythonShell, Options } from 'python-shell';
 import { z } from 'zod';
 
 // 1. Define Input Schema
@@ -41,107 +43,91 @@ export const codeExecutorTool = ai.defineTool(
     console.log('[CodeExecutorTool] Received parameters:', { language, code, timeoutMs });
 
     // CRITICAL SECURITY NOTE:
-    // Executing arbitrary code is extremely dangerous. A real-world implementation
-    // MUST use a robust sandboxing mechanism to isolate the code execution environment.
-    // This simulation is NOT secure and is for demonstration purposes only.
-    //
-    // Options for sandboxing include:
-    // 1. Docker Containers: Spin up a new, short-lived Docker container for each execution.
-    //    Define strict resource limits (CPU, memory, network policies).
-    // 2. gVisor: A container sandbox that provides a secure isolation boundary.
-    // 3. WebAssembly (Wasm): If the language can compile to Wasm, run it in a Wasm runtime.
-    //    Wasm provides a sandboxed environment by default.
-    // 4. Dedicated Cloud Services: AWS Lambda, Google Cloud Functions, Azure Functions, or specialized
-    //    code execution services (e.g., Judge0, Piston API) often provide sandboxing.
-    // 5. Virtual Machines: Heavier weight, but provides strong isolation.
-    //
-    // Key considerations for a real implementation:
-    // - Isolate file system access (use ephemeral storage or highly restricted mounts).
+    // Executing arbitrary code is extremely dangerous. `python-shell` itself is NOT a full sandbox.
+    // A real-world implementation MUST use a robust sandboxing mechanism (e.g., Docker containers,
+    // gVisor, WebAssembly, or dedicated cloud execution services) to isolate code execution.
+    // Key considerations for sandboxing:
+    // - Isolate file system access.
     // - Disable or strictly control network access.
-    // - Limit execution time (timeout).
-    // - Limit memory and CPU usage.
+    // - Limit execution time, memory, and CPU usage.
     // - Run as a non-root user with minimal privileges.
-    // - Sanitize input code for known malicious patterns (though this is hard to get perfect).
-    // - Regularly update the execution environment and dependencies.
+    // - Consider that disallowing specific modules (e.g., 'os', 'subprocess') requires more
+    //   advanced parsing or a custom Python environment, which is beyond `python-shell` alone.
 
     const effectiveTimeout = Math.min(timeoutMs || 5000, 30000); // Cap timeout at 30s
 
     if (language.toLowerCase() !== 'python') {
-      console.warn(`[CodeExecutorTool] Language '${language}' not supported by this simulation.`);
+      console.warn(`[CodeExecutorTool] Language '${language}' not supported. Only 'python' is currently implemented with python-shell.`);
       return {
         success: false,
-        error: `This code execution simulation currently only supports 'python'. Language requested: ${language}`,
+        error: `This tool currently only supports 'python' code execution. Language requested: ${language}`,
       };
     }
 
-    // Simulated Python Execution Logic:
-    console.log(`[CodeExecutorTool] Simulating Python code execution (timeout: ${effectiveTimeout}ms):`);
+    console.log(`[CodeExecutorTool] Executing Python code via python-shell (timeout: ${effectiveTimeout}ms):`);
     console.log(">>>\n" + code + "\n<<<");
 
-    // Simulate timeout before actual "execution" for testing
-    // if (effectiveTimeout < 50) { // Arbitrary short timeout for testing timeout handling
-    //   await new Promise(resolve => setTimeout(resolve, effectiveTimeout + 100)); // Simulate work that exceeds timeout
-    //   return { success: false, error: `Execution timed out after ${effectiveTimeout}ms (simulated pre-execution).`};
-    // }
+    return new Promise((resolve) => {
+      const startTime = Date.now();
 
-    const startTime = Date.now();
-    let stdout = "";
-    let stderr = "";
-    let success = true;
-    let simError = "";
+      const options: Options = {
+        mode: 'text',
+        pythonOptions: ['-B'], // Don't write .pyc files
+        // Consider adding pythonPath here if a specific virtual env or restricted Python binary should be used.
+        // For example: pythonPath: '/usr/bin/restricted-python',
+        args: [], // No arguments passed to the script itself in this basic setup
+        timeout: effectiveTimeout,
+      };
 
-    try {
-      if (code.trim() === "print('hello world')" || code.trim() === "print(\"hello world\")") {
-        stdout = "hello world\n";
-      } else if (code.includes("1 / 0")) {
-        // Note: In a real sandbox, the process would exit with an error, and you'd capture stderr.
-        // The `success` flag might be true if the process itself ran, but stderr would indicate the Python error.
-        // For this simulation, we'll set success to false for clear error propagation.
-        success = false;
-        stderr = "Traceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\nZeroDivisionError: division by zero";
-      } else if (code.includes("import os") || code.includes("import sys") || code.includes("subprocess") || code.includes("open(")) {
-        success = false; // Or true, but with a security warning in stderr. Let's make it a failure for simulation.
-        stderr = "SimulatedSecurityError: For security reasons, this simulation restricts modules like 'os', 'sys', 'subprocess' and functions like 'open()'. Such operations would be blocked in a real sandboxed environment.";
-      } else if (code.includes("while True: pass")) {
-        // Simulate a timeout for an infinite loop
-        await new Promise(resolve => setTimeout(resolve, effectiveTimeout + 100)); // Exceed timeout
-        // This path will likely not be reached in a real timeout scenario handled by the sandbox runner.
-        // The sandbox runner would kill the process.
-        // For simulation, we'll set an error as if the runner reported a timeout.
-        throw new Error("SIMULATED_TIMEOUT");
-      } else {
-        // Generic successful execution simulation
-        stdout = `Simulated output for Python code:\n${code}\nResult: ${Math.random() * 100}`;
-      }
-    } catch (e: any) {
-        if (e.message === "SIMULATED_TIMEOUT") {
-            success = false;
-            simError = `Execution timed out after ${effectiveTimeout}ms (simulated).`;
-            stderr = "TimeoutError: Code execution took too long.";
-        } else {
-            success = false;
-            simError = `An unexpected error occurred during simulated execution: ${e.message}`;
-            stderr = e.stack || e.message;
+      PythonShell.runString(code, options, function (err, results) {
+        const executionTimeMs = Date.now() - startTime;
+        let stdout = "";
+        let stderr = "";
+
+        if (results) {
+          stdout = results.join('\n');
         }
-    }
 
-    const executionTimeMs = Date.now() - startTime;
+        if (err) {
+          console.error('[CodeExecutorTool] python-shell error:', err);
+          stderr = err.stderr || (err.message && !err.killed ? err.message : '') || 'Unknown error during Python script execution.';
 
-    if (executionTimeMs > effectiveTimeout && !simError.includes("timed out")) {
-        // This case handles if the simulation logic itself was slow but didn't hit the SIMULATED_TIMEOUT path.
-        // A real sandbox would have terminated the process externally.
-        success = false;
-        simError = `Execution exceeded timeout of ${effectiveTimeout}ms. Actual: ${executionTimeMs}ms.`;
-        stderr = stderr ? `${stderr}\nTimeoutError: Execution took too long.` : "TimeoutError: Execution took too long.";
-    }
-
-
-    return {
-      success,
-      stdout: success ? stdout : "", // Typically no stdout on failure, but depends on what was captured before error.
-      stderr,
-      executionTimeMs,
-      error: simError, // This 'error' is for failures of the execution system itself (timeout, sandbox error)
-    };
+          if (err.killed) { // True if the process was killed due to timeout
+            resolve({
+              success: false,
+              stdout, // Might have partial stdout
+              stderr: `Execution timed out after ${effectiveTimeout}ms.\n${stderr}`.trim(),
+              executionTimeMs,
+              error: `Execution timed out after ${effectiveTimeout}ms.`,
+            });
+          } else if (err.exitCode !== undefined && err.exitCode !== 0) {
+            resolve({
+              success: false, // Script ran but had an error
+              stdout,
+              stderr,
+              executionTimeMs,
+              error: `Python script execution error (exit code: ${err.exitCode}).`,
+            });
+          } else {
+            // Other python-shell errors (e.g., python not found, though that's less likely in a controlled env)
+            resolve({
+              success: false,
+              stdout,
+              stderr,
+              executionTimeMs,
+              error: `Failed to execute Python script: ${err.message || 'Unknown internal error.'}`,
+            });
+          }
+        } else {
+          // Success
+          resolve({
+            success: true,
+            stdout,
+            stderr, // Could still have stderr (e.g. warnings)
+            executionTimeMs,
+          });
+        }
+      });
+    });
   }
 );
