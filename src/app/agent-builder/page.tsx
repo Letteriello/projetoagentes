@@ -10,23 +10,21 @@ import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  Card,
   CardHeader,
   CardTitle,
   CardContent,
-  CardDescription, // Added for modal
-  CardFooter, // Added for modal
+  CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription as DialogDesc, // Renamed to avoid conflict with CardDescription if used in same scope
+  DialogDescription as DialogDesc,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
@@ -74,7 +72,9 @@ import { toAgentFormData, toSavedAgentConfiguration } from "@/lib/agent-type-uti
 
 // Componentes dinâmicos com correção de imports
 const AgentBuilderDialog = React.lazy(() => 
-  import("@/components/features/agent-builder/agent-builder-dialog")
+  import("@/components/features/agent-builder/agent-builder-dialog").then(m => ({
+    default: m.default || m.AgentBuilderDialog || m
+  }))
 );
 
 // Componentes de modal
