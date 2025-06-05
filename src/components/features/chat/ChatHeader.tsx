@@ -33,6 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { ActiveChatTarget } from "@/hooks/use-chat-store"; // Import ActiveChatTarget
 import { ChatRunConfig } from "@/types/chat"; // Import ChatRunConfig
+import { capitalizeFirstLetter } from "@/lib/utils"; // Import capitalizeFirstLetter
 
 interface Gem {
   id: string;
@@ -122,11 +123,16 @@ export default function ChatHeader({
   const agentDisplayName = getSelectedModelName();
 
   let llmModelName: string | undefined = undefined;
-  if (activeChatTargetDetails?.type === 'agent' && activeChatTargetDetails.details?.config?.type === 'llm') {
+  let agentFramework: string | undefined = undefined;
+
+  if (activeChatTargetDetails?.type === 'agent' && activeChatTargetDetails.details?.config) {
     const agentConfig = activeChatTargetDetails.details.config;
-    if (agentConfig.agentModel) {
+    if (agentConfig.type === 'llm' && agentConfig.agentModel) { // Check type for agentModel access
       const modelDetails = llmModels.find(m => m.id === agentConfig.agentModel);
       llmModelName = modelDetails?.name;
+    }
+    if (agentConfig.framework) {
+      agentFramework = agentConfig.framework;
     }
   } else if (activeChatTargetDetails?.type === 'gem') {
     // For Gems, if they are configured to use a specific LLM model ID stored somewhere (e.g. in gem.llmModelId)
@@ -187,6 +193,11 @@ export default function ChatHeader({
           {llmModelName && (
             <Badge variant="outline" className="ml-2 text-xs">
               {llmModelName}
+            </Badge>
+          )}
+          {agentFramework && (
+            <Badge variant="info" className="ml-2 text-xs">
+              {capitalizeFirstLetter(agentFramework)}
             </Badge>
           )}
           <span className="text-xs text-muted-foreground ml-1">▼</span>

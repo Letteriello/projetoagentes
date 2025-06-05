@@ -776,7 +776,7 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
       userId: '', // This might be set by the backend or context
       config: {
         type: 'llm', // Default agent type
-        framework: 'genkit', // Default framework
+        framework: 'genkit', // Default framework // Ensure 'framework' is here
         agentGoal: '',
         agentTasks: [],
         agentPersonality: 'neutral', // Default personality
@@ -1351,7 +1351,13 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
                 <TabsContent value="general">
                   <GeneralTab
                     agentTypeOptions={agentTypeOptions}
-                    // agentFrameworkOptions={agentFrameworkOptions} // This prop seems to be missing in GeneralTab's definition based on previous files
+                    agentFrameworkOptions={[
+                      { value: "genkit", label: "Genkit (Default)" },
+                      { value: "langchain", label: "Langchain (Simulated)" },
+                      { value: "crewai", label: "CrewAI (Simulated)" },
+                      { value: "custom", label: "Custom Genkit Flow" },
+                      { value: "none", label: "None (Agent will not be directly executable)" }
+                    ]}
                     availableTools={availableTools} // For AI suggestions
                     SparklesIcon={Wand2}
                     showHelpModal={showHelpModal}
