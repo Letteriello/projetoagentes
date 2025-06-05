@@ -87,7 +87,7 @@ interface Gem {
 
 import ChatHeader from "@/components/features/chat/ChatHeader";
 // Corrigindo a importação do tipo ChatHeaderProps
-import type ChatHeaderProps from "@/components/features/chat/ChatHeader";
+import type { ChatHeaderProps } from "@/components/features/chat/ChatHeader";
 import WelcomeScreen from "@/components/features/chat/WelcomeScreen";
 import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";

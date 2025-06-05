@@ -3,8 +3,8 @@ export interface SavedAgentConfiguration {
   id: string;
   agentName: string;
   description?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date; // Changed from string to Date
+  updatedAt: Date; // Changed from string to Date
   userId: string;
   config: AgentConfig;
   isTemplate?: boolean;
@@ -26,7 +26,7 @@ export interface AgentConfig {
 
 export interface SystemPromptHistoryEntry {
   prompt: string;
-  timestamp: string;
+  timestamp: Date; // Changed from string to Date
 }
 
 export interface Tool {

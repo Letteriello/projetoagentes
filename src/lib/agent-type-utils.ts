@@ -11,7 +11,7 @@ export function toAgentFormData(config: AdaptedSavedAgentConfiguration): Adapted
     id: config.id,
     agentName: config.agentName,
     description: config.description || "",
-    type: config.config.scriptContent ? "scriptable" : "llm",
+    type: config.config.scriptContent ? "code" : "llm", // Changed "scriptable" to "code"
     tools: (config.config.tools || []).map(tool => tool.id),
     systemPrompt: config.config.systemPrompt,
     model: config.config.model || "gpt-3.5-turbo",

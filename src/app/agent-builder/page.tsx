@@ -10,7 +10,6 @@ import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  Card,
   CardHeader,
   CardTitle,
   CardContent,
@@ -26,7 +25,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 
@@ -185,101 +183,9 @@ const saveAgentTemplate = async (template: AdaptedSavedAgentConfiguration): Prom
   // Implementação temporária para compilar
   console.log("Salvando template:", template);
   return Promise.resolve();
-};// Componente AgentCard (linha de agente)
-function RenderAgentRow({
-  agent,
-  index,
-  style,
-  onEdit,
-  onDelete,
-  onDuplicate,
-  onSaveTemplate
-}: AgentRowProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const { toast } = useToast();
+};
 
-  const handleMonitor = () => {
-    // Implementação mock temporária
-    toast({
-      title: "Monitoramento de agente iniciado",
-      description: `Monitorando agente: ${agent.agentName}`
-    });
-  };
-
-  return (
-    <Card
-      className="relative hover:shadow-md transition-shadow"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <CardContent className="p-6 flex flex-col gap-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-lg font-semibold">{agent.agentName}</h3>
-            <p className="text-sm text-gray-500 mt-1">{agent.description || 'Sem descrição'}</p>
-          </div>
-          <div className="flex gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => onEdit(agent)}
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Editar</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => onDelete(agent)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Excluir</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {agent.config.tools?.length ? (
-            agent.config.tools.map((tool) => (
-              <Badge key={tool.id} variant="secondary">
-                {tool.name}
-              </Badge>
-            ))
-          ) : (
-            <span className="text-sm text-gray-500">Sem ferramentas configuradas</span>
-          )}
-        </div>
-
-        <div className="mt-4 flex justify-between items-center">
-          <div className="text-xs text-gray-500">
-            Atualizado: {new Date(agent.updatedAt).toLocaleDateString()}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => onDuplicate(agent)}>
-              Duplicar
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onSaveTemplate(agent)}>
-              Salvar Template
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}// Componente principal da página
+// Componente principal da página
 export default function AgentBuilderPage() {
   // Estado para agentes
   const [agents, setAgents] = useState<AdaptedSavedAgentConfiguration[]>([]);
@@ -616,12 +522,6 @@ export default function AgentBuilderPage() {
     );
   };
 
-  // Filtragem de agentes com base na pesquisa
-  const filteredAgents = agents.filter(agent => 
-    agent.agentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
   // Cálculo de estatísticas
   const totalAgents = agents.length;
   const agentsWithTools = agents.filter(agent => 
@@ -656,7 +556,7 @@ export default function AgentBuilderPage() {
   };
 
   // Renderização conditional com base no estado de carregamento
-  if (isLoading) {
+  if (isLoadingAgents) {
     return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
   }
   // Handler para salvar agente (criação ou edição)
@@ -831,9 +731,9 @@ export default function AgentBuilderPage() {
     // URL should have already been cleaned by the useEffect that detected 'data'
   };
   // Renderização do componente principal
-      // Fechar modal e resetar estado
-      setEditingAgent(null);
-    } catch (error) {
+    // Fechar modal e resetar estado
+    setEditingAgent(null);
+  } catch (error) {
       console.error("Erro ao salvar agente:", error);
       toast({
         title: "Erro ao salvar agente",
