@@ -137,15 +137,20 @@ export function AgentCard({
 }: AgentCardProps) {
   const isListView = viewMode === 'list';
 
-  const hasUnconfiguredTools = agent.toolsDetails?.some(
-    (toolDetail) => {
-      if (!toolDetail.hasConfig) {
-        return false;
+  // Call the hook here to get the memoized toolBadges
+  const toolBadges = useToolBadgesGrid(agent, availableTools);
+
+  const hasUnconfiguredTools = React.useMemo(() => {
+    return agent.toolsDetails?.some(
+      (toolDetail) => {
+        if (!toolDetail.hasConfig) {
+          return false;
+        }
+        const config = agent.toolConfigsApplied?.[toolDetail.id];
+        return !config || Object.keys(config).length === 0;
       }
-      const config = agent.toolConfigsApplied?.[toolDetail.id];
-      return !config || Object.keys(config).length === 0;
-    }
-  ) ?? false;
+    ) ?? false;
+  }, [agent.toolsDetails, agent.toolConfigsApplied]);
 
   const agentTypeDetails = agentTypeOptions.find(
     (opt) => opt.id === agent.config.type,
@@ -322,24 +327,15 @@ export function AgentCard({
                 <div className="pt-2">
                   <h4 className="text-sm font-semibold mb-1 text-foreground/80">Ferramentas:</h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {agent.toolsDetails.map((toolDetail) => {
-                      const fullTool = availableTools.find((t) => t.id === toolDetail.id);
-                      const IconComponent = getToolIconComponent(fullTool?.icon);
-                      const toolIcon = <IconComponent width={12} height={12} />;
-                      const isConfigured = fullTool?.needsConfiguration && agent.toolConfigsApplied?.[toolDetail.id] && Object.keys(agent.toolConfigsApplied[toolDetail.id] || {}).length > 0;
-                      return (
-                        <Badge key={toolDetail.id} variant={isConfigured && fullTool?.needsConfiguration ? "default" : "secondary"} className="text-xs h-6 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default" title={toolDetail.label + (fullTool?.needsConfiguration ? (isConfigured ? " (Configurada)" : " (Requer Configuração)") : "")}>
-                          {toolIcon}
-                          <span className="truncate group-hover:whitespace-normal group-hover:max-w-none">{safeToReactNode(toolDetail.label)}</span>
-                          {fullTool?.needsConfiguration && (<ConfigureIcon width={10} height={10} className={`ml-1 ${isConfigured ? "text-emerald-500" : "text-sky-500"}`} />)}
-                        </Badge>
-                      );
-                    })}
+                    {toolBadges}
                   </div>
                 </div>
               )}
             </CardContent>
           )}
+
+          {/* The toolBadges variable is already used above in CardContent, no need to call the hook here */}
+
         </div> {/* End of main content wrapper */}
 
         {/* CardFooter: Adjusted for List View */}
@@ -408,4 +404,53 @@ export function AgentCard({
       </Card>
     </motion.div>
   );
+}
+
+// Helper hook for memoizing tool badges in grid view to keep AgentCard cleaner
+function useToolBadgesGrid(
+  agent: SavedAgentConfiguration,
+  availableTools: AvailableTool[]
+) {
+  const toolBadges = React.useMemo(() => {
+    if (!agent.toolsDetails || agent.toolsDetails.length === 0) {
+      return null;
+    }
+    return agent.toolsDetails.map((toolDetail) => {
+      const fullTool = availableTools.find((t) => t.id === toolDetail.id);
+      const IconComponent = getToolIconComponent(fullTool?.icon);
+      const toolIcon = <IconComponent width={12} height={12} />;
+      const isConfigured = fullTool?.needsConfiguration &&
+        agent.toolConfigsApplied?.[toolDetail.id] &&
+        Object.keys(agent.toolConfigsApplied[toolDetail.id] || {}).length > 0;
+      return (
+        <Badge
+          key={toolDetail.id}
+          variant={isConfigured && fullTool?.needsConfiguration ? "default" : "secondary"}
+          className="text-xs h-6 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-default"
+          title={toolDetail.label + (fullTool?.needsConfiguration ? (isConfigured ? " (Configurada)" : " (Requer Configuração)") : "")}
+        >
+          {toolIcon}
+          <span className="truncate group-hover:whitespace-normal group-hover:max-w-none">
+            {safeToReactNode(toolDetail.label)}
+          </span>
+          {fullTool?.needsConfiguration && (
+            <ConfigureIcon
+              width={10}
+              height={10}
+              className={`ml-1 ${isConfigured ? "text-emerald-500" : "text-sky-500"}`}
+            />
+          )}
+        </Badge>
+      );
+    });
+  }, [agent.toolsDetails, availableTools, agent.toolConfigsApplied]);
+
+  // This hook doesn't render directly here, but its return value (toolBadges) will be used in AgentCard
+  // The placeholder below is just to satisfy React's rules about hooks not being conditional.
+  // In the AgentCard, we'll use the `toolBadges` variable generated by this hook.
+  // This is a bit unconventional; usually, the hook returns the value and the component uses it.
+  // Here, we're modifying the structure to prepare for the direct insertion of `toolBadges`
+  // The actual rendering of `toolBadges` is done inside the `CardContent` for the grid view.
+  // Let's adjust this to a more standard hook pattern.
+  return toolBadges;
 }

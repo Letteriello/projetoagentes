@@ -42,6 +42,8 @@ import { GenerateResponse } from '@genkit-ai/ai';
 import { AgentConfig, KnowledgeSource, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
 import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
 
+const MAX_HISTORY_MESSAGES_TO_SEND = 20;
+
 // Initialize LRU Cache for LLM responses
 const llmCache = new LRUCache<string, GenerateResponse>({
   max: 500, // Max 500 items
@@ -291,8 +293,14 @@ async function basicChatFlowInternal(
     if (input.systemPrompt) {
       messages.push({ role: 'system', content: [{ text: input.systemPrompt }] });
     }
-    if (input.history) {
-      messages.push(...input.history.map(msg => ({
+
+    let processedHistory = input.history || [];
+    if (processedHistory.length > MAX_HISTORY_MESSAGES_TO_SEND) {
+      processedHistory = processedHistory.slice(-MAX_HISTORY_MESSAGES_TO_SEND);
+    }
+
+    if (processedHistory.length > 0) {
+      messages.push(...processedHistory.map(msg => ({
         role: msg.role as ChatMessage['role'],
         content: Array.isArray(msg.content) ?
           msg.content.map(c => typeof c === 'string' ? { text: c } : c) :
