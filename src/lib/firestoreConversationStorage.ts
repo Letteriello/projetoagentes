@@ -48,6 +48,7 @@ export const getAllConversations = async (userId: string): Promise<Conversation[
         messages: [], // Messages are not fetched in this overview function
         agentId: data.agentId,
         userId: data.userId,
+        summary: data.summary, // Added summary
       });
     });
     return conversations;
@@ -113,6 +114,7 @@ export const getConversationById = async (conversationId: string): Promise<Conve
       messages,
       agentId: conversationData.agentId,
       userId: conversationData.userId,
+      summary: conversationData.summary, // Added summary
     };
   } catch (error) {
     console.error(`Error fetching conversation ${conversationId} from Firestore:`, error);
@@ -137,6 +139,7 @@ export const createNewConversation = async (userId: string, title?: string, agen
       userId: userId,
       agentId: agentId || null,
       title: title || `Chat ${new Date().toLocaleString()}`,
+      summary: `Chat summary for conversation started on ${new Date().toLocaleDateString()}`, // Added summary
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -146,6 +149,7 @@ export const createNewConversation = async (userId: string, title?: string, agen
     return {
       id: docRef.id,
       title: newConversationData.title,
+      summary: newConversationData.summary, // Added summary
       createdAt: now, 
       updatedAt: now,
       messages: [],
