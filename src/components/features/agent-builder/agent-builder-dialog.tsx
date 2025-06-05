@@ -797,6 +797,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
           maxResponseLength: undefined, // Explicitly undefined or a sensible default like 500
         },
         adkCallbacks: {}, // Initialize empty ADK callbacks
+        runConfig: {
+          max_llm_calls: undefined,
+          stream_response: true,
+          speech_config: {
+            voice: 'alloy',
+            speed: 1.0
+          }
+        }
       } as LLMAgentConfig, // Type assertion for the default config
       tools: [],
       toolConfigsApplied: {},
@@ -831,6 +839,14 @@ const AgentBuilderDialog: React.FC<AgentBuilderDialogProps> = ({
         artifacts: baseConfig.config?.artifacts || { ...DEFAULT_ARTIFACTS_CONFIG },
         // Explicitly ensure CFC field for LLM agents
         ...(isLLM && { enableCompositionalFunctionCalling: (baseConfig.config as LLMAgentConfig).enableCompositionalFunctionCalling || false }),
+        runConfig: {
+          ...(createDefaultSavedAgentConfiguration().config.runConfig!), // Get all runConfig defaults
+          ...(baseConfig.config?.runConfig || {}), // Override with agent's runConfig if it exists
+          speech_config: {
+            ...(createDefaultSavedAgentConfiguration().config.runConfig?.speech_config!), // Get speech defaults
+            ...(baseConfig.config?.runConfig?.speech_config || {}), // Override with agent's speech_config
+          }
+        },
       },
     };
 
