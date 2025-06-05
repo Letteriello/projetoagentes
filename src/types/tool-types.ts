@@ -1,89 +1,23 @@
-import { ReactNode } from "react";
-
-/**
- * Configuração de um servidor MCP
- */
+// Definição de tipos para ferramentas e MCP servers
 export interface MCPServerConfig {
   id: string;
   name: string;
-  url: string;
   description?: string;
-  status?: 'connected' | 'disconnected' | 'error' | 'loading';
+  url?: string;
+  apiKey?: string;
+  active?: boolean;
+  category?: string;
+  capabilities?: string[];
+  version?: string;
 }
 
-/**
- * Parâmetro de uma ferramenta
- */
-export interface ToolParameter {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  required: boolean;
-  description?: string;
-  defaultValue?: any;
-}
-
-/**
- * Campo de configuração para o formulário de configuração da ferramenta
- */
-export interface ToolConfigField {
-  id: string;
-  label: string;
-  type: 'text' | 'password' | 'select' | 'textarea' | 'checkbox' | 'number' | 'json';
-  required?: boolean;
-  options?: Array<{ label: string; value: string }>;
-  placeholder?: string;
-  description?: string;
-}
-
-/**
- * Exemplo de uso da ferramenta
- */
-export interface ToolExample {
-  title: string;
-  description: string;
-  code: string;
-}
-
-/**
- * Interface expandida de uma ferramenta disponível
- */
-import { LucideIcon } from "lucide-react";
-
-export interface AvailableTool {
+export interface ApiKeyEntry {
   id: string;
   name: string;
-  description: string;
-  icon?: LucideIcon;
-  hasConfig?: boolean; 
-  configType?: string; 
-  requiresAuth?: boolean;
-
-  // New fields for better categorization and framework alignment
-  type: 'regular' | 'mcp' | 'genkit_native' | 'langchain_native' | 'crewai_native' | 'custom';
-  frameworks?: ('genkit' | 'langchain' | 'crewai')[]; 
-  category?: string; 
-
-  // Campos específicos para MCP Tools
-  isMCPTool?: boolean; 
-  // mcpServerId?: string; // Removed - This will be part of ToolConfigData
-  // mcpServerName?: string; // Removed - This was likely for display and not persisted on the tool definition
-  mcpToolName?: string; // This might be the specific name/ID the MCP server expects for this tool
-  parameters?: ToolParameter[];
-
-  // Campos para configuração da UI
-  configFields?: ToolConfigField[];
-
-  // Campos para documentação
-  documentation?: string;
-  examples?: ToolExample[];
-
-  // Campo de compatibilidade com implementação existente
-  genkitToolName?: string;
-
-  // Schema for custom tools
-  // Primarily for tools where type === 'custom'
-  inputSchema?: string;
-  outputSchema?: string;
-
-  serviceTypeRequired?: string; // Added to address usage in ToolConfigModal
+  key: string;
+  service: string;
+  createdAt: string;
+  lastUsed?: string;
+  expiresAt?: string;
+  active?: boolean;
 }
