@@ -72,10 +72,12 @@ import { cn } from "@/lib/utils";
 // ApiKeyVaultEntry will be replaced by ApiKeyEntry from the service
 import { ApiKeyEntry } from "@/services/api-key-service"; // Import the service type
 import { listApiKeys } from "@/services/api-key-service"; // Import the function
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton"; // Keep for direct use if any, or if TableLoadingSkeleton doesn't cover all skeleton needs
 import { EmptyState } from '@/components/shared/EmptyState'; // Import EmptyState
 import { ExternalLink } from 'lucide-react'; // Import ExternalLink for the action button
 import withAuth from '@/components/auth/withAuth';
+import BaseForm from '@/components/shared/BaseForm'; // Import BaseForm
+import TableLoadingSkeleton from '@/components/shared/TableLoadingSkeleton'; // Import TableLoadingSkeleton
 
 const initialApiKeys: ApiKeyEntry[] = [];
 
@@ -96,17 +98,15 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
   const [isLoadingApiKeys, setIsLoadingApiKeys] = React.useState(true); // Added loading state
   const [isAddKeyDialogOpen, setIsAddKeyDialogOpen] = React.useState(false);
 
-  // RHF for "Add New Key" Dialog
-  const addKeyMethods = useForm<ApiKeyFormData>({
-    resolver: zodResolver(apiKeyFormSchema),
-    defaultValues: {
-      serviceName: "",
-      selectedServiceType: undefined,
-      customServiceType: "",
-      associatedAgentsInput: "",
-    },
-  });
-  const { watch: watchAddKeyForm } = addKeyMethods; // For conditional rendering
+  // addKeyMethods useForm hook is removed, BaseForm handles form state.
+  // const { watch: watchAddKeyForm, control: addKeyControl, handleSubmit: handleAddKeySubmitRHF } = addKeyMethods;
+
+  const addNewKeyDefaultValues: ApiKeyFormData = {
+    serviceName: "",
+    selectedServiceType: undefined,
+    customServiceType: "",
+    associatedAgentsInput: "",
+  };
 
   // Remove old local state for "Add New Key" Dialog
   // const [addServiceName, setAddServiceName] = React.useState<string>("");
@@ -339,11 +339,12 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
           open={isAddKeyDialogOpen}
           onOpenChange={(isOpen) => {
             setIsAddKeyDialogOpen(isOpen);
-            if (!isOpen) addKeyMethods.reset(); // Reset form on close
+            // BaseForm will re-initialize with addNewKeyDefaultValues due to its key or if defaultValues prop instance changes.
+            // If BaseForm needs an explicit reset, that would be a feature of BaseForm itself.
           }}
         >
           <DialogTrigger asChild>
-            <Button className="button-live-glow" onClick={() => addKeyMethods.reset()}>
+            <Button className="button-live-glow" onClick={() => setIsAddKeyDialogOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Nova Chave API
             </Button>
           </DialogTrigger>
@@ -354,10 +355,19 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                 Configure um novo serviço para gerenciamento de chave API.
               </DialogDescription>
             </DialogHeader>
-            <FormProvider {...addKeyMethods}>
-              <form onSubmit={addKeyMethods.handleSubmit(handleAddNewKeySubmit)} className="grid gap-4 py-4">
+            <BaseForm
+              key={isAddKeyDialogOpen ? "add-new-key-open" : "add-new-key-closed"} // Force re-mount on open to ensure fresh state
+              onSubmit={handleAddNewKeySubmit}
+              defaultValues={addNewKeyDefaultValues}
+              validationSchema={apiKeyFormSchema}
+              onCancel={() => setIsAddKeyDialogOpen(false)}
+              submitButtonText="Registrar Serviço"
+              formActionsContainerClassName="pt-4 flex justify-end gap-2"
+            >
+              {/* FormProvider is no longer needed here; BaseForm provides it. */}
+              <div className="grid gap-4 py-4">
                 <FormField
-                  control={addKeyMethods.control}
+                  // control prop removed; will use context from BaseForm
                   name="serviceName"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
@@ -370,7 +380,7 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                   )}
                 />
                 <FormField
-                  control={addKeyMethods.control}
+                  // control prop removed
                   name="selectedServiceType"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
@@ -391,23 +401,10 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                     </FormItem>
                   )}
                 />
-                {watchAddKeyForm("selectedServiceType") === "Other" && (
-                  <FormField
-                    control={addKeyMethods.control}
-                    name="customServiceType"
-                    render={({ field }) => (
-                      <FormItem className="grid grid-cols-4 items-center gap-4">
-                        <FormLabel className="text-right">Tipo Personalizado</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Especifique o tipo" className="col-span-3" />
-                        </FormControl>
-                        <FormMessage className="col-span-4 text-right -mt-2" />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                {/* CustomServiceTypeField will now use context from BaseForm */}
+                <CustomServiceTypeField />
                 <FormField
-                  control={addKeyMethods.control}
+                  // control prop removed
                   name="associatedAgentsInput"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
@@ -419,14 +416,9 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsAddKeyDialogOpen(false)}>Cancelar</Button>
-                  <Button type="submit" className="button-live-glow">
-                    Registrar Serviço
-                  </Button>
-                </DialogFooter>
-              </form>
-            </FormProvider>
+              </div>
+              {/* DialogFooter with buttons is now handled by BaseForm's own action buttons */}
+            </BaseForm>
           </DialogContent>
         </Dialog>
       </header>
@@ -443,31 +435,15 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
         </CardHeader>
         <CardContent>
           {isLoadingApiKeys ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome do Serviço</TableHead>
-                  <TableHead>Tipo de Serviço</TableHead>
-                  <TableHead>Data de Criação</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <TableRow key={`skeleton-${index}`}>
-                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <div className="flex justify-end space-x-2">
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-8 w-8" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <TableLoadingSkeleton
+              rowCount={4}
+              columnConfigs={[
+                { width: "w-1/3" }, // Nome do Serviço
+                { width: "w-1/4" }, // Tipo de Serviço
+                { width: "w-1/4" }, // Data de Criação
+                { width: "w-1/6", className: "flex justify-end space-x-2" } // Ações (align right, might need specific skeleton for buttons)
+              ]}
+            />
           ) : apiKeys.length === 0 ? (
             <EmptyState
               title="Comece a Configurar suas Chaves API"

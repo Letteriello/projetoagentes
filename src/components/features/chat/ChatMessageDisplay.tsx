@@ -9,123 +9,60 @@ import {
   Download,
   FileText,
   FileJson,
-  FileBadge, // Using FileBadge for CSV/Spreadsheet as per previous subtask consistency
-  FileCode2,
-  FileType as FileIcon, // Default file icon
+  // FileBadge, FileCode2, FileType, FileText, FileJson, PaperclipIcon, Download moved to AttachmentDisplay
   Settings2,      // Added for tool calls
   CheckCircle2,   // Added for tool success
   XCircle,        // Added for tool error
+  Info,           // Keep for Accordion trigger in verbose mode
 } from "lucide-react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"; // Added import for Badge
+// Image moved to AttachmentDisplay
+import { Button } from "@/components/ui/button"; // Keep for Retry button
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from 'rehype-raw';
-import { CodeBlock } from "./CodeBlock"; // Componente para realce de sintaxe em blocos de código.
-import { ChatMessageUI } from "@/types/chat"; // Tipo compartilhado para mensagens de chat.
+// ReactMarkdown, remarkGfm, rehypeRaw moved to MarkdownRenderer
+// CodeBlock is imported from message-parts
+import { ChatMessageUI } from "@/types/chat";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion"; // Added import for Accordion
-import { ChatRunConfig } from "@/types/chat"; // Import ChatRunConfig for type usage
+} from "@/components/ui/accordion";
+import { ChatRunConfig } from "@/types/chat";
 
-// Interface para as props do componente ChatMessageDisplay.
-// Define a estrutura esperada para uma mensagem de chat.
+// Import new components
+import MarkdownRenderer from "./message-parts/MarkdownRenderer";
+import AttachmentDisplay from "./message-parts/AttachmentDisplay";
+// CodeBlock already imported from ./message-parts/CodeBlock
+
 interface ChatMessageDisplayProps {
-  message: ChatMessageUI; // Objeto da mensagem, que inclui appliedUserChatConfig and appliedTestRunConfig.
-  onRegenerate?: (messageId: string) => void; // Função para tentar novamente o envio da mensagem.
-  isVerboseMode?: boolean; // Added isVerboseMode prop
-  // appliedUserChatConfig and appliedTestRunConfig are now part of message prop
+  message: ChatMessageUI;
+  onRegenerate?: (messageId: string) => void;
+  isVerboseMode?: boolean;
 }
 
-// Componente para exibir um cursor piscante, usado para indicar que o agente está digitando.
-const BlinkingCursor = () => (
-  <span className="inline-block w-0.5 h-4 bg-current animate-blink" />
-);
+// BlinkingCursor moved to MarkdownRenderer.tsx
+// getAttachmentIcon moved to AttachmentDisplay.tsx
 
-// Componente principal para exibir uma única mensagem de chat.
-// Responsável por renderizar o conteúdo da mensagem, incluindo texto, imagens e anexos de arquivo.
-
-import { Skeleton } from "@/components/ui/skeleton"; // Added import for Skeleton
-import { useTypewriter } from "@/hooks/useTypewriter"; // Import the useTypewriter hook
-
-// Helper function to get the appropriate attachment icon
-const getAttachmentIcon = (fileType?: string, fileName?: string): React.FC<React.SVGProps<SVGSVGElement>> => {
-  // Check by fileType first
-  if (fileType) {
-    // PDF
-    if (fileType === "application/pdf") return FileText;
-    // DOC/DOCX
-    if (fileType === "application/msword" || fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return FileText;
-    // JSON
-    if (fileType === "application/json") return FileJson;
-    // Code files
-    if (
-      fileType === "text/javascript" ||
-      fileType === "text/x-python" ||
-      fileType === "application/xml" ||
-      fileType === "text/css" ||
-      fileType === "text/html" ||
-      fileType === "text/markdown"
-    ) return FileCode2;
-    // CSV/Spreadsheet
-    if (fileType === "text/csv" || fileType === "application/vnd.ms-excel" || fileType.includes("spreadsheet")) return FileBadge;
-    // Plain text
-    if (fileType === "text/plain") return FileText;
-    // Generic text/code catch-all
-    if (fileType.startsWith("text/") || fileType.includes("script") || fileType.includes("code")) return FileCode2;
-  }
-
-  // Fallback based on extension if fileType is generic, missing, or not specific enough
-  if (fileName) {
-    const lowerFileName = fileName.toLowerCase();
-    // PDF
-    if (lowerFileName.endsWith(".pdf")) return FileText;
-    // DOC/DOCX
-    if (lowerFileName.endsWith(".doc") || lowerFileName.endsWith(".docx")) return FileText;
-    // JSON
-    if (lowerFileName.endsWith(".json")) return FileJson;
-    // Code files
-    if (
-      lowerFileName.endsWith(".js") ||
-      lowerFileName.endsWith(".py") ||
-      lowerFileName.endsWith(".xml") ||
-      lowerFileName.endsWith(".css") ||
-      lowerFileName.endsWith(".html") ||
-      lowerFileName.endsWith(".md")
-    ) return FileCode2;
-    // CSV
-    if (lowerFileName.endsWith(".csv")) return FileBadge;
-    // Plain text
-    if (lowerFileName.endsWith(".txt")) return FileText;
-  }
-
-  return FileIcon; // Default icon
-};
+import { Skeleton } from "@/components/ui/skeleton";
+import { useTypewriter } from "@/hooks/useTypewriter";
 
 export default function ChatMessageDisplay({
   message,
-  isVerboseMode, // Destructure isVerboseMode
+  isVerboseMode,
 }: ChatMessageDisplayProps) {
-  const isUser = message.sender === "user"; // Verifica se o remetente é o usuário.
-  const isAgent = message.sender === "agent"; // Verifica se o remetente é o agente.
+  const isUser = message.sender === "user";
+  const isAgent = message.sender === "agent";
 
-  // Use the typewriter hook for agent's streaming messages
   const displayedMessageText = useTypewriter({
-    text: message.text || "", // Ensure text is not undefined
-    isStreaming: !!message.isStreaming, // Ensure isStreaming is boolean
+    text: message.text || "",
+    isStreaming: !!message.isStreaming,
     isAgent: isAgent,
-    speed: 30, // Optional: adjust speed
+    speed: 30,
   });
 
-  const isUploadingAttachment = message.status === 'pending' && (!!message.imageUrl || !!message.fileName);
+  // const isUploadingAttachment = message.status === 'pending' && (!!message.imageUrl || !!message.fileName); // Removed as unused
 
-  // Função para lidar com o download de arquivos anexados.
-  // Cria um link temporário e simula um clique para iniciar o download.
   const handleDownload = () => {
     if (message.fileDataUri && message.fileName) {
       const link = document.createElement("a");
@@ -170,46 +107,14 @@ export default function ChatMessageDisplay({
             {message.toolResponse && message.toolResponse.status === 'error' && (
               <XCircle className="h-4 w-4 mr-2 self-center text-red-500 flex-shrink-0" />
             )}
-            {/* Seção para exibir a mensagem de texto usando ReactMarkdown. */}
+            {/* Use MarkdownRenderer for text content */}
             {message.text && (
-              <div className="flex-grow min-w-0"> {/* Ensure text content can shrink and wrap */}
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]} // Plugin para suporte a GitHub Flavored Markdown.
-                  rehypePlugins={[rehypeRaw]} // Added rehypeRaw
-                  className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-ol:my-2"
-                  components={{
-                    // Componente customizado para renderizar blocos de código com realce de sintaxe.
-                    code({ node, inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || "");
-                      return !inline && match ? (
-                        <CodeBlock
-                          language={match[1]}
-                          value={String(children).replace(/\n$/, "")}
-                          {...props}
-                        />
-                      ) : (
-                        <code className={cn(className, "text-sm")} {...props}>
-                          {children}
-                        </code>
-                      );
-                    },
-                    // Componente customizado para renderizar parágrafos.
-                    // Adiciona o cursor piscante se a mensagem for do agente e estiver sendo transmitida.
-                    p: ({ children }) => {
-                      // The BlinkingCursor should only appear at the very end of the streaming message.
-                      // We check if the displayed text is still shorter than the full text.
-                      const showCursor = isAgent && message.isStreaming && displayedMessageText.length < (message.text || "").length;
-                      return (
-                        <p>
-                          {children}
-                          {showCursor && <BlinkingCursor />}
-                        </p>
-                      );
-                    },
-                  }}
-                >
-                  {displayedMessageText}
-                </ReactMarkdown>
+              <div className="flex-grow min-w-0">
+                <MarkdownRenderer
+                  content={displayedMessageText}
+                  isStreaming={message.isStreaming}
+                  isAgent={isAgent}
+                />
               </div>
             )}
           </div>
@@ -263,58 +168,9 @@ Details: ${typeof message.toolResponse.errorDetails.details === 'object' ? JSON.
           )}
         </div>
 
-        {/* Seção para exibir imagens anexadas. */}
-        {message.imageUrl && (
-          <div className="mt-2"> {/* This mt-2 might need adjustment if details are present */}
-            {/*
-              IMPORTANT for Next.js Image optimization:
-              If message.imageUrl can be an external URL, its hostname must be configured
-              in next.config.js under images.domains or images.remotePatterns.
-              e.g., images: { remotePatterns: [{ protocol: 'https', hostname: 'example.com' }] }
-            */}
-            <Image
-              src={message.imageUrl}
-              alt={message.fileName || "Imagem anexada"} // Texto alternativo para a imagem.
-              width={300} // Largura da imagem.
-              height={200} // Altura da imagem.
-              className="rounded-md object-cover max-w-full h-auto" // Classes de estilo para a imagem. max-w-full e h-auto são importantes para responsividade.
-            />
-          </div>
-        )}
-        {/* Seção para exibir anexos de arquivo (que não são imagens). */}
-        {message.fileName && !message.imageUrl && (
-          <div
-            className={cn(
-              "mt-2 p-2.5 rounded-md flex items-center gap-2.5 text-sm", // This mt-2 might need adjustment
-              isUser ? "bg-primary/80" : "bg-muted/50 border border-border/30",
-            )}
-          >
-            {React.createElement(getAttachmentIcon(message.fileType, message.fileName), {
-              className: cn(
-                "h-5 w-5 flex-shrink-0", // Slightly larger icon for better visibility
-                isUser ? "text-primary-foreground/80" : "text-muted-foreground",
-              ),
-            })}
-            <span className="truncate flex-1" title={message.fileName}>
-              {message.fileName}
-            </span>
-            {/* Botão para baixar o arquivo, visível apenas se houver um URI de dados do arquivo. */}
-            {message.fileDataUri && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDownload} // Aciona o função de download ao clicar.
-                className={cn(
-                  "h-6 w-6 p-0", // Classes de estilo para o botão.
-                  isUser
-                    ? "text-primary-foreground/80 hover:text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Download className="h-4 w-4" /> {/* Ícone de download. */}
-              </Button>
-            )}
-          </div>
+        {/* Use AttachmentDisplay for images and files */}
+        {(message.imageUrl || message.fileName) && (
+          <AttachmentDisplay message={message} onDownload={handleDownload} />
         )}
 
         {/* Retrieved Context Display */}

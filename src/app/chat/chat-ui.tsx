@@ -23,7 +23,8 @@ import {
 } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "@/hooks/use-toast";
-import { useAgents } from "@/contexts/AgentsContext";
+// import { useAgents } from "@/contexts/AgentsContext"; // Will be removed
+import { useAgentStore } from '@/stores/agentStore'; // Added
 import { useAuth } from "@/contexts/AuthContext";
 import { saveAgentConfiguration } from "@/lib/agentServices";
 import { auth } from "@/lib/firebaseClient";
@@ -107,7 +108,9 @@ import MessageList from "@/components/features/chat/MessageList";
 import MessageInputArea from "@/components/features/chat/MessageInputArea";
 // import { Message } from "@/types/chat"; // Message type is used by useChatStore
 import { Conversation, ChatMessageUI, TestRunConfig, ChatRunConfig } from "@/types/chat"; // Added ChatRunConfig
-import LoadingState from "@/components/shared/LoadingState"; // Import LoadingState
+// LoadingState might be replaced or used alongside skeletons
+import LoadingState from "@/components/shared/LoadingState";
+import ChatMessageSkeleton from "@/components/shared/ChatMessageSkeleton"; // Import ChatMessageSkeleton
 // import { TestRunConfigPanel } from "@/components/features/chat/TestRunConfigPanel"; // Lazy loaded
 // import ConversationSidebar from "@/components/features/chat/ConversationSidebar"; // Lazy loaded
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,7 +122,10 @@ import { Label } from "@/components/ui/label";
 import { AgentSelector } from "@/components/features/agent-selector/agent-selector";
 // import * as cs from "@/lib/firestoreConversationStorage"; // No longer directly used here
 import { useRouter, useParams } from "next/navigation";
-import { useChatStore, ActiveChatTarget } from '@/hooks/use-chat-store'; // IMPORT THE STORE
+// import { useChatStore, ActiveChatTarget } from '@/hooks/use-chat-store'; // Removed old hook import
+import { useChatStore, ActiveChatTarget, ExtendedChatMessageUI, OptimisticUpdateAction } from '@/stores/chatStore'; // Import Zustand store and types
+import { llmModels as appLlmModels } from '@/data/llm-models'; // For ChatHeader llmModels prop
+
 
 const FeatureButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
   <button
@@ -142,9 +148,51 @@ export function ChatUI() {
   const router = useRouter();
   const params = useParams();
   const { currentUser } = useAuth();
-  // const currentUserId = currentUser?.uid; // Now from store.currentUserId
 
-  const store = useChatStore(); // USE THE STORE
+  // Instantiate the Zustand store
+  const store = useChatStore();
+
+  // Re-introduce useOptimistic here, using store.messages as the source of truth
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<ExtendedChatMessageUI[], OptimisticUpdateAction>(
+    store.messages, // Initialize with the "true" messages from the Zustand store
+    (state, action) => { // Reducer logic remains the same as in the old hook
+      switch (action.type) {
+        case 'add_message':
+          return [...state, action.message];
+        case 'update_message_content':
+          return state.map(msg =>
+            msg.id === action.messageId ? { ...msg, text: (msg.text || "") + action.newContentChunk, isStreaming: true } : msg
+          );
+        case 'update_message_status':
+          return state.map(msg =>
+            msg.id === action.messageId ? { ...msg, status: action.newStatus, text: action.newContent !== undefined ? action.newContent : msg.text, isStreaming: action.isStreaming !== undefined ? action.isStreaming : false, isError: action.newStatus === 'error' } : msg
+          );
+        case 'remove_message':
+          return state.filter(msg => msg.id !== action.messageId);
+        case 'set_messages':
+          return action.messages;
+        case 'update_message_feedback':
+          return state.map(msg =>
+            msg.id === action.messageId ? { ...msg, feedback: action.feedback } : msg
+          );
+        default:
+          return state;
+      }
+    }
+  );
+
+  // Effect to update store's currentUserId when currentUser changes from AuthContext
+  useEffect(() => {
+    store.setCurrentUserId(currentUser?.uid);
+  }, [currentUser?.uid, store.setCurrentUserId]);
+
+  // Effect to load conversations when currentUserId is available in the store
+  useEffect(() => {
+    if (store.currentUserId && store.conversations.length === 0 && !store.isLoadingConversations) {
+      store.loadConversations(store.currentUserId);
+    }
+  }, [store.currentUserId, store.conversations.length, store.isLoadingConversations, store.loadConversations]);
+
 
   const ConversationSidebar = lazy(() => import("@/components/features/chat/ConversationSidebar"));
   const TestRunConfigPanel = lazy(() => import("@/components/features/chat/TestRunConfigPanel"));
@@ -189,12 +237,12 @@ export function ChatUI() {
 
   const {
     savedAgents,
-    setSavedAgents, // This might be an issue if useAgents context also uses its own state management
-    addAgent,
-    updateAgent,
-    deleteAgent,
-    // isLoadingAgents // This might be an issue if useAgents context also uses its own state management
-  } = useAgents();
+    // setSavedAgents, // Not available/needed from Zustand store directly like this
+    // addAgent, // Not directly used by chat-ui for adding agents
+    // updateAgent, // Not directly used by chat-ui for updating
+    // deleteAgent, // Not directly used by chat-ui for deleting
+    isLoadingAgents, // Might be useful for conditional rendering if agents list is loading
+  } = useAgentStore();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -288,23 +336,36 @@ export function ChatUI() {
     setPendingAgentConfig(null); // This can remain if pendingAgentConfig is UI specific for agent creator
   }, [selectedGemId, selectedAgentId, selectedADKAgentId]);
 
-  // useEffect for loading conversations - MOVED TO useChatStore
+  // useEffect for loading conversations is now triggered by store.currentUserId change.
+  // handleSelectConversation is a store action, router is passed for navigation.
+  // useEffect for loading messages is effectively part of handleSelectConversation store action.
 
-  // handleSelectConversation is now store.handleSelectConversation
-  // No need to call addOptimisticMessage or router.push here, store handles it.
-
-  // useEffect for loading messages - MOVED TO useChatStore
-
-  // useEffect to sync activeConversationId from URL params
+  // useEffect to sync activeConversationId from URL params and load initial conversation
   useEffect(() => {
     const pathConvId = params.conversationId as string | undefined;
-    if (pathConvId && pathConvId !== store.activeConversationId) {
-      store.handleSelectConversation(pathConvId);
+    if (pathConvId) {
+      if (pathConvId !== store.activeConversationId) {
+        // Pass router to handleSelectConversation for navigation if needed
+        store.handleSelectConversation(pathConvId, router);
+      }
+    } else if (store.conversations.length > 0 && !store.activeConversationId && !store.isLoadingConversations) {
+      const lastActiveId = localStorage.getItem('lastActiveConversationId');
+      const targetConv = store.conversations.find(c => c.id === lastActiveId) || store.conversations[0];
+      if (targetConv) {
+        router.push(`/chat/${targetConv.id}`); // This will trigger the above block via params change
+      }
     }
-  }, [params.conversationId, store.activeConversationId, store.handleSelectConversation]);
+    // If still no activeConversationId (e.g. no conversations at all), do nothing, stay on /chat
+  }, [params.conversationId, store.activeConversationId, store.handleSelectConversation, router, store.conversations, store.isLoadingConversations]);
+
+  useEffect(() => {
+    if (store.activeConversationId) {
+      localStorage.setItem('lastActiveConversationId', store.activeConversationId);
+    }
+  }, [store.activeConversationId]);
 
 
-  const handleLogin = async () => { // This can remain as UI specific logic
+  const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -360,19 +421,23 @@ export function ChatUI() {
     });
 
     try {
-      // Pass the file, audioDataUri, userChatConfig, and testRunConfig to submitMessage.
+      // Call the Zustand store's submitMessage action
       await store.submitMessage(
         store.inputValue,
         activeChatTarget,
-        // testRunConfig, // testRunConfig is now passed as the fourth argument
+        store.currentUserId, // Pass currentUserId from store
+        store.activeConversationId, // Pass activeConversationId from store
+        optimisticMessages, // Pass current optimistic messages for history construction in action
         attachmentType === 'audio' ? undefined : file,
         attachmentType === 'audio' ? audioDataUri : undefined,
-        userChatConfig, // Pass the current userChatConfig
-        testRunConfig // Pass the current testRunConfig
+        userChatConfig,
+        testRunConfig,
+        router // Pass router for navigation if new conversation is created
       );
+      // Optimistic updates are handled by useOptimistic hook based on store.messages changes.
+      // The store.submitMessage updates the "true" store.messages state.
       updateMsgToast({
         title: "Message Sent!",
-        // description: "Your message has been sent.", // Optional description
         variant: "default"
       });
     } catch (error) {
@@ -392,8 +457,8 @@ export function ChatUI() {
   };
 
 
-  // handleNewConversation is now store.handleNewConversation
-  // handleDeleteConversation is now store.handleDeleteConversation
+  // handleNewConversation, handleDeleteConversation, handleRenameConversation are store actions.
+  // They need currentUserId and router passed if they cause navigation or user-specific ops.
 
   // fetchADKAgents can remain UI specific for fetching ADK agents list
   const fetchADKAgents = async () => {
@@ -527,12 +592,12 @@ export function ChatUI() {
     inputRef.current?.focus();
   };
 
-  // handleFeedback is now store.handleFeedback
-  // handleRegenerate is now store.handleRegenerate
+  // handleFeedback, handleRegenerate are store actions.
+  // They will need parameters like activeConversationId, optimisticMessages (for context).
 
-  // handleInputChange is now store.setInputValue
+  // handleInputChange is store.setInputValue
 
-  // Scroll to bottom effect remains, but uses store's optimisticMessages and isPending
+  // Scroll to bottom effect now uses `optimisticMessages` from the local `useOptimistic` hook
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollElement = scrollAreaRef.current.querySelector('div');
@@ -540,7 +605,7 @@ export function ChatUI() {
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [store.optimisticMessages, store.isPending]);
+  }, [optimisticMessages, store.isPending]); // store.isPending still relevant for agent typing
 
 
   // Test config related functions remain UI specific
@@ -596,16 +661,16 @@ export function ChatUI() {
               onToggleSidebar={() => setIsSidebarOpen(false)}
               conversations={store.conversations}
               activeConversationId={store.activeConversationId}
-              onSelectConversation={store.handleSelectConversation}
-              onNewConversation={() => store.handleNewConversation()}
-              onDeleteConversation={(conversation) => store.handleDeleteConversation(conversation.id)}
+              onSelectConversation={(id) => store.handleSelectConversation(id, router)}
+              onNewConversation={() => store.handleNewConversation(store.currentUserId!, "New Chat", router)}
+              onDeleteConversation={(conversation) => store.handleDeleteConversation(conversation.id, store.currentUserId, router)}
               onRenameConversation={store.handleRenameConversation}
               isLoading={store.isLoadingConversations}
               currentUserId={store.currentUserId}
-              gems={initialGems} // Keep UI specific props
-              savedAgents={savedAgents} // Keep UI specific props
-              adkAgents={adkAgents} // Keep UI specific props
-              onSelectAgent={(agent) => { // Keep UI specific logic
+              gems={initialGems}
+              savedAgents={savedAgents}
+              adkAgents={adkAgents}
+              onSelectAgent={(agent) => {
                 if ('displayName' in agent) setSelectedADKAgentId(agent.id);
                 else if ('prompt' in agent) setSelectedGemId(agent.id);
                 else if ('agentName' in agent || 'id' in agent) setSelectedAgentId(agent.id);
@@ -627,11 +692,12 @@ export function ChatUI() {
             usingADKAgent={!!selectedADKAgentId}
             setUsingADKAgent={(value) => { if (!value) setSelectedADKAgentId(null); }}
             selectedADKAgentId={selectedADKAgentId}
-            setSelectedADKAgentId={setSelectedADKAgentId}
+            setSelectedADKAgentId={setSelectedADKAgentId} // These props are for ChatHeader's internal state passed to ChatTargetSelector
             selectedGemId={selectedGemId}
             setSelectedGemId={setSelectedGemId}
-            initialGems={initialGems}
-            handleNewConversation={() => store.handleNewConversation()}
+            initialGems={initialGems} // Pass initialGems
+            llmModels={appLlmModels} // Pass appLlmModels for ChatTargetSelector
+            handleNewConversation={() => store.handleNewConversation(store.currentUserId!, "New Chat", router)}
             isADKInitializing={isADKInitializing}
             onExportChatLog={handleExportChatLog}
             isVerboseMode={isVerboseMode} // Pass verbose mode state
@@ -649,37 +715,36 @@ export function ChatUI() {
         <div className="flex-1 flex flex-col relative overflow-hidden">
           <div className="flex-1 overflow-hidden">
             <ScrollArea ref={scrollAreaRef} className="h-full p-4 pt-2">
-              <LoadingState
-                isLoading={store.isLoadingMessages}
-                loadingText="Carregando mensagens..."
-                loadingType="spinner"
-                // No explicit error state managed here for messages, so error prop is omitted
-              >
-                {!currentUser ? (
-                  <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
-                    <LogIn size={48} className="mb-4 text-primary" />
-                    <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
-                    <p className="mb-4 text-lg">Por favor, faça login para usar o chat.</p>
-                    <Button onClick={handleLogin} variant="default" size="lg">
-                      <LogIn className="mr-2 h-5 w-5" /> Entrar com Google
-                    </Button>
-                  </div>
-                ) : store.optimisticMessages.length === 0 && !store.isPending && !pendingAgentConfig ? (
-                  <div className="min-h-[calc(100vh-180px)]">
-                    <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
-                  </div>
-                ) : (
-                  <div className="pb-20">
-                    <MessageList
-                      messages={store.optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
-                      isPending={store.isPending}
-                      onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
-                      onFeedback={store.handleFeedback}
-                      isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
-                    />
-                  </div>
-                )}
-              </LoadingState>
+              {store.isLoadingMessages ? (
+                <div className="space-y-4 pb-20">
+                  <ChatMessageSkeleton senderType="agent" />
+                  <ChatMessageSkeleton senderType="user" />
+                  <ChatMessageSkeleton senderType="agent" />
+                </div>
+              ) : !currentUser ? (
+                <div className="flex flex-col items-center justify-center min-h-[calc(100vh-180px)] text-center">
+                  <LogIn size={48} className="mb-4 text-primary" />
+                  <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
+                  <p className="mb-4 text-lg">Por favor, faça login para usar o chat.</p>
+                  <Button onClick={handleLogin} variant="default" size="lg">
+                    <LogIn className="mr-2 h-5 w-5" /> Entrar com Google
+                  </Button>
+                </div>
+              ) : store.optimisticMessages.length === 0 && !store.isPending && !pendingAgentConfig ? (
+                <div className="min-h-[calc(100vh-180px)]">
+                  <WelcomeScreen onSuggestionClick={handleSuggestionClick} />
+                </div>
+              ) : (
+                <div className="pb-20">
+                  <MessageList
+                    messages={store.optimisticMessages.map(m => ({...m, isUser: m.sender === 'user'}))}
+                    isPending={store.isPending}
+                    onRegenerate={(messageId) => store.handleRegenerate(messageId, activeChatTarget, testRunConfig)}
+                    onFeedback={store.handleFeedback}
+                    isVerboseMode={isVerboseMode} // Pass isVerboseMode to MessageList
+                  />
+                </div>
+              )}
             </ScrollArea>
           </div>
 

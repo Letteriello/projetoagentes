@@ -15,21 +15,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from '@/components/ui/textarea'; // Textarea might be used by workflow description
 import type { SavedAgentConfiguration, LLMAgentConfig } from '@/types/agent-types'; // Changed import
 // Remove aiModels and AIModel, will be replaced by llmModels
 // import { aiModels, AIModel } from '@/data/ai-models';
 import { llmModels } from '@/data/llm-models'; // Import the new llmModels
 import type { LLMModelDetails } from '@/types/agent-configs-new'; // Import LLMModelDetails for type safety
-import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for now, verify if needed
+import { WorkflowDetailedType } from '@/types/agent-configs-new'; // Kept for workflow type selection
 import { InfoIcon } from '@/components/ui/InfoIcon'; // Keep for other uses if any
 import { agentBuilderHelpContent } from '@/data/agent-builder-help-content';
 import { Button } from '@/components/ui/button';
-import { Wand2, Loader2, ClipboardCopy, Info, History } from 'lucide-react'; // Added Info, History, ClipboardCopy
-import { toast } from '@/hooks/use-toast'; // Added toast
+import { Wand2, Loader2, Info } from 'lucide-react'; // Removed ClipboardCopy, History
+// import { toast } from '@/hooks/use-toast'; // Removed toast, as its usages were removed
 import { debounce } from '../../../../lib/utils'; // Import debounce
-import { MAX_SYSTEM_PROMPT_LENGTH } from '@/lib/zod-schemas'; // Import MAX_SYSTEM_PROMPT_LENGTH
-import { CodeBlock } from '@/components/features/chat/CodeBlock'; // Import CodeBlock
+// import { MAX_SYSTEM_PROMPT_LENGTH } from '@/lib/zod-schemas'; // Removed, was for system prompt preview
+// import { CodeBlock } from '@/components/features/chat/CodeBlock'; // Removed, was for system prompt preview
 
 interface BehaviorTabProps {
   agentToneOptions: string[];
@@ -39,6 +39,7 @@ interface BehaviorTabProps {
   // New props for manual system prompt editing
   isSystemPromptManuallyEdited: boolean;
   setIsSystemPromptManuallyEdited: React.Dispatch<React.SetStateAction<boolean>>;
+  children?: React.ReactNode; // Added to allow PromptBuilder to be passed as a child
 }
 
 type FormContextType = SavedAgentConfiguration;
@@ -61,89 +62,25 @@ export default function BehaviorTab({
   isSuggesting,
   isSystemPromptManuallyEdited,
   setIsSystemPromptManuallyEdited,
+  children, // Destructure children
 }: BehaviorTabProps) {
   const methods = useFormContext<FormContextType>();
-  const { control, watch, getValues, setValue } = methods; // Destructure getValues and setValue
+  const { control, watch } = methods; // Removed getValues, setValue if not directly used here
   const agentType = watch('config.type');
-  const systemPromptGenerated = watch('config.systemPromptGenerated');
-  const manualSystemPromptOverride = watch('config.manualSystemPromptOverride');
-  const systemPromptHistory = watch('config.systemPromptHistory'); // Watch history
-
-  const handleCopySystemPrompt = () => {
-    const systemPrompt = getValues().config?.systemPromptGenerated;
-    if (systemPrompt) {
-      navigator.clipboard.writeText(systemPrompt)
-        .then(() => {
-          toast({ title: "Sucesso!", description: "Prompt do sistema copiado para a área de transferência." });
-        })
-        .catch(err => {
-          console.error("Failed to copy system prompt: ", err);
-          toast({ title: "Erro", description: "Falha ao copiar o prompt do sistema.", variant: "destructive" });
-        });
-    } else {
-      toast({ title: "Atenção", description: "Nenhum prompt do sistema gerado para copiar.", variant: "destructive" });
-    }
-  };
+  // systemPromptGenerated, manualSystemPromptOverride, systemPromptHistory are now managed by PromptBuilder or not needed here
+  // handleCopySystemPrompt is also part of PromptBuilder's concerns if it's about the preview there.
 
   return (
     <div className="space-y-6">
-      {/* Common Fields: agentGoal and agentTasks */}
-      <FormFieldWithLabel
-        name="config.agentGoal"
-        label="Agent Goal"
-        control={control}
-        tooltipContent={
-          <p className="max-w-xs">
-            Defina a meta primária que o agente deve alcançar. Isso será usado para formar a declaração de objetivo principal no prompt do sistema. Ex: "Ajudar usuários a encontrar informações sobre produtos."
-          </p>
-        }
-        render={({ field }) => (
-          <FormControl>
-            <Textarea {...field} placeholder="Define the primary goal for this agent..." />
-          </FormControl>
-        )}
-      />
+      {/* Render children (PromptBuilder will be passed here) */}
+      {children}
 
-      {/* Agent Tasks - Assuming it's part of LLMAgentConfig and thus rendered when agentType === 'llm' */}
-      {/* If it's truly common, it stays outside. If LLM specific, it should be inside the agentType === 'llm' block */}
-      <FormFieldWithLabel
-        name="config.agentTasks"
-        label="Agent Tasks (one per line)"
-        control={control}
-        tooltipContent={
-          <p className="max-w-xs">
-            Liste as tarefas específicas que o agente deve executar para atingir seu objetivo. Cada tarefa será detalhada no prompt do sistema. Ex: "Coletar requisitos do usuário", "Buscar documentação relevante".
-          </p>
-        }
-        render={({ field }) => (
-          <FormControl>
-            <Textarea
-              {...field}
-                placeholder="List the specific tasks the agent needs to perform, one per line."
-                rows={4}
-                // Convert array to string for display, and string to array on change if needed by schema
-                // For now, Zod schema for agentTasks: z.array(z.string()) will likely fail for a direct string.
-                // This would require a .transform in Zod or a custom component.
-                // Or, change Zod schema for agentTasks to z.string() for this simple case.
-                // For this iteration, we pass the raw string value.
-                value={Array.isArray(field.value) ? field.value.join('\n') : field.value || ''}
-                onChange={(e) => {
-                  // field.onChange(e.target.value.split('\n').filter(task => task.trim() !== '')); // Example to send array
-                  field.onChange(e.target.value); // Send string for now
-                }}
-              />
-            </FormControl>
-            <FormMessage />
-            <p className="text-xs text-muted-foreground">
-              Note: Validation for tasks currently expects a direct string. Array conversion is illustrative.
-            </p>
-          </FormItem>
-        )}
-      />
-
-      {/* LLM Specific Fields */}
+      {/* LLM Specific Fields NOT covered by PromptBuilder (e.g., Model selection, Temp, TopK, TopP, CFC) */}
+      {/* These fields were previously mixed with prompt fields. Now they are separated. */}
       {agentType === 'llm' && (
         <>
+          {/* AI Model, Temp, TopK, TopP, CFC, etc. fields from the original BehaviorTab */}
+          {/* These are NOT part of PromptBuilder, so they remain here. */}
           <FormField
             control={control}
             name="config.agentModel"
@@ -162,7 +99,7 @@ export default function BehaviorTab({
                       <SelectValue placeholder="Select an AI model" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent className="max-h-[400px] overflow-y-auto"> {/* Added max-height and scroll */}
+                  <SelectContent className="max-h-[400px] overflow-y-auto">
                     {Object.entries(
                       llmModels.reduce((acc, model) => {
                         const providerKey = model.provider || 'Unknown Provider';
@@ -183,7 +120,7 @@ export default function BehaviorTab({
                                   {model.name}
                                 </SelectItem>
                               </TooltipTrigger>
-                              <TooltipContent side="right" align="start" className="w-80 z-50"> {/* Added z-index */}
+                              <TooltipContent side="right" align="start" className="w-80 z-50">
                                 <div className="font-bold text-lg mb-2">{model.name}</div>
                                 <div className="text-sm space-y-1">
                                   <p><span className="font-semibold">Provider:</span> {model.provider}</p>
@@ -199,7 +136,6 @@ export default function BehaviorTab({
                                     {model.capabilities?.streaming ? " Streaming" : ""}
                                     {model.capabilities?.tools ? ", Tools" : ""}
                                     {(model.capabilities as any)?.vision ? ", Vision" : ""}
-                                    {/* Filter out initial comma if no streaming */}
                                     {(model.capabilities?.tools || (model.capabilities as any)?.vision) && model.capabilities?.streaming === undefined ? "" : ""}
                                   </p>
                                 </div>
@@ -214,32 +150,23 @@ export default function BehaviorTab({
                 <FormMessage />
               </FormItem>
             )}
-            )}
           />
 
-          {/* Top K Field */}
           <FormField
             control={control}
-            name="config.topK" // Path for LLMAgentConfig
+            name="config.topK"
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center space-x-2">
                   <FormLabel>Top K</FormLabel>
-                  <InfoIcon
-                    tooltipText="Controla a aleatoriedade. Reduz o conjunto de tokens considerados para amostragem para os K mais prováveis. Ajuda a prevenir tokens de baixa probabilidade. Deixe vazio para usar o padrão do modelo."
-                  />
+                  <InfoIcon tooltipText="Controla a aleatoriedade..." />
                 </div>
                 <FormControl>
                   <Input
-                    type="number"
-                    {...field}
-                    placeholder="Ex: 40 (padrão do modelo se vazio)"
-                    value={field.value ?? ''} // Handle undefined/null case for input display
-                    onChange={e => {
-                      const value = e.target.value;
-                      field.onChange(value === '' ? undefined : parseInt(value, 10));
-                    }}
-                    step="1" // Integers
+                    type="number" {...field} placeholder="Ex: 40"
+                    value={field.value ?? ''}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                    step="1"
                   />
                 </FormControl>
                 <FormMessage />
@@ -247,30 +174,20 @@ export default function BehaviorTab({
             )}
           />
 
-          {/* Max Output Tokens Field */}
           <FormField
             control={control}
-            name="config.maxOutputTokens" // Path for LLMAgentConfig
+            name="config.maxOutputTokens"
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center space-x-2">
                   <FormLabel>Token Limit / Max Output Tokens</FormLabel>
-                  <InfoIcon
-                    tooltipText="Define o número máximo de tokens que o modelo pode gerar em uma única resposta. Se não definido, usará o padrão do modelo selecionado ou um padrão global da aplicação."
-                    // onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'maxOutputTokens' })} // Add to help content if needed
-                  />
+                  <InfoIcon tooltipText="Define o número máximo de tokens..." />
                 </div>
                 <FormControl>
                   <Input
-                    type="number"
-                    {...field}
-                    placeholder="Ex: 2048 (padrão do modelo se vazio)"
-                    value={field.value ?? ''} // Handle undefined/null case for input display
-                    onChange={e => {
-                      const value = e.target.value;
-                      // Allow clearing the input (sets to undefined), or parse to int
-                      field.onChange(value === '' ? undefined : parseInt(value, 10));
-                    }}
+                    type="number" {...field} placeholder="Ex: 2048"
+                    value={field.value ?? ''}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                   />
                 </FormControl>
                 <FormMessage />
@@ -278,49 +195,30 @@ export default function BehaviorTab({
             )}
           />
 
-            )}
-          />
-
-          {/* Top P Field */}
           <FormField
             control={control}
-            name="config.topP" // Path for LLMAgentConfig
-            render={({ field }) => ( // field provided by render is for the specific RHF field registration
+            name="config.topP"
+            render={({ field }) => (
               <FormItem>
                 <div className="flex items-center space-x-2">
                   <FormLabel>Top P</FormLabel>
-                  <InfoIcon
-                    tooltipText="Controla a diversidade via amostragem de núcleo. Ex: 0.1 significa que apenas tokens compreendendo os 10% de massa de probabilidade superior são considerados. Ajuda a prevenir tokens de baixa probabilidade. Deixe vazio/1 para usar o padrão do modelo ou desabilitar."
-                  />
+                  <InfoIcon tooltipText="Controla a diversidade..." />
                 </div>
                 <FormControl>
                   <div className="flex flex-col space-y-2 pt-2">
                     <Controller
-                      name="config.topP" // Controller also needs the name
-                      control={control}
-                      // defaultValue={undefined} // Let it be undefined initially to signify "model default"
-                      render={({ field: controllerField }) => { // field from Controller's render prop
+                      name="config.topP" control={control}
+                      render={({ field: controllerField }) => {
                         const val = typeof controllerField.value === 'number' ? controllerField.value : undefined;
-                        const debouncedSliderChange = useMemo(() => {
-                            return debounce((sliderValue: number[]) => {
-                              // If slider is at max (1), treat as 'undefined' to use model default
-                              controllerField.onChange(sliderValue[0] === 1 ? undefined : sliderValue[0]);
-                            }, 300);
-                        }, [controllerField.onChange]);
-
+                        const debouncedSliderChange = useMemo(() => debounce((sliderValue: number[]) => {
+                          controllerField.onChange(sliderValue[0] === 1 ? undefined : sliderValue[0]);
+                        }, 300), [controllerField.onChange]);
                         return (
                           <>
-                            <Slider
-                              min={0.01}
-                              max={1} // Slider max is 1. When value is 1, it implies "use default" or "disabled"
-                              step={0.01}
-                              value={val !== undefined ? [val] : [1]} // Display 1 if undefined
-                              onValueChange={debouncedSliderChange}
-                            />
+                            <Slider min={0.01} max={1} step={0.01} value={val !== undefined ? [val] : [1]} onValueChange={debouncedSliderChange} />
                             <div className="flex justify-between text-sm text-muted-foreground">
                               <span>Value: {val !== undefined ? val.toFixed(2) : "Default (1.0)"}</span>
-                              <Button variant="link" size="sm" className="p-0 h-auto"
-                                onClick={() => controllerField.onChange(val === undefined ? 0.9 : undefined)}>
+                              <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => controllerField.onChange(val === undefined ? 0.9 : undefined)}>
                                 {val === undefined ? "Set (e.g. 0.9)" : "Use Default"}
                               </Button>
                             </div>
@@ -337,305 +235,57 @@ export default function BehaviorTab({
 
           <FormField
             control={control}
-            name="config.agentPersonality"
-            label="Agent Personality/Tone"
-            control={control}
-            tooltipContent={
-              <p className="max-w-xs">
-                Escolha a personalidade que o agente deve adotar. Isso influenciará o tom e o estilo de suas respostas no prompt. Ex: "Um assistente amigável e prestativo".
-              </p>
-            }
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} value={field.value || ""}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select personality" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {agentToneOptions.map(tone => (
-                    <SelectItem key={tone} value={tone.toLowerCase()}>
-                      {tone}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-
-          <FormField
-            control={control}
             name="config.agentTemperature"
             render={({ field }) => {
-              const debouncedOnChange = useMemo(() => {
-                return debounce(field.onChange, 300);
-              }, [field.onChange]);
-
+              const debouncedOnChange = useMemo(() => debounce(field.onChange, 300), [field.onChange]);
               return (
                 <FormItem>
-                <div className="flex items-center space-x-2">
-                  <FormLabel>Agent Temperature (Creativity)</FormLabel>
-                  <InfoIcon
-                    tooltipText={agentBuilderHelpContent.behaviorTab.agentTemperature.tooltip}
-                    onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'agentTemperature' })}
-                  />
-                </div>
-                <FormControl>
-                  <div className="flex flex-col space-y-2 pt-2"> {/* Added pt-2 for spacing */}
-                    <Slider
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={[typeof field.value === 'number' ? field.value : 0.7]} // Ensure value is number
-                      onValueChange={(value) => debouncedOnChange(value[0])}
-                    />
-                    <div className="text-center text-sm text-muted-foreground">
-                      Value: {(typeof field.value === 'number' ? field.value : 0.7).toFixed(2)} (0: Precise, 1: Creative)
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <FormLabel>Agent Temperature (Creativity)</FormLabel>
+                    <InfoIcon tooltipText={agentBuilderHelpContent.behaviorTab.agentTemperature.tooltip} onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'agentTemperature' })} />
                   </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
+                  <FormControl>
+                    <div className="flex flex-col space-y-2 pt-2">
+                      <Slider min={0} max={1} step={0.01} value={[typeof field.value === 'number' ? field.value : 0.7]} onValueChange={(value) => debouncedOnChange(value[0])} />
+                      <div className="text-center text-sm text-muted-foreground">
+                        Value: {(typeof field.value === 'number' ? field.value : 0.7).toFixed(2)} (0: Precise, 1: Creative)
+                      </div>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
-          {/* Agent Restrictions Field - To be added if not present, or modified if it is */}
-          {/* Assuming agentRestrictions is an array of strings, typically handled by a TagInput or similar */}
-          {/* For now, let's represent it with a Textarea similar to agentTasks for simplicity if TagInput isn't used */}
-          <FormField
-            control={control}
-            name="config.agentRestrictions"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center space-x-2">
-                  <FormLabel className="flex items-center">
-                    Agent Restrictions (one per line)
-                    <TooltipProvider>
-                      <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <Info size={14} className="ml-1.5 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                          <p className="max-w-xs">
-                            Defina quaisquer restrições ou regras que o agente deve seguir estritamente. Estas serão listadas como diretivas no prompt. Ex: "Não fornecer aconselhamento financeiro", "Manter as respostas concisas".
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </FormLabel>
-                </div>
-                <FormControl>
-                  <Textarea
-                    {...field}
-                    placeholder="List the specific restrictions for the agent, one per line."
-                    rows={3}
-                    value={Array.isArray(field.value) ? field.value.join('\n') : field.value || ''}
-                    onChange={(e) => {
-                      // field.onChange(e.target.value.split('\n').filter(restriction => restriction.trim() !== '')); // Example for array
-                      field.onChange(e.target.value); // Send string for now
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-                 <p className="text-xs text-muted-foreground">
-                    Note: Restrictions are expected as a direct string input here.
-                </p>
-              </FormItem>
-            )}
-          />
-          {/* End of Agent Restrictions Field */}
 
-          {/* AI Suggestions Button */}
-          {onGetAiSuggestions && agentType === 'llm' && (
+          {onGetAiSuggestions && (
             <div className="mt-6 pt-6 border-t">
                <h3 className="text-lg font-medium mb-2">Assistente de Configuração IA</h3>
                <p className="text-sm text-muted-foreground mb-4">
-                Obtenha sugestões da IA para personalidade, restrições, modelo, temperatura e ferramentas com base no objetivo e tarefas definidos para o agente.
+                Obtenha sugestões da IA para personalidade, restrições, modelo, temperatura e ferramentas com base no objetivo e tarefas definidos para o agente (via PromptBuilder).
                </p>
               <Button type="button" onClick={onGetAiSuggestions} disabled={isSuggesting} className="w-full sm:w-auto">
-                {isSuggesting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Wand2 className="mr-2 h-4 w-4" />
-                )}
-                Sugerir Configurações de Comportamento (IA)
-              </Button>
-               <p className="text-xs text-muted-foreground mt-2">
-                Certifique-se de que o "Agent Goal" e "Agent Tasks" estejam preenchidos para melhores sugestões.
-              </p>
-            </div>
-          )}
-
-          {/* Compositional Function Calling Checkbox */}
-          {agentType === 'llm' && (
-            <FormField
-              control={control}
-              name="config.enableCompositionalFunctionCalling"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-4 bg-background">
-                  <div className="space-y-0.5">
-                    <FormLabel>Habilitar Compositional Function Calling (CFC)</FormLabel>
-                    <FormDescription>
-                      Sinaliza que o LLM pode orquestrar múltiplas chamadas de ferramentas em um único turno.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          )}
-
-          {/* Copy System Prompt Button */}
-          {agentType === 'llm' && (
-            <div className="mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCopySystemPrompt}
-              >
-                <ClipboardCopy className="mr-2 h-4 w-4" />
-                Copiar Prompt do Sistema
+                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                Sugerir Configurações (IA)
               </Button>
             </div>
           )}
 
-          {/* System Prompt Preview and Edit Section */}
-          {agentType === 'llm' && (
-            <div className="mt-6 pt-6 border-t">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-2">
-                  <FormLabel>Preview do Prompt do Sistema</FormLabel>
-                  <InfoIcon
-                    tooltipText="Este é o prompt do sistema que será usado pelo agente. Você pode editá-lo manualmente."
-                    // Optional: Add modal content if more detailed help is needed
-                    // onClick={() => showHelpModal({ tab: 'behaviorTab', field: 'systemPromptPreview' })}
-                  />
+          <FormField
+            control={control}
+            name="config.enableCompositionalFunctionCalling"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-4 bg-background">
+                <div className="space-y-0.5">
+                  <FormLabel>Habilitar Compositional Function Calling (CFC)</FormLabel>
+                  <FormDescription>Sinaliza que o LLM pode orquestrar múltiplas chamadas de ferramentas.</FormDescription>
                 </div>
-                {!isSystemPromptManuallyEdited ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setValue('config.manualSystemPromptOverride', getValues('config.systemPromptGenerated') || '', { shouldValidate: true, shouldDirty: true });
-                      setIsSystemPromptManuallyEdited(true);
-                    }}
-                  >
-                    Editar Prompt
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setValue('config.manualSystemPromptOverride', '', { shouldValidate: false, shouldDirty: true }); // Clear the override
-                      setIsSystemPromptManuallyEdited(false); // Triggers regeneration in parent
-                      // Optionally, explicitly trigger re-validation or re-generation if needed,
-                      // though the change in isSystemPromptManuallyEdited should handle it via useEffect in parent.
-                    }}
-                  >
-                    Resetar para Gerado Automaticamente
-                  </Button>
-                )}
-              </div>
-              <FormField
-                control={control}
-                // The 'name' for FormField is primarily for RHF to connect to the schema for validation errors.
-                // Since we display errors for both fields separately using Controller below,
-                // we can use a common or even one of the two names here.
-                // Let's use manualSystemPromptOverride as it's the one being actively edited.
-                name={"config.manualSystemPromptOverride"}
-                render={({ field }) => ( // field might not be directly used here if value/onChange are handled by Textarea/CodeBlock
-                  <FormItem>
-                    {/* No FormLabel needed here as it's part of the outer structure */}
-                    <FormControl>
-                      {isSystemPromptManuallyEdited ? (
-                        <Textarea
-                          value={manualSystemPromptOverride || ''}
-                          onChange={(e) => {
-                            setValue('config.manualSystemPromptOverride', e.target.value, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          placeholder="Edite o prompt do sistema manualmente..."
-                          rows={10}
-                          className="font-mono text-xs bg-muted/20 border-primary" // Highlight when editing
-                        />
-                      ) : (
-                        <div className="rounded-md border bg-background p-1 min-h-[160px]"> {/* Adjusted min-height */}
-                          <CodeBlock
-                            language="markdown"
-                            value={systemPromptGenerated || 'O prompt do sistema gerado aparecerá aqui...'}
-                            className="text-xs max-h-[210px] overflow-y-auto" // Max height to match Textarea approx.
-                            showLineNumbers={false}
-                            wrapLines={true}
-                          />
-                        </div>
-                      )}
-                    </FormControl>
-                    {/* Validation messages using Controller */}
-                    <Controller
-                      name="config.manualSystemPromptOverride"
-                      control={control}
-                      render={({ fieldState }) => (isSystemPromptManuallyEdited && fieldState.error) ? <FormMessage>{fieldState.error.message}</FormMessage> : null}
-                    />
-                    <Controller
-                      name="config.systemPromptGenerated"
-                      control={control}
-                      render={({ fieldState }) => (!isSystemPromptManuallyEdited && fieldState.error) ? <FormMessage>{fieldState.error.message}</FormMessage> : null}
-                    />
-                  </FormItem>
-                )}
-              />
-              {/* Character Counter */}
-              <p className="text-xs text-muted-foreground mt-1">
-                {(isSystemPromptManuallyEdited ? manualSystemPromptOverride : systemPromptGenerated)?.length || 0} / {MAX_SYSTEM_PROMPT_LENGTH} caracteres
-              </p>
-              {isSystemPromptManuallyEdited && (
-                 <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
-                  Você está editando manualmente o prompt do sistema. As alterações automáticas baseadas em outros campos não serão aplicadas até você resetar.
-                </p>
-              )}
-
-              {/* Prompt History Select */}
-              {systemPromptHistory && systemPromptHistory.length > 0 && (
-                <div className="mt-4">
-                  <FormLabel className="flex items-center mb-1 text-sm">
-                    <History size={14} className="mr-1.5" />
-                    Restaurar Prompt Anterior:
-                  </FormLabel>
-                  <Select
-                    onValueChange={(promptValue) => {
-                      if (promptValue) {
-                        setValue('config.manualSystemPromptOverride', promptValue, { shouldValidate: true, shouldDirty: true });
-                        // Ensure setIsSystemPromptManuallyEdited is callable
-                        if (typeof setIsSystemPromptManuallyEdited === 'function') {
-                          setIsSystemPromptManuallyEdited(true);
-                        }
-                        toast({ title: "Prompt Histórico Restaurado", description: "O prompt selecionado foi carregado no editor." });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full text-xs">
-                      <SelectValue placeholder="Selecione uma versão para restaurar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {systemPromptHistory.map((entry, index) => (
-                        <SelectItem key={index} value={entry.prompt} className="text-xs">
-                          {new Date(entry.timestamp).toLocaleString()} - {entry.prompt.substring(0, 50)}...
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-          )}
+                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+              </FormItem>
+            )}
+          />
+          {/* System Prompt Preview and manual editing UI has been moved to PromptBuilder.tsx */}
+          {/* Copy system prompt button also moved to PromptBuilder or handled within its context. */}
         </>
       )}
 

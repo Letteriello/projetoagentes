@@ -8,7 +8,7 @@ import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { AppLayout } from "@/components/layout/app-layout";
 import { ErrorBoundaryClient } from '@/components/error-boundary-client';
 import { Toaster } from "@/components/ui/toaster";
-import { AgentsProvider } from '@/contexts/AgentsContext';
+// import { AgentsProvider } from '@/contexts/AgentsContext'; // Removed
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -240,27 +240,26 @@ export default function RootLayout({
           <LoggerProvider>
             <AuthProvider>
               <EnvironmentProvider>
-                <AgentsProvider>
-                  <SidebarProvider>
-                    <AppLayout>
-                      <ErrorBoundaryClient>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={pathname} // Use pathname from usePathname()
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.5 }}
-                          >
-                            <main id="main-content" tabIndex={-1}>
-                              {children}
-                            </main>
-                          </motion.div>
-                        </AnimatePresence>
-                      </ErrorBoundaryClient>
-                    </AppLayout>
-                  </SidebarProvider>
-                </AgentsProvider>
+                {/* AgentsProvider removed */}
+                <SidebarProvider>
+                  <AppLayout>
+                    <ErrorBoundaryClient>
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={pathname} // Use pathname from usePathname()
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.5 }}
+                        >
+                          <main id="main-content" tabIndex={-1}>
+                            {children}
+                          </main>
+                        </motion.div>
+                      </AnimatePresence>
+                    </ErrorBoundaryClient>
+                  </AppLayout>
+                </SidebarProvider>
               </EnvironmentProvider>
             </AuthProvider>
             <Toaster />

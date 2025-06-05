@@ -1,7 +1,7 @@
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 // REMOVED: import { okaidia } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { minimalistLight, minimalistDark } from './codeblockThemes';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '../../../../contexts/ThemeContext'; // Adjusted path
 // Import languages using CommonJS syntax
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
 import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';

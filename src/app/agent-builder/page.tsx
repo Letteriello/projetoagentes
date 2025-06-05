@@ -34,11 +34,13 @@ import {
 import EmptyState from '@/components/shared/EmptyState'; // Import EmptyState
 import { useToast } from "@/hooks/use-toast";
 import { saveAgentTemplate, getAgentTemplate } from "@/lib/agentServices";
-import { useAgents } from "@/contexts/AgentsContext";
+// import { useAgents } from "@/contexts/AgentsContext"; // Removed
+import { useAgentStore } from '@/stores/agentStore'; // Added
 import { useAgentStorage } from "@/hooks/use-agent-storage";
 import { cn } from "@/lib/utils";
 import { FixedSizeList } from 'react-window'; // Import FixedSizeList
 import { AgentCard } from "@/components/features/agent-builder/agent-card";
+import AgentCardSkeleton from '@/components/shared/AgentCardSkeleton'; // Import Skeleton
 import {
   Tooltip,
   TooltipContent,
@@ -210,23 +212,22 @@ export default function AgentBuilderPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+  // Use Zustand store
   const {
     savedAgents: agents, 
     addAgent, 
     updateAgent, 
     deleteAgent, 
-    isLoadingAgents: isLoading,
-    fetchAgents: refreshAgents 
-  } = useAgents();
+    isLoadingAgents: isLoading, // Renamed from isLoading to match store
+    fetchAgents: refreshAgents, // Renamed from fetchAgents to match store
+    errorAgents, // Get error state from store
+  } = useAgentStore();
   
-  // Usamos uma variável para o erro, já que a propriedade pode não existir no contexto
-  const agentsError = null;
-  
-  // Utilizando hooks de armazenamento de agentes
+  // Utilizando hooks de armazenamento de agentes - This might become redundant if store handles all storage ops
   const {
     saveAgent: saveAgentConfig,
-    loadAgents: loadAgentConfigs,
-    deleteAgent: deleteAgentConfig,
+    // loadAgents: loadAgentConfigs, // Store handles loading
+    // deleteAgent: deleteAgentConfig, // Store handles deleting
   } = useAgentStorage();
 
   const [isBuilderModalOpen, setIsBuilderModalOpen] = React.useState(false);
@@ -284,6 +285,15 @@ export default function AgentBuilderPage() {
   }, []);
 
   React.useEffect(() => {
+    // Initial fetch of agents when component mounts if not already loading
+    // The store itself does not auto-fetch on init anymore.
+    if (!isLoading && agents.length === 0 && !errorAgents) { // Check error state too
+        refreshAgents();
+    }
+  }, [isLoading, agents.length, refreshAgents, errorAgents]);
+
+
+  React.useEffect(() => {
     // Parâmetro 'create' para criar um novo agente
     if (searchParams.get('create') === 'true') {
       handleCreateNewAgent();
@@ -291,7 +301,7 @@ export default function AgentBuilderPage() {
 
     // Parâmetro 'edit' com ID para editar um agente
     const editId = searchParams.get('edit');
-    if (editId) {
+    if (editId && agents.length > 0) { // Ensure agents are loaded before finding
       const agentToEdit = agents.find(a => a.id === editId);
       if (agentToEdit) {
         handleEditAgent(agentToEdit);
@@ -300,13 +310,13 @@ export default function AgentBuilderPage() {
 
     // Parâmetro 'monitor' com ID para monitorar um agente
     const monitorId = searchParams.get('monitor');
-    if (monitorId) {
+    if (monitorId && agents.length > 0) { // Ensure agents are loaded
       const agentToMonitor = agents.find(a => a.id === monitorId);
       if (agentToMonitor) {
         setSelectedAgentForMonitoring(agentToMonitor);
       }
     }
-  }, [searchParams, agents, handleCreateNewAgent]);
+  }, [searchParams, agents, handleCreateNewAgent]); // agents dependency is important here
 
   // Este useEffect já estava sendo implementado acima, então removemos a duplicação
 
@@ -540,12 +550,58 @@ export default function AgentBuilderPage() {
   const agentsWithTools = agents.filter(agent => agent.tools && agent.tools.length > 0).length;
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Carregando agentes...</div>;
+    // Determine skeleton count based on view mode or a fixed number
+    const skeletonCount = viewMode === 'grid' ? 8 : 4; // Example: 8 for grid, 4 for list
+    return (
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        {/* Header can remain as is, or also have skeletons if parts of it load */}
+        <header className="mb-8">
+         {/* Simplified header during skeleton loading, or could also be skeletonized */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                Construtor de Agentes IA
+              </h1>
+              <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">
+                Crie, configure e gerencie seus agentes de inteligência artificial.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 mt-4 md:mt-0">
+              <Skeleton className="h-10 w-24 rounded-md" />
+              <Skeleton className="h-10 w-24 rounded-md" />
+              <Skeleton className="h-10 w-32 rounded-md" />
+            </div>
+          </div>
+           {/* Stats Cards Skeletons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <Card><CardHeader><Skeleton className="h-5 w-3/5" /></CardHeader><CardContent><Skeleton className="h-8 w-1/2" /></CardContent></Card>
+            <Card><CardHeader><Skeleton className="h-5 w-3/5" /></CardHeader><CardContent><Skeleton className="h-8 w-1/2" /></CardContent></Card>
+          </div>
+          <div className="flex justify-end items-center mb-4">
+            <Skeleton className="h-10 w-10 mr-2 rounded-md" />
+            <Skeleton className="h-10 w-10 rounded-md" />
+          </div>
+        </header>
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: skeletonCount }).map((_, index) => (
+              <AgentCardSkeleton key={index} viewMode="grid" />
+            ))}
+          </div>
+        ) : (
+          <div className="border rounded-md overflow-hidden space-y-2 p-2">
+            {Array.from({ length: skeletonCount }).map((_, index) => (
+              <AgentCardSkeleton key={index} viewMode="list" />
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   // Mostrar mensagem de erro caso exista
-  if (agentsError) {
-    const errorMessage = typeof agentsError === 'string' ? agentsError : 'Erro desconhecido ao carregar agentes';
+  if (errorAgents) { // Use errorAgents from store
+    const errorMessage = typeof errorAgents === 'string' ? errorAgents : 'Erro desconhecido ao carregar agentes';
     return <div className="flex items-center justify-center h-screen text-red-500">Erro ao carregar agentes: {errorMessage}</div>;
   }
 
