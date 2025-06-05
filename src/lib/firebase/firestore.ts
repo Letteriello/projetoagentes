@@ -1,4 +1,4 @@
-// src/lib/firestoreClient.ts
+// src/lib/firebase/firestore.ts
 import { Firestore } from '@google-cloud/firestore';
 
 let firestore: Firestore;
@@ -60,57 +60,3 @@ try {
 }
 
 export { firestore };
-
-/*
-Firestore Security Rules (Conceptual - to be defined in firestore.rules):
-
-// Default deny all access
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Placeholder: Deny all reads and writes by default
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Agents Collection
-    // - Users can create agents (userId should match auth.uid).
-    // - Users can read/update/delete their own agents.
-    // - (Optional) Admins or specific roles might have broader access.
-    match /agents/{agentId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      // TODO: Add rules for fetching all agents (e.g., for a public list or admin view if needed)
-      // This might require a separate rule or a function to check roles.
-    }
-
-    // Conversations Collection
-    // - Users can create conversations (userId should match auth.uid).
-    // - Users can read/update/delete their own conversations.
-    match /conversations/{conversationId} {
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-
-      // Messages Sub-collection
-      // - Users can create messages in their own conversations.
-      // - Users can read messages in their own conversations.
-      // - (Optional) Server-side logic (agent) might also write messages.
-      match /messages/{messageId} {
-        allow read: if request.auth != null && get(/databases/$(database)/documents/conversations/$(conversationId)).data.userId == request.auth.uid;
-        allow create: if request.auth != null && get(/databases/$(database)/documents/conversations/$(conversationId)).data.userId == request.auth.uid;
-        // Generally, messages are immutable once created.
-        // allow update, delete: if false; // Or allow only for specific admin roles or message types
-      }
-    }
-  }
-}
-
-User ID Handling:
-- The `userId` field in both `agents` and `conversations` collections is critical.
-- In a production environment, this `userId` would come from an authentication system (e.g., Firebase Authentication `request.auth.uid`).
-- For initial local development and testing (especially with the emulator and no auth setup),
-  a placeholder `userId` (e.g., "defaultUser", "localTestUser") can be used.
-- Client-side code will need to be adapted to pass this `userId` when creating/querying data.
-- Security rules will then enforce that users can only access their own data.
-*/
