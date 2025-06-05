@@ -37,35 +37,63 @@ export async function GET(request: Request) {
       filters.startAfterTimestamp = startAfterTimestamp;
     }
 
-    // Validate date parsing
     // Validate date parsing for startTime and endTime
     if (searchParams.has('startTime') && filters.startTime && isNaN(filters.startTime.getTime())) {
-      return NextResponse.json({ error: 'Invalid startTime format. Please use ISO 8601 format.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Invalid startTime format. Please use ISO 8601 format.', code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      );
     }
     if (searchParams.has('endTime') && filters.endTime && isNaN(filters.endTime.getTime())) {
-      return NextResponse.json({ error: 'Invalid endTime format. Please use ISO 8601 format.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Invalid endTime format. Please use ISO 8601 format.', code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      );
     }
     // Validate limit parsing
     if (searchParams.has('limit') && (isNaN(filters.limit!) || filters.limit! <= 0)) {
-      return NextResponse.json({ error: 'Invalid limit format. Must be a positive integer.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Invalid limit format. Must be a positive integer.', code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      );
     }
-    // Validate startAfterTimestamp (basic check, more robust validation could be added)
+    // Validate startAfterTimestamp
     if (filters.startAfterTimestamp && isNaN(new Date(filters.startAfterTimestamp).getTime())) {
-        return NextResponse.json({ error: 'Invalid startAfterTimestamp format. Please use ISO 8601 format.' }, { status: 400 });
+        return NextResponse.json(
+          { success: false, error: 'Invalid startAfterTimestamp format. Please use ISO 8601 format.', code: 'VALIDATION_ERROR' },
+          { status: 400 }
+        );
     }
 
-
+    // Fetch logs using the service function
     const logs = await getRawLogs(filters);
-    return NextResponse.json(logs);
+    // For successful GET, directly return the data. Standardizing to { success: true, data: logs } is also an option.
+    return NextResponse.json(logs, { status: 200 });
 
-  } catch (error) {
-    console.error('Error fetching raw logs:', error);
-    let errorMessage = 'Failed to fetch logs';
+  } catch (error: unknown) { // Catch unknown for better type safety before instanceof check
+    // Consider using a structured logger (e.g., Winston) if available throughout the project
+    console.error('[API agent-monitor/logs GET] Error fetching raw logs:', error);
+
+    let errorMessage = 'An unexpected error occurred while fetching logs.';
+    // It's good practice to not expose raw internal error messages to the client in production.
+    // However, providing some detail can be helpful for debugging if the error is deemed safe to share.
+    let errorDetails; // Undefined by default, only populate if needed
+
     if (error instanceof Error) {
-        errorMessage = error.message;
+        // Potentially map known errors from getRawLogs to specific client messages/codes here
+        // For now, we'll use a generic message for 500s from getRawLogs
+        errorDetails = error.message; // Capture original message for details
     }
-    // It's good practice to not expose raw internal error messages to the client in production
-    // For now, we'll return a generic message or the error message if available.
-    return NextResponse.json({ error: 'Failed to fetch logs', details: errorMessage }, { status: 500 });
+
+    // Standardized error response
+    return NextResponse.json(
+      {
+        success: false,
+        error: errorMessage,
+        code: 'INTERNAL_SERVER_ERROR',
+        details: errorDetails // Only include details if it's considered safe and useful for the client
+      },
+      { status: 500 }
+    );
   }
 }
