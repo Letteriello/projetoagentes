@@ -48,6 +48,7 @@ import {
   GripVertical, // Import GripVertical
   MoreVertical, // For dropdown menu in list view
   Sparkles, // Example, or another icon for framework
+  Share2, // Added Share2 for sharing
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -61,6 +62,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast"; // Added useToast
 import { safeToReactNode, capitalizeFirstLetter } from "@/lib/utils"; // Import capitalizeFirstLetter
 import type {
   SavedAgentConfiguration,
@@ -138,7 +140,52 @@ export function AgentCard({
   viewMode = 'grid', // Default to grid
   onGenerateQualityReport, // Added for Task 8.2
 }: AgentCardProps) {
+  const { toast } = useToast();
   const isListView = viewMode === 'list';
+
+  const handleShare = async (agentToShare: SavedAgentConfiguration) => {
+    const shareableConfig = {
+      // id: agentToShare.id, // Original ID, new one will be generated on import
+      agentName: agentToShare.agentName,
+      agentDescription: agentToShare.agentDescription,
+      agentVersion: agentToShare.agentVersion,
+      icon: agentToShare.icon,
+      config: agentToShare.config, // Include the main config block
+      tools: agentToShare.tools, // Array of tool IDs
+      toolsDetails: agentToShare.toolsDetails?.map(td => ({ // Include essential details for tools
+        id: td.id,
+        name: td.name,
+        description: td.description,
+        hasConfig: td.hasConfig,
+        genkitToolName: td.genkitToolName,
+        // Do not include full inputSchema or outputSchema here to keep URL shorter if they are very large
+        // The tool definition should be fetched from availableTools on import based on ID
+      })),
+      toolConfigsApplied: agentToShare.toolConfigsApplied,
+      // Add other essential fields but avoid overly verbose ones for URL length
+    };
+
+    try {
+      const jsonString = JSON.stringify(shareableConfig);
+      const base64EncodedJson = btoa(jsonString);
+      // Ensure window.location.origin is available (client-side only)
+      const shareableLink = `${window.location.origin}/agent-builder/import?data=${base64EncodedJson}`;
+
+      await navigator.clipboard.writeText(shareableLink);
+      toast({
+        title: "Link Copiado!",
+        description: "O link compartilhável do agente foi copiado para sua área de transferência.",
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error("Failed to copy share link:", error);
+      toast({
+        title: "Erro ao Copiar",
+        description: "Não foi possível copiar o link. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Call the hook here to get the memoized toolBadges
   const toolBadges = useToolBadgesGrid(agent, availableTools);
@@ -396,6 +443,7 @@ export function AgentCard({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="left" align="end" className="bg-popover text-popover-foreground">
                   <DropdownMenuItem onClick={() => onSaveAsTemplate(agent)}><SaveIcon size={14} className="mr-2" /> Salvar como Template</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleShare(agent)}><Share2 size={14} className="mr-2" /> Compartilhar</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onViewMonitoring(agent)}><EyeIcon size={14} className="mr-2" /> Monitorar</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onTest(agent)}><ChatIcon size={14} className="mr-2" /> Testar</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onGenerateQualityReport(agent)}>
@@ -417,6 +465,9 @@ export function AgentCard({
               </Button>
               <Button variant="outline" size="sm" onClick={() => onGenerateQualityReport(agent)} className="group">
                 <FileText size={16} className="mr-1.5 group-hover:animate-jiggle" /> Rel. Qualidade
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleShare(agent)} className="group">
+                <Share2 size={16} className="mr-1.5 group-hover:animate-jiggle" /> Compartilhar
               </Button>
               <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex group">
                 <ChatIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Testar
