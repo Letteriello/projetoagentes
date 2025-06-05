@@ -16,7 +16,7 @@ export const CalculatorInputSchema = z.object({
 });
 
 export const CalculatorOutputSchema = z.object({
-  result: z.union([z.number(), z.string()]).describe("The result of the calculation or an error message."),
+  result: z.number().describe("The result of the calculation."),
 });
 
 export const calculatorTool = ai.defineTool(
@@ -25,20 +25,28 @@ export const calculatorTool = ai.defineTool(
     description:
       "Performs mathematical calculations. Input a mathematical expression as a string (e.g., '2 + 2 * 10 / 4'). Supports addition (+), subtraction (-), multiplication (*), and division (/). Respects order of operations (multiplication/division before addition/subtraction).",
     inputSchema: CalculatorInputSchema,
-    outputSchema: CalculatorOutputSchema,
+    outputSchema: CalculatorOutputSchema, // Updated schema
   },
   async (input: z.infer<typeof CalculatorInputSchema>) => {
     const { expression, flowName, agentId } = input;
     const toolName = 'calculator';
-    let toolOutput: { result: number | string };
 
     try {
       // Simple expression evaluator
       const sanitizedExpression = expression.replace(/\s+/g, ''); // Remove all whitespace
-      if (!/^[\d\.\+\-\*\/\(\)]+$/.test(sanitizedExpression)) {
+      if (!/^[0-9\.\+\-\*\/\(\)]+$/.test(sanitizedExpression)) {
         // Note: Parentheses are checked in regex but not handled by this simplified evaluator
-        throw new Error("Expression contains invalid characters or unsupported parentheses.");
+        // Allow leading minus/plus for unary operations
+        if(!/^[+\-]?([0-9].*)?$/.test(sanitizedExpression) && !/^[0-9\.\+\-\*\/\(\)]+$/.test(sanitizedExpression.substring(1))){
+            throw new Error("Expression contains invalid characters or unsupported parentheses.");
+        }
       }
+
+      // Enhanced check for invalid sequences like '++' or '**' or leading '*' '/'
+      if (/[\+\-\*\/]{2,}/.test(sanitizedExpression) || /^[\*\/]/.test(sanitizedExpression)) {
+        throw new Error("Expression contains invalid sequence of operators or starts with invalid operator.");
+      }
+
 
       const tokens: (number | string)[] = [];
       let currentNumber = '';
@@ -47,19 +55,17 @@ export const calculatorTool = ai.defineTool(
         if (/[\d\.]/.test(char)) {
           currentNumber += char;
         } else if (/[\+\-\*\/]/.test(char)) {
-          if (currentNumber) {
-            tokens.push(parseFloat(currentNumber));
-            currentNumber = '';
-          }
-          if (char === '-' || char === '+') {
-            if (tokens.length === 0 || typeof tokens[tokens.length - 1] === 'string') {
-              currentNumber += char;
-              continue;
+          // Handle unary minus/plus at the beginning or after an operator
+          if ((char === '-' || char === '+') && (currentNumber === '' && (tokens.length === 0 || typeof tokens[tokens.length - 1] === 'string'))) {
+            currentNumber += char; // Start new number with sign
+          } else {
+            if (currentNumber) {
+              tokens.push(parseFloat(currentNumber));
+              currentNumber = '';
             }
+            tokens.push(char); // Push the operator
           }
-          tokens.push(char);
         } else {
-          // This path should ideally not be reached if regex is comprehensive for supported chars
           throw new Error(`Unsupported character '${char}' in expression.`);
         }
       }
@@ -68,8 +74,16 @@ export const calculatorTool = ai.defineTool(
       }
 
       if (tokens.length === 0) {
-        throw new Error("Empty expression.");
+        throw new Error("Empty expression results in no tokens.");
       }
+
+      // Check for NaN tokens which can result from parseFloat on just '-' or '+'
+      for(const token of tokens) {
+        if(typeof token === 'number' && isNaN(token)) {
+          throw new Error("Invalid number token found. Likely a misplaced operator or invalid number format.");
+        }
+      }
+
 
       const applyOp = (a: number, b: number, op: string): number => {
         switch (op) {
@@ -77,9 +91,9 @@ export const calculatorTool = ai.defineTool(
           case '-': return a - b;
           case '*': return a * b;
           case '/':
-            if (b === 0) throw new Error("Division by zero.");
+            if (b === 0) throw new Error("Division by zero is not allowed.");
             return a / b;
-          default: throw new Error(`Unknown operator ${op}`);
+          default: throw new Error(`Unknown operator ${op}.`);
         }
       };
 
@@ -89,13 +103,13 @@ export const calculatorTool = ai.defineTool(
       while (i < tokens.length) {
         const token = tokens[i];
         if (typeof token === 'string' && (token === '*' || token === '/')) {
-          const left = pass1.pop();
-          const right = tokens[i + 1];
+          const left = pass1.pop(); // This should be a number
+          const right = tokens[i + 1]; // This should be a number
           if (typeof left !== 'number' || typeof right !== 'number') {
-            throw new Error("Invalid expression format for multiplication/division.");
+            throw new Error("Invalid expression format: Missing number around multiplication/division operator.");
           }
           pass1.push(applyOp(left, right, token));
-          i += 2;
+          i += 2; // Consumed operator and right operand
         } else {
           pass1.push(token);
           i += 1;
@@ -105,45 +119,49 @@ export const calculatorTool = ai.defineTool(
       // Addition and Subtraction next
       let resultAcc = pass1[0];
       if (typeof resultAcc !== 'number') {
-        throw new Error("Expression must start with a number or valid unary minus/plus.");
+        // This handles cases where the expression might start with an operator without a preceding number (e.g. "*2+3")
+        // or is just an operator, which should be caught by earlier checks or result in NaN.
+        throw new Error("Invalid expression: Must start with a number or valid unary operation.");
       }
 
-      for (let i = 1; i < pass1.length; i += 2) {
-        const op = pass1[i];
-        const right = pass1[i + 1];
+      for (let j = 1; j < pass1.length; j += 2) {
+        const op = pass1[j];
+        const right = pass1[j + 1];
         if (typeof op !== 'string' || typeof right !== 'number') {
-          throw new Error("Invalid sequence of operators and numbers during addition/subtraction.");
+          throw new Error("Invalid expression format: Operator must be followed by a number during addition/subtraction pass.");
         }
         resultAcc = applyOp(resultAcc as number, right, op);
       }
 
       if (typeof resultAcc !== 'number' || isNaN(resultAcc)) {
-        throw new Error("Could not compute the final result. Invalid expression.");
+        // This is a fallback, most specific errors should be caught earlier.
+        throw new Error("Calculation resulted in NaN. Check expression for valid numbers and operations.");
       }
       
-      toolOutput = { result: resultAcc };
-      // Success logging within try block, after result is confirmed
-      enhancedLogger.logToolCall({
-        flowName: flowName || "unknown_flow",
-        agentId: agentId || "unknown_agent",
+      const toolOutput = { result: resultAcc };
+      enhancedLogger.logToolCall({ // Only log on success
+        flowName: flowName || "calculator_flow", // Provide default if undefined
+        agentId: agentId || "calculator_agent", // Provide default if undefined
         toolName: toolName,
         input: { expression },
         output: toolOutput,
       });
+      return toolOutput;
 
     } catch (error: any) {
-      // Error logging within catch block
-      toolOutput = { result: error.message || "An unexpected error occurred during calculation." };
-      enhancedLogger.logError({
-        flowName: flowName || "unknown_flow",
-        agentId: agentId || "unknown_agent",
-        message: `Error in ${toolName} tool`,
-        error: error instanceof Error ? error : new Error(String(error)), // Ensure it's an Error object
-        details: { input: expression, output: toolOutput },
+      enhancedLogger.logError({ // Log error before throwing
+        flowName: flowName || "calculator_flow_error",
+        agentId: agentId || "calculator_agent_error",
+        message: `Error in ${toolName} tool: ${error.message}`,
+        error: error instanceof Error ? error : new Error(String(error)),
+        details: { input: expression, expressionProcessed: expression.replace(/\s+/g, '') },
         toolName: toolName,
       });
+      // Re-throw the error to be handled by Genkit
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Calculation failed: ${error.message || "An unexpected error occurred."}`);
     }
-    
-    return toolOutput;
   }
 );

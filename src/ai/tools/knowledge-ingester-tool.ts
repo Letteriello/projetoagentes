@@ -14,11 +14,13 @@ export const KnowledgeIngesterInputSchema = z.object({
 });
 
 // 2. Define Output Schema
+// Success field removed. Message field removed (or could be repurposed for only success messages if desired).
+// Errors are thrown for failures.
 export const KnowledgeIngesterOutputSchema = z.object({
-  success: z.boolean().describe("Indicates whether the simulated ingestion was successful."),
   ingestedDocumentId: z.string().describe("The ID of the ingested document (simulated, or the one provided)."),
-  message: z.string().describe("A message indicating the result of the ingestion."),
   vectorizationStatus: z.string().describe("Simulated status of vectorization (e.g., 'Simulated - Vectorized and Indexed')."),
+  // Optional: A specific success message field if needed, distinct from error handling.
+  // successMessage: z.string().optional().describe("Message confirming successful ingestion."),
 });
 
 // 3. Create knowledgeIngesterTool
@@ -26,37 +28,37 @@ export const knowledgeIngesterTool = ai.defineTool(
   {
     name: 'knowledgeIngester',
     description:
-      "SIMULATED: Ingests a document (text) into the agent's knowledge base (RAG memory). This simulation mocks the process of making content searchable by vectorizing and indexing it.",
+      "SIMULATED: Ingests a document (text) into the agent's knowledge base (RAG memory). This simulation mocks the process of making content searchable by vectorizing and indexing it. Throws an error if document text is too short.",
     inputSchema: KnowledgeIngesterInputSchema,
-    outputSchema: KnowledgeIngesterOutputSchema,
+    outputSchema: KnowledgeIngesterOutputSchema, // Updated Schema
   },
-  async (input: z.infer<typeof KnowledgeIngesterInputSchema>) => {
+  async (input: z.infer<typeof KnowledgeIngesterInputSchema>): Promise<z.infer<typeof KnowledgeIngesterOutputSchema>> => {
     console.log('[KnowledgeIngesterTool] Received input:', {
       documentId: input.documentId,
       metadata: input.metadata,
       documentTextSnippet: input.documentText.substring(0, 100) + '...',
     });
 
-    if (!input.documentText || input.documentText.trim().length < 10) { // Arbitrary minimum length
-      console.warn('[KnowledgeIngesterTool] Document text is empty or too short. Simulating ingestion failure.');
-      return {
-        success: false,
-        ingestedDocumentId: input.documentId || "",
-        message: "Simulated ingestion failed: Document text is empty or too short (min 10 chars).",
-        vectorizationStatus: "Not Processed",
-      };
+    const minDocLength = 10; // Define minimum document length for ingestion
+
+    if (!input.documentText || input.documentText.trim().length < minDocLength) {
+      const errorMsg = `Simulated ingestion failed: Document text is empty or too short (min ${minDocLength} chars). Provided length: ${input.documentText?.trim().length || 0}.`;
+      console.warn(`[KnowledgeIngesterTool] ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
     const generatedId = input.documentId || `sim_doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const vectorizationStatus = "Simulated - Vectorized and Indexed";
 
-    const successMessage = `Document (ID: ${generatedId}) with preview '${input.documentText.substring(0, 50)}...' simulated ingestion successfully. Associated metadata: ${JSON.stringify(input.metadata || {})}.`;
+    // Optional: if a success message is desired in the output, it can be constructed here.
+    // const successMsg = `Document (ID: ${generatedId}) simulated ingestion successfully.`;
+    // console.log(`[KnowledgeIngesterTool] ${successMsg}`);
 
-    console.log(`[KnowledgeIngesterTool] ${successMessage}`);
+    // Return the successful output
     return {
-      success: true,
       ingestedDocumentId: generatedId,
-      message: successMessage,
-      vectorizationStatus: "Simulated - Vectorized and Indexed",
+      vectorizationStatus: vectorizationStatus,
+      // successMessage: successMsg, // Uncomment if successMessage is added to output schema
     };
   }
 );

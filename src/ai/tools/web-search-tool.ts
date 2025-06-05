@@ -45,11 +45,11 @@ export const WebSearchInputSchema = z.object({
 });
 
 // Define the Zod schema for the tool's output
+// Message and errorDetails fields removed. Errors are thrown for failures.
 // @ts-ignore
 export const WebSearchOutputSchema = z.object({
   results: z.array(SearchResultSchema).describe("Array of search results."),
-  message: z.string().optional().describe("A message summarizing the search outcome."),
-  errorDetails: ErrorDetailsSchema.optional().describe("Structured error information if the web search failed."),
+  // Optional: could add a field like `queryEcho: z.string()` if useful for successful response.
 });
 
 // Remove the incomplete Tool definition as per analysis
@@ -58,129 +58,123 @@ export const WebSearchOutputSchema = z.object({
 export function createPerformWebSearchTool(
   config: WebSearchToolConfig = {} // Default to empty config
 ): ToolDefinition<typeof WebSearchInputSchema, typeof WebSearchOutputSchema> {
-  const toolName = config.name || "performGoogleWebSearch"; // Default to Google search
+  const toolName = config.name || "performGoogleWebSearch";
   const toolDescription = config.description || "Performs a web search using Google Custom Search API to find up-to-date information.";
 
-  // Determine API key and CSE ID: config > environment > undefined
   const apiKey = config.apiKey || process.env.GOOGLE_API_KEY;
-  const cseId = process.env.GOOGLE_CSE_ID; // Assuming CSE ID comes from env, not typically in generic config.apiKey
+  const cseId = process.env.GOOGLE_CSE_ID; // Specific to Google Custom Search
 
-  // Determine API URL: config > default Google Search API > undefined
   let apiUrl = config.apiUrl;
-  if (!apiUrl && apiKey && cseId) {
+  if (!apiUrl && apiKey && cseId) { // Default to Google Custom Search if key and CSE ID are available
     apiUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}`;
   }
 
-  winstonLogger.info(`[${toolName}] Initialized.`, {
-    toolName,
-    resolvedApiUrl: apiUrl || 'No API URL resolved (will be simulated or error)',
-    apiKeyProvided: !!apiKey,
-    cseIdProvided: !!cseId,
-  });
+  // Log initialization status
+  if (!apiKey || !cseId) { // For Google CSE, both are typically needed.
+    winstonLogger.warn(
+      `[${toolName}] Initialized with INCOMPLETE configuration for Google Custom Search. Missing GOOGLE_API_KEY or GOOGLE_CSE_ID. Tool will throw an error if called without full config.`,
+      { toolName, apiKeyProvided: !!apiKey, cseIdProvided: !!cseId, apiUrlProvided: !!apiUrl }
+    );
+  } else if (!apiUrl) {
+     winstonLogger.warn(
+      `[${toolName}] Initialized but API URL could not be determined (e.g. missing apiKey/cseId for default Google, or no apiUrl in config). Tool will throw an error if called.`,
+      { toolName }
+    );
+  }
+ else {
+    winstonLogger.info(`[${toolName}] Initialized successfully.`, {
+      toolName,
+      resolvedApiUrl: apiUrl,
+      apiKeyProvided: !!apiKey, // Useful to log if key was found, not the key itself
+      cseIdProvided: !!cseId,   // Useful to log if CSE ID was found
+    });
+  }
 
   return ai.defineTool(
     {
       name: toolName,
       description: toolDescription,
       inputSchema: WebSearchInputSchema,
-      outputSchema: WebSearchOutputSchema,
+      outputSchema: WebSearchOutputSchema, // Updated schema
     },
-    async (input: z.infer<typeof WebSearchInputSchema>) => {
+    async (input: z.infer<typeof WebSearchInputSchema>): Promise<z.infer<typeof WebSearchOutputSchema>> => {
       const { query, num_results = 5, flowName, agentId } = input;
+
+      // Configuration Check at runtime
+      if (!apiKey || !cseId || !apiUrl) { // Check all essential parts for Google CSE
+        const errorMsg = `Web search tool '${toolName}' is not properly configured. Essential settings (API key, CSE ID for Google, or API URL) are missing.`;
+        winstonLogger.error(
+          `[${toolName}] ${errorMsg}`,
+          { toolName, flowName, agentId, apiKeyProvided: !!apiKey, cseIdProvided: !!cseId, apiUrlConfigured: !!apiUrl }
+        );
+        throw new Error(errorMsg);
+      }
 
       winstonLogger.info(`[${toolName}] Executing web search`, {
         toolName,
         query,
         num_results,
-        resolvedApiUrl: apiUrl,
+        resolvedApiUrl: apiUrl, // Log the actual URL being used (without sensitive parts if they were separate)
         flowName,
         agentId,
       });
 
-      if (!apiKey || !cseId || !apiUrl) {
-        winstonLogger.warn(
-          `[${toolName}] API key, CSE ID, or API URL not configured. GOOGLE_API_KEY and GOOGLE_CSE_ID must be set in the environment, or apiKey and apiUrl provided in config. Returning simulated results.`,
-          { toolName, flowName, agentId, apiKeyProvided: !!apiKey, cseIdProvided: !!cseId, apiUrlProvided: !!apiUrl }
-        );
-        const simulatedResults: SearchResult[] = Array.from({ length: Math.min(num_results, 10) }, (_, i) => ({
-          title: `Simulated Result ${i + 1} for "${query}" (Missing API Config)`,
-          url: `https://example.com/simulated-search?q=${encodeURIComponent(query)}&index=${i}`,
-          snippet: `This is a simulated search result snippet #${i + 1}. API key or CSE ID was not configured. Please set GOOGLE_API_KEY and GOOGLE_CSE_ID environment variables.`,
-        }));
-        return {
-          results: simulatedResults,
-          message: "Web search simulation complete (API key, CSE ID, or API URL not configured).",
-        };
-      }
-
       try {
-        // Actual API call logic using axios for Google Custom Search
-        winstonLogger.info(`[${toolName}] Making API call to Google Custom Search`, { toolName, apiUrl, query, num_results });
+        winstonLogger.info(`[${toolName}] Making API call to configured search endpoint`, { toolName, query, num_results });
         
-        const response = await axios.get(apiUrl, { // apiUrl here already includes key and cx
-          params: {
-            q: query,
-            num: Math.min(num_results, 10), // Max 10 results for Google CSE basic
-          },
-          headers: {
-            'Accept': 'application/json',
-          },
+        // Construct params carefully, not including key/cx if they are already in apiUrl
+        const searchParams: Record<string, any> = { q: query, num: Math.min(num_results, 10) };
+        // if apiUrl was a base URL, apiKey and cseId would be added to params here.
+        // But current logic embeds them into apiUrl for Google CSE.
+
+        const response = await axios.get(apiUrl, { // If apiUrl includes key/cx, no need to add them to params again.
+          params: searchParams,
+          headers: { 'Accept': 'application/json' },
         });
 
-        let searchResults: SearchResult[] = [];
         if (response.data && response.data.items) {
-          searchResults = response.data.items.map((item: any) => ({
+          const searchResults: SearchResult[] = response.data.items.map((item: any) => ({
             title: item.title || 'No title',
-            url: item.link || item.url || 'No URL',
+            url: item.link || item.url || 'No URL', // item.link is common for Google CSE
             snippet: item.snippet || 'No snippet',
-          })).slice(0, Math.min(num_results, 10));
+          })).slice(0, Math.min(num_results, 10)); // Ensure we respect num_results
+
+          winstonLogger.info(`[${toolName}] Successfully fetched ${searchResults.length} results for "${query}".`, { toolName, flowName, agentId });
+          return { results: searchResults };
         } else {
-           winstonLogger.warn(`[${toolName}] No items found in API response or unexpected structure.`, { responseData: response.data, toolName, flowName, agentId });
+           winstonLogger.warn(`[${toolName}] No items found in API response or unexpected structure. Query: "${query}"`, { responseData: response.data, toolName, flowName, agentId });
+           // Consider if this should be an error or just return empty results
+           return { results: [] }; // Return empty results if API gives no items
         }
 
-        return {
-          results: searchResults,
-          message: `Successfully fetched ${searchResults.length} results for "${query}" from Google Custom Search.`,
-        };
-
-      } catch (error) {
-        // Keep existing error handling logic
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during web search.';
-        let errorCode = 'UNKNOWN_TOOL_ERROR';
-        let errorDetailsData: any = undefined;
-        let logMetadata: Record<string, any> = {
-          toolName,
-          flowName,
-          agentId,
-          query,
-          error: error instanceof Error ? { message: error.message, stack: error.stack, name: error.name } : String(error),
-        };
+      } catch (error: any) {
+        let errorMessage = 'An unknown error occurred during web search.';
+        let capturedErrorDetails: any = { originalError: String(error) };
 
         if (axios.isAxiosError(error)) {
-          errorCode = error.response?.status ? `AXIOS_${error.response.status}` : 'AXIOS_ERROR';
-          errorDetailsData = error.response?.data;
-          logMetadata.axiosError = {
+          errorMessage = `Web search API call failed with status ${error.response?.status || 'unknown'}: ${error.message}`;
+          capturedErrorDetails = {
+            message: error.message,
             status: error.response?.status,
-            data: errorDetailsData,
+            data: error.response?.data, // This could be large, log selectively or summarize
             code: error.code,
           };
-        } else if (error instanceof z.ZodError) {
-          errorCode = 'INPUT_VALIDATION_ERROR';
-          errorDetailsData = error.issues;
-          logMetadata.zodErrorIssues = error.issues;
+          winstonLogger.error(`[${toolName}] Axios error during web search: ${errorMessage}`, {
+            toolName, flowName, agentId, query, ...capturedErrorDetails
+          });
+        } else if (error instanceof z.ZodError) { // Should not happen if input validation is done by Genkit before tool fn
+          errorMessage = `Web search input validation error: ${error.message}`;
+          capturedErrorDetails = error.issues;
+           winstonLogger.error(`[${toolName}] Zod validation error (should be caught by Genkit): ${errorMessage}`, {
+            toolName, flowName, agentId, query, issues: error.issues
+          });
+        } else {
+           winstonLogger.error(`[${toolName}] Non-Axios error during web search: ${errorMessage}`, {
+            toolName, flowName, agentId, query, error: String(error)
+          });
         }
-
-        winstonLogger.error(`[${toolName}] Error during web search`, logMetadata);
-
-        return {
-          results: [],
-          message: undefined,
-          errorDetails: {
-            code: errorCode,
-            message: errorMessage,
-            details: errorDetailsData,
-          },
-        };
+        // Throw a new error, optionally with a cause for better debugging
+        throw new Error(errorMessage, { cause: capturedErrorDetails });
       }
     }
   );
