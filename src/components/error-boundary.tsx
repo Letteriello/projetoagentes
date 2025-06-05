@@ -54,8 +54,8 @@ export class ErrorBoundary extends Component<
       return (
         this.props.fallback || (
           <div style={{ padding: "20px", textAlign: "center" }}>
-            <h2>Something went wrong</h2>
-            <p>An error occurred while loading the page.</p>
+            <h2>Algo deu errado</h2>
+            <p>Por favor, tente recarregar a página ou entre em contato com o suporte se o problema persistir.</p>
             <button
               onClick={() => typeof window !== "undefined" && window.location.reload()}
               style={{
@@ -66,26 +66,11 @@ export class ErrorBoundary extends Component<
                 color: "white",
                 border: "none",
                 borderRadius: "4px",
+                marginTop: "20px",
               }}
             >
-              Reload Page
+              Recarregar Página
             </button>
-            {this.state.error && (
-              <details style={{ marginTop: "20px", textAlign: "left" }}>
-                <summary>Error details</summary>
-                <pre
-                  style={{
-                    background: "#f5f5f5",
-                    padding: "10px",
-                    borderRadius: "4px",
-                    overflowX: "auto",
-                    marginTop: "10px",
-                  }}
-                >
-                  {this.state.error.toString()}
-                </pre>
-              </details>
-            )}
           </div>
         )
       );

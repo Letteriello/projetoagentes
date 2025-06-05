@@ -29,20 +29,14 @@ function ErrorFallback({
 
   return (
     <div className="p-5 text-center">
-      <h2 className="text-xl font-bold mb-2">Algo deu errado</h2>
-      <p className="mb-4">Ocorreu um erro ao carregar a página.</p>
+      <h2 className="text-xl font-bold mb-2">Ocorreu um erro</h2>
+      <p className="mb-4">Por favor, tente novamente ou entre em contato com o suporte se o problema persistir.</p>
       <button
         onClick={resetErrorBoundary}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
       >
         Tentar novamente
       </button>
-      <details className="mt-5 text-left">
-        <summary className="cursor-pointer text-sm text-gray-600">Detalhes do erro</summary>
-        <pre className="bg-gray-100 p-3 rounded mt-2 text-xs overflow-x-auto">
-          {error.toString()}
-        </pre>
-      </details>
     </div>
   );
 }
