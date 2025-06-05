@@ -14,6 +14,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { EnvironmentProvider } from '@/contexts/EnvironmentContext';
 import { LoggerProvider } from '@/components/logger-provider';
+import Joyride, { Step, CallBackProps, STATUS, EVENTS, ACTIONS } from "react-joyride";
 
 // Network Status Hook
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -38,6 +39,33 @@ export const inter = Inter({
   variable: '--font-inter',
   display: 'swap'
 });
+
+const initialSteps: Step[] = [
+  {
+    target: '[data-tour="sidebar"]',
+    content: 'Esta é a barra de navegação principal. Aqui você pode acessar todas as seções da aplicação.',
+    placement: 'right',
+    title: 'Navegação Principal'
+  },
+  {
+    target: '[data-tour="agent-builder-link"]',
+    content: 'Clique aqui para criar e gerenciar seus agentes de IA.',
+    placement: 'right',
+    title: 'Construtor de Agentes'
+  },
+  {
+    target: '[data-tour="chat-link"]',
+    content: 'Acesse o chat para interagir com seus agentes.',
+    placement: 'right',
+    title: 'Chat com Agentes'
+  },
+  {
+    target: '[data-tour="api-keys-link"]',
+    content: 'Configure suas chaves de API aqui para conectar seus agentes a serviços externos.',
+    placement: 'top',
+    title: 'Chaves API'
+  }
+];
 
 // Script to polyfill Node.js modules early in the page lifecycle
 function NodePolyfillScript() {
@@ -95,6 +123,41 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [runTour, setRunTour] = React.useState(false);
+  const [tourSteps] = React.useState<Step[]>(initialSteps);
+
+  React.useEffect(() => {
+    const hasCompletedTour = localStorage.getItem('hasCompletedTour');
+    if (!hasCompletedTour) {
+      // setTimeout to ensure the DOM is ready, especially for portal-based elements or dynamic content
+      setTimeout(() => setRunTour(true), 500);
+    }
+  }, []);
+
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { status, type, lifecycle, action } = data;
+    console.log('Joyride callback data:', data);
+
+    if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
+      setRunTour(false);
+      localStorage.setItem('hasCompletedTour', 'true');
+    } else if (type === EVENTS.TOOLTIP_CLOSE && lifecycle === 'tooltip' && action === ACTIONS.CLOSE) {
+      // This handles the case where the user closes the tooltip manually by clicking the 'X'
+      setRunTour(false);
+      localStorage.setItem('hasCompletedTour', 'true');
+    } else if (type === EVENTS.TARGET_NOT_FOUND) {
+      console.error(`Target not found for step: ${data.step?.target}`);
+      // Optional: move to next step or stop tour
+      // For now, Joyride will show its own error in the tooltip.
+      // if (data.index + 1 < tourSteps.length) {
+      //   // Example: programmatically go to next step if current target is not found
+      //   // This requires more complex state management for currentStep or directly using Joyride's API if available
+      // } else {
+      //   setRunTour(false); // Or stop if it's a critical step
+      // }
+    }
+  };
+
   const {
     isOpen,
     openPalette,
@@ -235,6 +298,46 @@ export default function RootLayout({
                 ))}
               </CommandList>
             </CommandDialog>
+            <Joyride
+              steps={tourSteps}
+              run={runTour}
+              callback={handleJoyrideCallback}
+              continuous={true}
+              showProgress={true}
+              showSkipButton={true}
+              locale={{ back: 'Voltar', close: 'Fechar', last: 'Fim', next: 'Próximo', skip: 'Pular' }}
+              styles={{
+                options: {
+                  arrowColor: 'var(--joyride-arrow-color, #38bdf8)',
+                  backgroundColor: 'var(--joyride-background-color, #1e293b)',
+                  overlayColor: 'var(--joyride-overlay-color, rgba(0, 0, 0, 0.8))',
+                  primaryColor: 'var(--joyride-primary-color, #38bdf8)',
+                  textColor: 'var(--joyride-text-color, #e2e8f0)',
+                  zIndex: 10000, // Ensure it's above other elements like command palette (1000-5000 usually)
+                },
+                tooltip: {
+                  borderRadius: '0.5rem',
+                },
+                buttonNext: {
+                  backgroundColor: 'var(--joyride-button-next-bg, #0ea5e9)',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 1rem',
+                },
+                buttonBack: {
+                  color: 'var(--joyride-button-back-color, #0ea5e9)',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 1rem',
+                },
+                buttonSkip: {
+                  color: 'var(--joyride-button-skip-color, #94a3b8)', // slate-400
+                  fontSize: '0.875rem',
+                },
+                buttonClose: {
+                  // For the 'X' button, ensure it's visible on dark background
+                  color: 'var(--joyride-button-close-color, #94a3b8)', // slate-400
+                }
+              }}
+            />
           </LoggerProvider>
         </ThemeProvider>
       </body>

@@ -1,6 +1,7 @@
 // src/types/agent-configs.ts
 import { ReactNode } from 'react';
 import { ToolConfigField as ToolConfigFieldBase } from './tool-types';
+import { ChatRunConfig } from './run-config-types';
 
 // Tipos básicos
 export type AgentFramework = "genkit" | "crewai" | "langchain" | "custom" | "none";
@@ -102,6 +103,7 @@ export interface AgentConfigBase {
   prompt: string; // This seems like a duplicate or misplaced field, often prompts are part of LLMConfig. Review.
   timestamp: string; // This seems like a metadata field, not typically part of base config. Review.
   evaluationGuardrails?: EvaluationGuardrails; // Added for Task 9.4
+  runConfig?: ChatRunConfig;
 }
 
 export interface ModelSafetySettingItem {

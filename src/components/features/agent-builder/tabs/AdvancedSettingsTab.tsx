@@ -4,6 +4,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Settings2, AlertTriangle } from 'lucide-react';
 import {
   FormField,
@@ -112,6 +113,116 @@ const AdvancedSettingsTab: React.FC = (/*props: AdvancedSettingsTabProps*/) => {
               </FormItem>
             )}
           />
+        </CardContent>
+      </Card>
+
+      {/* Run Configuration Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Run Configuration</CardTitle>
+          <CardDescription>
+            Configure default execution parameters for the agent. These settings can be overridden at runtime.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FormField
+            control={control}
+            name="config.runConfig.max_llm_calls"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Max LLM Calls</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 10 (0 for unlimited)"
+                    {...field}
+                    value={field.value === undefined ? '' : String(field.value)}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                  />
+                </FormControl>
+                <FormMessage />
+                <p className="text-xs text-muted-foreground pt-1">
+                  Maximum number of LLM calls allowed per run. 0 or empty for unlimited.
+                </p>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="config.runConfig.stream_response"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base">
+                    Stream Response
+                  </FormLabel>
+                  <p className="text-xs text-muted-foreground pt-1">
+                    If enabled, the agent will stream responses back as they are generated.
+                  </p>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value || false}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-md">Speech Configuration</CardTitle>
+              <CardDescription className="text-xs">
+                Default speech output settings (if supported by the LLM/client).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-2">
+              <FormField
+                control={control}
+                name="config.runConfig.speech_config.voice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Voice</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., alloy, echo, nova"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name="config.runConfig.speech_config.speed"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Speed (current: {field.value || 1.0}x)</FormLabel>
+                    <FormControl>
+                      {/* Using Slider for speed */}
+                      <Slider
+                        min={0.25}
+                        max={4}
+                        step={0.05}
+                        defaultValue={[1.0]} // DefaultValue for slider if field.value is undefined initially
+                        value={field.value !== undefined ? [field.value] : [1.0]}
+                        onValueChange={(value) => field.onChange(value[0])}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                     <p className="text-xs text-muted-foreground pt-1">
+                      Speech speed multiplier (0.25x to 4x).
+                    </p>
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
     </div>

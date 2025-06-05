@@ -73,6 +73,8 @@ import { cn } from "@/lib/utils";
 import { ApiKeyEntry } from "@/services/api-key-service"; // Import the service type
 import { listApiKeys } from "@/services/api-key-service"; // Import the function
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { EmptyState } from '@/components/shared/EmptyState'; // Import EmptyState
+import { ExternalLink } from 'lucide-react'; // Import ExternalLink for the action button
 import withAuth from '@/components/auth/withAuth';
 
 const initialApiKeys: ApiKeyEntry[] = [];
@@ -440,24 +442,22 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome do Serviço</TableHead>
-                <TableHead>Tipo de Serviço</TableHead>
-                <TableHead>Data de Criação</TableHead> {/* Changed from Data de Registro */}
-                {/* <TableHead>Último Uso</TableHead> // Removed as not in service's ApiKeyEntry */}
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoadingApiKeys ? (
-                Array.from({ length: 4 }).map((_, index) => (
+          {isLoadingApiKeys ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome do Serviço</TableHead>
+                  <TableHead>Tipo de Serviço</TableHead>
+                  <TableHead>Data de Criação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 4 }).map((_, index) => (
                   <TableRow key={`skeleton-${index}`}>
                     <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-1/2" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-1/4" /></TableCell>
-                    {/* <TableCell><Skeleton className="h-5 w-1/4" /></TableCell> // Skeleton for LastUsed removed */}
                     <TableCell className="text-right space-x-1">
                       <div className="flex justify-end space-x-2">
                         <Skeleton className="h-8 w-8" />
@@ -465,35 +465,46 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              ) : apiKeys.length === 0 ? (
+                ))}
+              </TableBody>
+            </Table>
+          ) : apiKeys.length === 0 ? (
+            <EmptyState
+              title="Comece a Configurar suas Chaves API"
+              description={
+                <>
+                  Para que seus agentes possam utilizar serviços de IA poderosos como Google AI Studio ou OpenAI,
+                  você precisa adicionar as respectivas chaves API.
+                  <br />
+                  Veja nossos guias para obter suas chaves e configurá-las aqui.
+                </>
+              }
+              icon={<KeyRound className="h-12 w-12 text-muted-foreground" />}
+              actionButton={{
+                text: "Guias: Obter Chaves API",
+                onClick: () => window.open('https://developers.google.com/studio/docs/get-api-key', '_blank'), // Example real link
+                icon: <ExternalLink className="mr-2 h-4 w-4" />,
+                variant: 'default',
+                className: 'mt-4 bg-blue-600 hover:bg-blue-700 text-white',
+              }}
+              className="py-10 md:py-16"
+            />
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 md:py-16">
-                    <div className="flex flex-col items-center justify-center space-y-3 text-center">
-                      <KeyRound className="h-16 w-16 text-muted-foreground/70" />
-                      <h2 className="text-xl font-medium text-foreground">
-                        Nenhuma Chave API Configurada
-                      </h2>
-                      <p className="text-sm text-muted-foreground max-w-md">
-                        As chaves API permitem que seus agentes se conectem e interajam com serviços externos. Adicione sua primeira chave para começar.
-                      </p>
-                      <Button onClick={() => {
-                        addKeyMethods.reset(); // Ensure form is reset
-                        setIsAddKeyDialogOpen(true);
-                      }} className="mt-2">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Adicionar Chave API
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableHead>Nome do Serviço</TableHead>
+                  <TableHead>Tipo de Serviço</TableHead>
+                  <TableHead>Data de Criação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ) : (
-                apiKeys.map((key) => (
+              </TableHeader>
+              <TableBody>
+                {apiKeys.map((key) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-medium">{key.serviceName}</TableCell>
                     <TableCell>{key.serviceType}</TableCell>
-                    <TableCell>{new Date(key.createdAt).toLocaleDateString()}</TableCell> {/* Changed to createdAt */}
-                    {/* <TableCell>{key.lastUsed ? new Date(key.lastUsed).toLocaleDateString() : "Nunca"}</TableCell> // lastUsed removed */}
+                    <TableCell>{new Date(key.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button
                         variant="ghost"
@@ -514,10 +525,10 @@ function ApiKeyVaultPage() { // Renamed to start with uppercase for HOC conventi
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">
