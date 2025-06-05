@@ -1,6 +1,6 @@
 "use client";
 
-import type { SavedAgentConfiguration } from '@/types/agent-configs-fixed'; // Adjust path if necessary
+import type { SavedAgentConfiguration, AgentSummary, AgentType, AgentFramework } from '@/types/unified-agent-types'; // Updated import
 import * as React from 'react';
 import { firestore } from '@/lib/firebaseClient';
 import {
@@ -22,10 +22,9 @@ import { useToast } from '@/hooks/use-toast'; // Assuming a toast hook is availa
 const PLACEHOLDER_USER_ID = "defaultUser";
 
 interface AgentsContextType {
-  savedAgents: SavedAgentConfiguration[];
-  // setSavedAgents: React.Dispatch<React.SetStateAction<SavedAgentConfiguration[]>>; // Removed as state is managed internally by Firestore ops
-  addAgent: (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<SavedAgentConfiguration | null>;
-  updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
+  savedAgents: AgentSummary[]; // Changed to AgentSummary[]
+  addAgent: (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>) => Promise<AgentSummary | null>; // Return AgentSummary
+  updateAgent: (agentId: string, agentConfigUpdate: Partial<Omit<SavedAgentConfiguration, 'id' | 'userId' | 'createdAt'>>) => Promise<void>; // Payload can be full, state update is summary
   deleteAgent: (agentId: string) => Promise<void>;
   isLoadingAgents: boolean;
 }
@@ -33,9 +32,26 @@ interface AgentsContextType {
 const AgentsContext = React.createContext<AgentsContextType | undefined>(undefined);
 
 export function FirestoreAgentsProvider({ children }: { children: React.ReactNode }) {
-  const [savedAgents, setSavedAgents] = React.useState<SavedAgentConfiguration[]>([]);
+  const [savedAgents, setSavedAgents] = React.useState<AgentSummary[]>([]); // Changed to AgentSummary[]
   const [isLoadingAgents, setIsLoadingAgents] = React.useState<boolean>(true);
   const { toast } = useToast();
+
+  // TODO: Implement loadFullAgentConfig(agentId: string) to fetch full agent details when needed for editing or detailed view.
+  // This function would likely use getDoc from Firestore to fetch a single agent's complete SavedAgentConfiguration.
+  // Example:
+  // const loadFullAgentConfig = async (agentId: string): Promise<SavedAgentConfiguration | null> => {
+  //   try {
+  //     const agentDocRef = doc(firestore, 'agents', agentId);
+  //     const docSnap = await getDoc(agentDocRef);
+  //     if (docSnap.exists()) {
+  //       return { id: docSnap.id, ...docSnap.data() } as SavedAgentConfiguration;
+  //     }
+  //     return null;
+  //   } catch (error) {
+  //     console.error("Error loading full agent config:", error);
+  //     return null;
+  //   }
+  // };
 
   React.useEffect(() => {
     const fetchAgents = async () => {
@@ -46,60 +62,39 @@ export function FirestoreAgentsProvider({ children }: { children: React.ReactNod
         const q = query(agentsCollectionRef, where("userId", "==", PLACEHOLDER_USER_ID), orderBy("updatedAt", "desc"));
         
         const querySnapshot = await getDocs(q);
-        const agents: SavedAgentConfiguration[] = [];
+        const agents: AgentSummary[] = []; // Changed to AgentSummary[]
         querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          // Comprehensive mapping based on SavedAgentConfiguration structure
-          const agentData: SavedAgentConfiguration = {
+          const data = docSnap.data() as SavedAgentConfiguration; // Assume data is full config from Firestore
+
+          // Map to AgentSummary
+          const summary: AgentSummary = {
             id: docSnap.id,
             userId: data.userId,
             agentName: data.agentName,
             agentDescription: data.agentDescription,
+            // Ensure agentType and framework are derived correctly, might need nullish coalescing or checks
+            agentType: data.config?.type || (data.agentType as AgentType) || 'custom', // Fallback needed if config is not guaranteed
+            icon: data.icon,
+            framework: data.config?.framework || (data.framework as AgentFramework), // Fallback for framework
+            isRootAgent: data.config?.isRootAgent, // isRootAgent might be on config in unified types
+            templateId: data.templateId,
+            toolsSummary: {
+              count: data.tools?.length || 0,
+              // A simple check for configuredNeeded. A more detailed check might involve inspecting toolDetails if available.
+              configuredNeeded: (data.tools?.length || 0) > 0 &&
+                                (Object.keys(data.toolConfigsApplied || {}).length < (data.tools?.length || 0)),
+            },
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now()), // Ensure Date object
             agentVersion: data.agentVersion,
-            agentType: data.agentType,
-            // LLM-specific fields (ensure they exist or provide defaults)
-            agentGoal: data.agentGoal || "",
-            agentTasks: data.agentTasks || "",
-            agentPersonality: data.agentPersonality || "",
-            agentRestrictions: data.agentRestrictions || "",
-            agentModel: data.agentModel || "googleai/gemini-1.5-flash-latest", // Default model
-            agentTemperature: data.agentTemperature === undefined ? 0.7 : data.agentTemperature, // Default temperature
-            // Workflow-specific fields
-            workflowDescription: data.workflowDescription,
-            detailedWorkflowType: data.detailedWorkflowType,
-            loopMaxIterations: data.loopMaxIterations,
-            loopTerminationConditionType: data.loopTerminationConditionType,
-            loopExitToolName: data.loopExitToolName,
-            loopExitStateKey: data.loopExitStateKey,
-            loopExitStateValue: data.loopExitStateValue,
-            // Custom/A2A-specific fields
-            customLogicDescription: data.customLogicDescription,
-            a2aConfig: data.a2aConfig, // This is an object itself
-            // Common fields
-            agentTools: data.agentTools || [],
-            toolConfigsApplied: data.toolConfigsApplied || {},
-            systemPromptGenerated: data.systemPromptGenerated || "",
-            isRootAgent: data.isRootAgent || false,
-            subAgents: data.subAgents || [],
-            globalInstruction: data.globalInstruction || "",
-            enableStatePersistence: data.enableStatePersistence || false,
-            statePersistenceType: data.statePersistenceType || 'memory',
-            initialStateValues: data.initialStateValues || [],
-            enableStateSharing: data.enableStateSharing || false,
-            stateSharingStrategy: data.stateSharingStrategy || 'explicit',
-            enableRAG: data.enableRAG || false,
-            ragMemoryConfig: data.ragMemoryConfig, 
-            enableArtifacts: data.enableArtifacts || false,
-            artifactStorageType: data.artifactStorageType || 'memory',
-            artifacts: data.artifacts || [],
-            cloudStorageBucket: data.cloudStorageBucket,
-            localStoragePath: data.localStoragePath,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+            isTemplate: data.isTemplate,
+            isFavorite: data.isFavorite,
+            tags: data.tags,
+            category: data.category,
           };
-          agents.push(agentData);
+          agents.push(summary);
         });
-        setSavedAgents(agents);
+        // Sort by updatedAt descending after mapping
+        setSavedAgents(agents.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
       } catch (error) {
         console.error("Error fetching agents from Firestore:", error);
         toast({
@@ -115,28 +110,54 @@ export function FirestoreAgentsProvider({ children }: { children: React.ReactNod
     fetchAgents();
   }, [toast]);
 
-  const addAgent = async (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<SavedAgentConfiguration | null> => {
+  const addAgent = async (agentConfigData: Omit<SavedAgentConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'userId'>): Promise<AgentSummary | null> => {
     setIsLoadingAgents(true);
     try {
-      const fullAgentData = {
-        ...agentConfigData, // Spread all properties from the form/input
+      // Data sent to Firestore is the full configuration
+      const fullAgentData: SavedAgentConfiguration = {
+        ...(agentConfigData as SavedAgentConfiguration), // Cast to include all potential fields of SavedAgentConfiguration
         userId: PLACEHOLDER_USER_ID,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      const docRef = await addDoc(collection(firestore, 'agents'), fullAgentData);
-      
-      const newAgentForState: SavedAgentConfiguration = {
-        ...(agentConfigData as SavedAgentConfiguration), // Cast to ensure all type properties are met
-        id: docRef.id,
-        userId: PLACEHOLDER_USER_ID,
-        createdAt: new Date(), 
-        updatedAt: new Date(), 
+        // Firestore will convert serverTimestamp, but for local state, we'll use current Date.
+        // Actual values from Firestore (like createdAt, updatedAt) are preferred if available post-creation,
+        // but for immediate state update, new Date() is a close approximation.
+        // The Firestore listener (useEffect) will eventually fetch the exact server-generated timestamps.
+        createdAt: serverTimestamp() as any, // Temporary type assertion for serverTimestamp
+        updatedAt: serverTimestamp() as any, // Temporary type assertion for serverTimestamp
+        // Ensure required fields for SavedAgentConfiguration that might be missing in Omit<> are present
+        id: '', // ID will be generated by Firestore, this is a placeholder
+        // agentType: agentConfigData.config?.type || 'custom', // Ensure agentType is set if not directly in agentConfigData
+        // framework: agentConfigData.config?.framework,
       };
 
-      setSavedAgents(prev => [newAgentForState, ...prev].sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
-      toast({ title: "Agente Adicionado", description: `"${newAgentForState.agentName}" foi salvo com sucesso.` });
-      return newAgentForState;
+      const docRef = await addDoc(collection(firestore, 'agents'), fullAgentData);
+      
+      // Create AgentSummary for the local state
+      const newAgentSummary: AgentSummary = {
+        id: docRef.id,
+        userId: PLACEHOLDER_USER_ID,
+        agentName: agentConfigData.agentName,
+        agentDescription: agentConfigData.agentDescription,
+        agentType: agentConfigData.config?.type || (agentConfigData.agentType as AgentType) || 'custom',
+        icon: agentConfigData.icon,
+        framework: agentConfigData.config?.framework || (agentConfigData.framework as AgentFramework),
+        isRootAgent: agentConfigData.config?.isRootAgent,
+        templateId: agentConfigData.templateId,
+        toolsSummary: {
+          count: agentConfigData.tools?.length || 0,
+          configuredNeeded: (agentConfigData.tools?.length || 0) > 0 &&
+                            (Object.keys(agentConfigData.toolConfigsApplied || {}).length < (agentConfigData.tools?.length || 0)),
+        },
+        updatedAt: new Date(), // Use current date for local sort, Firestore listener will get actual
+        agentVersion: agentConfigData.agentVersion,
+        isTemplate: agentConfigData.isTemplate,
+        isFavorite: agentConfigData.isFavorite,
+        tags: agentConfigData.tags,
+        category: agentConfigData.category,
+      };
+
+      setSavedAgents(prev => [newAgentSummary, ...prev].sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+      toast({ title: "Agente Adicionado", description: `"${newAgentSummary.agentName}" foi salvo com sucesso.` });
+      return newAgentSummary; // Return the summary
     } catch (error) {
       console.error("Error adding agent to Firestore:", error);
       toast({
@@ -154,16 +175,41 @@ export function FirestoreAgentsProvider({ children }: { children: React.ReactNod
     setIsLoadingAgents(true);
     const agentRef = doc(firestore, 'agents', agentId);
     try {
-      const { id, userId, createdAt, updatedAt, ...updatePayload } = agentConfigUpdate; // Exclude immutable fields
-      
-      await updateDoc(agentRef, {
-        ...updatePayload, 
+      // Firestore receives a partial of SavedAgentConfiguration
+      const updatePayloadFirestore = {
+        ...agentConfigUpdate,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      await updateDoc(agentRef, updatePayloadFirestore);
       
-      setSavedAgents(prev =>
-        prev.map(agent =>
-          agent.id === agentId ? { ...agent, ...updatePayload, updatedAt: new Date() } : agent
+      // Update local AgentSummary state
+      setSavedAgents(prevSummaries =>
+        prevSummaries.map(summary =>
+          summary.id === agentId
+            ? {
+                ...summary,
+                // Selectively update summary fields from agentConfigUpdate
+                agentName: agentConfigUpdate.agentName ?? summary.agentName,
+                agentDescription: agentConfigUpdate.agentDescription ?? summary.agentDescription,
+                agentType: agentConfigUpdate.config?.type || (agentConfigUpdate.agentType as AgentType) ?? summary.agentType,
+                icon: agentConfigUpdate.icon ?? summary.icon,
+                framework: agentConfigUpdate.config?.framework || (agentConfigUpdate.framework as AgentFramework) ?? summary.framework,
+                isRootAgent: agentConfigUpdate.config?.isRootAgent ?? summary.isRootAgent,
+                templateId: agentConfigUpdate.templateId ?? summary.templateId,
+                toolsSummary: { // Re-calculate toolsSummary
+                  count: agentConfigUpdate.tools?.length ?? summary.toolsSummary?.count ?? 0,
+                  configuredNeeded: (agentConfigUpdate.tools?.length ?? summary.toolsSummary?.count ?? 0) > 0 &&
+                                    (Object.keys(agentConfigUpdate.toolConfigsApplied || {}).length < (agentConfigUpdate.tools?.length ?? summary.toolsSummary?.count ?? 0)),
+                },
+                updatedAt: new Date(), // Use current date for local sort
+                agentVersion: agentConfigUpdate.agentVersion ?? summary.agentVersion,
+                isTemplate: agentConfigUpdate.isTemplate ?? summary.isTemplate,
+                isFavorite: agentConfigUpdate.isFavorite ?? summary.isFavorite,
+                tags: agentConfigUpdate.tags ?? summary.tags,
+                category: agentConfigUpdate.category ?? summary.category,
+              }
+            : summary
         ).sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       );
       toast({ title: "Agente Atualizado", description: "As alterações foram salvas." });

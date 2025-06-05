@@ -6,6 +6,13 @@ import {
 } from '@/types/apiKeyVaultTypes';
 
 const API_BASE_URL = '/api/apikeys'; // Base URL for the API key metadata endpoints
+const API_KEY_METAS_CACHE_KEY = "apiKeyMetasCache";
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface ApiKeyCache {
+  timestamp: number;
+  data: ApiKeyMetadata[];
+}
 
 /**
  * Registers a new API key with the backend for secure storage.
@@ -26,7 +33,15 @@ export const saveApiKey = async (payload: RegisterApiKeyPayload): Promise<ApiKey
     const errorData = await response.json().catch(() => ({ error: 'Failed to save API key and parse error response' }));
     throw new Error(errorData.error || `Failed to save API key: ${response.statusText}`);
   }
-  return response.json();
+  const data = await response.json();
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(API_KEY_METAS_CACHE_KEY);
+    }
+  } catch (error) {
+    console.warn("Failed to clear API key cache:", error);
+  }
+  return data;
 };
 
 /**
@@ -54,13 +69,38 @@ export const getApiKeyMeta = async (id: string): Promise<ApiKeyMetadata | undefi
  * @returns A promise that resolves to an array of API key metadata.
  */
 export const listApiKeyMetas = async (): Promise<ApiKeyMetadata[]> => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const cachedItem = localStorage.getItem(API_KEY_METAS_CACHE_KEY);
+      if (cachedItem) {
+        const parsedCache: ApiKeyCache = JSON.parse(cachedItem);
+        if (Date.now() - parsedCache.timestamp < CACHE_TTL_MS) {
+          return parsedCache.data;
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to read from API key cache:", error);
+      // Proceed to fetch from API if cache read fails
+    }
+  }
+
   const response = await fetch(API_BASE_URL);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Failed to list API key metadata and parse error response' }));
     throw new Error(errorData.error || `Failed to list API key metadata: ${response.statusText}`);
   }
-  return response.json();
+  const apiData = await response.json();
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const cacheToStore: ApiKeyCache = { timestamp: Date.now(), data: apiData };
+      localStorage.setItem(API_KEY_METAS_CACHE_KEY, JSON.stringify(cacheToStore));
+    } catch (error) {
+      console.warn("Failed to write to API key cache:", error);
+    }
+  }
+  return apiData;
 };
 
 /**
@@ -78,6 +118,13 @@ export const deleteApiKey = async (id: string): Promise<void> => {
     throw new Error(errorData.error || `Failed to delete API key: ${response.statusText}`);
   }
   // No content expected on successful delete typically (204 No Content)
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(API_KEY_METAS_CACHE_KEY);
+    }
+  } catch (error) {
+    console.warn("Failed to clear API key cache after delete:", error);
+  }
 };
 
 /**
@@ -99,7 +146,15 @@ export const updateApiKeyMeta = async (id: string, payload: UpdateApiKeyMetadata
     const errorData = await response.json().catch(() => ({ error: 'Failed to update API key metadata and parse error response' }));
     throw new Error(errorData.error || `Failed to update API key metadata: ${response.statusText}`);
   }
-  return response.json();
+  const data = await response.json();
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(API_KEY_METAS_CACHE_KEY);
+    }
+  } catch (error) {
+    console.warn("Failed to clear API key cache after update:", error);
+  }
+  return data;
 };
 
 console.log(
