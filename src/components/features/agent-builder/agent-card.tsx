@@ -109,6 +109,7 @@ interface AgentCardProps {
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
   viewMode?: 'grid' | 'list'; // Added viewMode prop
+  onGenerateQualityReport: (agent: SavedAgentConfiguration) => void; // Added for Task 8.2
 }
 
 const starVariants = {
@@ -135,6 +136,7 @@ export function AgentCard({
   onDrop,
   onDragEnd,
   viewMode = 'grid', // Default to grid
+  onGenerateQualityReport, // Added for Task 8.2
 }: AgentCardProps) {
   const isListView = viewMode === 'list';
 
@@ -396,6 +398,9 @@ export function AgentCard({
                   <DropdownMenuItem onClick={() => onSaveAsTemplate(agent)}><SaveIcon size={14} className="mr-2" /> Salvar como Template</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onViewMonitoring(agent)}><EyeIcon size={14} className="mr-2" /> Monitorar</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onTest(agent)}><ChatIcon size={14} className="mr-2" /> Testar</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onGenerateQualityReport(agent)}>
+                    <FileText size={14} className="mr-2" /> Gerar Rel. Qualidade
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
@@ -409,6 +414,9 @@ export function AgentCard({
               </Button>
               <Button variant="outline" size="sm" onClick={() => onViewMonitoring(agent)} className="group">
                 <EyeIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Monitorar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onGenerateQualityReport(agent)} className="group">
+                <FileText size={16} className="mr-1.5 group-hover:animate-jiggle" /> Rel. Qualidade
               </Button>
               <Button variant="outline" size="sm" onClick={() => onTest(agent)} className="hidden sm:inline-flex group">
                 <ChatIcon size={16} className="mr-1.5 group-hover:animate-jiggle" /> Testar

@@ -13,6 +13,10 @@ import {
   Settings,
   Cloud,
   Server,
+  FileText, // Added for Task 8.4
+  Layers,   // Added for Task 8.4
+  Clock,    // Added for Task 8.4
+  Activity, // Added for Task 8.4
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -599,6 +603,47 @@ export function RagMemoryTab({
                     </Tooltip>
                   </Label>
                 </div>
+
+                {/* START: Task 8.4 - RAG Corpus Info */}
+                {ragMemoryConfig.enabled &&
+                  (ragMemoryConfig.serviceType === "vertex-ai-rag" || ragMemoryConfig.serviceType === "in-memory") && (
+                    <>
+                      <Separator className="my-6" />
+                      <div className="space-y-3">
+                        <h4 className="text-md font-medium flex items-center gap-2">
+                          <Database size={16} className="text-primary/90" />
+                          Resumo do Corpus de Conhecimento (Simulado)
+                        </h4>
+                        <Card className="bg-muted/30 p-4 space-y-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground flex items-center"><FileText size={14} className="mr-2"/>Documentos Indexados:</span>
+                            <span className="font-semibold">{Math.floor(Math.random() * 100) + 5}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground flex items-center"><Layers size={14} className="mr-2"/>Chunks Criados:</span>
+                            <span className="font-semibold">{(Math.floor(Math.random() * 2000) + 200).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground flex items-center"><Clock size={14} className="mr-2"/>Última Atualização:</span>
+                            <span className="font-semibold">{new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground flex items-center"><Database size={14} className="mr-2"/>Tamanho Estimado:</span>
+                            <span className="font-semibold">{(Math.random() * 500 + 50).toFixed(1)} MB</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground flex items-center"><Activity size={14} className="mr-2"/>Status do Indexador:</span>
+                              <Badge variant={
+                                  ["default", "destructive", "outline"][Math.floor(Math.random() * 3)] as any
+                              }>
+                                  {["Ativo e Sincronizado", "Requer Atenção", "Reindexando..."][Math.floor(Math.random() * 3)]}
+                              </Badge>
+                          </div>
+                        </Card>
+                      </div>
+                    </>
+                  )}
+                {/* END: Task 8.4 - RAG Corpus Info */}
               </div>
             )}
           </CardContent>
