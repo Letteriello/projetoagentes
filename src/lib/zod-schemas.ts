@@ -364,32 +364,42 @@ export const mcpServerConfigSchema = z.object({
 
 export const mcpServerFormSchema = mcpServerConfigSchema.omit({ id: true, status: true });
 
-// API Key Vault Form Schema
-// Duplicating SERVICE_TYPE_OPTIONS here for schema validation independence.
-// Ensure this list is kept in sync with the one in ApiKeyVaultPage.tsx if it's maintained there.
-const API_KEY_SERVICE_TYPE_OPTIONS = [
-  "OpenAI", "Google Gemini", "Google Search", "OpenRouter",
-  "Generic", "Custom API", "Database", "Other"
-] as const;
-
-export const apiKeyFormSchema = z.object({
-  serviceName: z.string().min(1, "Service name is required."),
-  selectedServiceType: z.enum(API_KEY_SERVICE_TYPE_OPTIONS),
+// Schema for the 'Add New API Key' form
+export const registerApiKeyFormSchema = z.object({
+  serviceName: z.string().min(1, "Nome do serviço é obrigatório."),
+  apiKey: z.string().trim().min(1, "Chave API é obrigatória.").max(1024, "Chave API excede o comprimento máximo permitido de 1024 caracteres."),
+  selectedServiceType: z.string().min(1, "Tipo de serviço é obrigatório."),
   customServiceType: z.string().optional(),
-  // associatedAgentsInput is for client-side parsing, not directly part of the core ApiKeyVaultEntry model usually
-  // The actual API key value is handled separately and securely, not in this form schema.
-  associatedAgentsInput: z.string().optional(),
+  displayFragment: z.string().optional(),
+  associatedAgentsInput: z.string().optional(), // Comma-separated string
 }).superRefine((data, ctx) => {
-  if (data.selectedServiceType === "Other" && (!data.customServiceType || data.customServiceType.trim() === "")) {
+  if (data.selectedServiceType === 'Other' && (!data.customServiceType || data.customServiceType.trim() === '')) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["customServiceType"],
-      message: "Custom service type is required when 'Other' is selected.",
+      path: ['customServiceType'],
+      message: 'Tipo de serviço personalizado é obrigatório quando "Outro" é selecionado.',
     });
   }
 });
+export type RegisterApiKeyFormData = z.infer<typeof registerApiKeyFormSchema>;
 
-export type ApiKeyFormData = z.infer<typeof apiKeyFormSchema>;
+// Schema for the 'Edit API Key Metadata' form
+export const updateApiKeyMetadataFormSchema = z.object({
+  serviceName: z.string().min(1, "Nome do serviço é obrigatório."),
+  selectedServiceType: z.string().min(1, "Tipo de serviço é obrigatório."),
+  customServiceType: z.string().optional(),
+  displayFragment: z.string().optional(),
+  associatedAgentsInput: z.string().optional(), // Comma-separated string
+}).superRefine((data, ctx) => {
+  if (data.selectedServiceType === 'Other' && (!data.customServiceType || data.customServiceType.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['customServiceType'],
+      message: 'Tipo de serviço personalizado é obrigatório quando "Outro" é selecionado.',
+    });
+  }
+});
+export type UpdateApiKeyMetadataFormData = z.infer<typeof updateApiKeyMetadataFormSchema>;
 
 // Define available user roles
 export const USER_ROLES = ["Usuário Padrão", "Administrador", "Desenvolvedor"] as const;
