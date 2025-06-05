@@ -107,10 +107,20 @@ export async function getRawLogs(filters: RawLogFilters): Promise<LogEntry[]> {
       const timestamp = admin.firestore.Timestamp.fromDate(new Date(filters.startAfterTimestamp));
       query = query.startAfter(timestamp);
     } catch (error) {
-      console.error("[logService] Error parsing startAfterTimestamp for query:", error);
-      // Consider how to handle invalid startAfterTimestamp.
-      // For now, it logs and the query proceeds without startAfter, potentially returning the first page.
-      // Returning a specific error or throwing might be appropriate if strict validation is needed here.
+      // MODIFIED: Replaced console.error with writeLogEntry
+      await writeLogEntry({
+        severity: 'WARN',
+        flowName: 'logService/getRawLogs',
+        message: 'Error parsing startAfterTimestamp for query. Proceeding without pagination cursor.',
+        details: {
+          invalidTimestamp: filters.startAfterTimestamp,
+          errorName: (error instanceof Error ? error.name : undefined),
+          errorMessage: (error instanceof Error ? error.message : String(error)),
+          // errorStack: (error instanceof Error ? error.stack : undefined) // Decided against stack for this warning
+        }
+      });
+      // The query proceeds without startAfter, potentially returning the first page.
+      // This behavior is kept as per the original comment.
     }
   }
 
@@ -400,6 +410,11 @@ export async function writeLogEntry(logData: Omit<LogEntry, 'timestamp'>): Promi
       timestamp: admin.firestore.Timestamp.now(),
     };
     await admin.firestore().collection(LOGS_COLLECTION).add(entry);
+
+    if (process.env.NODE_ENV !== 'production') {
+      const { timestamp, ...restOfData } = entry; // Exclude Firestore timestamp from console
+      console.info(`[LogService DEV] ${entry.severity || entry.type || 'LOG'}:`, entry.message || '', restOfData);
+    }
   } catch (error) {
     console.error('Failed to write log entry to Firestore:', error, 'Log data:', logData);
     // Depending on policy, might re-throw or handle silently
@@ -427,7 +442,7 @@ export function logA2AMessageEvent(
   message: string,
   additionalDetails?: Record<string, any>
 ): void {
-  writeLogEntry({
+  const logPayload: LogEntry = {
     type,
     agentId: context.agentId,
     flowName: 'A2ACommunication', // Generic flow name for A2A
@@ -438,7 +453,13 @@ export function logA2AMessageEvent(
       ...additionalDetails,
     },
     severity: 'INFO',
-  });
+  };
+  writeLogEntry(logPayload);
+
+  if (process.env.NODE_ENV !== 'production') {
+    const { timestamp, ...restOfData } = logPayload;
+    console.info(`[LogService DEV A2A_MSG] ${type}:`, message, restOfData);
+  }
 }
 
 /**
@@ -450,27 +471,35 @@ export function logA2AError(
   errorMessage: string,
   errorDetails?: Record<string, any> | Error
 ): void {
-  let detailsObject = { ...context };
+  let detailsObjectForFirestore = { ...context };
   if (errorDetails instanceof Error) {
-    detailsObject = {
-      ...detailsObject,
+    detailsObjectForFirestore = {
+      ...detailsObjectForFirestore,
       errorName: errorDetails.name,
       errorMessage: errorDetails.message,
       errorStack: errorDetails.stack,
     };
   } else if (errorDetails) {
-    detailsObject = { ...detailsObject, ...errorDetails };
+    detailsObjectForFirestore = { ...detailsObjectForFirestore, ...errorDetails };
   }
 
-  writeLogEntry({
+  const logPayload: LogEntry = {
     type,
     agentId: context.agentId,
     flowName: 'A2ACommunication',
     traceId: context.traceId,
     message: errorMessage,
-    details: detailsObject,
+    details: detailsObjectForFirestore,
     severity: 'ERROR',
-  });
+  };
+  writeLogEntry(logPayload);
+
+  if (process.env.NODE_ENV !== 'production') {
+    const { timestamp, ...restOfData } = logPayload;
+    // For console logging, we might want a slightly different details structure if errorDetails was an Error
+    const consoleDetails = { ...context, ...(errorDetails instanceof Error ? { error: { name: errorDetails.name, message: errorDetails.message, stack: errorDetails.stack } } : errorDetails) };
+    console.error(`[LogService DEV A2A_ERR] ${type}:`, errorMessage, consoleDetails);
+  }
 }
 
 /**
@@ -482,7 +511,7 @@ export function logA2AStatusChange(
   message: string,
   additionalDetails?: Record<string, any>
 ): void {
-  writeLogEntry({
+  const logPayload: LogEntry = {
     type: 'a2a_channel_status',
     agentId: context.agentId,
     flowName: 'A2ACommunication',
@@ -494,5 +523,11 @@ export function logA2AStatusChange(
       ...additionalDetails,
     },
     severity: 'INFO', // Could be WARNING for "unresponsive" or "disconnected" if desired
-  });
+  };
+  writeLogEntry(logPayload);
+
+  if (process.env.NODE_ENV !== 'production') {
+    const { timestamp, ...restOfData } = logPayload;
+    console.info(`[LogService DEV A2A_STATUS] ${status}:`, message, restOfData);
+  }
 }
