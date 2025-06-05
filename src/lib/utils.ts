@@ -52,3 +52,8 @@ export function debounce<T extends (...args: any[]) => any>(
     }, delay);
   };
 }
+
+export const capitalizeFirstLetter = (string: string | undefined): string => {
+  if (!string) return '';
+  return string.charAt(0).toUpperCase() + string.slice(1);
+};

@@ -26,3 +26,19 @@ console.log('- workflowAgentRunnerFlow:', !!workflowAgentRunnerFlow); // Log the
 // 2. Or, if this `dev.ts` is your main entry for `genkit start`, ensure they are discoverable.
 //    The Genkit CLI (`genkit start`) typically discovers flows defined with `defineFlow`
 //    when the file containing them is executed.
+
+import { langchainAgentFlow } from './flows/langchain-agent-flow';
+import { crewAIAgentFlow } from './flows/crewai-agent-flow';
+
+export default {
+  flows: [
+    agentCreatorChatFlow,
+    basicChatFlow,
+    aiConfigurationAssistantFlow,
+    workflowAgentRunnerFlow,
+    langchainAgentFlow,
+    crewAIAgentFlow,
+  ],
+  // tools: [], // Add tools if you have any to export
+  // instruments: [], // Add instruments if any
+};
