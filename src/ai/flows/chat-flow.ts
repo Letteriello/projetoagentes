@@ -42,6 +42,12 @@ import { GenerateResponse } from '@genkit-ai/ai';
 import { AgentConfig, KnowledgeSource, RagMemoryConfig, LLMModelDetails } from '../../types/agent-configs-new'; // Adjust path as needed
 import { llmModels } from '../../data/llm-models'; // Adjust path from src/ai/flows to src/data
 
+// Import new flows and their schemas
+import { langchainAgentFlow, LangchainAgentFlowInputSchema, LangchainAgentFlowOutputSchema } from './langchain-agent-flow';
+import { crewAIAgentFlow, CrewAIAgentFlowInputSchema, CrewAIAgentFlowOutputSchema } from './crewai-agent-flow';
+import { runFlow } from 'genkit/flow';
+
+
 const MAX_HISTORY_MESSAGES_TO_SEND = 20;
 
 // Initialize LRU Cache for LLM responses
@@ -311,7 +317,8 @@ async function basicChatFlowInternal(
 
     let retrievedContextForLLM = "";
     let retrievedContextForDisplay: string | undefined = undefined;
-    const agentConfigFromInput = input as Partial<AgentConfig & ChatFlowParams>;
+    const agentConfigFromInput = input as Partial<AgentConfig & ChatFlowParams & { config?: { framework?: string, subAgents?: string[] }, toolsDetails?: any[] }>;
+
 
     if (agentConfigFromInput.ragMemoryConfig?.enabled && agentConfigFromInput.knowledgeSources && agentConfigFromInput.knowledgeSources.length > 0) {
       const simulatedRAGContextParts: string[] = [];
@@ -332,6 +339,123 @@ async function basicChatFlowInternal(
     }
 
     let userMessageText = retrievedContextForLLM ? `${retrievedContextForLLM}${input.userMessage}` : input.userMessage;
+
+
+    // Framework-specific flow invocation
+    const framework = agentConfigFromInput?.config?.framework;
+    winstonLogger.info(`[FrameworkDispatch] Detected framework: ${framework}`, { agentId, framework, flowName });
+
+    if (framework === 'langchain') {
+      winstonLogger.info(`[FrameworkDispatch] Invoking Langchain simulation flow for agent: ${agentConfigFromInput?.agentName}`, { agentId, flowName });
+      const langchainInput: z.infer<typeof LangchainAgentFlowInputSchema> = {
+        agentConfig: agentConfigFromInput,
+        userMessage: userMessageText,
+        // history: processedHistory, // Assuming Langchain flow can handle history if needed
+      };
+      try {
+        const langchainFlowOutput = await runFlow(langchainAgentFlow, langchainInput);
+        winstonLogger.info(`[FrameworkDispatch] Langchain flow completed. Simulated response: ${langchainFlowOutput.simulatedResponse.substring(0, 100)}...`, { agentId, flowName });
+
+        const langChainToolResults: ToolExecutionResult[] = (langchainFlowOutput.toolEvents || []).map(event => ({
+          name: event.toolName,
+          input: event.input,
+          output: event.output,
+          status: event.status === 'simulated_success' ? 'success' : 'error',
+          ref: `lc-sim-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          errorDetails: event.status === 'simulated_failure' ? { message: 'Simulated tool failure in Langchain flow' } : undefined,
+        }));
+
+        chatEvents.push({
+          id: `evt-lc-flow-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL',
+          eventTitle: 'Langchain Flow Simulation',
+          eventDetails: `Langchain flow executed. Output: ${langchainFlowOutput.simulatedResponse.substring(0, 100)}... Tools simulated: ${langchainFlowOutput.toolEvents?.length || 0}`
+        });
+        (langchainFlowOutput.toolEvents || []).forEach(toolEvent => {
+          chatEvents.push({
+            id: `evt-lc-tool-${toolEvent.toolName}-${Date.now()}`,
+            timestamp: new Date(),
+            eventType: toolEvent.status === 'simulated_success' ? 'TOOL_CALL' : 'TOOL_ERROR',
+            toolName: toolEvent.toolName,
+            eventTitle: `Langchain Tool: ${toolEvent.toolName} (${toolEvent.status})`,
+            eventDetails: `Input: ${JSON.stringify(toolEvent.input).substring(0,50)}... Output: ${JSON.stringify(toolEvent.output).substring(0,50)}...`
+          });
+        });
+
+        return {
+          outputMessage: langchainFlowOutput.simulatedResponse,
+          toolRequests: (langchainFlowOutput.toolEvents || []).map(event => ({ name: event.toolName, input: event.input as Record<string, unknown> })),
+          toolResults: langChainToolResults,
+          chatEvents,
+          retrievedContextForDisplay,
+        };
+      } catch (e: any) {
+        winstonLogger.error(`[FrameworkDispatch] Error running Langchain flow for agent ${agentConfigFromInput?.agentName}: ${e.message}`, { agentId, flowName, error: e });
+        return { error: `Error in Langchain simulation: ${e.message}`, chatEvents, retrievedContextForDisplay };
+      }
+    } else if (framework === 'crewai') {
+      winstonLogger.info(`[FrameworkDispatch] Invoking CrewAI simulation flow for agent: ${agentConfigFromInput?.agentName}`, { agentId, flowName });
+      const crewaiInput: z.infer<typeof CrewAIAgentFlowInputSchema> = {
+        agentConfig: agentConfigFromInput,
+        userMessage: userMessageText,
+        // history: processedHistory, // Assuming CrewAI flow can handle history
+      };
+      try {
+        const crewaiFlowOutput = await runFlow(crewAIAgentFlow, crewaiInput);
+        winstonLogger.info(`[FrameworkDispatch] CrewAI flow completed. Simulated response: ${crewaiFlowOutput.simulatedResponse.substring(0,100)}...`, { agentId, flowName });
+
+        const crewAIToolResults: ToolExecutionResult[] = (crewaiFlowOutput.simulatedTasks || []).flatMap(task =>
+          (task.toolEvents || []).map(event => ({
+            name: event.toolName,
+            input: event.input,
+            output: event.output,
+            status: event.status === 'simulated_success' ? 'success' : 'error',
+            ref: `crew-sim-${task.taskName}-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            errorDetails: event.status === 'simulated_failure' ? { message: `Simulated tool failure in CrewAI task '${task.taskName}'` } : undefined,
+          }))
+        );
+
+        chatEvents.push({
+          id: `evt-crew-flow-${Date.now()}`, timestamp: new Date(), eventType: 'AGENT_CONTROL',
+          eventTitle: 'CrewAI Flow Simulation',
+          eventDetails: `CrewAI flow executed. Output: ${crewaiFlowOutput.simulatedResponse.substring(0,100)}... Tasks simulated: ${crewaiFlowOutput.simulatedTasks?.length || 0}`
+        });
+        (crewaiFlowOutput.simulatedTasks || []).forEach(task => {
+           chatEvents.push({
+            id: `evt-crew-task-${task.taskName}-${Date.now()}`,
+            timestamp: new Date(),
+            eventType: 'AGENT_CONTROL', // Or a more specific CrewAI task event type
+            eventTitle: `CrewAI Task: ${task.taskName} (${task.status})`,
+            eventDetails: `Assigned to: ${task.assignedTo}. Tools used: ${task.toolEvents?.length || 0}`
+          });
+          (task.toolEvents || []).forEach(toolEvent => {
+            chatEvents.push({
+              id: `evt-crew-tool-${task.taskName}-${toolEvent.toolName}-${Date.now()}`,
+              timestamp: new Date(),
+              eventType: toolEvent.status === 'simulated_success' ? 'TOOL_CALL' : 'TOOL_ERROR',
+              toolName: toolEvent.toolName,
+              eventTitle: `CrewAI Task '${task.taskName}' Tool: ${toolEvent.toolName} (${toolEvent.status})`,
+              eventDetails: `Input: ${JSON.stringify(toolEvent.input).substring(0,50)}... Output: ${JSON.stringify(toolEvent.output).substring(0,50)}...`
+            });
+          });
+        });
+
+
+        return {
+          outputMessage: crewaiFlowOutput.simulatedResponse,
+          toolRequests: (crewaiFlowOutput.simulatedTasks || []).flatMap(task => (task.toolEvents || []).map(event => ({ name: event.toolName, input: event.input as Record<string, unknown> }))),
+          toolResults: crewAIToolResults,
+          chatEvents,
+          retrievedContextForDisplay,
+        };
+      } catch (e: any) {
+        winstonLogger.error(`[FrameworkDispatch] Error running CrewAI flow for agent ${agentConfigFromInput?.agentName}: ${e.message}`, { agentId, flowName, error: e });
+        return { error: `Error in CrewAI simulation: ${e.message}`, chatEvents, retrievedContextForDisplay };
+      }
+    } else {
+      winstonLogger.info(`[FrameworkDispatch] Proceeding with default Genkit LLM/tool processing for framework: ${framework || 'genkit/custom/none'}`, { agentId, flowName });
+    }
+
+    // Fallthrough to existing Genkit LLM and tool processing logic if not Langchain or CrewAI
     const userMessageContent: Part[] = [{ text: userMessageText }];
 
     if (input.audioDataUri) {

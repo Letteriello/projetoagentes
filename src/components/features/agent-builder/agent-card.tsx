@@ -47,6 +47,7 @@ import {
   Star, // Added Star
   GripVertical, // Import GripVertical
   MoreVertical, // For dropdown menu in list view
+  Sparkles, // Example, or another icon for framework
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -60,7 +61,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { safeToReactNode } from "@/lib/utils";
+import { safeToReactNode, capitalizeFirstLetter } from "@/lib/utils"; // Import capitalizeFirstLetter
 import type {
   SavedAgentConfiguration,
   AgentConfig,
@@ -157,6 +158,7 @@ export function AgentCard({
   );
   const agentTypeLabel =
     agentTypeDetails?.label.split("(")[0].trim() || agent.config.type;
+  const agentFramework = agent.config.framework;
 
   let AgentIconComponent: React.ReactNode;
   const iconSize = isListView ? 24 : 32; // Smaller icon for list view (w-6 h-6 vs w-10 h-10 which is 40px)
@@ -248,6 +250,11 @@ export function AgentCard({
                       <div className="flex items-center gap-2">
                         <TooltipProvider><Tooltip><TooltipTrigger asChild className="group"><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-amber-500 h-7 w-7" onClick={() => onToggleFavorite(agent.id, !isFavorite)}><motion.span key={isFavorite ? "favorite" : "not-favorite"} variants={starVariants} animate="toggled" className="flex items-center justify-center"><Star className={cn("h-5 w-5 group-hover:animate-jiggle", isFavorite ? "fill-amber-500 text-amber-500" : "text-muted-foreground")} /></motion.span></Button></TooltipTrigger><TooltipContent><p>{isFavorite ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}</p></TooltipContent></Tooltip></TooltipProvider>
                         <Badge variant="secondary" className="text-xs h-6">{safeToReactNode(agentTypeLabel)}</Badge>
+                        {agentFramework && (
+                          <Badge variant="outline" className="text-xs h-6 ml-2">
+                            {capitalizeFirstLetter(agentFramework)}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <CardDescription className="text-sm text-muted-foreground mb-3 line-clamp-3 min-h-[3.75rem]">
@@ -272,11 +279,22 @@ export function AgentCard({
                         <TooltipProvider><Tooltip><TooltipTrigger asChild><AlertCircle className="w-3 h-3 ml-1 text-amber-500 flex-shrink-0" /></TooltipTrigger><TooltipContent><p>Requer Configuração</p></TooltipContent></Tooltip></TooltipProvider>
                       )}
                    </div>
-                    <Badge variant="secondary" className="text-xs h-5 px-1.5 ml-2 flex-shrink-0">{safeToReactNode(agentTypeLabel)}</Badge>
-                    {/* Display workflowType badge for workflow agents in list view */}
-                    {isListView && agent.config.type === 'workflow' && (agent.config as WorkflowAgentConfig).workflowType && (
-                      <Badge variant="outline" className="text-xs h-5 px-1.5 ml-1 flex-shrink-0">
-                        {capitalize((agent.config as WorkflowAgentConfig).workflowType || '')}
+                    <div className="flex items-center flex-shrink-0">
+                      <Badge variant="secondary" className="text-xs h-5 px-1.5 ml-2">{safeToReactNode(agentTypeLabel)}</Badge>
+                      {agentFramework && (
+                        <Badge variant="outline" className="text-xs h-5 px-1.5 ml-1">
+                          {capitalizeFirstLetter(agentFramework)}
+                        </Badge>
+                      )}
+                      {/* Display workflowType badge for workflow agents in list view */}
+                      {isListView && agent.config.type === 'workflow' && (agent.config as WorkflowAgentConfig).workflowType && (
+                        <Badge variant="outline" className="text-xs h-5 px-1.5 ml-1 flex-shrink-0">
+                          {capitalizeFirstLetter((agent.config as WorkflowAgentConfig).workflowType || '')}
+                        </Badge>
+                      )}
+                    </div>
+                </div>
+                <CardDescription className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                       </Badge>
                     )}
                 </div>
@@ -313,7 +331,7 @@ export function AgentCard({
                   <h4 className="text-sm font-semibold mb-0.5 text-foreground/80">Descrição do Fluxo:</h4>
                   <p className="text-xs text-muted-foreground line-clamp-3 min-h-[3rem]">
                     {safeToReactNode((agent.config as WorkflowAgentConfig).workflowDescription)}
-                    {(agent.config as WorkflowAgentConfig).workflowType && (<span className="block text-xs text-primary/70">Tipo: {safeToReactNode((agent.config as WorkflowAgentConfig).workflowType)}</span>)}
+                    {(agent.config as WorkflowAgentConfig).workflowType && (<span className="block text-xs text-primary/70">Tipo: {safeToReactNode(capitalizeFirstLetter((agent.config as WorkflowAgentConfig).workflowType))}</span>)}
                   </p>
                 </div>
               )}
